@@ -1,0 +1,17 @@
+/Makefile/1.34/Fri Nov 13 16:46:30 2015//
+/README/1.5/Sat Jul 19 23:50:38 2014//
+/commands.c/1.87/Fri Jun 28 13:35:04 2019//
+/defines.h/1.8/Sat Jul 19 23:50:38 2014//
+/externs.h/1.31/Fri Jul  7 09:14:26 2017//
+/genget.c/1.6/Thu Jul 11 05:11:16 2019//
+/main.c/1.36/Sun Dec  6 12:00:16 2015//
+/network.c/1.17/Tue Jul 22 07:30:24 2014//
+/ring.c/1.11/Tue Jul 22 07:30:24 2014//
+/ring.h/1.9/Sun Jul 20 08:12:46 2014//
+/sys_bsd.c/1.35/Fri Jun 28 13:35:04 2019//
+/telnet.1/1.64/Thu Jan 16 16:46:47 2020//
+/telnet.c/1.36/Thu Jul 11 03:54:27 2019//
+/telnet_locl.h/1.9/Sun Jul 20 08:12:46 2014//
+/terminal.c/1.14/Fri Jul  7 09:14:26 2017//
+/utilities.c/1.22/Tue Aug 22 15:04:18 2017//
+D

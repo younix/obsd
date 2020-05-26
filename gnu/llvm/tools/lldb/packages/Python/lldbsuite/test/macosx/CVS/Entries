@@ -1,0 +1,14 @@
+D/add-dsym////
+D/debug-info////
+D/duplicate-archive-members////
+D/find-app-in-bundle////
+D/find-dsym////
+D/function-starts////
+D/indirect_symbol////
+D/load-kext////
+D/nslog////
+D/order////
+D/queues////
+D/safe-to-func-call////
+D/thread-names////
+D/universal////

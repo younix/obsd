@@ -1,0 +1,12 @@
+/Base.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+/Bzip2.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+/Deflate.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+/FAQ.pod/1.4/Mon Dec 30 02:13:44 2019/-ko/
+/Gzip.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+/RawDeflate.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+/Zip.pm/1.5/Mon Dec 30 02:13:44 2019/-ko/
+D/Adapter////
+D/Base////
+D/Gzip////
+D/Zip////
+D/Zlib////

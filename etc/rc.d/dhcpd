@@ -1,0 +1,15 @@
+#!/bin/ksh
+#
+# $OpenBSD: dhcpd,v 1.3 2018/01/11 19:52:12 rpe Exp $
+
+daemon="/usr/sbin/dhcpd"
+
+. /etc/rc.d/rc.subr
+
+rc_reload=NO
+
+rc_pre() {
+	touch /var/db/dhcpd.leases
+}
+
+rc_cmd $1
