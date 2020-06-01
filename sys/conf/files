@@ -334,6 +334,10 @@ file	dev/ic/pcf8584.c		pcfiic
 define	ac97
 file	dev/ic/ac97.c			ac97
 
+# Comtrol RocketPort multiport serial cards
+device	rp: tty
+file	dev/ic/rp.c			rp & (rp_pci)	needs-flag
+
 # Cyclades Cyclom multiport serial cards
 device	cy: tty
 file	dev/ic/cy.c			cy & (cy_isa | cy_pci)	needs-flag
