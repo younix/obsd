@@ -125,6 +125,8 @@ cdev_decl(lms);
 #include "opms.h"
 cdev_decl(pms);
 #endif
+#include "rp.h"
+cdev_decl(rp);
 #include "cy.h"
 cdev_decl(cy);
 #include "tun.h"
@@ -215,7 +217,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 31 */
 	cdev_notdef(),			/* 32 */
 	cdev_notdef(),			/* 33 */
-	cdev_notdef(),			/* 34 */
+	cdev_tty_init(NRP,rp),		/* 34: Comtrol RocketPort serial port */
 	cdev_notdef(),			/* 35: Microsoft mouse */
 	cdev_notdef(),			/* 36: Logitech mouse */
 	cdev_notdef(),			/* 37: Extended PS/2 mouse */

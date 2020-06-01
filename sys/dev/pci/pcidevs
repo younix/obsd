@@ -195,6 +195,7 @@ vendor	AD		0x11d4	Analog Devices
 vendor	ZORAN		0x11de	Zoran
 vendor	PIJNENBURG	0x11e3	Pijnenburg
 vendor	COMPEX		0x11f6	Compex
+vendor	COMCORP		0x11fe	Comtrol Corporation
 vendor	CYCLADES	0x120e	Cyclades
 vendor	ESSENTIAL	0x120f	Essential Communications
 vendor	O2MICRO		0x1217	O2 Micro
@@ -2606,6 +2607,9 @@ product COMPAQ NF3P_BNC		0xf150	NetFlex 3/PB
 product COMPEX COMPEXE		0x1401	Compexe
 product COMPEX RL100ATX		0x2011	RL100-ATX
 product COMPEX 98713		0x9881	PMAC 98713
+
+/* Comtrol Corporation */
+product COMCORP ROCKETPORT_16	0x0009	RocketPort PCI 16-port Serial
 
 /* Conexant products */
 product CONEXANT 56K_WINMODEM	0x1033	56k Winmodem
