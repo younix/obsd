@@ -8368,6 +8368,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "PMAC 98713",
 	},
 	{
+	    PCI_VENDOR_COMCORP, PCI_PRODUCT_COMCORP_ROCKETPORT_16,
+	    "RocketPort PCI 16-port Serial",
+	},
+	{
 	    PCI_VENDOR_CONEXANT, PCI_PRODUCT_CONEXANT_56K_WINMODEM,
 	    "56k Winmodem",
 	},
@@ -31686,6 +31690,10 @@ static const struct pci_known_vendor pci_known_vendors[] = {
 	{
 	    PCI_VENDOR_COMPEX,
 	    "Compex",
+	},
+	{
+	    PCI_VENDOR_COMCORP,
+	    "Comtrol Corporation",
 	},
 	{
 	    PCI_VENDOR_CYCLADES,
