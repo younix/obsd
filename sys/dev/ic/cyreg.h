@@ -148,6 +148,7 @@ struct cy_port {
 	u_char			 cy_flags;
 	u_char			*cy_ibuf, *cy_ibuf_end;
 	u_char			*cy_ibuf_rd_ptr, *cy_ibuf_wr_ptr;
+	int			 cy_cua;
 #ifdef CY_DEBUG1
 	int			 cy_rx_int_count;
 	int			 cy_tx_int_count;

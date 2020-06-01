@@ -67,6 +67,7 @@
 #include <dev/ic/cd1400reg.h>
 #include <dev/ic/cyreg.h>
 
+#define DEVCUA(x) (minor(x) & 0x80)
 
 int	cy_intr(void *);
 int	cyparam(struct tty *, struct termios *);
@@ -366,21 +367,37 @@ cyopen(dev, flag, mode, p)
 		s = spltty();
 	}
 
-	/* wait for carrier if necessary */
-	if (!ISSET(flag, O_NONBLOCK)) {
-		while (!ISSET(tp->t_cflag, CLOCAL) &&
-		    !ISSET(tp->t_state, TS_CARR_ON)) {
-			SET(tp->t_state, TS_WOPEN);
-			error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
-			    "cydcd");
-			if (error != 0) {
+	if (DEVCUA(dev)) {
+		if (ISSET(tp->t_state, TS_ISOPEN)) {
+			/* Ah, but someone already is dialed in... */
+			splx(s);
+			return EBUSY;
+		}
+		cy->cy_cua = 1;
+	} else {
+		/* tty (not cua) device; wait for carrier if necessary. */
+		/* wait for carrier if necessary */
+		if (!ISSET(flag, O_NONBLOCK)) {
+			if (cy->cy_cua) {
+				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
-				CLR(tp->t_state, TS_WOPEN);
-				return (error);
+				return EBUSY;
+			}
+		} else {
+			while (cy->cy_cua ||
+			    (!ISSET(tp->t_cflag, CLOCAL) &&
+			    !ISSET(tp->t_state, TS_CARR_ON))) {
+				SET(tp->t_state, TS_WOPEN);
+				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
+				    "cydcd");
+				if (error != 0 && ISSET(tp->t_state, TS_WOPEN)) {
+					CLR(tp->t_state, TS_WOPEN);
+					splx(s);
+					return (error);
+				}
 			}
 		}
 	}
-
 	splx(s);
 
 	return (*linesw[tp->t_line].l_open)(dev, tp, p);
@@ -422,7 +439,7 @@ cyclose(dev, flag, mode, p)
 	 * receive interrupts here or somewhere ?
 	 */
 	CLR(tp->t_state, TS_BUSY | TS_FLUSH);
-
+	cy->cy_cua = 0;
 	splx(s);
 	ttyclose(tp);
 
