@@ -6,7 +6,6 @@
 /perl.supp/1.1.1.2/Mon Sep 29 17:18:58 2008/-ko/
 /test.pl/1.4/Mon Dec 30 02:13:56 2019/-ko/
 /thread_it.pl/1.3/Wed Feb 13 21:15:30 2019/-ko/
-D/Module_Pluggable////
 D/base////
 D/benchmark////
 D/bigmem////
@@ -19,12 +18,9 @@ D/mro////
 D/op////
 D/opbasic////
 D/perf////
-D/pod////
 D/porting////
-D/pragma////
 D/re////
 D/run////
 D/test_pl////
 D/uni////
 D/win32////
-D/x2p////

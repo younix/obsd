@@ -3,7 +3,6 @@
 D/arch////
 D/bioctl////
 D/cat////
-D/ccdconfig////
 D/chmod////
 D/chroot////
 D/cp////
@@ -12,13 +11,11 @@ D/dd////
 D/df////
 D/dhclient////
 D/disklabel////
-D/disknames////
 D/dmesg////
 D/doas////
 D/ed////
 D/eeprom////
 D/encrypt////
-D/expr////
 D/fdisk////
 D/fsck////
 D/fsck_ext2fs////
@@ -35,7 +32,6 @@ D/init////
 D/installboot////
 D/kbd////
 D/ksh////
-D/less////
 D/libstubs////
 D/ln////
 D/ls////
@@ -59,16 +55,12 @@ D/newfs_msdos////
 D/pax////
 D/pdisk////
 D/ping////
-D/ping6////
-D/pppd////
 D/pwd_mkdb////
 D/reboot////
 D/restore////
 D/rm////
 D/route////
-D/rsh////
 D/sed////
-D/sha256////
 D/signify////
 D/slaacd////
 D/sleep////
@@ -77,4 +69,3 @@ D/sync////
 D/sysctl////
 D/tee////
 D/umount////
-D/ztsscale////

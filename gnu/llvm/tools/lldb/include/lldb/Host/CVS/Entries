@@ -44,8 +44,6 @@ D/common////
 D/freebsd////
 D/linux////
 D/macosx////
-D/mingw////
-D/msvc////
 D/netbsd////
 D/openbsd////
 D/posix////

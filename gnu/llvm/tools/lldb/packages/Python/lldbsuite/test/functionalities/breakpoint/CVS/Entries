@@ -1,7 +1,6 @@
 D/address_breakpoints////
 D/auto_continue////
 D/breakpoint_by_line_and_column////
-D/breakpoint_case_sensitivity////
 D/breakpoint_command////
 D/breakpoint_conditions////
 D/breakpoint_hit_count////
@@ -14,7 +13,6 @@ D/breakpoint_names////
 D/breakpoint_options////
 D/breakpoint_set_restart////
 D/comp_dir_symlink////
-D/consecutive_breakpoins////
 D/consecutive_breakpoints////
 D/cpp////
 D/cpp_exception////

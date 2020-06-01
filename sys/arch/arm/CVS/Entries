@@ -2,10 +2,6 @@ D/arm////
 D/armv7////
 D/conf////
 D/cortex////
-D/footbridge////
 D/include////
 D/mainbus////
-D/s3c2xx0////
-D/sa11x0////
 D/simplebus////
-D/xscale////

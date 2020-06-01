@@ -9,9 +9,7 @@
 D/cmake////
 D/docs////
 D/examples////
-D/gtest////
 D/include////
-D/lib////
 D/lit////
 D/lldb.xcodeproj////
 D/lldb.xcworkspace////
@@ -23,5 +21,4 @@ D/third_party////
 D/tools////
 D/unittests////
 D/utils////
-D/watchpoint////
 D/www////

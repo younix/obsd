@@ -19,21 +19,12 @@
 /test_use.pm/1.1.1.1/Fri Sep 24 14:49:15 2010/-ko/
 /test_use_14937.pm/1.1.1.1/Fri Sep 24 14:49:15 2010/-ko/
 /universal.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
-D/Dev////
 D/Devel////
-D/Filter////
-D/MakeMaker////
-D/Math////
-D/Parse////
-D/Test////
 D/charnames////
-D/compress////
 D/croak////
 D/deprecate////
-D/dprof////
 D/feature////
 D/locale////
-D/sample-tests////
 D/strict////
 D/subs////
 D/warnings////

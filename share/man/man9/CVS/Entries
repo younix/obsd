@@ -7,7 +7,6 @@
 /SipHash24.9/1.6/Mon Sep 14 15:14:55 2015//
 /VOP_LOOKUP.9/1.44/Sat Oct  6 23:08:13 2018//
 /aml_evalnode.9/1.11/Mon Sep 14 15:14:55 2015//
-/arc4random.9/1.14/Sat Apr 28 20:25:07 2018//
 /atomic_add_int.9/1.6/Thu Feb 13 12:05:05 2014//
 /atomic_cas_uint.9/1.7/Wed Feb  6 01:35:07 2019//
 /atomic_dec_int.9/1.6/Thu Feb 13 12:05:05 2014//
@@ -64,7 +63,6 @@
 /if_addrhook_add.9/1.2/Fri Nov  8 08:14:11 2019//
 /if_get.9/1.2/Tue Dec  8 18:35:51 2015//
 /if_rxr_init.9/1.9/Tue May 12 20:47:58 2020//
-/ifq_deq_begin.9/1.2/Mon Nov 23 11:07:58 2015//
 /ifq_enqueue.9/1.10/Tue Dec 11 01:33:40 2018//
 /iic.9/1.9/Mon Nov 23 17:53:57 2015//
 /imax.9/1.2/Mon Apr 23 11:11:38 2018//
@@ -174,4 +172,6 @@
 /vwakeup.9/1.5/Wed Aug 14 06:32:33 2013//
 /wdog_register.9/1.7/Wed Jul 17 20:21:56 2013//
 /wsfont_init.9/1.2/Fri May 10 17:24:53 2019//
-D/man9.i386////
+/arc4random.9/1.15/Mon Jun  1 06:23:22 2020//
+/ifq_deq_begin.9/1.4/Mon Jun  1 06:23:23 2020//
+D

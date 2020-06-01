@@ -7,11 +7,8 @@ D/debugserver////
 D/driver////
 D/install-headers////
 D/intel-features////
-D/intel-mpx////
-D/lldb-gdbserver////
 D/lldb-mi////
 D/lldb-perf////
-D/lldb-platform////
 D/lldb-server////
 D/lldb-test////
 D/lldb-vscode////

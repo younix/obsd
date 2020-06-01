@@ -5,7 +5,6 @@ D/boot////
 D/boot32////
 D/boot64////
 D/bootecoff////
-D/libkern////
 D/libsa////
 D/libsa32////
 D/libz////

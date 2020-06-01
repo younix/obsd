@@ -6,7 +6,6 @@ D/bind////
 D/clock_gettime////
 D/cmsgsize////
 D/descrip////
-D/dev////
 D/dup2////
 D/dup2_accept////
 D/dup2_self////
@@ -33,14 +32,8 @@ D/mmap-fail////
 D/mmap2////
 D/mmap3////
 D/mount////
-D/mquery////
 D/nanosleep////
 D/noexec////
-D/nxbss////
-D/nxheap////
-D/nxheap-mprotect////
-D/nxstack////
-D/nxstack-mprotect////
 D/open////
 D/pipe////
 D/pledge////
@@ -56,7 +49,6 @@ D/rcvtimeo////
 D/realpath////
 D/realpath-unmount////
 D/recvwait////
-D/rfork////
 D/rlimit-file////
 D/setuid////
 D/sig-stop////
@@ -69,7 +61,6 @@ D/sigprof////
 D/sigpthread////
 D/sigsuspend////
 D/sosplice////
-D/splice////
 D/stackjmp////
 D/stackpivot////
 D/syscall////
@@ -77,7 +68,6 @@ D/syscall_segment////
 D/sysvmsg////
 D/sysvsem////
 D/sysvshm////
-D/tame////
 D/unalign////
 D/unfdpass////
 D/unixsock////

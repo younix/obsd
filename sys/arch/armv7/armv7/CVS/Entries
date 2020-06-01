@@ -1,5 +1,4 @@
 /armv7.c/1.17/Wed Apr 29 15:25:07 2020//
-/armv7_machdep.c/1.60/Sat May 23 20:32:47 2020//
 /armv7_machdep.h/1.13/Sun Aug 27 12:42:22 2017//
 /armv7_start.S/1.17/Mon May  6 03:32:48 2019//
 /armv7var.h/1.17/Tue Apr  7 10:11:01 2020//
@@ -8,4 +7,5 @@
 /intr.c/1.17/Mon Apr 27 13:02:50 2020//
 /locore0.S/1.6/Fri Oct 25 21:13:50 2019//
 /platform.c/1.24/Fri Oct 25 10:17:06 2019//
+/armv7_machdep.c/1.61/Mon Jun  1 06:23:23 2020//
 D

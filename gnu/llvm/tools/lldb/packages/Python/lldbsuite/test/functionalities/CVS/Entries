@@ -21,7 +21,6 @@ D/dead-strip////
 D/deleted-executable////
 D/disassembly////
 D/dynamic_value_child_count////
-D/embedded_interpreter////
 D/exec////
 D/expr-doesnt-deadlock////
 D/expr-entry-bp////
@@ -63,7 +62,6 @@ D/process_save_core////
 D/ptr_refs////
 D/recursion////
 D/register////
-D/reproducer////
 D/rerun////
 D/return-value////
 D/set-data////
@@ -75,7 +73,6 @@ D/stats////
 D/stats_api////
 D/step-avoids-no-debug////
 D/step_scripted////
-D/stop-hook////
 D/tail_call_frames////
 D/target_command////
 D/target_create_deps////

@@ -100,8 +100,6 @@
 /mac.h/1.10/Fri Jul  8 03:44:42 2016//
 /match.c/1.41/Wed Nov 13 04:47:52 2019//
 /match.h/1.19/Wed Mar  6 22:14:23 2019//
-/misc.c/1.148/Tue May 26 01:06:52 2020//
-/misc.h/1.85/Tue May 26 01:06:52 2020//
 /moduli.c/1.37/Fri Nov 15 06:00:20 2019//
 /monitor.c/1.210/Fri Mar 13 03:17:07 2020//
 /monitor.h/1.23/Sat Jan 19 21:43:56 2019//
@@ -124,7 +122,6 @@
 /poly1305.h/1.4/Fri May  2 03:27:54 2014//
 /progressmeter.c/1.50/Thu Jan 23 07:10:22 2020//
 /progressmeter.h/1.5/Thu Jan 24 16:52:17 2019//
-/readconf.c/1.329/Fri Apr 24 03:33:21 2020//
 /readconf.h/1.133/Fri Apr  3 02:27:12 2020//
 /readpass.c/1.61/Thu Jan 23 07:10:22 2020//
 /rijndael.c/1.20/Mon Mar 16 11:09:52 2015//
@@ -134,8 +131,6 @@
 /sc25519.c/1.3/Mon Dec  9 11:03:45 2013//
 /sc25519.h/1.3/Mon Dec  9 11:03:45 2013//
 /scp.1/1.89/Thu Apr 30 18:28:37 2020//
-/scp.c/1.210/Wed May  6 20:57:38 2020//
-/servconf.c/1.363/Fri Apr 17 03:30:05 2020//
 /servconf.h/1.144/Fri Apr 17 03:30:05 2020//
 /serverloop.c/1.222/Thu Jan 30 07:21:38 2020//
 /serverloop.h/1.8/Tue Sep 12 06:32:07 2017//
@@ -169,7 +164,6 @@
 /ssh-ed25519.c/1.8/Wed Feb 26 13:40:09 2020//
 /ssh-gss.h/1.14/Tue Jul 10 09:13:30 2018//
 /ssh-keygen.1/1.203/Fri Apr  3 02:26:56 2020//
-/ssh-keygen.c/1.411/Mon May 18 04:29:35 2020//
 /ssh-keyscan.1/1.45/Sat Nov 30 07:07:59 2019//
 /ssh-keyscan.c/1.131/Sun Dec 15 19:47:10 2019//
 /ssh-keysign.8/1.16/Sat Nov 30 07:07:59 2019//
@@ -177,7 +171,6 @@
 /ssh-pkcs11-client.c/1.16/Sat Jan 25 00:03:36 2020//
 /ssh-pkcs11-helper.8/1.6/Sat Nov 30 07:07:59 2019//
 /ssh-pkcs11-helper.c/1.23/Fri Mar  6 18:26:21 2020//
-/ssh-pkcs11.c/1.49/Fri Mar 13 04:16:27 2020//
 /ssh-pkcs11.h/1.6/Sat Jan 25 00:03:36 2020//
 /ssh-rsa.c/1.68/Thu Sep 13 02:08:33 2018//
 /ssh-sandbox.h/1.1/Thu Jun 23 09:34:13 2011//
@@ -188,13 +181,11 @@
 /ssh-sk.h/1.10/Fri Jan 10 23:43:26 2020//
 /ssh-xmss.c/1.2/Wed Feb 26 13:40:09 2020//
 /ssh.1/1.412/Fri Apr 17 03:34:42 2020//
-/ssh.c/1.527/Fri Apr 10 00:52:07 2020//
 /ssh.h/1.89/Thu Dec 27 03:25:25 2018//
 /ssh2.h/1.18/Wed May  4 14:22:33 2016//
 /ssh_api.c/1.19/Thu Oct 31 21:23:19 2019//
 /ssh_api.h/1.2/Tue Apr 10 00:10:49 2018//
 /ssh_config/1.34/Mon Feb  4 02:39:42 2019//
-/ssh_config.5/1.325/Sat Apr 11 20:20:09 2020//
 /sshbuf-getput-basic.c/1.10/Fri Dec 13 19:09:37 2019//
 /sshbuf-getput-crypto.c/1.8/Fri Nov 15 06:00:20 2019//
 /sshbuf-io.c/1.2/Sat Jan 25 23:28:06 2020//
@@ -207,7 +198,6 @@
 /sshd.8/1.312/Sat Jan 25 06:03:10 2020//
 /sshd.c/1.555/Tue May 26 01:09:05 2020//
 /sshd_config/1.103/Mon Apr  9 20:41:22 2018//
-/sshd_config.5/1.311/Fri Apr 17 06:12:41 2020//
 /ssherr.c/1.10/Sat Jan 25 23:13:09 2020//
 /ssherr.h/1.8/Sat Jan 25 23:13:09 2020//
 /sshkey-xmss.c/1.8/Wed Nov 13 07:53:10 2019//
@@ -244,9 +234,7 @@
 /xmss_hash_address.h/1.2/Mon Feb 26 03:56:44 2018//
 /xmss_wots.c/1.3/Tue Apr 10 00:10:49 2018//
 /xmss_wots.h/1.3/Mon Feb 26 12:14:53 2018//
-D/lib////
 D/moduli-gen////
-D/scard////
 D/scp////
 D/sftp////
 D/sftp-server////
@@ -259,3 +247,13 @@ D/ssh-keysign////
 D/ssh-pkcs11-helper////
 D/ssh-sk-helper////
 D/sshd////
+/misc.c/1.152/Mon Jun  1 06:23:30 2020//
+/misc.h/1.87/Mon Jun  1 06:23:30 2020//
+/readconf.c/1.331/Mon Jun  1 06:23:30 2020//
+/scp.c/1.211/Mon Jun  1 06:23:30 2020//
+/servconf.c/1.365/Mon Jun  1 06:23:30 2020//
+/ssh-keygen.c/1.412/Mon Jun  1 06:23:30 2020//
+/ssh-pkcs11.c/1.50/Mon Jun  1 06:23:30 2020//
+/ssh.c/1.528/Mon Jun  1 06:23:30 2020//
+/ssh_config.5/1.328/Mon Jun  1 06:23:30 2020//
+/sshd_config.5/1.312/Mon Jun  1 06:23:30 2020//

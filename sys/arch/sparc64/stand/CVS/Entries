@@ -1,8 +1,6 @@
 /Makefile/1.7/Wed Nov 26 08:15:41 2014//
 /Makefile.inc/1.11/Mon Dec 31 11:44:57 2018//
 D/bootblk////
-D/installboot////
-D/libkern////
 D/libsa////
 D/libz////
 D/ofwboot////

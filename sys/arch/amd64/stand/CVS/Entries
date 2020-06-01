@@ -4,13 +4,11 @@ D/biosboot////
 D/boot////
 D/cdboot////
 D/cdbr////
-D/efi////
 D/efi32////
 D/efi64////
 D/efiboot////
 D/etc////
 D/fdboot////
-D/installboot////
 D/libsa////
 D/mbr////
 D/pxeboot////

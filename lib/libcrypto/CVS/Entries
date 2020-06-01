@@ -27,7 +27,6 @@
 /o_time.h/1.7/Wed Dec 21 15:49:29 2016//
 /openssl.cnf/1.2/Wed Oct  1 13:19:51 2014//
 /opensslfeatures.h/1.20/Sat Nov  2 13:38:04 2019//
-/opensslv.h/1.59/Sat May  9 15:22:52 2020//
 /ossl_typ.h/1.13/Wed Sep 30 04:10:07 2015//
 /pariscid.pl/1.5/Thu May  1 22:26:21 2014//
 /ppccap.c/1.6/Thu Jul 17 23:48:24 2014//
@@ -39,7 +38,6 @@
 /x86_64cpuid.pl/1.12/Fri Nov  4 17:30:30 2016//
 /x86_arch.h/1.1/Fri Nov  4 17:30:30 2016//
 /x86cpuid.pl/1.8/Fri Nov  4 17:30:30 2016//
-D/acss////
 D/aes////
 D/arc4random////
 D/arch////
@@ -55,11 +53,9 @@ D/cmac////
 D/cms////
 D/comp////
 D/conf////
-D/crypto////
 D/curve25519////
 D/des////
 D/dh////
-D/doc////
 D/dsa////
 D/dso////
 D/ec////
@@ -72,17 +68,11 @@ D/gost////
 D/hkdf////
 D/hmac////
 D/idea////
-D/jpake////
-D/krb5////
 D/lhash////
 D/man////
-D/md////
-D/md2////
 D/md4////
 D/md5////
-D/mdc2////
 D/modes////
-D/name////
 D/objects////
 D/ocsp////
 D/pem////
@@ -90,22 +80,15 @@ D/perlasm////
 D/pkcs12////
 D/pkcs7////
 D/poly1305////
-D/pqueue////
 D/rand////
 D/rc2////
 D/rc4////
-D/rc5////
-D/rijndael////
 D/ripemd////
 D/rsa////
-D/seed////
 D/sha////
 D/sm3////
 D/sm4////
-D/srp////
 D/stack////
-D/store////
-D/threads////
 D/ts////
 D/txt_db////
 D/ui////
@@ -113,3 +96,4 @@ D/util////
 D/whrlpool////
 D/x509////
 D/x509v3////
+/opensslv.h/1.60/Mon Jun  1 06:23:13 2020//

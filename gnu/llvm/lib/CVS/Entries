@@ -13,7 +13,6 @@ D/Fuzzer////
 D/IR////
 D/IRReader////
 D/LTO////
-D/LibDriver////
 D/LineEditor////
 D/Linker////
 D/MC////

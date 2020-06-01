@@ -1,7 +1,6 @@
 /Makefile/1.7/Sun Jan 28 13:42:17 2018//
 D/malloc0test////
 D/malloc_errno////
-D/malloc_free////
 D/malloc_general////
 D/malloc_threaderr////
 D/malloc_ulimit1////

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rnd.c,v 1.216 2020/05/26 14:27:24 deraadt Exp $	*/
+/*	$OpenBSD: rnd.c,v 1.220 2020/05/31 06:23:56 dlg Exp $	*/
 
 /*
  * Copyright (c) 2011 Theo de Raadt.
@@ -51,25 +51,26 @@
  * the entropy collection mechanism enqueue_randomness() and timeout-driven
  * mixing into the chacha state.  The first submissions come from device
  * probes, later on interrupt-time submissions are more common.  Entropy
- * data (and timing information) is XOR spread over the entropy input ring
- * rnd_event_space[] for later integration.
+ * data (and timing information) get mixed over the entropy input ring
+ * rnd_event_space[] -- the goal is to collect damage.
  *
- * Based upon timeouts, data in the entropy input ring rnd_event_space[] is
- * drawn down, CRC bit-distributed and mixed into entropy_pool[].
+ * Based upon timeouts, a selection of the entropy ring rnd_event_space[]
+ * CRC bit-distributed and XOR mixed into entropy_pool[].
  *
  * From time to time, entropy_pool[] is SHA512-whitened, mixed with time
  * information again, XOR'd with the inner and outer states of the existing
  * chacha state, to create a new chacha state.
+ *
+ * During early boot (until cold=0), enqueue operations are immediately
+ * dequeued, and mixed into the chacha.
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/event.h>
 #include <sys/ioctl.h>
 #include <sys/malloc.h>
 #include <sys/timeout.h>
 #include <sys/atomic.h>
-#include <sys/mutex.h>
 #include <sys/task.h>
 #include <sys/msgbuf.h>
 #include <sys/mount.h>
@@ -80,9 +81,6 @@
 #define KEYSTREAM_ONLY
 #include <crypto/chacha_private.h>
 
-#include <dev/rndvar.h>
-
-#include <uvm/uvm_param.h>
 #include <uvm/uvm_extern.h>
 
 /*
@@ -179,13 +177,11 @@ void
 enqueue_randomness(u_int val)
 {
 	struct rand_event *rep;
-	struct timespec	ts;
 	int e;
 
-	nanotime(&ts);
 	e = (atomic_inc_int_nv(&rnd_event_prod) - 1) & (QEVLEN-1);
 	rep = &rnd_event_space[e];
-	rep->re_time += ts.tv_nsec ^ (ts.tv_sec << 20);
+	rep->re_time += cpu_rnd_messybits();
 	rep->re_val += val;
 
 	if (rnd_cold) {

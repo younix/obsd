@@ -15,7 +15,6 @@
 /install-sh/1.5/Thu Mar 19 17:48:06 2020//
 /ltmain.sh/1.4/Fri Feb  8 10:29:08 2019//
 /systemd.m4/1.1/Fri Feb 17 18:53:32 2017//
-D/.github////
 D/cachedb////
 D/daemon////
 D/dns64////
@@ -26,9 +25,7 @@ D/edns-subnet////
 D/ipsecmod////
 D/ipset////
 D/iterator////
-D/ldns////
 D/libunbound////
-D/pythonmod////
 D/respip////
 D/services////
 D/sldns////

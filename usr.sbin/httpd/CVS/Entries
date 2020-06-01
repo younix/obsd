@@ -17,10 +17,4 @@
 /server_fcgi.c/1.81/Sun Feb  9 09:44:04 2020//
 /server_file.c/1.68/Fri May 22 07:18:17 2020//
 /server_http.c/1.139/Fri May 22 07:18:17 2020//
-D/cgi-bin////
-D/conf////
-D/htdocs////
-D/icons////
-D/logs////
-D/src////
-D/support////
+D

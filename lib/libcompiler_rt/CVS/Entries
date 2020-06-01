@@ -187,8 +187,6 @@
 D/Darwin-excludes////
 D/aarch64////
 D/arm////
-D/arm64////
-D/armv6m////
 D/i386////
 D/macho_embedded////
 D/ppc////

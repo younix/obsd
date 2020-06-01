@@ -1,13 +1,9 @@
 /Makefile/1.23/Sun Jan 22 03:27:31 2017//
-D/apm_init////
-D/boot////
-D/boot.dos////
 D/compile////
 D/conf////
 D/eisa////
 D/i386////
 D/include////
 D/isa////
-D/netboot////
 D/pci////
 D/stand////

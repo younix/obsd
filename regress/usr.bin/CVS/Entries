@@ -11,7 +11,6 @@ D/cut////
 D/cvs////
 D/dc////
 D/diff////
-D/diff-patch////
 D/diff3////
 D/dirname////
 D/doas////
@@ -21,7 +20,6 @@ D/fold////
 D/ftp////
 D/grep////
 D/gzip////
-D/gzsig////
 D/join////
 D/jot////
 D/lam////
@@ -31,12 +29,10 @@ D/m4////
 D/mail////
 D/make////
 D/mandoc////
-D/mdoclint////
 D/nc////
 D/netstat////
 D/openssl////
 D/patch////
-D/pcc////
 D/pkg-config////
 D/rcs////
 D/rev////
@@ -50,4 +46,3 @@ D/tsort////
 D/ul////
 D/wc////
 D/xargs////
-D/xlint////

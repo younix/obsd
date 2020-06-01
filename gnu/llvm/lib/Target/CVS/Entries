@@ -12,13 +12,11 @@ D/ARC////
 D/ARM////
 D/AVR////
 D/BPF////
-D/CppBackend////
 D/Hexagon////
 D/Lanai////
 D/MSP430////
 D/Mips////
 D/NVPTX////
-D/Nios2////
 D/PowerPC////
 D/RISCV////
 D/Sparc////

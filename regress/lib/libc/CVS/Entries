@@ -41,7 +41,6 @@ D/regex////
 D/setjmp////
 D/setjmp-fpu////
 D/setjmp-signal////
-D/sigreturn////
 D/sigsetjmp////
 D/sigthr////
 D/sleep////

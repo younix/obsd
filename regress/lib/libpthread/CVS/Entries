@@ -12,7 +12,6 @@ D/cancel_wait////
 D/close////
 D/close_race////
 D/closefrom////
-D/cond_signal////
 D/cwd////
 D/dlopen////
 D/dup2_race////
@@ -65,6 +64,5 @@ D/stack////
 D/stdarg////
 D/stdfiles////
 D/stdio////
-D/suspend_np1////
 D/switch////
 D/system////

@@ -8,7 +8,6 @@
 /gethex.c/1.7/Thu Jul 27 16:47:43 2017//
 /gmisc.c/1.1/Sun Sep  7 20:36:08 2008//
 /hd_init.c/1.2/Wed Aug 26 01:54:09 2015//
-/hdtoa.c/1.4/Fri Apr 27 13:46:01 2018//
 /hexnan.c/1.3/Wed Aug 26 01:54:09 2015//
 /ldtoa.c/1.4/Wed Mar  9 16:28:47 2016//
 /misc.c/1.7/Wed Sep 21 04:38:56 2016//
@@ -22,4 +21,5 @@
 /strtorx.c/1.3/Sat Jul  2 18:03:43 2011//
 /sum.c/1.2/Fri Oct 16 12:15:03 2009//
 /ulp.c/1.2/Sat Jul  2 18:03:43 2011//
+/hdtoa.c/1.5/Mon Jun  1 06:23:12 2020//
 D

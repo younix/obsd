@@ -102,16 +102,5 @@
 /zonec.c/1.26/Tue Sep 17 16:19:35 2019//
 /zonec.h/1.9/Tue Sep 17 16:19:35 2019//
 /zparser.y/1.21/Tue Sep 17 16:19:35 2019//
-D/.buildkite////
-D/compat////
-D/daemon////
-D/dns64////
 D/dnstap////
 D/doc////
-D/iterator////
-D/libunbound////
-D/services////
-D/sldns////
-D/smallapp////
-D/util////
-D/validator////

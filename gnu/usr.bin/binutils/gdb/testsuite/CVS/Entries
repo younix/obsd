@@ -10,8 +10,6 @@ D/gdb.ada////
 D/gdb.arch////
 D/gdb.asm////
 D/gdb.base////
-D/gdb.c++////
-D/gdb.chill////
 D/gdb.cp////
 D/gdb.disasm////
 D/gdb.dwarf2////

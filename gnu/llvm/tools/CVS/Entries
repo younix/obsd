@@ -12,7 +12,6 @@ D/lli////
 D/llvm-ar////
 D/llvm-as////
 D/llvm-as-fuzzer////
-D/llvm-as-parasitic-coverage-repro////
 D/llvm-bcanalyzer////
 D/llvm-c-test////
 D/llvm-cat////
@@ -23,7 +22,6 @@ D/llvm-cvtres////
 D/llvm-cxxdump////
 D/llvm-cxxfilt////
 D/llvm-cxxmap////
-D/llvm-demangle-fuzzer////
 D/llvm-diff////
 D/llvm-dis////
 D/llvm-dwarfdump////
@@ -41,9 +39,7 @@ D/llvm-lto2////
 D/llvm-mc////
 D/llvm-mc-assemble-fuzzer////
 D/llvm-mc-disassemble-fuzzer////
-D/llvm-mc-fuzzer////
 D/llvm-mca////
-D/llvm-mcmarkup////
 D/llvm-microsoft-demangle-fuzzer////
 D/llvm-modextract////
 D/llvm-mt////
@@ -52,7 +48,6 @@ D/llvm-objcopy////
 D/llvm-objdump////
 D/llvm-opt-fuzzer////
 D/llvm-opt-report////
-D/llvm-pdbdump////
 D/llvm-pdbutil////
 D/llvm-profdata////
 D/llvm-rc////
@@ -66,7 +61,6 @@ D/llvm-stress////
 D/llvm-strings////
 D/llvm-symbolizer////
 D/llvm-undname////
-D/llvm-vtabledump////
 D/llvm-xray////
 D/llvm-yaml-numeric-parser-fuzzer////
 D/lto////

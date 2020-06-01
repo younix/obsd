@@ -2,14 +2,10 @@
 /Makefile.inc/1.51/Tue Jul 25 13:32:14 2017//
 D/biosboot////
 D/boot////
-D/boot.com////
 D/cdboot////
 D/cdbr////
 D/etc////
 D/fdboot////
-D/installboot////
-D/libkern////
 D/libsa////
-D/libz////
 D/mbr////
 D/pxeboot////

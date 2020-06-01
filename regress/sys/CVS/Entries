@@ -4,13 +4,11 @@ D/copy////
 D/crypto////
 D/ddb////
 D/dev////
-D/fdescfs////
 D/ffs////
 D/fifofs////
 D/fileops////
 D/kern////
 D/mfs_noperm////
-D/miscfs////
 D/net////
 D/netinet////
 D/netinet6////
