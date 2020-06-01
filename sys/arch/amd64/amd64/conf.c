@@ -75,6 +75,12 @@ struct bdevsw	bdevsw[] =
 };
 int	nblkdev = nitems(bdevsw);
 
+/* open, close, read, write, ioctl, tty, mmap */
+#define cdev_pc_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), dev_init(c,n,stop), \
+	dev_init(c,n,tty), ttselect, dev_init(c,n,mmap), D_TTY }
+
 /* open, close, read, ioctl */
 #define cdev_joy_init(c,n) { \
 	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
@@ -132,6 +138,8 @@ cdev_decl(lms);
 #include "opms.h"
 cdev_decl(pms);
 #endif
+#include "rp.h"
+cdev_decl(rp);
 #include "cy.h"
 cdev_decl(cy);
 #include "tun.h"
@@ -222,7 +230,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 31 */
 	cdev_notdef(),			/* 32 */
 	cdev_notdef(),			/* 33 */
-	cdev_notdef(),			/* 34 */
+	cdev_tty_init(NRP,rp),		/* 34: Comtrol RocketPort serial port */
 	cdev_notdef(),			/* 35: Microsoft mouse */
 	cdev_notdef(),			/* 36: Logitech mouse */
 	cdev_notdef(),			/* 37: Extended PS/2 mouse */

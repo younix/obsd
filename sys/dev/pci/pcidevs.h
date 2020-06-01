@@ -200,6 +200,7 @@
 #define	PCI_VENDOR_ZORAN	0x11de		/* Zoran */
 #define	PCI_VENDOR_PIJNENBURG	0x11e3		/* Pijnenburg */
 #define	PCI_VENDOR_COMPEX	0x11f6		/* Compex */
+#define	PCI_VENDOR_COMCORP	0x11fe		/* Comtrol Corporation */
 #define	PCI_VENDOR_CYCLADES	0x120e		/* Cyclades */
 #define	PCI_VENDOR_ESSENTIAL	0x120f		/* Essential Communications */
 #define	PCI_VENDOR_O2MICRO	0x1217		/* O2 Micro */
@@ -2610,6 +2611,9 @@
 #define	PCI_PRODUCT_COMPEX_COMPEXE	0x1401		/* Compexe */
 #define	PCI_PRODUCT_COMPEX_RL100ATX	0x2011		/* RL100-ATX */
 #define	PCI_PRODUCT_COMPEX_98713	0x9881		/* PMAC 98713 */
+
+/* Comtrol Corporation */
+#define	PCI_PRODUCT_COMCORP_ROCKETPORT_16	0x0009		/* RocketPort PCI 16-port Serial */
 
 /* Conexant products */
 #define	PCI_PRODUCT_CONEXANT_56K_WINMODEM	0x1033		/* 56k Winmodem */

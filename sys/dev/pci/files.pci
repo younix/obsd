@@ -270,6 +270,10 @@ device	ppb: pcibus
 attach	ppb at pci
 file	dev/pci/ppb.c			ppb
 
+# Comtrol RocketPort
+attach	rp at pci with rp_pci
+file	dev/pci/rp_pci.c		rp_pci
+
 # Cyclades Cyclom-8/16/32
 attach	cy at pci with cy_pci
 file	dev/pci/cy_pci.c		cy_pci
