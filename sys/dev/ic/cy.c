@@ -1159,11 +1159,14 @@ cy_intr(arg)
 				}
 				sc->sc_events = 1;
 			} else { /* no exception, received data OK */
+				u_char buf[512];
+				size_t i = 0;
 				n_chars = cd_read_reg(cy, CD1400_RDCR);
 
 				/* If no tty or not open, discard data */
 				if (cy->cy_tty == NULL ||
 				    !ISSET(cy->cy_tty->t_state, TS_ISOPEN)) {
+//XXX: cd_read_multi_reg(cy, CD1400_RDSR, ...)
 					while (n_chars--)
 						cd_read_reg(cy, CD1400_RDSR);
 					goto end_rx_serv;
@@ -1174,10 +1177,15 @@ cy_intr(arg)
 				    sc->sc_dev.dv_xname, cy->cy_port_num,
 				    n_chars);
 #endif
+
+				cd_read_multi_reg(cy, CD1400_RDSR, buf, n_chars);
+
+#if 1
 				while (n_chars--) {
 					*buf_p++ = 0; /* status: OK */
-					*buf_p++ = cd_read_reg(cy,
-					    CD1400_RDSR); /* data byte */
+//					*buf_p++ = cd_read_reg(cy,
+//					    CD1400_RDSR); /* data byte */
+					*buf_p++ = buf[i++];
 					if (buf_p == cy->cy_ibuf_end)
 						buf_p = cy->cy_ibuf;
 					if (buf_p == cy->cy_ibuf_rd_ptr) {
@@ -1188,6 +1196,7 @@ cy_intr(arg)
 						break;
 					}
 				}
+#endif
 				sc->sc_events = 1;
 			}
 
