@@ -105,6 +105,10 @@
 #define cd_read_reg(cy,reg) bus_space_read_1(cy->cy_memt, cy->cy_memh, \
 			  cy->cy_chip_offs+(((reg<<1))<<cy->cy_bustype))
 
+#define cd_read_multi_reg(cy, reg, ptr, len) \
+	bus_space_read_multi_1((cy)->cy_memt, (cy)->cy_memh, \
+	(cy)->cy_chip_offs+(((reg<<1)) << (cy)->cy_bustype), (ptr), (len))
+
 #define cd_write_reg(cy,reg,val) bus_space_write_1(cy->cy_memt, cy->cy_memh, \
 			  cy->cy_chip_offs+(((reg<<1))<<cy->cy_bustype), \
 			  (val))
