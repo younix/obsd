@@ -24,7 +24,6 @@
 /omcm.c/1.1/Fri Apr 10 22:02:45 2020//
 /omdisplay.c/1.8/Mon May 25 09:55:48 2020//
 /omdog.c/1.8/Mon Nov 27 06:29:41 2017//
-/omehci.c/1.5/Tue Apr  7 09:09:46 2020//
 /omehcivar.h/1.2/Mon May  6 03:45:58 2019//
 /omgpio.c/1.12/Fri Apr 10 22:02:45 2020//
 /omgpiovar.h/1.2/Wed Nov 20 13:32:40 2013//
@@ -38,4 +37,5 @@
 /ti_iic.c/1.13/Fri Apr 10 22:02:45 2020//
 /ti_iicreg.h/1.1/Sun Nov 24 15:00:22 2013//
 /omrng.c/1.2/Mon Jun  1 06:23:23 2020//
+/omehci.c/1.6/Sat Jun  6 10:25:30 2020//
 D

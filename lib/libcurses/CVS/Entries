@@ -69,7 +69,6 @@
 /legacy_coding.3/1.1/Fri Sep 16 17:24:20 2016//
 /nc_alloc.h/1.7/Tue Jan 12 23:21:59 2010//
 /nc_panel.h/1.4/Tue Jan 12 23:21:59 2010//
-/nc_tparm.h/1.1/Tue Jan 12 23:21:59 2010//
 /ncurses_cfg.h/1.27/Wed Sep 21 06:26:51 2011//
 /ncurses_def.h/1.2/Tue Jan 12 23:21:59 2010//
 /parametrized.h/1.3/Tue Jan 12 23:21:59 2010//
@@ -91,3 +90,4 @@ D/tinfo////
 D/trace////
 D/tty////
 D/widechar////
+/nc_tparm.h/1.2/Sat Jun  6 10:25:18 2020//

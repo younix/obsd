@@ -1,4 +1,4 @@
-#   $OpenBSD: tlsfuzzer.py,v 1.3 2020/05/24 10:35:57 tb Exp $
+#   $OpenBSD: tlsfuzzer.py,v 1.7 2020/06/06 01:40:08 beck Exp $
 #
 # Copyright (c) 2020 Theo Buehler <tb@openbsd.org>
 #
@@ -79,6 +79,16 @@ tls13_tests = TestGroup("TLSv1.3 tests", [
     Test("test-tls13-legacy-version.py"),
     Test("test-tls13-nociphers.py"),
     Test("test-tls13-record-padding.py"),
+    Test("test-tls13-shuffled-extentions.py"),
+
+    # The skipped tests fail due to a bug in BIO_gets() which masks the retry
+    # signalled from an SSL_read() failure. Testing with httpd(8) shows we're
+    # handling these corner cases correctly since tls13_record_layer.c -r1.47.
+    Test("test-tls13-zero-length-data.py", [
+        "-e", "zero-length app data",
+        "-e", "zero-length app data with large padding",
+        "-e", "zero-length app data with padding",
+    ]),
 ])
 
 # Tests that take a lot of time (> ~30s on an x280)
@@ -89,6 +99,13 @@ tls13_slow_tests = TestGroup("slow TLSv1.3 tests", [
 
     Test("test-tls13-invalid-ciphers.py"),
     Test("test-tls13-serverhello-random.py", tls13_unsupported_ciphers),
+
+    # Mark two tests cases as xfail for now. The tests expect an arguably
+    # correct decode_error while we send a decrypt_error (like fizz/boring).
+    Test("test-tls13-record-layer-limits.py", [
+        "-x", "max size payload (2**14) of Finished msg, with 16348 bytes of left padding, cipher TLS_AES_128_GCM_SHA256",
+        "-x", "max size payload (2**14) of Finished msg, with 16348 bytes of left padding, cipher TLS_CHACHA20_POLY1305_SHA256",
+    ]),
 ])
 
 tls13_extra_cert_tests = TestGroup("TLSv1.3 certificate tests", [
@@ -125,22 +142,10 @@ tls13_failing_tests = TestGroup("failing TLSv1.3 tests", [
     # Most failing tests expect the CCS right before finished.
     # What's up with that?
     Test("test-tls13-version-negotiation.py"),
-
-    # The following three tests fail due to broken pipe.
-    # AssertionError: Unexpected closure from peer:
-    # 'zero-length app data'
-    # 'zero-length app data with large padding'
-    # 'zero-length app data with padding'
-    Test("test-tls13-zero-length-data.py"),
 ])
 
 tls13_slow_failing_tests = TestGroup("slow, failing TLSv1.3 tests", [
-    # After adding record overflow alert, 14 tests fail because
-    # they expect ExpectNewSessionTicket().
-    Test("test-tls13-record-layer-limits.py" ),
-
     # Other test failures bugs in keyshare/tlsext negotiation?
-    Test("test-tls13-shuffled-extentions.py"),    # should reject 2nd CH
     Test("test-tls13-unrecognised-groups.py"),    # unexpected closure
 
     # 5 failures:
@@ -219,6 +224,7 @@ tls12_tests = TestGroup("TLSv1.2 tests", [
     Test("test-conversation.py"),
     Test("test-cve-2016-2107.py"),
     Test("test-dhe-rsa-key-exchange.py"),
+    Test("test-dhe-rsa-key-exchange-with-bad-messages.py"),
     Test("test-early-application-data.py"),
     Test("test-empty-extensions.py"),
     Test("test-fuzzed-MAC.py"),
@@ -304,9 +310,6 @@ tls12_failing_tests = TestGroup("failing TLSv1.2 tests", [
     # abrupt closure
     Test("test-cve-2016-6309.py"),
 
-    # failing tests are fixed by sending illegal_parameter alert after
-    # DH_compute_keyTest() in ssl_srvr.c
-    Test("test-dhe-rsa-key-exchange-with-bad-messages.py"),
     # Tests expect an illegal_parameter alert
     Test("test-ecdhe-rsa-key-exchange-with-bad-messages.py"),
 

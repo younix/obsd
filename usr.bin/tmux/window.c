@@ -1,4 +1,4 @@
-/* $OpenBSD: window.c,v 1.263 2020/05/21 07:24:13 nicm Exp $ */
+/* $OpenBSD: window.c,v 1.265 2020/06/05 11:20:51 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -436,14 +436,21 @@ window_resize(struct window *w, u_int sx, u_int sy, int xpixel, int ypixel)
 }
 
 void
-window_pane_send_resize(struct window_pane *wp, int yadjust)
+window_pane_send_resize(struct window_pane *wp, int force)
 {
 	struct window	*w = wp->window;
 	struct winsize	 ws;
-	u_int  		 sy = wp->sy + yadjust;
+	u_int  		 sy;
 
 	if (wp->fd == -1)
 		return;
+
+	if (!force)
+		sy = wp->sy;
+	else if (wp->sy <= 1)
+		sy = wp->sy + 1;
+	else
+		sy = wp->sy - 1;
 	log_debug("%s: %%%u resize to %u,%u", __func__, wp->id, wp->sx, sy);
 
 	memset(&ws, 0, sizeof ws);
@@ -877,8 +884,8 @@ window_pane_create(struct window *w, u_int sx, u_int sy, u_int hlimit)
 	wp->xoff = 0;
 	wp->yoff = 0;
 
-	wp->sx = wp->osx = sx;
-	wp->sy = wp->osx = sy;
+	wp->sx = sx;
+	wp->sy = sy;
 
 	wp->pipe_fd = -1;
 	wp->pipe_event = NULL;
@@ -918,6 +925,8 @@ window_pane_destroy(struct window_pane *wp)
 
 	if (event_initialized(&wp->resize_timer))
 		event_del(&wp->resize_timer);
+	if (event_initialized(&wp->force_timer))
+		event_del(&wp->force_timer);
 
 	RB_REMOVE(window_pane_tree, &all_window_panes, wp);
 
@@ -944,16 +953,17 @@ window_pane_read_callback(__unused struct bufferevent *bufev, void *data)
 		new_data = window_pane_get_new_data(wp, wpo, &new_size);
 		if (new_size > 0) {
 			bufferevent_write(wp->pipe_event, new_data, new_size);
-			window_pane_update_used_data(wp, wpo, new_size, 1);
+			window_pane_update_used_data(wp, wpo, new_size);
 		}
 	}
 
 	log_debug("%%%u has %zu bytes", wp->id, size);
 	TAILQ_FOREACH(c, &clients, entry) {
-		if (c->session != NULL && c->flags & CLIENT_CONTROL)
+		if (c->session != NULL && (c->flags & CLIENT_CONTROL))
 			control_write_output(c, wp);
 	}
 	input_parse_pane(wp);
+	bufferevent_disable(wp->event, EV_READ);
 }
 
 static void
@@ -978,7 +988,6 @@ window_pane_set_event(struct window_pane *wp)
 	    NULL, window_pane_error_callback, wp);
 	wp->ictx = input_init(wp, wp->event);
 
-	bufferevent_setwatermark(wp->event, EV_READ, 0, READ_SIZE);
 	bufferevent_enable(wp->event, EV_READ|EV_WRITE);
 }
 
@@ -998,7 +1007,14 @@ window_pane_resize(struct window_pane *wp, u_int sx, u_int sy)
 	wme = TAILQ_FIRST(&wp->modes);
 	if (wme != NULL && wme->mode->resize != NULL)
 		wme->mode->resize(wme, sx, sy);
-	wp->flags |= (PANE_RESIZE|PANE_RESIZED);
+
+	/*
+	 * If the pane has already been resized, set the force flag and make
+	 * the application resize twice to force it to redraw.
+	 */
+	if (wp->flags & PANE_RESIZE)
+		wp->flags |= PANE_RESIZEFORCE;
+	wp->flags |= PANE_RESIZE;
 }
 
 void
@@ -1559,27 +1575,11 @@ window_pane_get_new_data(struct window_pane *wp,
 
 void
 window_pane_update_used_data(struct window_pane *wp,
-    struct window_pane_offset *wpo, size_t size, int acknowledge)
+    struct window_pane_offset *wpo, size_t size)
 {
 	size_t	used = wpo->used - wp->base_offset;
 
 	if (size > EVBUFFER_LENGTH(wp->event->input) - used)
 		size = EVBUFFER_LENGTH(wp->event->input) - used;
 	wpo->used += size;
-
-	if (acknowledge)
-		window_pane_acknowledge_data(wp, wpo, size);
-}
-
-void
-window_pane_acknowledge_data(struct window_pane *wp,
-    struct window_pane_offset *wpo, size_t size)
-{
-	size_t	acknowledged = wpo->acknowledged - wp->base_offset;
-
-	if (size > EVBUFFER_LENGTH(wp->event->input) - acknowledged)
-		size = EVBUFFER_LENGTH(wp->event->input) - acknowledged;
-	wpo->acknowledged += size;
-	if (wpo->acknowledged > wpo->used)
-		wpo->acknowledged = wpo->used;
 }

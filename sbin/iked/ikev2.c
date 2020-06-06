@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.228 2020/05/30 17:44:35 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.230 2020/06/03 17:56:42 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -633,8 +633,10 @@ ikev2_recv(struct iked *env, struct iked_message *msg)
 		sa->sa_msgid_current = msg->msg_msgid;
 	}
 
-	if (sa_address(sa, &sa->sa_peer, &msg->msg_peer) == -1 ||
-	    sa_address(sa, &sa->sa_local, &msg->msg_local) == -1)
+	if (sa_address(sa, &sa->sa_peer, (struct sockaddr *)&msg->msg_peer)
+	    == -1 ||
+	    sa_address(sa, &sa->sa_local, (struct sockaddr *)&msg->msg_local)
+	    == -1)
 		return;
 
 	sa->sa_fd = msg->msg_fd;
@@ -1257,8 +1259,10 @@ ikev2_init_auth(struct iked *env, struct iked_message *msg)
 
 	if (ca_setauth(env, sa, authmsg, PROC_CERT) == -1) {
 		log_debug("%s: failed to get cert", __func__);
+		ibuf_release(authmsg);
 		return (-1);
 	}
+	ibuf_release(authmsg);
 
 	return (ikev2_init_ike_auth(env, sa));
 }
@@ -3718,8 +3722,10 @@ ikev2_init_create_child_sa(struct iked *env, struct iked_message *msg)
 			sa->sa_nextr = NULL;
 			/* Setup address, socket and NAT information */
 			sa_state(env, dsa, IKEV2_STATE_CLOSING);
-			sa_address(dsa, &dsa->sa_peer, &sa->sa_peer.addr);
-			sa_address(dsa, &dsa->sa_local, &sa->sa_local.addr);
+			sa_address(dsa, &dsa->sa_peer,
+			    (struct sockaddr *)&sa->sa_peer.addr);
+			sa_address(dsa, &dsa->sa_local,
+			    (struct sockaddr *)&sa->sa_local.addr);
 			dsa->sa_fd = sa->sa_fd;
 			dsa->sa_natt = sa->sa_natt;
 			dsa->sa_udpencap = sa->sa_udpencap;

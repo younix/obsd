@@ -1,4 +1,4 @@
-/* $OpenBSD: server-client.c,v 1.351 2020/05/26 08:41:47 nicm Exp $ */
+/* $OpenBSD: server-client.c,v 1.356 2020/06/05 11:20:51 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -45,7 +45,6 @@ static void	server_client_check_redraw(struct client *);
 static void	server_client_set_title(struct client *);
 static void	server_client_reset_state(struct client *);
 static int	server_client_assume_paste(struct session *);
-static void	server_client_resize_event(int, short, void *);
 
 static void	server_client_dispatch(struct imsg *, void *);
 static void	server_client_dispatch_command(struct client *, struct imsg *);
@@ -57,6 +56,9 @@ static void	server_client_dispatch_read_data(struct client *,
 		    struct imsg *);
 static void	server_client_dispatch_read_done(struct client *,
 		    struct imsg *);
+
+/* Maximum data allowed to be held for a pane for a control client. */
+#define SERVER_CLIENT_PANE_LIMIT 16777216
 
 /* Compare client windows. */
 static int
@@ -80,7 +82,7 @@ server_client_how_many(void)
 
 	n = 0;
 	TAILQ_FOREACH(c, &clients, entry) {
-		if (c->session != NULL && (~c->flags & CLIENT_DETACHING))
+		if (c->session != NULL && (~c->flags & CLIENT_UNATTACHEDFLAGS))
 			n++;
 	}
 	return (n);
@@ -386,7 +388,7 @@ server_client_suspend(struct client *c)
 {
 	struct session	*s = c->session;
 
-	if (s == NULL || (c->flags & CLIENT_DETACHING))
+	if (s == NULL || (c->flags & CLIENT_UNATTACHEDFLAGS))
 		return;
 
 	tty_stop_tty(&c->tty);
@@ -400,12 +402,14 @@ server_client_detach(struct client *c, enum msgtype msgtype)
 {
 	struct session	*s = c->session;
 
-	if (s == NULL || (c->flags & CLIENT_DETACHING))
+	if (s == NULL || (c->flags & CLIENT_UNATTACHEDFLAGS))
 		return;
 
-	c->flags |= CLIENT_DETACHING;
-	notify_client("client-detached", c);
-	proc_send(c->peer, msgtype, -1, s->name, strlen(s->name) + 1);
+	c->flags |= CLIENT_EXIT;
+
+	c->exit_type = CLIENT_EXIT_DETACH;
+	c->exit_msgtype = msgtype;
+	c->exit_session = xstrdup(s->name);
 }
 
 /* Execute command to replace a client. */
@@ -1088,7 +1092,7 @@ server_client_update_latest(struct client *c)
 	w->latest = c;
 
 	if (options_get_number(w->options, "window-size") == WINDOW_SIZE_LATEST)
-		recalculate_size(w);
+		recalculate_size(w, 0);
 }
 
 /*
@@ -1398,50 +1402,14 @@ server_client_check_window_resize(struct window *w)
 	resize_window(w, w->new_sx, w->new_sy, w->new_xpixel, w->new_ypixel);
 }
 
-/* Check if we need to force a resize. */
-static int
-server_client_resize_force(struct window_pane *wp)
-{
-	struct timeval	tv = { .tv_usec = 100000 };
-
-	/*
-	 * If we are resizing to the same size as when we entered the loop
-	 * (that is, to the same size the application currently thinks it is),
-	 * tmux may have gone through several resizes internally and thrown
-	 * away parts of the screen. So we need the application to actually
-	 * redraw even though its final size has not changed.
-	 */
-
-	if (wp->flags & PANE_RESIZEFORCE) {
-		wp->flags &= ~PANE_RESIZEFORCE;
-		return (0);
-	}
-
-	if (wp->sx != wp->osx ||
-	    wp->sy != wp->osy ||
-	    wp->sx <= 1 ||
-	    wp->sy <= 1)
-		return (0);
-
-	log_debug("%s: %%%u forcing resize", __func__, wp->id);
-	window_pane_send_resize(wp, -1);
-
-	evtimer_add(&wp->resize_timer, &tv);
-	wp->flags |= PANE_RESIZEFORCE;
-	return (1);
-}
-
-/* Resize a pane. */
+/* Resize timer event. */
 static void
-server_client_resize_pane(struct window_pane *wp)
+server_client_resize_timer(__unused int fd, __unused short events, void *data)
 {
-	log_debug("%s: %%%u resize to %u,%u", __func__, wp->id, wp->sx, wp->sy);
-	window_pane_send_resize(wp, 0);
+	struct window_pane	*wp = data;
 
-	wp->flags &= ~PANE_RESIZE;
-
-	wp->osx = wp->sx;
-	wp->osy = wp->sy;
+	log_debug("%s: %%%u resize timer expired", __func__, wp->id);
+	evtimer_del(&wp->resize_timer);
 }
 
 /* Start the resize timer. */
@@ -1450,49 +1418,74 @@ server_client_start_resize_timer(struct window_pane *wp)
 {
 	struct timeval	tv = { .tv_usec = 250000 };
 
-	if (!evtimer_pending(&wp->resize_timer, NULL))
-		evtimer_add(&wp->resize_timer, &tv);
+	log_debug("%s: %%%u resize timer started", __func__, wp->id);
+	evtimer_add(&wp->resize_timer, &tv);
 }
 
-/* Resize timer event. */
+/* Force timer event. */
 static void
-server_client_resize_event(__unused int fd, __unused short events, void *data)
+server_client_force_timer(__unused int fd, __unused short events, void *data)
 {
 	struct window_pane	*wp = data;
 
-	evtimer_del(&wp->resize_timer);
+	log_debug("%s: %%%u force timer expired", __func__, wp->id);
+	evtimer_del(&wp->force_timer);
+	wp->flags |= PANE_RESIZENOW;
+}
 
-	if (~wp->flags & PANE_RESIZE)
-		return;
-	log_debug("%s: %%%u timer fired (was%s resized)", __func__, wp->id,
-	    (wp->flags & PANE_RESIZED) ? "" : " not");
+/* Start the force timer. */
+static void
+server_client_start_force_timer(struct window_pane *wp)
+{
+	struct timeval	tv = { .tv_usec = 10000 };
 
-	if (wp->base.saved_grid == NULL && (wp->flags & PANE_RESIZED)) {
-		log_debug("%s: %%%u deferring timer", __func__, wp->id);
-		server_client_start_resize_timer(wp);
-	} else if (!server_client_resize_force(wp)) {
-		log_debug("%s: %%%u resizing pane", __func__, wp->id);
-		server_client_resize_pane(wp);
-	}
-	wp->flags &= ~PANE_RESIZED;
+	log_debug("%s: %%%u force timer started", __func__, wp->id);
+	evtimer_add(&wp->force_timer, &tv);
 }
 
 /* Check if pane should be resized. */
 static void
 server_client_check_pane_resize(struct window_pane *wp)
 {
+	if (!event_initialized(&wp->resize_timer))
+		evtimer_set(&wp->resize_timer, server_client_resize_timer, wp);
+	if (!event_initialized(&wp->force_timer))
+		evtimer_set(&wp->force_timer, server_client_force_timer, wp);
+
 	if (~wp->flags & PANE_RESIZE)
 		return;
+	log_debug("%s: %%%u needs to be resized", __func__, wp->id);
 
-	if (!event_initialized(&wp->resize_timer))
-		evtimer_set(&wp->resize_timer, server_client_resize_event, wp);
+	if (evtimer_pending(&wp->resize_timer, NULL)) {
+		log_debug("%s: %%%u resize timer is running", __func__, wp->id);
+		return;
+	}
+	server_client_start_resize_timer(wp);
 
-	if (!evtimer_pending(&wp->resize_timer, NULL)) {
-		log_debug("%s: %%%u starting timer", __func__, wp->id);
-		server_client_resize_pane(wp);
-		server_client_start_resize_timer(wp);
-	} else
-		log_debug("%s: %%%u timer running", __func__, wp->id);
+	if (~wp->flags & PANE_RESIZEFORCE) {
+		/*
+		 * The timer is not running and we don't need to force a
+		 * resize, so just resize immediately.
+		 */
+		log_debug("%s: resizing %%%u now", __func__, wp->id);
+		window_pane_send_resize(wp, 0);
+		wp->flags &= ~PANE_RESIZE;
+	} else {
+		/*
+		 * The timer is not running, but we need to force a resize. If
+		 * the force timer has expired, resize to the real size now.
+		 * Otherwise resize to the force size and start the timer.
+		 */
+		if (wp->flags & PANE_RESIZENOW) {
+			log_debug("%s: resizing %%%u after forced resize", __func__, wp->id);
+			window_pane_send_resize(wp, 0);
+			wp->flags &= ~(PANE_RESIZE|PANE_RESIZEFORCE|PANE_RESIZENOW);
+		} else if (!evtimer_pending(&wp->force_timer, NULL)) {
+			log_debug("%s: forcing resize of %%%u", __func__, wp->id);
+			window_pane_send_resize(wp, 1);
+			server_client_start_force_timer(wp);
+		}
+	}
 }
 
 /* Check pane buffer size. */
@@ -1505,14 +1498,15 @@ server_client_check_pane_buffer(struct window_pane *wp)
 	struct window_pane_offset	*wpo;
 	int				 off = 1, flag;
 	u_int				 attached_clients = 0;
+	size_t				 new_size;
 
 	/*
-	 * Work out the minimum acknowledged size. This is the most that can be
-	 * removed from the buffer.
+	 * Work out the minimum used size. This is the most that can be removed
+	 * from the buffer.
 	 */
-	minimum = wp->offset.acknowledged;
-	if (wp->pipe_fd != -1 && wp->pipe_offset.acknowledged < minimum)
-		minimum = wp->pipe_offset.acknowledged;
+	minimum = wp->offset.used;
+	if (wp->pipe_fd != -1 && wp->pipe_offset.used < minimum)
+		minimum = wp->pipe_offset.used;
 	TAILQ_FOREACH(c, &clients, entry) {
 		if (c->session == NULL)
 			continue;
@@ -1530,11 +1524,16 @@ server_client_check_pane_buffer(struct window_pane *wp)
 		if (!flag)
 			off = 0;
 
-		log_debug("%s: %s has %zu bytes used, %zu bytes acknowledged "
-		    "for %%%u", __func__, c->name, wpo->used, wpo->acknowledged,
+		window_pane_get_new_data(wp, wpo, &new_size);
+		log_debug("%s: %s has %zu bytes used and %zu left for %%%u",
+		    __func__, c->name, wpo->used - wp->base_offset, new_size,
 		    wp->id);
-		if (wpo->acknowledged < minimum)
-			minimum = wpo->acknowledged;
+		if (new_size > SERVER_CLIENT_PANE_LIMIT) {
+			control_discard(c);
+			c->flags |= CLIENT_EXIT;
+		}
+		if (wpo->used < minimum)
+			minimum = wpo->used;
 	}
 	if (attached_clients == 0)
 		off = 0;
@@ -1543,8 +1542,8 @@ server_client_check_pane_buffer(struct window_pane *wp)
 		goto out;
 
 	/* Drain the buffer. */
-	log_debug("%s: %%%u has %zu minimum (of %zu) bytes acknowledged",
-	    __func__, wp->id, minimum, EVBUFFER_LENGTH(evb));
+	log_debug("%s: %%%u has %zu minimum (of %zu) bytes used", __func__,
+	    wp->id, minimum, EVBUFFER_LENGTH(evb));
 	evbuffer_drain(evb, minimum);
 
 	/*
@@ -1553,20 +1552,15 @@ server_client_check_pane_buffer(struct window_pane *wp)
 	 */
 	if (wp->base_offset > SIZE_MAX - minimum) {
 		log_debug("%s: %%%u base offset has wrapped", __func__, wp->id);
-		wp->offset.acknowledged -= wp->base_offset;
 		wp->offset.used -= wp->base_offset;
-		if (wp->pipe_fd != -1) {
-			wp->pipe_offset.acknowledged -= wp->base_offset;
+		if (wp->pipe_fd != -1)
 			wp->pipe_offset.used -= wp->base_offset;
-		}
 		TAILQ_FOREACH(c, &clients, entry) {
 			if (c->session == NULL || (~c->flags & CLIENT_CONTROL))
 				continue;
 			wpo = control_pane_offset(c, wp, &flag);
-			if (wpo != NULL && !flag) {
-				wpo->acknowledged -= wp->base_offset;
+			if (wpo != NULL && !flag)
 				wpo->used -= wp->base_offset;
-			}
 		}
 		wp->base_offset = minimum;
 	} else
@@ -1579,6 +1573,7 @@ out:
 	 * clients, all of which are control clients which are not able to
 	 * accept any more data.
 	 */
+	log_debug("%s: pane %%%u is %s", __func__, wp->id, off ? "off" : "on");
 	if (off)
 		bufferevent_disable(wp->event, EV_READ);
 	else
@@ -1770,12 +1765,18 @@ static void
 server_client_check_exit(struct client *c)
 {
 	struct client_file	*cf;
+	const char		*name = c->exit_session;
 
+	if (c->flags & (CLIENT_DEAD|CLIENT_EXITED))
+		return;
 	if (~c->flags & CLIENT_EXIT)
 		return;
-	if (c->flags & CLIENT_EXITED)
-		return;
 
+	if (c->flags & CLIENT_CONTROL) {
+		control_discard(c);
+		if (!control_all_done(c))
+			return;
+	}
 	RB_FOREACH(cf, client_files, &c->files) {
 		if (EVBUFFER_LENGTH(cf->buffer) != 0)
 			return;
@@ -1783,8 +1784,20 @@ server_client_check_exit(struct client *c)
 
 	if (c->flags & CLIENT_ATTACHED)
 		notify_client("client-detached", c);
-	proc_send(c->peer, MSG_EXIT, -1, &c->retval, sizeof c->retval);
 	c->flags |= CLIENT_EXITED;
+
+	switch (c->exit_type) {
+	case CLIENT_EXIT_RETURN:
+		proc_send(c->peer, MSG_EXIT, -1, &c->retval, sizeof c->retval);
+		break;
+	case CLIENT_EXIT_SHUTDOWN:
+		proc_send(c->peer, MSG_SHUTDOWN, -1, NULL, 0);
+		break;
+	case CLIENT_EXIT_DETACH:
+		proc_send(c->peer, c->exit_msgtype, -1, name, strlen(name) + 1);
+		break;
+	}
+	free(c->exit_session);
 }
 
 /* Redraw timer callback. */
@@ -1996,7 +2009,6 @@ server_client_dispatch(struct imsg *imsg, void *arg)
 	case MSG_EXITING:
 		if (datalen != 0)
 			fatalx("bad MSG_EXITING size");
-
 		c->session = NULL;
 		tty_close(&c->tty);
 		proc_send(c->peer, MSG_EXITED, -1, NULL, 0);
@@ -2050,7 +2062,7 @@ server_client_command_done(struct cmdq_item *item, __unused void *data)
 
 	if (~c->flags & CLIENT_ATTACHED)
 		c->flags |= CLIENT_EXIT;
-	else if (~c->flags & CLIENT_DETACHING)
+	else if (~c->flags & CLIENT_EXIT)
 		tty_send_requests(&c->tty);
 	return (CMD_RETURN_NORMAL);
 }
@@ -2338,6 +2350,23 @@ server_client_get_cwd(struct client *c, struct session *s)
 	return ("/");
 }
 
+/* Get control client flags. */
+static uint64_t
+server_client_control_flags(struct client *c, const char *next)
+{
+	if (strcmp(next, "pause-after") == 0) {
+		c->pause_age = 0;
+		return (CLIENT_CONTROL_PAUSEAFTER);
+	}
+	if (sscanf(next, "pause-after=%u", &c->pause_age) == 1) {
+		c->pause_age *= 1000;
+		return (CLIENT_CONTROL_PAUSEAFTER);
+	}
+	if (strcmp(next, "no-output") == 0)
+		return (CLIENT_CONTROL_NOOUTPUT);
+	return (0);
+}
+
 /* Set client flags. */
 void
 server_client_set_flags(struct client *c, const char *flags)
@@ -2352,11 +2381,10 @@ server_client_set_flags(struct client *c, const char *flags)
 		if (not)
 			next++;
 
-		flag = 0;
-		if (c->flags & CLIENT_CONTROL) {
-			if (strcmp(next, "no-output") == 0)
-				flag = CLIENT_CONTROL_NOOUTPUT;
-		}
+		if (c->flags & CLIENT_CONTROL)
+			flag = server_client_control_flags(c, next);
+		else
+			flag = 0;
 		if (strcmp(next, "read-only") == 0)
 			flag = CLIENT_READONLY;
 		else if (strcmp(next, "ignore-size") == 0)
@@ -2372,7 +2400,7 @@ server_client_set_flags(struct client *c, const char *flags)
 		else
 			c->flags |= flag;
 		if (flag == CLIENT_CONTROL_NOOUTPUT)
-			control_free_offsets(c);
+			control_reset_offsets(c);
 	}
 	free(copy);
 }
@@ -2381,7 +2409,8 @@ server_client_set_flags(struct client *c, const char *flags)
 const char *
 server_client_get_flags(struct client *c)
 {
-	static char s[256];
+	static char	s[256];
+	char	 	tmp[32];
 
 	*s = '\0';
 	if (c->flags & CLIENT_ATTACHED)
@@ -2392,6 +2421,11 @@ server_client_get_flags(struct client *c)
 		strlcat(s, "ignore-size,", sizeof s);
 	if (c->flags & CLIENT_CONTROL_NOOUTPUT)
 		strlcat(s, "no-output,", sizeof s);
+	if (c->flags & CLIENT_CONTROL_PAUSEAFTER) {
+		xsnprintf(tmp, sizeof tmp, "pause-after=%u,",
+		    c->pause_age / 1000);
+		strlcat(s, tmp, sizeof s);
+	}
 	if (c->flags & CLIENT_READONLY)
 		strlcat(s, "read-only,", sizeof s);
 	if (c->flags & CLIENT_ACTIVEPANE)

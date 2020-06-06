@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_server.c,v 1.55 2020/05/29 18:00:10 jsing Exp $ */
+/* $OpenBSD: tls13_server.c,v 1.58 2020/06/06 01:40:09 beck Exp $ */
 /*
  * Copyright (c) 2019, 2020 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
@@ -126,9 +126,50 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 		return tls13_use_legacy_server(ctx);
 	}
 
+	/* Add decoded values to the current ClientHello hash */
+	if (!tls13_clienthello_hash_init(ctx)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+	if (!tls13_clienthello_hash_update_bytes(ctx, (void *)&legacy_version,
+	    sizeof(legacy_version))) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+	if (!tls13_clienthello_hash_update(ctx, &client_random)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+	if (!tls13_clienthello_hash_update(ctx, &session_id)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+	if (!tls13_clienthello_hash_update(ctx, &cipher_suites)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+	if (!tls13_clienthello_hash_update(ctx, &compression_methods)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+		goto err;
+	}
+
 	if (!tlsext_server_parse(s, cbs, &alert_desc, SSL_TLSEXT_MSG_CH)) {
 		ctx->alert = alert_desc;
 		goto err;
+	}
+
+	/* Finalize first ClientHello hash, or validate against it */
+	if (!ctx->hs->hrr) {
+		if (!tls13_clienthello_hash_finalize(ctx)) {
+			ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
+			goto err;
+		}
+	} else {
+		if (!tls13_clienthello_hash_validate(ctx)) {
+			ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
+			goto err;
+		}
+		tls13_clienthello_hash_clear(ctx->hs);
 	}
 
 	/*
@@ -146,8 +187,11 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 		goto err;
 	}
 	if (!CBS_write_bytes(&session_id, ctx->hs->legacy_session_id,
-	    sizeof(ctx->hs->legacy_session_id), &ctx->hs->legacy_session_id_len))
+	    sizeof(ctx->hs->legacy_session_id),
+	    &ctx->hs->legacy_session_id_len)) {
+		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
 		goto err;
+	}
 
 	/* Parse cipher suites list and select preferred cipher. */
 	if ((ciphers = ssl_bytes_to_cipher_list(s, &cipher_suites)) == NULL) {
@@ -255,7 +299,7 @@ err:
 }
 
 static int
-tls13_server_engage_record_protection(struct tls13_ctx *ctx) 
+tls13_server_engage_record_protection(struct tls13_ctx *ctx)
 {
 	struct tls13_secrets *secrets;
 	struct tls13_secret context;
@@ -469,7 +513,7 @@ tls13_server_check_certificate(struct tls13_ctx *ctx, CERT_PKEY *cpk,
 	/*
 	 * The digitalSignature bit MUST be set if the Key Usage extension is
 	 * present as per RFC 8446 section 4.4.2.2.
-	 */ 
+	 */
 	if ((cpk->x509->ex_flags & EXFLAG_KUSAGE) &&
 	    !(cpk->x509->ex_kusage & X509v3_KU_DIGITAL_SIGNATURE))
 		goto done;
@@ -483,7 +527,7 @@ tls13_server_check_certificate(struct tls13_ctx *ctx, CERT_PKEY *cpk,
  done:
 	return 1;
 }
- 
+
 static int
 tls13_server_select_certificate(struct tls13_ctx *ctx, CERT_PKEY **out_cpk,
     const struct ssl_sigalg **out_sigalg)
@@ -508,7 +552,8 @@ tls13_server_select_certificate(struct tls13_ctx *ctx, CERT_PKEY **out_cpk,
 	if (cert_ok)
 		goto done;
 
-	return 0;
+	cpk = NULL;
+	sigalg = NULL;
 
  done:
 	*out_cpk = cpk;
@@ -528,7 +573,10 @@ tls13_server_certificate_send(struct tls13_ctx *ctx, CBB *cbb)
 	X509 *cert;
 	int i, ret = 0;
 
-	if (!tls13_server_select_certificate(ctx, &cpk, &sigalg)) {
+	if (!tls13_server_select_certificate(ctx, &cpk, &sigalg))
+		goto err;
+
+	if (cpk == NULL) {
 		/* A server must always provide a certificate. */
 		ctx->alert = TLS13_ALERT_HANDSHAKE_FAILURE;
 		tls13_set_errorx(ctx, TLS13_ERR_NO_CERTIFICATE, 0,
@@ -586,7 +634,7 @@ tls13_server_certificate_verify_send(struct tls13_ctx *ctx, CBB *cbb)
 	memset(&sig_cbb, 0, sizeof(sig_cbb));
 
 	if ((cpk = ctx->hs->cpk) == NULL)
- 		goto err;
+		goto err;
 	if ((sigalg = ctx->hs->sigalg) == NULL)
 		goto err;
 	pkey = cpk->privatekey;

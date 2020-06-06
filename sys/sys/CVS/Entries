@@ -44,7 +44,6 @@
 /ioctl.h/1.17/Sun Feb 28 15:46:19 2016//
 /ipc.h/1.13/Sat Nov 15 21:42:50 2014//
 /kcore.h/1.1/Thu Apr 18 21:40:57 1996//
-/kcov.h/1.4/Sun Jan 20 09:57:23 2019//
 /kernel.h/1.23/Wed May 20 17:24:17 2020//
 /kthread.h/1.7/Tue Feb 18 12:13:40 2020//
 /ktrace.h/1.38/Tue Feb 26 22:24:41 2019//
@@ -136,4 +135,5 @@
 /wait.h/1.17/Fri Jun 13 22:40:31 2014//
 /witness.h/1.5/Tue Apr 23 13:35:12 2019//
 /systm.h/1.147/Mon Jun  1 06:23:28 2020//
+/kcov.h/1.5/Sat Jun  6 10:25:35 2020//
 D
