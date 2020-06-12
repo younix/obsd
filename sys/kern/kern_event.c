@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_event.c,v 1.134 2020/05/30 14:10:17 mpi Exp $	*/
+/*	$OpenBSD: kern_event.c,v 1.136 2020/06/12 09:34:17 mpi Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>

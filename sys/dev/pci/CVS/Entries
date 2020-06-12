@@ -1,5 +1,4 @@
 /Makefile/1.4/Mon Oct 14 09:01:34 1996//
-/aac_pci.c/1.25/Fri Dec 19 22:44:58 2014//
 /adv_pci.c/1.13/Tue Feb 18 20:24:52 2020//
 /adw_pci.c/1.18/Fri Sep  8 05:36:52 2017//
 /agp.c/1.49/Tue Dec 22 21:05:37 2015//
@@ -108,7 +107,6 @@
 /if_bgereg.h/1.130/Sun Nov 29 20:19:35 2015//
 /if_bnx.c/1.127/Sun May 17 08:27:51 2020//
 /if_bnxreg.h/1.49/Sat Dec  5 16:23:37 2015//
-/if_bnxt.c/1.22/Mon Apr 27 10:06:45 2020//
 /if_bnxtreg.h/1.3/Wed Apr 24 10:09:49 2019//
 /if_bwfm_pci.c/1.36/Sat Mar  7 09:56:46 2020//
 /if_bwfm_pci.h/1.2/Fri Jan  5 23:30:16 2018//
@@ -119,7 +117,6 @@
 /if_dc_pci.c/1.76/Tue Apr 11 14:43:49 2017//
 /if_de.c/1.137/Wed Mar  8 12:02:41 2017//
 /if_devar.h/1.39/Sun Nov 25 19:52:08 2018//
-/if_em.c/1.352/Tue May 12 08:49:54 2020//
 /if_em.h/1.77/Wed Apr 22 08:47:11 2020//
 /if_em_hw.c/1.108/Wed Apr 22 08:47:11 2020//
 /if_em_hw.h/1.82/Mon Mar 23 15:02:51 2020//
@@ -144,11 +141,6 @@
 /if_iwmvar.h/1.55/Fri Apr  3 08:32:21 2020//
 /if_iwnreg.h/1.56/Mon Jul 29 10:50:08 2019//
 /if_iwnvar.h/1.37/Mon Apr 27 08:02:24 2020//
-/if_iwx.c/1.19/Tue May 26 12:07:36 2020//
-/if_iwxreg.h/1.6/Tue May 26 11:59:48 2020//
-/if_iwxvar.h/1.6/Tue May 26 12:05:51 2020//
-/if_ix.c/1.165/Fri Apr 24 08:50:23 2020//
-/if_ix.h/1.40/Mon Apr  6 08:31:04 2020//
 /if_ixgb.c/1.71/Sun Jan 22 10:17:38 2017//
 /if_ixgb.h/1.19/Tue Nov 24 17:11:39 2015//
 /if_ixgb_osdep.h/1.4/Tue Jul 26 14:57:57 2011//
@@ -257,7 +249,6 @@
 /pccbb.c/1.100/Fri Mar 20 19:32:41 2020//
 /pccbbreg.h/1.12/Thu Oct 18 21:40:49 2012//
 /pccbbvar.h/1.16/Mon Sep  6 18:34:34 2010//
-/pchtemp.c/1.4/Tue May 24 07:59:24 2016//
 /pci.c/1.115/Wed Jan 15 14:01:19 2020//
 /pci_map.c/1.32/Mon Jun 17 11:04:06 2019//
 /pci_quirks.c/1.7/Mon Jul 20 18:05:04 2015//
@@ -339,16 +330,25 @@
 D/bktr////
 D/drm////
 /amdpm.c/1.35/Mon Jun  1 06:23:26 2020//
-/azalia.c/1.256/Mon Jun  1 06:23:26 2020//
 /hifn7751.c/1.180/Mon Jun  1 06:23:26 2020//
 /if_vmx.c/1.56/Mon Jun  1 06:23:27 2020//
 /safe.c/1.44/Mon Jun  1 06:23:27 2020//
 /ubsec.c/1.166/Mon Jun  1 06:23:27 2020//
-/files.pci/1.345/Mon Jun  1 07:19:12 2020//
-/if_iwm.c/1.311/Sat Jun  6 10:25:33 2020//
-/if_iwn.c/1.232/Sat Jun  6 10:25:33 2020//
-/if_mcx.c/1.49/Sat Jun  6 10:25:33 2020//
-/if_wpi.c/1.152/Sat Jun  6 10:25:33 2020//
-/pcidevs/1.1925/Mon Jun  1 07:19:12 2020//
-/pcidevs.h/1.1918/Mon Jun  1 07:19:12 2020//
-/pcidevs_data.h/1.1913/Mon Jun  1 07:19:12 2020//
+/aac_pci.c/1.25/Sat Jun  6 11:20:14 2020//
+/azalia.c/1.257/Fri Jun 12 23:41:49 2020//
+/files.pci/1.345/Fri Jun 12 23:39:33 2020//
+/if_bnxt.c/1.24/Fri Jun 12 23:41:50 2020//
+/if_em.c/1.353/Fri Jun 12 23:41:50 2020//
+/if_iwm.c/1.312/Fri Jun 12 23:41:50 2020//
+/if_iwn.c/1.233/Fri Jun 12 23:41:50 2020//
+/if_iwx.c/1.26/Fri Jun 12 23:41:50 2020//
+/if_iwxreg.h/1.9/Fri Jun 12 23:41:50 2020//
+/if_iwxvar.h/1.8/Fri Jun 12 23:41:50 2020//
+/if_ix.c/1.166/Fri Jun 12 23:41:50 2020//
+/if_ix.h/1.41/Fri Jun 12 23:41:50 2020//
+/if_mcx.c/1.52/Fri Jun 12 23:41:50 2020//
+/if_wpi.c/1.152/Sat Jun  6 11:21:49 2020//
+/pchtemp.c/1.5/Fri Jun 12 23:41:50 2020//
+/pcidevs/1.1927/Fri Jun 12 23:41:50 2020//
+/pcidevs.h/1.1920/Fri Jun 12 23:41:50 2020//
+/pcidevs_data.h/1.1915/Fri Jun 12 23:41:50 2020//

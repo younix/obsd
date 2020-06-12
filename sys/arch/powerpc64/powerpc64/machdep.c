@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.11 2020/05/31 06:23:58 dlg Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.19 2020/06/10 19:06:53 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -18,9 +18,11 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/buf.h>
 #include <sys/exec.h>
 #include <sys/exec_elf.h>
-#include <sys/extent.h>
+#include <sys/msgbuf.h>
+#include <sys/reboot.h>
 
 #include <machine/cpufunc.h>
 #include <machine/opal.h>
@@ -46,6 +48,7 @@ struct uvm_constraint_range *uvm_md_constraints[] = { NULL };
 int cold = 1;
 int safepri = 0;
 int physmem;
+paddr_t physmax;
 
 struct vm_map *exec_map;
 struct vm_map *phys_map;
@@ -75,6 +78,9 @@ struct fdt_reg initrd_reg;
 void memreg_add(const struct fdt_reg *);
 void memreg_remove(const struct fdt_reg *);
 
+paddr_t fdt_pa;
+size_t fdt_size;
+
 void
 init_powernv(void *fdt, void *tocbase)
 {
@@ -94,8 +100,9 @@ init_powernv(void *fdt, void *tocbase)
 	memset(__bss_start, 0, _end - __bss_start);
 
 	if (!fdt_init(fdt) || fdt_get_size(fdt) == 0)
-		panic("%s: no FDT\r\n", __func__);
+		panic("no FDT");
 
+	/* Get OPAL base and entry addresses from FDT. */
 	node = fdt_find_node("/ibm,opal");
 	if (node) {
 		fdt_node_property(node, "opal-base-address", &prop);
@@ -105,9 +112,12 @@ init_powernv(void *fdt, void *tocbase)
 		fdt_node_property(node, "compatible", &prop);
 	}
 
+	/* At this point we can call OPAL runtime services and use printf(9). */
 	printf("Hello, World!\n");
 
-	printf("MSR 0x%016llx\n", mfmsr());
+	/* Stash these such that we can remap the FDT later. */
+	fdt_pa = (paddr_t)fdt;
+	fdt_size = fdt_get_size(fdt);
 
 	/*
 	 * Initialize all traps with the stub that calls the generic
@@ -118,11 +128,16 @@ init_powernv(void *fdt, void *tocbase)
 	__syncicache(EXC_RSVD, EXC_LAST - EXC_RSVD);
 
 	*((void **)TRAP_ENTRY) = generictrap;
-	*((void **)TRAP_TOCBASE) = tocbase;
 
 	/* We're now ready to take traps. */
 	msr = mfmsr();
 	mtmsr(msr | PSL_RI);
+
+#define LPCR_LPES	0x0000000000000008UL
+#define LPCR_HVICE	0x0000000000000002UL
+
+	mtlpcr(LPCR_LPES | LPCR_HVICE);
+	isync();
 
 	/* Add all memory. */
 	node = fdt_find_node("/");
@@ -138,6 +153,8 @@ init_powernv(void *fdt, void *tocbase)
 			if (reg.size == 0)
 				continue;
 			memreg_add(&reg);
+			physmem += atop(reg.size);
+			physmax = MAX(physmax, reg.addr + reg.size);
 		}
 	}
 
@@ -172,10 +189,11 @@ init_powernv(void *fdt, void *tocbase)
 #ifdef DDB
 	/* Load symbols from initrd. */
 	db_machine_init();
-	if (initrd_reg.addr != 0)
+	if (initrd_reg.size != 0)
 		memreg_remove(&initrd_reg);
 #endif
 
+	pmap_bootstrap();
 	uvm_setpagesize();
 
 	for (i = 0; i < nmemreg; i++) {
@@ -184,11 +202,14 @@ init_powernv(void *fdt, void *tocbase)
 
 		uvm_page_physload(atop(start), atop(end),
 		    atop(start), atop(end), 0);
-		physmem += atop(end - start);
 	}
 
-	__asm volatile ("trap");
-	opal_cec_reboot();
+	/* Enable translation. */
+	msr = mfmsr();
+	mtmsr(msr | (PSL_DR|PSL_IR));
+	isync();
+
+	initmsgbuf((caddr_t)uvm_pageboot_alloc(MSGBUFSIZE), MSGBUFSIZE);
 }
 
 void
@@ -351,36 +372,42 @@ struct consdev *cn_tab = &opal_consdev;
 int
 copyin(const void *src, void *dst, size_t size)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
 int
 copyout(const void *src, void *dst, size_t size)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
 int
 copystr(const void *src, void *dst, size_t len, size_t *lenp)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
 int
 copyinstr(const void *src, void *dst, size_t size, size_t *lenp)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
 int
 copyoutstr(const void *src, void *dst, size_t size, size_t *lenp)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
 int
 kcopy(const void *src, void *dst, size_t size)
 {
+	printf("%s\n", __func__);
 	return EFAULT;
 }
 
@@ -391,39 +418,48 @@ need_resched(struct cpu_info *ci)
 }
 
 void
-delay(u_int us)
-{
-}
-
-void
 cpu_startup(void)
 {
-}
+	paddr_t pa, epa;
+	vaddr_t va;
+	void *fdt;
+	
+	printf("%s", version);
 
-void
-cpu_initclocks(void)
-{
-}
+	bufinit();
 
-void
-setstatclockrate(int new)
-{
+	/* Remap the FDT. */
+	pa = trunc_page(fdt_pa);
+	epa = round_page(fdt_pa + fdt_size);
+	va = (vaddr_t)km_alloc(epa - pa, &kv_any, &kp_none, &kd_waitok);
+	fdt = (void *)(va + (fdt_pa & PAGE_MASK));
+	while (pa < epa) {
+		pmap_kenter_pa(va, pa, PROT_READ | PROT_WRITE);
+		va += PAGE_SIZE;
+		pa += PAGE_SIZE;
+	}
+
+	if (!fdt_init(fdt) || fdt_get_size(fdt) == 0)
+		panic("can't remap FDT");
 }
 
 void
 setregs(struct proc *p, struct exec_package *pack, u_long stack,
     register_t *retval)
 {
+	printf("%s\n", __func__);
 }
 
 void
 sendsig(sig_t catcher, int sig, sigset_t mask, const siginfo_t *ksip)
 {
+	printf("%s\n", __func__);
 }
 
 int
 sys_sigreturn(struct proc *p, void *v, register_t *retval)
 {
+	printf("%s\n", __func__);
 	return EJUSTRETURN;
 }
 
@@ -451,9 +487,34 @@ consinit(void)
 {
 }
 
+void
+opal_powerdown(void)
+{
+	int64_t error;
+
+	do {
+		error = opal_cec_power_down(0);
+		if (error == OPAL_BUSY_EVENT)
+			opal_poll_events(NULL);
+	} while (error == OPAL_BUSY || error == OPAL_BUSY_EVENT);
+
+	if (error != OPAL_SUCCESS)
+		return;
+
+	/* Wait for the actual powerdown to happen. */
+	for (;;)
+		opal_poll_events(NULL);
+}
+
 __dead void
 boot(int howto)
 {
+	if ((howto & RB_HALT) != 0) {
+		if ((howto & RB_POWERDOWN) != 0)
+			opal_powerdown();
+	}
+
+	printf("rebooting...\n");
 	opal_cec_reboot();
 
 	for (;;)

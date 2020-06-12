@@ -225,17 +225,17 @@ D/utils////
 D/vms////
 D/vos////
 D/win32////
-/INSTALL/1.26/Sat Jun  6 10:25:07 2020/-ko/
-/MANIFEST/1.59/Sat Jun  6 10:25:07 2020/-ko/
-/META.json/1.10/Sat Jun  6 10:25:07 2020/-kb/
-/META.yml/1.10/Sat Jun  6 10:25:07 2020/-ko/
-/Makefile.SH/1.52/Sat Jun  6 10:25:07 2020/-ko/
-/README.haiku/1.10/Sat Jun  6 10:25:07 2020/-ko/
-/README.macosx/1.10/Sat Jun  6 10:25:07 2020/-ko/
-/README.os2/1.26/Sat Jun  6 10:25:07 2020/-ko/
-/README.vms/1.27/Sat Jun  6 10:25:07 2020/-ko/
-/embed.fnc/1.11/Sat Jun  6 10:25:07 2020/-ko/
-/embed.h/1.26/Sat Jun  6 10:25:07 2020/-ko/
-/patchlevel.h/1.50/Sat Jun  6 10:25:07 2020/-ko/
-/proto.h/1.27/Sat Jun  6 10:25:07 2020/-ko/
-/regcomp.c/1.30/Sat Jun  6 10:25:07 2020/-ko/
+/INSTALL/1.26/Sat Jun  6 11:21:48 2020/-ko/
+/MANIFEST/1.59/Sat Jun  6 11:21:48 2020/-ko/
+/META.json/1.10/Sat Jun  6 11:21:48 2020/-kb/
+/META.yml/1.10/Sat Jun  6 11:21:48 2020/-ko/
+/Makefile.SH/1.52/Sat Jun  6 11:21:48 2020/-ko/
+/README.haiku/1.10/Sat Jun  6 11:21:48 2020/-ko/
+/README.macosx/1.10/Sat Jun  6 11:21:48 2020/-ko/
+/README.os2/1.26/Sat Jun  6 11:21:48 2020/-ko/
+/README.vms/1.27/Sat Jun  6 11:21:48 2020/-ko/
+/embed.fnc/1.11/Sat Jun  6 11:21:48 2020/-ko/
+/embed.h/1.26/Sat Jun  6 11:21:48 2020/-ko/
+/patchlevel.h/1.50/Sat Jun  6 11:21:48 2020/-ko/
+/proto.h/1.27/Sat Jun  6 11:21:48 2020/-ko/
+/regcomp.c/1.30/Sat Jun  6 11:21:48 2020/-ko/

@@ -10,7 +10,6 @@
 /kern_acct.c/1.42/Tue Oct 22 21:19:22 2019//
 /kern_bufq.c/1.33/Thu Dec 19 17:40:10 2019//
 /kern_clock.c/1.101/Tue Jan 21 16:16:23 2020//
-/kern_descrip.c/1.201/Fri Mar 13 10:07:01 2020//
 /kern_exec.c/1.213/Sat Feb 15 09:35:48 2020//
 /kern_exit.c/1.188/Wed Mar 18 15:48:21 2020//
 /kern_fork.c/1.225/Fri Mar 20 08:14:07 2020//
@@ -24,14 +23,12 @@
 /kern_prot.c/1.76/Tue Jul  9 12:23:25 2019//
 /kern_resource.c/1.68/Mon Jul 15 20:44:48 2019//
 /kern_rwlock.c/1.45/Mon Mar  2 17:07:49 2020//
-/kern_sched.c/1.66/Fri Feb 21 11:10:23 2020//
 /kern_sensors.c/1.39/Thu Dec 19 17:40:11 2019//
 /kern_sig.c/1.256/Tue Apr  7 13:27:51 2020//
 /kern_smr.c/1.8/Fri Apr  3 03:36:56 2020//
 /kern_srp.c/1.12/Fri Sep  8 05:36:53 2017//
 /kern_subr.c/1.50/Sun Apr 29 17:26:31 2018//
 /kern_synch.c/1.170/Mon Apr  6 07:52:12 2020//
-/kern_task.c/1.27/Thu Dec 19 17:40:11 2019//
 /kern_time.c/1.130/Wed May 20 17:23:01 2020//
 /kern_timeout.c/1.72/Tue Feb 18 12:13:40 2020//
 /kern_unveil.c/1.39/Sun Mar 22 20:23:36 2020//
@@ -39,7 +36,6 @@
 /kern_watchdog.c/1.14/Fri Jul  5 22:10:50 2019//
 /kern_xxx.c/1.36/Tue Apr  2 11:00:22 2019//
 /makesyscalls.sh/1.13/Mon Sep 26 16:42:34 2016//
-/spec_vnops.c/1.100/Mon Jan 20 23:21:55 2020//
 /subr_autoconf.c/1.94/Mon Dec 30 23:56:26 2019//
 /subr_evcount.c/1.12/Sat Mar 14 03:38:50 2015//
 /subr_extent.c/1.63/Sat Jan 11 14:30:24 2020//
@@ -73,7 +69,6 @@
 /tty_nmea.c/1.49/Thu Aug 15 15:08:14 2019//
 /tty_pty.c/1.99/Thu May 21 09:34:06 2020//
 /tty_subr.c/1.33/Mon Mar 14 23:08:06 2016//
-/tty_tty.c/1.25/Wed Apr  8 08:07:51 2020//
 /uipc_domain.c/1.57/Wed Jul  3 10:19:45 2019//
 /uipc_mbuf.c/1.274/Wed Jan 22 22:56:35 2020//
 /uipc_mbuf2.c/1.44/Tue Jul 16 21:41:37 2019//
@@ -95,11 +90,16 @@
 /vfs_vnops.c/1.114/Wed Apr  8 08:07:51 2020//
 /vfs_vops.c/1.28/Wed Apr  8 08:07:51 2020//
 /init_main.c/1.299/Mon Jun  1 06:23:28 2020//
-/kern_event.c/1.134/Mon Jun  1 06:23:28 2020//
 /kern_sysctl.c/1.372/Mon Jun  1 06:23:28 2020//
 /kern_tc.c/1.57/Mon Jun  1 06:23:28 2020//
 /sched_bsd.c/1.63/Mon Jun  1 06:23:28 2020//
 /subr_disk.c/1.237/Mon Jun  1 06:23:28 2020//
 /tty.c/1.156/Mon Jun  1 06:23:28 2020//
-/uipc_syscalls.c/1.185/Mon Jun  1 06:23:28 2020//
+/kern_descrip.c/1.202/Fri Jun 12 23:41:54 2020//
+/kern_event.c/1.136/Fri Jun 12 23:41:54 2020//
+/kern_sched.c/1.67/Fri Jun 12 23:41:54 2020//
+/kern_task.c/1.30/Fri Jun 12 23:41:54 2020//
+/spec_vnops.c/1.102/Fri Jun 12 23:41:54 2020//
+/tty_tty.c/1.27/Fri Jun 12 23:41:54 2020//
+/uipc_syscalls.c/1.186/Fri Jun 12 23:41:54 2020//
 D

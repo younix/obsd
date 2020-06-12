@@ -12,7 +12,7 @@
 /gostr341001_pmeth.c/1.14/Sun Jan 29 17:49:23 2017//
 /gostr341194.c/1.5/Thu Sep 10 15:56:25 2015//
 /streebog.c/1.6/Thu May  9 22:54:28 2019//
-/gost_err.c/1.4/Sat Jun  6 10:25:18 2020//
-/gostr341001_ameth.c/1.16/Sat Jun  6 10:25:18 2020//
-/gostr341001_params.c/1.4/Sat Jun  6 10:25:18 2020//
+/gost_err.c/1.4/Sat Jun  6 11:21:48 2020//
+/gostr341001_ameth.c/1.16/Sat Jun  6 11:21:48 2020//
+/gostr341001_params.c/1.4/Sat Jun  6 11:21:48 2020//
 D

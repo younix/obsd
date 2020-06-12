@@ -1,4 +1,4 @@
-/*	$OpenBSD: locore.S,v 1.4 2020/05/27 22:22:04 gkoehler Exp $	*/
+/*	$OpenBSD: locore.S,v 1.11 2020/06/12 22:01:01 gkoehler Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -17,6 +17,7 @@
  */
 
 #include <machine/opal.h>
+#include <machine/psl.h>
 
 	.abiversion 2
 
@@ -80,10 +81,25 @@ name:					\
 OPAL_CALL(OPAL_TEST, opal_test)
 OPAL_CALL(OPAL_CONSOLE_WRITE, opal_console_write)
 OPAL_CALL(OPAL_CONSOLE_READ, opal_console_read)
+OPAL_CALL(OPAL_RTC_READ, opal_rtc_read)
+OPAL_CALL(OPAL_RTC_WRITE, opal_rtc_write)
 OPAL_CALL(OPAL_CEC_POWER_DOWN, opal_cec_power_down)
 OPAL_CALL(OPAL_CEC_REBOOT, opal_cec_reboot)
-OPAL_CALL(OPAL_POLL_EVENTS, opal_poll_events)	
-	
+OPAL_CALL(OPAL_POLL_EVENTS, opal_poll_events)
+OPAL_CALL(OPAL_PCI_CONFIG_READ_WORD, opal_pci_config_read_word)
+OPAL_CALL(OPAL_PCI_CONFIG_WRITE_WORD, opal_pci_config_write_word)
+OPAL_CALL(OPAL_PCI_EEH_FREEZE_STATUS, opal_pci_eeh_freeze_status)
+OPAL_CALL(OPAL_PCI_EEH_FREEZE_CLEAR, opal_pci_eeh_freeze_clear)
+OPAL_CALL(OPAL_PCI_PHB_MMIO_ENABLE, opal_pci_phb_mmio_enable)
+OPAL_CALL(OPAL_PCI_SET_PHB_MEM_WINDOW, opal_pci_set_phb_mem_window)
+OPAL_CALL(OPAL_PCI_MAP_PE_MMIO_WINDOW, opal_pci_map_pe_mmio_window)
+OPAL_CALL(OPAL_PCI_SET_PE, opal_pci_set_pe)
+OPAL_CALL(OPAL_PCI_SET_XIVE_PE, opal_pci_set_xive_pe)
+OPAL_CALL(OPAL_GET_MSI_32, opal_get_msi_32)
+OPAL_CALL(OPAL_GET_MSI_64, opal_get_msi_64)
+OPAL_CALL(OPAL_PCI_MAP_PE_DMA_WINDOW_REAL, opal_pci_map_pe_dma_window_real)
+OPAL_CALL(OPAL_PCI_RESET, opal_pci_reset)
+
 opal_call:
 	mflr	%r11
 	std	%r11, 16(%r1)
@@ -97,9 +113,23 @@ opal_call:
 	ld	%r11, 0(%r11)
 	ld	%r12, 0(%r12)
 
+	/* Save MSR */
+	std	%r31, 12(%r1)
+	mfmsr	%r31
+
+	/* Disable transaltion and external interrupts */
+	andi.	%r2, %r31, ~(PSL_DR|PSL_IR|PSL_EE)@l
+	mtmsr	%r2
+	isync
+
 	mr	%r2, %r11
 	mtctr	%r12
 	bctrl
+
+	/* Restore MSR */
+	mtmsrd	%r31
+	isync
+	ld	%r31, 12(%r1)
 
 	ld	%r2, 24(%r1)
 	addi	%r1, %r1, 32
@@ -115,8 +145,8 @@ opal_call:
 	.globl db_enter
 db_enter:
 	trap
-	blr
-	
+	/* The trap handler will return from db_enter(). */
+
 	.globl setjmp
 setjmp:
 	mflr	%r0
