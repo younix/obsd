@@ -1,4 +1,4 @@
-/*	$OpenBSD: drm_linux.c,v 1.59 2020/06/08 04:47:58 jsg Exp $	*/
+/*	$OpenBSD: drm_linux.c,v 1.61 2020/07/02 11:01:21 jsg Exp $	*/
 /*
  * Copyright (c) 2013 Jonathan Gray <jsg@openbsd.org>
  * Copyright (c) 2015, 2016 Mark Kettenis <kettenis@openbsd.org>
@@ -303,28 +303,6 @@ kthread_stop(struct proc *p)
 	free(thread, M_DRM, sizeof(*thread));
 }
 
-struct timespec
-ns_to_timespec(const int64_t nsec)
-{
-	struct timespec ts;
-	int32_t rem;
-
-	if (nsec == 0) {
-		ts.tv_sec = 0;
-		ts.tv_nsec = 0;
-		return (ts);
-	}
-
-	ts.tv_sec = nsec / NSEC_PER_SEC;
-	rem = nsec % NSEC_PER_SEC;
-	if (rem < 0) {
-		ts.tv_sec--;
-		rem += NSEC_PER_SEC;
-	}
-	ts.tv_nsec = rem;
-	return (ts);
-}
-
 int64_t
 timeval_to_ns(const struct timeval *tv)
 {
@@ -548,7 +526,7 @@ kmap(struct vm_page *pg)
 }
 
 void
-kunmap(void *addr)
+kunmap_va(void *addr)
 {
 	vaddr_t va = (vaddr_t)addr;
 

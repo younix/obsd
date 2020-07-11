@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.3 2020/06/12 22:01:01 gkoehler Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.6 2020/06/24 20:19:14 kettenis Exp $	*/
 /*	$NetBSD: db_trace.c,v 1.15 1996/02/22 23:23:41 gwr Exp $	*/
 
 /*
@@ -82,6 +82,8 @@ struct db_variable db_regs[] = {
 
 struct db_variable *db_eregs = db_regs + nitems(db_regs);
 
+extern vaddr_t trapexit;
+
 /* stdu r1,_(r1) */
 #define inst_establish_frame(ins) ((ins & 0xffff0003) == 0xf8210001)
 
@@ -95,6 +97,7 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 	char		 c, *cp = modif;
 	Elf_Sym		*sym;
 	int		 has_frame, trace_proc = 0;
+	int		 end_trace = 0;
 
 	while ((c = *cp++) != 0) {
 		if (c == 't')
@@ -148,7 +151,25 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 
 		/* Go to the next frame. */
 		lastsp = sp;
-		if (!has_frame) {
+
+		if (lr == (vaddr_t)&trapexit) {
+			struct trapframe *frame =
+			    (struct trapframe *)(sp + 32);
+
+			if ((frame->srr1 & PSL_PR) && frame->exc == EXC_SC) {
+				(*pr)("--- syscall (number %ld) ---\n",
+				      frame->fixreg[0]);
+			} else {
+				(*pr)("--- trap (type 0x%x) ---\n",
+				      frame->exc);
+			}
+
+			if (frame->srr1 & PSL_PR)
+				end_trace = 1;
+
+			sp = frame->fixreg[1];
+			lr = frame->srr0 + 4;
+		} else if (!has_frame) {
 			lr = ddb_regs.lr;
 			has_frame = 1;
 		} else {
@@ -162,6 +183,11 @@ db_stack_trace_print(db_expr_t addr, int have_addr, db_expr_t count,
 			db_read_bytes(sp + 16, sizeof(vaddr_t), (char *)&lr);
 		}
 		callpc = lr - 4;
+
+		if (end_trace) {
+			(*pr)("End of kernel: 0x%lx lr 0x%lx\n", sp, callpc);
+			break;
+		}
 
 		--count;
 	}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpufunc.h,v 1.4 2020/06/09 18:58:14 kettenis Exp $	*/
+/*	$OpenBSD: cpufunc.h,v 1.7 2020/07/10 23:22:48 gkoehler Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -35,6 +35,12 @@ static inline void
 ptesync(void)
 {
 	__asm volatile ("ptesync" ::: "memory");
+}
+
+static inline void
+sync(void)
+{
+	__asm volatile ("sync" ::: "memory");
 }
 
 static inline void
@@ -125,6 +131,14 @@ mtdec(uint32_t value)
 	__asm volatile ("mtdec %0" :: "r"(value));
 }
 
+static inline uint32_t
+mfpvr(void)
+{
+	uint32_t value;
+	__asm volatile ("mfspr %0, 287" : "=r"(value));
+	return value;
+}
+
 static inline uint64_t
 mflpcr(void)
 {
@@ -143,6 +157,20 @@ static inline void
 mtptcr(uint64_t value)
 {
 	__asm volatile ("mtspr 464, %0" :: "r"(value));
+}
+
+static inline uint64_t
+mfpmsr(void)
+{
+	uint64_t value;
+	__asm volatile ("mfspr %0, 853" : "=r"(value));
+	return value;
+}
+
+static inline void
+mtpmcr(uint64_t value)
+{
+	__asm volatile ("mtspr 884, %0" :: "r"(value));
 }
 
 static inline uint32_t

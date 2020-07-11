@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_sis.c,v 1.135 2017/01/22 10:17:38 dlg Exp $ */
+/*	$OpenBSD: if_sis.c,v 1.137 2020/07/10 13:26:38 patrick Exp $ */
 /*
  * Copyright (c) 1997, 1998, 1999
  *	Bill Paul <wpaul@ctr.columbia.edu>.  All rights reserved.
@@ -1185,7 +1185,7 @@ sis_attach(struct device *parent, struct device *self, void *aux)
 	ifp->if_ioctl = sis_ioctl;
 	ifp->if_start = sis_start;
 	ifp->if_watchdog = sis_watchdog;
-	IFQ_SET_MAXLEN(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
+	ifq_set_maxlen(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_hardmtu = 1518; /* determined experimentally on DP83815 */
 
@@ -1447,7 +1447,8 @@ sis_rxeof(struct sis_softc *sc)
 		ml_enqueue(&ml, m);
 	}
 
-	if_input(ifp, &ml);
+	if (ifiq_input(&ifp->if_rcv, &ml))
+		if_rxr_livelocked(&sc->sis_cdata.sis_rx_ring);
 
 	sis_fill_rx_ring(sc);
 }
@@ -1585,7 +1586,7 @@ sis_intr(void *arg)
 	 */
 	SIS_SETBIT(sc, SIS_CSR, SIS_CSR_RX_ENABLE);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (!ifq_empty(&ifp->if_snd))
 		sis_start(ifp);
 
 	return (1);
@@ -1965,7 +1966,7 @@ sis_watchdog(struct ifnet *ifp)
 	s = splnet();
 	sis_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (!ifq_empty(&ifp->if_snd))
 		sis_start(ifp);
 
 	splx(s);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.19 2020/06/10 19:06:53 kettenis Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.48 2020/07/10 17:09:37 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -17,18 +17,26 @@
  */
 
 #include <sys/param.h>
-#include <sys/systm.h>
 #include <sys/buf.h>
 #include <sys/exec.h>
 #include <sys/exec_elf.h>
+#include <sys/mount.h>
 #include <sys/msgbuf.h>
+#include <sys/proc.h>
 #include <sys/reboot.h>
+#include <sys/signalvar.h>
+#include <sys/syscallargs.h>
+#include <sys/systm.h>
+#include <sys/user.h>
 
 #include <machine/cpufunc.h>
+#include <machine/fpu.h>
 #include <machine/opal.h>
+#include <machine/pcb.h>
 #include <machine/psl.h>
 #include <machine/trap.h>
 
+#include <net/if.h>
 #include <uvm/uvm_extern.h>
 
 #include <dev/ofw/fdt.h>
@@ -66,7 +74,11 @@ extern uint64_t opal_base;
 extern uint64_t opal_entry;
 
 extern char trapcode[], trapcodeend[];
+extern char hvtrapcode[], hvtrapcodeend[];
 extern char generictrap[];
+extern char generichvtrap[];
+
+extern char initstack[];
 
 struct fdt_reg memreg[VM_PHYSSEG_MAX];
 int nmemreg;
@@ -78,6 +90,9 @@ struct fdt_reg initrd_reg;
 void memreg_add(const struct fdt_reg *);
 void memreg_remove(const struct fdt_reg *);
 
+void parse_bootargs(const char *);
+const char *parse_bootduid(const char *);
+
 paddr_t fdt_pa;
 size_t fdt_size;
 
@@ -85,10 +100,11 @@ void
 init_powernv(void *fdt, void *tocbase)
 {
 	struct fdt_reg reg;
+	register_t uspace;
 	paddr_t trap;
 	uint64_t msr;
-	char *prop;
 	void *node;
+	char *prop;
 	int len;
 	int i;
 
@@ -110,6 +126,16 @@ init_powernv(void *fdt, void *tocbase)
 		fdt_node_property(node, "opal-entry-address", &prop);
 		opal_entry = bemtoh64((uint64_t *)prop);
 		fdt_node_property(node, "compatible", &prop);
+
+		opal_reinit_cpus(OPAL_REINIT_CPUS_HILE_BE);
+
+		/*
+		 * The following call will fail on Power ISA 2.0x CPUs,
+		 * but that is fine since they don't support Radix Tree
+		 * translation.  On Power ISA 3.0 CPUs this will make
+		 * the full TLB available.
+		 */
+		opal_reinit_cpus(OPAL_REINIT_CPUS_MMU_HASH);
 	}
 
 	/* At this point we can call OPAL runtime services and use printf(9). */
@@ -125,13 +151,24 @@ init_powernv(void *fdt, void *tocbase)
 	 */
 	for (trap = EXC_RST; trap < EXC_LAST; trap += 32)
 		memcpy((void *)trap, trapcode, trapcodeend - trapcode);
-	__syncicache(EXC_RSVD, EXC_LAST - EXC_RSVD);
+
+	/* Hypervisor interrupts needs special handling. */
+	memcpy((void *)EXC_HDSI, hvtrapcode, hvtrapcodeend - hvtrapcode);
+	memcpy((void *)EXC_HISI, hvtrapcode, hvtrapcodeend - hvtrapcode);
+	memcpy((void *)EXC_HEA, hvtrapcode, hvtrapcodeend - hvtrapcode);
+	memcpy((void *)EXC_HMI, hvtrapcode, hvtrapcodeend - hvtrapcode);
+	memcpy((void *)EXC_HFAC, hvtrapcode, hvtrapcodeend - hvtrapcode);
+	memcpy((void *)EXC_HVI, hvtrapcode, hvtrapcodeend - hvtrapcode);
 
 	*((void **)TRAP_ENTRY) = generictrap;
+	*((void **)TRAP_HVENTRY) = generichvtrap;
+
+	/* Make the stubs visible to the CPU. */
+	__syncicache(EXC_RSVD, EXC_LAST - EXC_RSVD);
 
 	/* We're now ready to take traps. */
 	msr = mfmsr();
-	mtmsr(msr | PSL_RI);
+	mtmsr(msr | (PSL_ME|PSL_RI));
 
 #define LPCR_LPES	0x0000000000000008UL
 #define LPCR_HVICE	0x0000000000000002UL
@@ -210,6 +247,12 @@ init_powernv(void *fdt, void *tocbase)
 	isync();
 
 	initmsgbuf((caddr_t)uvm_pageboot_alloc(MSGBUFSIZE), MSGBUFSIZE);
+
+	proc0paddr = (struct user *)initstack;
+	proc0.p_addr = proc0paddr;
+	curpcb = &proc0.p_addr->u_pcb;
+	uspace = (register_t)proc0paddr + USPACE - FRAMELEN;
+	proc0.p_md.md_regs = (struct trapframe *)uspace;
 }
 
 void
@@ -302,6 +345,15 @@ self_reloc(Elf_Dyn *dynamic, Elf_Addr base)
 	}
 }
 
+void *
+opal_phys(void *va)
+{
+	paddr_t pa;
+
+	pmap_extract(pmap_kernel(), (vaddr_t)va, &pa);
+	return (void *)pa;
+}
+
 void
 opal_printf(const char *fmt, ...)
 {
@@ -317,7 +369,7 @@ opal_printf(const char *fmt, ...)
 		 len = sizeof(buf) - 1;
 	va_end(ap);
 
-	opal_console_write(0, &len, buf);
+	opal_console_write(0, opal_phys(&len), opal_phys(buf));
 }
 
 void
@@ -338,7 +390,7 @@ opal_cngetc(dev_t dev)
 
 	for (;;) {
 		len = 1;
-		opal_console_read(0, &len, &ch);
+		opal_console_read(0, opal_phys(&len), opal_phys(&ch));
 		if (len)
 			return ch;
 		opal_poll_events(NULL);
@@ -350,8 +402,15 @@ opal_cnputc(dev_t dev, int c)
 {
 	uint64_t len = 1;
 	char ch = c;
+	int64_t error;
 
-	opal_console_write(0, &len, &ch);
+	opal_console_write(0, opal_phys(&len), opal_phys(&ch));
+	while (1) {
+		error = opal_console_flush(0);
+		if (error != OPAL_BUSY && error != OPAL_PARTIAL)
+			break;
+		delay(1);
+	}
 }
 
 void
@@ -370,62 +429,173 @@ struct consdev opal_consdev = {
 struct consdev *cn_tab = &opal_consdev;
 
 int
-copyin(const void *src, void *dst, size_t size)
+copyin(const void *uaddr, void *kaddr, size_t len)
 {
-	printf("%s\n", __func__);
-	return EFAULT;
+	pmap_t pm = curproc->p_vmspace->vm_map.pmap;
+	vaddr_t kva;
+	vsize_t klen;
+	int error;
+
+	while (len > 0) {
+		error = pmap_set_user_slb(pm, (vaddr_t)uaddr, &kva, &klen);
+		if (error)
+			return error;
+		if (klen > len)
+			klen = len;
+		error = kcopy((const void *)kva, kaddr, klen);
+		pmap_unset_user_slb();
+		if (error)
+			return error;
+
+		uaddr = (const char *)uaddr + klen;
+		kaddr = (char *)kaddr + klen;
+		len -= klen;
+	}
+
+	return 0;
 }
 
 int
-copyout(const void *src, void *dst, size_t size)
+copyout(const void *kaddr, void *uaddr, size_t len)
 {
-	printf("%s\n", __func__);
-	return EFAULT;
+	pmap_t pm = curproc->p_vmspace->vm_map.pmap;
+	vaddr_t kva;
+	vsize_t klen;
+	int error;
+
+	while (len > 0) {
+		error = pmap_set_user_slb(pm, (vaddr_t)uaddr, &kva, &klen);
+		if (error)
+			return error;
+		if (klen > len)
+			klen = len;
+		error = kcopy(kaddr, (void *)kva, klen);
+		pmap_unset_user_slb();
+		if (error)
+			return error;
+
+		kaddr = (const char *)kaddr + klen;
+		uaddr = (char *)uaddr + klen;
+		len -= klen;
+	}
+
+	return 0;
 }
 
 int
-copystr(const void *src, void *dst, size_t len, size_t *lenp)
+copyinstr(const void *uaddr, void *kaddr, size_t len, size_t *done)
 {
-	printf("%s\n", __func__);
-	return EFAULT;
+	pmap_t pm = curproc->p_vmspace->vm_map.pmap;
+	vaddr_t kva;
+	vsize_t klen;
+	size_t count, total;
+	int error = 0;
+
+	if (len == 0)
+		return ENAMETOOLONG;
+
+	total = 0;
+	while (len > 0) {
+		error = pmap_set_user_slb(pm, (vaddr_t)uaddr, &kva, &klen);
+		if (error)
+			goto out;
+		if (klen > len)
+			klen = len;
+		error = copystr((const void *)kva, kaddr, klen, &count);
+		total += count;
+		pmap_unset_user_slb();
+		if (error == 0 || error == EFAULT)
+			goto out;
+
+		uaddr = (const char *)uaddr + klen;
+		kaddr = (char *)kaddr + klen;
+		len -= klen;
+	}
+
+out:
+	if (done)
+		*done = total;
+	return error;
 }
 
 int
-copyinstr(const void *src, void *dst, size_t size, size_t *lenp)
+copyoutstr(const void *kaddr, void *uaddr, size_t len, size_t *done)
 {
-	printf("%s\n", __func__);
-	return EFAULT;
-}
+	pmap_t pm = curproc->p_vmspace->vm_map.pmap;
+	vaddr_t kva;
+	vsize_t klen;
+	size_t count, total;
+	int error = 0;
 
-int
-copyoutstr(const void *src, void *dst, size_t size, size_t *lenp)
-{
-	printf("%s\n", __func__);
-	return EFAULT;
-}
+	if (len == 0)
+		return ENAMETOOLONG;
 
-int
-kcopy(const void *src, void *dst, size_t size)
-{
-	printf("%s\n", __func__);
-	return EFAULT;
+	total = 0;
+	while (len > 0) {
+		error = pmap_set_user_slb(pm, (vaddr_t)uaddr, &kva, &klen);
+		if (error)
+			goto out;
+		if (klen > len)
+			klen = len;
+		error = copystr(kaddr, (void *)kva, klen, &count);
+		total += count;
+		pmap_unset_user_slb();
+		if (error == 0 || error == EFAULT)
+			goto out;
+
+		kaddr = (const char *)kaddr + klen;
+		uaddr = (char *)uaddr + klen;
+		len -= klen;
+	}
+
+out:
+	if (done)
+		*done = total;
+	return error;
 }
 
 void
 need_resched(struct cpu_info *ci)
 {
 	ci->ci_want_resched = 1;
+
+	/* There's a risk we'll be called before the idle threads start */
+	if (ci->ci_curproc) {
+		aston(ci->ci_curproc);
+		cpu_kick(ci);
+	}
 }
 
 void
 cpu_startup(void)
 {
+	vaddr_t minaddr, maxaddr, va;
 	paddr_t pa, epa;
-	vaddr_t va;
 	void *fdt;
-	
+	void *node;
+	char *prop;
+	int len;
+
 	printf("%s", version);
 
+	/*
+	 * Allocate a submap for exec arguments.  This map effectively
+	 * limits the number of processes exec'ing at any time.
+	 */
+	minaddr = vm_map_min(kernel_map);
+	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    16 * NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
+
+
+	/*
+	 * Allocate a submap for physio.
+	 */
+	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
+
+	/*
+	 * Set up buffers, so they can be used to read disk labels.
+	 */
 	bufinit();
 
 	/* Remap the FDT. */
@@ -441,26 +611,264 @@ cpu_startup(void)
 
 	if (!fdt_init(fdt) || fdt_get_size(fdt) == 0)
 		panic("can't remap FDT");
+
+	intr_init();
+
+	node = fdt_find_node("/chosen");
+	if (node) {
+		len = fdt_node_property(node, "bootargs", &prop);
+		if (len > 0)
+			parse_bootargs(prop);
+	}
+
+	if (boothowto & RB_CONFIG) {
+#ifdef BOOT_CONFIG
+		user_config();
+#else
+		printf("kernel does not support -c; continuing..\n");
+#endif
+	}
 }
+
+void
+parse_bootargs(const char *bootargs)
+{
+	const char *cp = bootargs;
+
+	if (strncmp(cp, "bootduid=", strlen("bootduid=")) == 0)
+		cp = parse_bootduid(cp + strlen("bootduid="));
+
+	while (*cp != '-')
+		if (*cp++ == '\0')
+			return;
+	cp++;
+
+	while (*cp != 0) {
+		switch(*cp) {
+		case 'a':
+			boothowto |= RB_ASKNAME;
+			break;
+		case 'c':
+			boothowto |= RB_CONFIG;
+			break;
+		case 'd':
+			boothowto |= RB_KDB;
+			break;
+		case 's':
+			boothowto |= RB_SINGLE;
+			break;
+		default:
+			printf("unknown option `%c'\n", *cp);
+			break;
+		}
+		cp++;
+	}
+}
+
+const char *
+parse_bootduid(const char *bootarg)
+{
+	const char *cp = bootarg;
+	uint64_t duid = 0;
+	int digit, count = 0;
+
+	while (count < 16) {
+		if (*cp >= '0' && *cp <= '9')
+			digit = *cp - '0';
+		else if (*cp >= 'a' && *cp <= 'f')
+			digit = *cp - 'a' + 10;
+		else
+			break;
+		duid *= 16;
+		duid += digit;
+		count++;
+		cp++;
+	}
+
+	if (count > 0) {
+		memcpy(&bootduid, &duid, sizeof(bootduid));
+		return cp;
+	}
+
+	return bootarg;
+}
+
+#define PSL_USER \
+    (PSL_SF | PSL_HV | PSL_EE | PSL_PR | PSL_ME | PSL_IR | PSL_DR | PSL_RI)
 
 void
 setregs(struct proc *p, struct exec_package *pack, u_long stack,
     register_t *retval)
 {
-	printf("%s\n", __func__);
+	struct trapframe *frame = p->p_md.md_regs;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct ps_strings arginfo;
+
+	copyin((void *)p->p_p->ps_strings, &arginfo, sizeof(arginfo));
+
+	memset(frame, 0, sizeof(*frame));
+	frame->fixreg[1] = stack;
+	frame->fixreg[3] = retval[0] = arginfo.ps_nargvstr;
+	frame->fixreg[4] = retval[1] = (register_t)arginfo.ps_argvstr;
+	frame->fixreg[5] = (register_t)arginfo.ps_envstr;
+	frame->fixreg[6] = (register_t)pack->ep_emul_argp;
+	frame->fixreg[12] = pack->ep_entry;
+	frame->srr0 = pack->ep_entry;
+	frame->srr1 = PSL_USER;
+
+	memset(&pcb->pcb_fpstate, 0, sizeof(pcb->pcb_fpstate));
+	pcb->pcb_flags = 0;
 }
 
 void
 sendsig(sig_t catcher, int sig, sigset_t mask, const siginfo_t *ksip)
 {
-	printf("%s\n", __func__);
+	struct proc *p = curproc;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	struct trapframe *tf = p->p_md.md_regs;
+	struct sigframe *fp, frame;
+	struct sigacts *psp = p->p_p->ps_sigacts;
+	siginfo_t *sip = NULL;
+	int i;
+
+	/* Allocate space for the signal handler context. */
+	if ((p->p_sigstk.ss_flags & SS_DISABLE) == 0 &&
+	    !sigonstack(tf->fixreg[1]) && (psp->ps_sigonstack & sigmask(sig)))
+		fp = (struct sigframe *)
+		    trunc_page((vaddr_t)p->p_sigstk.ss_sp + p->p_sigstk.ss_size);
+	else
+		fp = (struct sigframe *)tf->fixreg[1];
+
+	fp = (struct sigframe *)(STACKALIGN(fp - 1) - 288);
+
+	/* Save FPU state to PCB if necessary. */
+	if (pcb->pcb_flags & (PCB_FP|PCB_VEC|PCB_VSX) &&
+	    tf->srr1 & (PSL_FP|PSL_VEC|PSL_VSX)) {
+		tf->srr1 &= ~(PSL_FP|PSL_VEC|PSL_VSX);
+		save_vsx(p);
+	}
+
+	/* Build stack frame for signal trampoline. */
+	memset(&frame, 0, sizeof(frame));
+	frame.sf_signum = sig;
+
+	/* Save register context. */
+	for (i = 0; i < 32; i++)
+		frame.sf_sc.sc_frame.fixreg[i] = tf->fixreg[i];
+	frame.sf_sc.sc_frame.lr = tf->lr;
+	frame.sf_sc.sc_frame.cr = tf->cr;
+	frame.sf_sc.sc_frame.xer = tf->xer;
+	frame.sf_sc.sc_frame.ctr = tf->ctr;
+	frame.sf_sc.sc_frame.srr0 = tf->srr0;
+	frame.sf_sc.sc_frame.srr1 = tf->srr1;
+
+	/* Copy the saved FPU state into the frame if necessary. */
+	if (pcb->pcb_flags & (PCB_FP|PCB_VEC|PCB_VSX)) {
+		memcpy(frame.sf_sc.sc_vsx, pcb->pcb_fpstate.fp_vsx,
+		    sizeof(pcb->pcb_fpstate.fp_vsx));
+		frame.sf_sc.sc_fpscr = pcb->pcb_fpstate.fp_fpscr;
+		frame.sf_sc.sc_vscr = pcb->pcb_fpstate.fp_vscr;
+	}
+
+	/* Save signal mask. */
+	frame.sf_sc.sc_mask = mask;
+
+	if (psp->ps_siginfo & sigmask(sig)) {
+		sip = &fp->sf_si;
+		frame.sf_si = *ksip;
+	}
+
+	frame.sf_sc.sc_cookie = (long)&fp->sf_sc ^ p->p_p->ps_sigcookie;
+	if (copyout(&frame, fp, sizeof(frame)))
+		sigexit(p, SIGILL);
+
+	/*
+	 * Build context to run handler in.
+	 */
+	tf->fixreg[1] = (register_t)fp;
+	tf->fixreg[3] = sig;
+	tf->fixreg[4] = (register_t)sip;
+	tf->fixreg[5] = (register_t)&fp->sf_sc;
+	tf->fixreg[12] = (register_t)catcher;
+
+	tf->srr0 = p->p_p->ps_sigcode;
 }
 
 int
 sys_sigreturn(struct proc *p, void *v, register_t *retval)
 {
-	printf("%s\n", __func__);
+	struct sys_sigreturn_args /* {
+		syscallarg(struct sigcontext *) sigcntxp;
+	} */ *uap = v;
+	struct sigcontext ksc, *scp = SCARG(uap, sigcntxp);
+	struct trapframe *tf = p->p_md.md_regs;
+	struct pcb *pcb = &p->p_addr->u_pcb;
+	int error;
+	int i;
+
+	if (PROC_PC(p) != p->p_p->ps_sigcoderet) {
+		sigexit(p, SIGILL);
+		return EPERM;
+	}
+
+	if ((error = copyin(scp, &ksc, sizeof ksc)))
+		return error;
+
+	if (ksc.sc_cookie != ((long)scp ^ p->p_p->ps_sigcookie)) {
+		sigexit(p, SIGILL);
+		return EFAULT;
+	}
+
+	/* Prevent reuse of the sigcontext cookie */
+	ksc.sc_cookie = 0;
+	(void)copyout(&ksc.sc_cookie, (caddr_t)scp +
+	    offsetof(struct sigcontext, sc_cookie), sizeof (ksc.sc_cookie));
+
+	/* Make sure the processor mode has not been tampered with. */
+	if (ksc.sc_frame.srr1 != PSL_USER)
+		return EINVAL;
+
+	/* Restore register context. */
+	for (i = 0; i < 32; i++)
+		tf->fixreg[i] = ksc.sc_frame.fixreg[i];
+	tf->lr = ksc.sc_frame.lr;
+	tf->cr = ksc.sc_frame.cr;
+	tf->xer = ksc.sc_frame.xer;
+	tf->ctr = ksc.sc_frame.ctr;
+	tf->srr0 = ksc.sc_frame.srr0;
+	tf->srr1 = ksc.sc_frame.srr1;
+
+	/* Write saved FPU state back to PCB if necessary. */
+	if (pcb->pcb_flags & (PCB_FP|PCB_VEC|PCB_VSX)) {
+		memcpy(pcb->pcb_fpstate.fp_vsx, ksc.sc_vsx,
+		    sizeof(pcb->pcb_fpstate.fp_vsx));
+		pcb->pcb_fpstate.fp_fpscr = ksc.sc_fpscr;
+		pcb->pcb_fpstate.fp_vscr = ksc.sc_vscr;
+	}
+
+	/* Restore signal mask. */
+	p->p_sigmask = ksc.sc_mask & ~sigcantmask;
+
 	return EJUSTRETURN;
+}
+
+void	cpu_switchto_asm(struct proc *, struct proc *);
+
+void
+cpu_switchto(struct proc *old, struct proc *new)
+{
+	if (old) {
+		struct pcb *pcb = &old->p_addr->u_pcb;
+		struct trapframe *tf = old->p_md.md_regs;
+
+		if (pcb->pcb_flags & (PCB_FP|PCB_VEC|PCB_VSX) &&
+		    tf->srr1 & (PSL_FP|PSL_VEC|PSL_VSX)) {
+			tf->srr1 &= ~(PSL_FP|PSL_VEC|PSL_VSX);
+			save_vsx(old);
+		}
+	}
+
+	cpu_switchto_asm(old, new);
 }
 
 /*
@@ -506,27 +914,55 @@ opal_powerdown(void)
 		opal_poll_events(NULL);
 }
 
+int	waittime = -1;
+
 __dead void
 boot(int howto)
 {
+	if ((howto & RB_RESET) != 0)
+		goto doreset;
+
+	if (cold) {
+		if ((howto & RB_USERREQ) == 0)
+			howto |= RB_HALT;
+		goto haltsys;
+	}
+
+	boothowto = howto;
+	if ((howto & RB_NOSYNC) == 0 && waittime < 0) {
+		waittime = 0;
+		vfs_shutdown(curproc);
+
+		if ((howto & RB_TIMEBAD) == 0) {
+			resettodr();
+		} else {
+			printf("WARNING: not updating battery clock\n");
+		}
+	}
+	if_downall();
+
+	uvm_shutdown();
+	splhigh();
+	cold = 1;
+
+haltsys:
+	config_suspend_all(DVACT_POWERDOWN);
+
 	if ((howto & RB_HALT) != 0) {
 		if ((howto & RB_POWERDOWN) != 0)
 			opal_powerdown();
+
+		printf("\n");
+		printf("The operating system has halted.\n");
+		printf("Please press any key to reboot.\n\n");
+		cngetc();
 	}
 
+doreset:
 	printf("rebooting...\n");
 	opal_cec_reboot();
 
 	for (;;)
 		continue;
 	/* NOTREACHED */
-}
-
-unsigned int
-cpu_rnd_messybits(void)
-{
-	struct timespec ts;
-
-	nanotime(&ts);
-	return (ts.tv_nsec ^ (ts.tv_sec << 20));
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_time.c,v 1.130 2020/05/20 17:23:01 cheloha Exp $	*/
+/*	$OpenBSD: kern_time.c,v 1.132 2020/07/09 02:17:07 cheloha Exp $	*/
 /*	$NetBSD: kern_time.c,v 1.20 1996/02/18 11:57:06 fvdl Exp $	*/
 
 /*
@@ -391,6 +391,9 @@ sys_settimeofday(struct proc *p, void *v, register_t *retval)
 	return (0);
 }
 
+#define ADJFREQ_MAX (500000000LL << 32)
+#define ADJFREQ_MIN (-500000000LL << 32)
+
 int
 sys_adjfreq(struct proc *p, void *v, register_t *retval)
 {
@@ -408,6 +411,8 @@ sys_adjfreq(struct proc *p, void *v, register_t *retval)
 			return (error);
 		if ((error = copyin(freq, &f, sizeof(f))))
 			return (error);
+		if (f < ADJFREQ_MIN || f > ADJFREQ_MAX)
+			return (EINVAL);
 	}
 
 	rw_enter(&tc_lock, (freq == NULL) ? RW_READ : RW_WRITE);
@@ -778,6 +783,7 @@ ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
 }
 
 todr_chip_handle_t todr_handle;
+int inittodr_done;
 
 #define MINYEAR		((OpenBSD / 100) - 1)	/* minimum plausible year */
 
@@ -793,6 +799,8 @@ inittodr(time_t base)
 	struct timeval rtctime;
 	struct timespec ts;
 	int badbase;
+
+	inittodr_done = 1;
 
 	if (base < (MINYEAR - 1970) * SECYR) {
 		printf("WARNING: preposterous time in file system\n");
@@ -856,7 +864,11 @@ resettodr(void)
 {
 	struct timeval rtctime;
 
-	if (time_second == 1)
+	/*
+	 * Skip writing the RTC if inittodr(9) never ran.  We don't
+	 * want to overwrite a reasonable value with a nonsense value.
+	 */
+	if (!inittodr_done)
 		return;
 
 	microtime(&rtctime);

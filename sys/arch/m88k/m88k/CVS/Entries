@@ -16,7 +16,6 @@
 /m88k_machdep.c/1.70/Tue Oct 15 10:05:43 2019//
 /mem.c/1.6/Thu Dec 14 03:30:43 2017//
 /mutex.c/1.1/Tue May 26 11:55:10 2020//
-/pmap.c/1.85/Wed Oct 19 08:28:20 2016//
 /process.S/1.26/Fri May 17 22:35:19 2013//
 /process_machdep.c/1.4/Mon Jul 28 17:50:11 2008//
 /sig_machdep.c/1.29/Tue Jul 10 04:19:59 2018//
@@ -26,4 +25,5 @@
 /vectors_88100.S/1.7/Mon Jun  9 15:00:57 2014//
 /vectors_88110.S/1.9/Mon Jun  9 15:00:57 2014//
 /vm_machdep.c/1.25/Sun Feb 12 04:55:08 2017//
+/pmap.c/1.86/Sat Jul 11 07:57:47 2020//
 D

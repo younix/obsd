@@ -172,7 +172,6 @@
 /gengtype.c/1.1.1.1/Thu Oct 15 17:11:28 2009//
 /gengtype.h/1.1.1.1/Thu Oct 15 17:11:28 2009//
 /genmddeps.c/1.1.1.1/Thu Oct 15 17:11:28 2009//
-/genmodes.c/1.1.1.1/Thu Oct 15 17:11:28 2009//
 /genmultilib/1.1.1.1/Thu Oct 15 17:11:28 2009//
 /genopinit.c/1.1.1.1/Thu Oct 15 17:11:28 2009//
 /genoutput.c/1.1.1.1/Thu Oct 15 17:11:28 2009//
@@ -504,3 +503,4 @@ D/ginclude////
 D/objc////
 D/objcp////
 D/treelang////
+/genmodes.c/1.2/Sat Jul 11 07:57:04 2020//

@@ -77,7 +77,6 @@
 /sanity.sh/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /size.c/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /srconv.c/1.1.1.1/Sun Apr 24 20:14:40 2011//
-/stabs.c/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /stamp-h.in/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /strings.c/1.2/Thu Oct 22 14:53:00 2015//
 /sysdump.c/1.1.1.1/Sun Apr 24 20:14:40 2011//
@@ -94,3 +93,4 @@
 /wrstabs.c/1.1.1.1/Sun Apr 24 20:14:40 2011//
 D/doc////
 D/po////
+/stabs.c/1.2/Sat Jul 11 07:57:19 2020//

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.9 2020/06/10 19:06:53 kettenis Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.18 2020/07/05 20:49:40 naddy Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -35,6 +35,7 @@
 #include <machine/frame.h>
 #include <machine/intr.h>
 #include <machine/psl.h>
+#include <machine/pte.h>
 
 #include <sys/device.h>
 #include <sys/sched.h>
@@ -45,6 +46,10 @@ struct cpu_info {
 	struct schedstate_percpu ci_schedstate;
 
 	struct proc	*ci_curproc;
+	struct pcb	*ci_curpcb;
+
+	struct slb	ci_kernel_slb[32];
+	paddr_t		ci_user_slb_pa;
 
 #define CPUSAVE_LEN	9
 	register_t	ci_tempsave[CPUSAVE_LEN];
@@ -56,6 +61,7 @@ struct cpu_info {
 	
 	volatile int 	ci_cpl;
 	uint32_t	ci_ipending;
+	uint32_t	ci_idepth;
 #ifdef DIAGNOSTIC
 	int		ci_mutex_level;
 #endif
@@ -77,9 +83,11 @@ register struct cpu_info *__curcpu asm("r13");
 	for (cii = 0, ci = curcpu(); ci != NULL; ci = NULL)
 #define cpu_number()		0
 
-#define CLKF_INTR(frame)	0
-#define CLKF_USERMODE(frame)	0
-#define CLKF_PC(frame)		0
+#define clockframe trapframe
+
+#define CLKF_INTR(frame)	(curcpu()->ci_idepth > 1)
+#define CLKF_USERMODE(frame)	(frame->srr1 & PSL_PR)
+#define CLKF_PC(frame)		(frame->srr0)
 
 #define aston(p)		((p)->p_md.md_astpending = 1)
 #define need_proftick(p)	aston(p)
@@ -89,7 +97,16 @@ register struct cpu_info *__curcpu asm("r13");
 #define CPU_BUSY_CYCLE()	do {} while (0)
 #define signotify(p)		setsoftast()
 
-unsigned int cpu_rnd_messybits(void);
+#define curpcb			curcpu()->ci_curpcb
+
+static inline unsigned int
+cpu_rnd_messybits(void)
+{
+	uint64_t tb;
+
+	__asm volatile("mftb %0" : "=r" (tb));
+	return ((tb >> 32) ^ tb);
+}
 
 void need_resched(struct cpu_info *);
 #define clear_resched(ci)	((ci)->ci_want_resched = 0)
@@ -99,8 +116,10 @@ void delay(u_int);
 
 #define setsoftast()		aston(curcpu()->ci_curproc)
 
-#define PROC_STACK(p)		0
-#define PROC_PC(p)		0
+#define PROC_STACK(p)		((p)->p_md.md_regs->fixreg[1])
+#define PROC_PC(p)		((p)->p_md.md_regs->srr0)
+
+void	proc_trampoline(void);
 
 static inline void
 intr_enable(void)

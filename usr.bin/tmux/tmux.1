@@ -1,4 +1,4 @@
-.\" $OpenBSD: tmux.1,v 1.783 2020/06/12 07:52:38 nicm Exp $
+.\" $OpenBSD: tmux.1,v 1.788 2020/07/06 09:14:20 nicm Exp $
 .\"
 .\" Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
 .\"
@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: June 12 2020 $
+.Dd $Mdocdate: July 6 2020 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -989,6 +989,8 @@ output is paused once the pane is
 behind in control mode
 .It read-only
 the client is read-only
+.It wait-exit
+wait for an empty line input before exiting in control mode
 .El
 .Pp
 A leading
@@ -1253,6 +1255,7 @@ specified multiple times.
 .It Xo Ic refresh-client
 .Op Fl cDlLRSU
 .Op Fl A Ar pane:state
+.Op Fl B Ar name:what:format
 .Op Fl C Ar XxY
 .Op Fl f Ar flags
 .Op Fl t Ar target-client
@@ -1325,6 +1328,31 @@ If
 will pause the pane.
 .Fl A
 may be given multiple times for different panes.
+.Pp
+.Fl B
+sets a subscription to a format for a control mode client.
+The argument is split into three items by colons:
+.Ar name
+is a name for the subscription;
+.Ar what
+is a type of item to subscribe to;
+.Ar format
+is the format.
+After a subscription is added, changes to the format are reported with the
+.Ic %subscription-changed
+notification, at most once a second.
+If only the name is given, the subscription is removed.
+.Ar what
+may be empty to check the format only for the attached session, or one of:
+a pane ID such as
+.Ql %0 ;
+.Ql %*
+for all panes in the attached session;
+an window ID such as
+.Ql @0 ;
+or
+.Ql @*
+for all windows in the attached session.
 .Pp
 .Fl f
 sets a comma-separated list of client flags, see
@@ -1792,7 +1820,7 @@ from which the layout was originally defined.
 Commands related to windows and panes are as follows:
 .Bl -tag -width Ds
 .It Xo Ic break-pane
-.Op Fl adP
+.Op Fl abdP
 .Op Fl F Ar format
 .Op Fl n Ar window-name
 .Op Fl s Ar src-pane
@@ -1804,9 +1832,11 @@ Break
 off from its containing window to make it the only pane in
 .Ar dst-window .
 With
-.Fl a ,
-the window is moved to the next index up (following windows
-are moved if necessary).
+.Fl a
+or
+.Fl b ,
+the window is moved to the next index after or before (existing windows are
+moved if necessary).
 If
 .Fl d
 is given, the new window does not become the current window.
@@ -2029,6 +2059,8 @@ The following keys may be used in customize mode:
 .It Li "s" Ta "Set option value or key attribute"
 .It Li "S" Ta "Set global option value"
 .It Li "w" Ta "Set window option value, if option is for pane and window"
+.It Li "d" Ta "Set an option or key to the default"
+.It Li "D" Ta "Set tagged options and tagged keys to the default"
 .It Li "u" Ta "Unset an option (set to default value if global) or unbind a key"
 .It Li "U" Ta "Unset tagged options and unbind tagged keys"
 .It Li "C-s" Ta "Search by name"
@@ -2188,7 +2220,7 @@ If no
 .Ar target-session
 is specified, select the last window of the current session.
 .It Xo Ic link-window
-.Op Fl adk
+.Op Fl abdk
 .Op Fl s Ar src-window
 .Op Fl t Ar dst-window
 .Xc
@@ -2203,9 +2235,12 @@ is specified and no such window exists, the
 .Ar src-window
 is linked there.
 With
-.Fl a ,
-the window is moved to the next index up (following windows
-are moved if necessary).
+.Fl a
+or
+.Fl b
+the window is moved to the next index after or before
+.Ar dst-window
+(existing windows are moved if necessary).
 If
 .Fl k
 is given and
@@ -2272,7 +2307,7 @@ section.
 Does the same as
 .Ic join-pane .
 .It Xo Ic move-window
-.Op Fl ardk
+.Op Fl abrdk
 .Op Fl s Ar src-window
 .Op Fl t Ar dst-window
 .Xc
@@ -2290,7 +2325,7 @@ the
 .Ic base-index
 option.
 .It Xo Ic new-window
-.Op Fl adkP
+.Op Fl abdkP
 .Op Fl c Ar start-directory
 .Op Fl e Ar environment
 .Op Fl F Ar format
@@ -2301,10 +2336,12 @@ option.
 .D1 (alias: Ic neww )
 Create a new window.
 With
-.Fl a ,
-the new window is inserted at the next index up from the specified
+.Fl a
+or
+.Fl b ,
+the new window is inserted at the next index after or before the specified
 .Ar target-window ,
-moving windows up if necessary,
+moving windows up if necessary;
 otherwise
 .Ar target-window
 is the new window location.
@@ -2936,7 +2973,7 @@ specifies a prefix to print before each key and
 .Fl 1
 lists only the first matching key.
 .Fl a
-lists the command for keys that do have a note rather than skipping them.
+lists the command for keys that do not have a note rather than skipping them.
 .It Xo Ic send-keys
 .Op Fl FHlMRX
 .Op Fl N Ar repeat-count
@@ -5921,7 +5958,7 @@ or an error occurred.
 If present,
 .Ar reason
 describes why the client exited.
-.It Ic %extended-output Ar pane-id Ar age Ar ... : Ar value
+.It Ic %extended-output Ar pane-id Ar age Ar ... \&  : Ar value
 New form of
 .Ic %output
 sent when the
@@ -5969,6 +6006,26 @@ changed its active window to the window with ID
 .Ar window-id .
 .It Ic %sessions-changed
 A session was created or destroyed.
+.It Xo Ic %subscription-changed
+.Ar name
+.Ar session-id
+.Ar window-id
+.Ar window-index
+.Ar pane-id ... \&  :
+.Ar value
+.Xc
+The value of the format associated with subscription
+.Ar name
+has changed to
+.Ar value .
+See
+.Ic refresh-client
+.Fl B .
+Any arguments after
+.Ar pane-id
+up until a single
+.Ql \&:
+are for future use and should be ignored.
 .It Ic %unlinked-window-add Ar window-id
 The window with ID
 .Ar window-id

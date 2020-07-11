@@ -1,10 +1,8 @@
-/Makefile/1.108/Mon Apr 20 04:44:47 2020//
 /addrmatch.sh/1.5/Fri Mar 13 03:18:45 2020//
 /agent-getpeereid.sh/1.11/Tue Nov 26 23:43:10 2019//
 /agent-pkcs11.sh/1.7/Tue Nov 26 23:43:10 2019//
 /agent-ptrace.sh/1.4/Tue Nov 26 23:43:10 2019//
 /agent-timeout.sh/1.6/Tue Nov 26 23:43:10 2019//
-/agent.sh/1.17/Sat Dec 21 02:33:07 2019//
 /allow-deny-users.sh/1.5/Fri Jul 13 02:13:50 2018//
 /authinfo.sh/1.3/Tue Apr 10 00:13:27 2018//
 /banner.sh/1.3/Sun Apr 30 23:34:55 2017//
@@ -51,7 +49,6 @@
 /login-timeout.sh/1.9/Mon Aug  7 00:53:51 2017//
 /modpipe.c/1.6/Thu Nov 21 03:16:47 2013//
 /moduli.in/1.1/Mon Sep 12 02:25:46 2016//
-/multiplex.sh/1.32/Sat Jan 25 02:57:53 2020//
 /multipubkey.sh/1.3/Wed Dec 11 18:47:14 2019//
 /portnum.sh/1.2/Fri May 17 10:34:30 2013//
 /principals-command.sh/1.11/Mon Dec 16 02:39:05 2019//
@@ -99,3 +96,7 @@ D/misc////
 D/unittests////
 /percent.sh/1.7/Mon Jun  1 06:23:21 2020//
 /servcfginclude.sh/1.2/Mon Jun  1 06:23:21 2020//
+/Makefile/1.109/Sat Jul 11 07:57:43 2020//
+/agent-subprocess.sh/1.1/Fri Jun 19 05:07:09 2020//
+/agent.sh/1.18/Sat Jul 11 07:57:43 2020//
+/multiplex.sh/1.33/Sat Jul 11 07:57:43 2020//

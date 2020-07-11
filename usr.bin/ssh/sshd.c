@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.556 2020/06/05 06:18:07 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.560 2020/07/03 10:12:26 markus Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -920,7 +920,7 @@ send_rexec_state(int fd, struct sshbuf *conf)
 	    (r = sshbuf_put_stringb(m, inc)) != 0)
 		fatal("%s: buffer error: %s", __func__, ssh_err(r));
 	if (ssh_msg_send(fd, 0, m) == -1)
-		fatal("%s: ssh_msg_send failed", __func__);
+		error("%s: ssh_msg_send failed", __func__);
 
 	sshbuf_free(m);
 	sshbuf_free(inc);
@@ -1616,6 +1616,7 @@ main(int ac, char **av)
 	if ((cfg = sshbuf_new()) == NULL)
 		fatal("%s: sshbuf_new failed", __func__);
 	if (rexeced_flag) {
+		setproctitle("%s", "[rexeced]");
 		recv_rexec_state(REEXEC_CONFIG_PASS_FD, cfg);
 		if (!debug_flag) {
 			startup_pipe = dup(REEXEC_STARTUP_PIPE_FD);
@@ -1726,10 +1727,19 @@ main(int ac, char **av)
 		    &pubkey, NULL)) != 0 && r != SSH_ERR_SYSTEM_ERROR)
 			do_log2(ll, "Unable to load host key \"%s\": %s",
 			    options.host_key_files[i], ssh_err(r));
-		if (pubkey == NULL && key != NULL)
+		if (pubkey != NULL && key != NULL) {
+			if (!sshkey_equal(pubkey, key)) {
+				error("Public key for %s does not match "
+				    "private key", options.host_key_files[i]);
+				sshkey_free(pubkey);
+				pubkey = NULL;
+			}
+		}
+		if (pubkey == NULL && key != NULL) {
 			if ((r = sshkey_from_private(key, &pubkey)) != 0)
 				fatal("Could not demote key: \"%s\": %s",
 				    options.host_key_files[i], ssh_err(r));
+		}
 		sensitive_data.host_keys[i] = key;
 		sensitive_data.host_pubkeys[i] = pubkey;
 
@@ -1955,6 +1965,7 @@ main(int ac, char **av)
 		dup2(config_s[1], REEXEC_CONFIG_PASS_FD);
 		close(config_s[1]);
 
+		ssh_signal(SIGHUP, SIG_IGN); /* avoid reset to SIG_DFL */
 		execv(rexec_argv[0], rexec_argv);
 
 		/* Reexec has failed, fall back and continue */

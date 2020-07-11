@@ -8,7 +8,6 @@
 /date.y/1.14/Fri Aug 26 09:02:54 2016//
 /diff.c/1.40/Fri Jun 28 13:35:03 2019//
 /diff.h/1.9/Fri Jul 23 21:46:05 2010//
-/diff3.c/1.43/Sat Aug 10 16:39:33 2019//
 /ident.1/1.12/Sat Jun 29 09:08:41 2013//
 /ident.c/1.32/Fri Aug 26 09:02:54 2016//
 /merge.1/1.4/Thu Jun  7 11:37:21 2018//
@@ -36,5 +35,6 @@
 /worklist.h/1.4/Fri Jan 16 06:40:11 2015//
 /xmalloc.c/1.12/Fri Jun 28 05:44:09 2019//
 /xmalloc.h/1.4/Tue Nov 17 18:25:03 2015//
-/rcsprog.c/1.162/Fri Jun 12 23:41:57 2020//
+/diff3.c/1.44/Sat Jul 11 07:57:55 2020//
+/rcsprog.c/1.162/Fri Jun 12 23:44:15 2020//
 D

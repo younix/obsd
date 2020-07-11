@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_trunk.c,v 1.145 2020/05/21 00:44:36 dlg Exp $	*/
+/*	$OpenBSD: if_trunk.c,v 1.147 2020/07/10 13:22:22 patrick Exp $	*/
 
 /*
  * Copyright (c) 2005, 2006, 2007 Reyk Floeter <reyk@openbsd.org>
@@ -1009,7 +1009,7 @@ trunk_start(struct ifnet *ifp)
 	int error;
 
 	for (;;) {
-		IFQ_DEQUEUE(&ifp->if_snd, m);
+		m = ifq_dequeue(&ifp->if_snd);
 		if (m == NULL)
 			break;
 
@@ -1045,8 +1045,8 @@ trunk_hashmbuf(struct mbuf *m, SIPHASH_KEY *key)
 #endif
 	SIPHASH_CTX ctx;
 
-	if (m->m_pkthdr.ph_flowid & M_FLOWID_VALID)
-		return (m->m_pkthdr.ph_flowid & M_FLOWID_MASK);
+	if (m->m_pkthdr.csum_flags & M_FLOWID)
+		return (m->m_pkthdr.ph_flowid);
 
 	SipHash24_Init(&ctx, key);
 	off = sizeof(*eh);

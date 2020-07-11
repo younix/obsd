@@ -45,7 +45,6 @@
 /smbiosvar.h/1.4/Thu Feb 20 06:12:14 2020//
 /softintr.h/1.1/Sat Dec 17 23:38:33 2016//
 /spinlock.h/1.2/Tue Sep  5 02:40:54 2017//
-/stdarg.h/1.1/Sat Dec 17 23:38:33 2016//
 /sysarch.h/1.1/Sat Dec 17 23:38:33 2016//
 /tcb.h/1.2/Tue Jan 10 13:13:12 2017//
 /trap.h/1.1/Sat Dec 17 23:38:33 2016//
@@ -53,4 +52,5 @@
 /vmparam.h/1.7/Sat Jun  1 18:38:27 2019//
 /armreg.h/1.11/Sat Jun  6 11:21:49 2020//
 /cpu.h/1.18/Sat Jun  6 11:21:49 2020//
+/timetc.h/1.1/Mon Jul  6 13:33:07 2020//
 D

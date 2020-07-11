@@ -1,4 +1,4 @@
-/*	$OpenBSD: dev.c,v 1.72 2020/06/12 15:40:18 ratchov Exp $	*/
+/*	$OpenBSD: dev.c,v 1.75 2020/06/28 05:21:39 ratchov Exp $	*/
 /*
  * Copyright (c) 2008-2012 Alexandre Ratchov <alex@caoua.org>
  *
@@ -67,6 +67,7 @@ int dev_init(struct dev *);
 void dev_done(struct dev *);
 struct dev *dev_bynum(int);
 void dev_del(struct dev *);
+void dev_setalt(struct dev *, unsigned int);
 unsigned int dev_roundof(struct dev *, unsigned int);
 void dev_wakeup(struct dev *);
 void dev_sync_attach(struct dev *);
@@ -1017,10 +1018,11 @@ dev_new(char *path, struct aparams *par,
 		return NULL;
 	}
 	d = xmalloc(sizeof(struct dev));
-	d->path_list = NULL;
-	namelist_add(&d->path_list, path);
+	d->alt_list = NULL;
+	dev_addname(d,path);
 	d->num = dev_sndnum++;
 	d->opt_list = NULL;
+	d->alt_num = 1;
 
 	/*
 	 * XXX: below, we allocate a midi input buffer, since we don't
@@ -1063,6 +1065,51 @@ dev_new(char *path, struct aparams *par,
 	d->next = dev_list;
 	dev_list = d;
 	return d;
+}
+
+/*
+ * add a alternate name
+ */
+int
+dev_addname(struct dev *d, char *name)
+{
+	struct dev_alt *a;
+
+	if (d->alt_list != NULL && d->alt_list->idx == DEV_NMAX - 1) {
+		log_puts(name);
+		log_puts(": too many alternate names\n");
+		return 0;
+	}
+	a = xmalloc(sizeof(struct dev_alt));
+	a->name = name;
+	a->idx = (d->alt_list == NULL) ? 0 : d->alt_list->idx + 1;
+	a->next = d->alt_list;
+	d->alt_list = a;
+	return 1;
+}
+
+/*
+ * set prefered alt device name
+ */
+void
+dev_setalt(struct dev *d, unsigned int idx)
+{
+	struct dev_alt **pa, *a;
+
+	/* find alt with given index */
+	for (pa = &d->alt_list; (a = *pa)->idx != idx; pa = &a->next)
+		;
+
+	/* detach from list */
+	*pa = a->next;
+
+	/* attach at head */
+	a->next = d->alt_list;
+	d->alt_list = a;
+
+	/* reopen device with the new alt */
+	if (idx != d->alt_num)
+		dev_reopen(d);
 }
 
 /*
@@ -1154,6 +1201,7 @@ dev_open(struct dev *d)
 {
 	int i;
 	char name[CTL_NAMEMAX];
+	struct dev_alt *a;
 
 	d->master_enabled = 0;
 	d->mode = d->reqmode;
@@ -1185,6 +1233,14 @@ dev_open(struct dev *d)
 		    CTLADDR_SLOT_LEVEL(i),
 		    name, -1, "level",
 		    NULL, -1, 127, d->slot[i].vol);
+	}
+
+	for (a = d->alt_list; a != NULL; a = a->next) {
+		snprintf(name, sizeof(name), "%d", a->idx);
+		dev_addctl(d, "", CTL_SEL,
+		    CTLADDR_ALT_SEL + a->idx,
+		    "server", -1, "device",
+		    name, -1, 1, a->idx == d->alt_num);
 	}
 
 	d->pstate = DEV_INIT;
@@ -1418,6 +1474,7 @@ void
 dev_del(struct dev *d)
 {
 	struct dev **p;
+	struct dev_alt *a;
 
 #ifdef DEBUG
 	if (log_level >= 3) {
@@ -1440,7 +1497,10 @@ dev_del(struct dev *d)
 	}
 	midi_del(d->midi);
 	*p = d->next;
-	namelist_clear(&d->path_list);
+	while ((a = d->alt_list) != NULL) {
+		d->alt_list = a->next;
+		xfree(a);
+	}
 	xfree(d);
 }
 
@@ -2270,6 +2330,7 @@ ctl_log(struct ctl *c)
 		break;
 	case CTL_VEC:
 	case CTL_LIST:
+	case CTL_SEL:
 		ctl_node_log(&c->node1);
 		log_puts(":");
 		log_putu(c->curval);
@@ -2294,7 +2355,7 @@ dev_addctl(struct dev *d, char *gstr, int type, int addr,
 	strlcpy(c->group, gstr, CTL_NAMEMAX);
 	strlcpy(c->node0.name, str0, CTL_NAMEMAX);
 	c->node0.unit = unit0;
-	if (c->type == CTL_VEC || c->type == CTL_LIST) {
+	if (c->type == CTL_VEC || c->type == CTL_LIST || c->type == CTL_SEL) {
 		strlcpy(c->node1.name, str1, CTL_NAMEMAX);
 		c->node1.unit = unit1;
 	} else
@@ -2445,7 +2506,13 @@ dev_setctl(struct dev *d, int addr, int val)
 		c->dirty = 1;
 		dev_ref(d);
 	} else {
-		if (addr == CTLADDR_MASTER) {
+		if (addr >= CTLADDR_ALT_SEL) {
+			if (val) {
+				num = addr - CTLADDR_ALT_SEL;
+				dev_setalt(d, num);
+			}
+			return 1;
+		} else if (addr == CTLADDR_MASTER) {
 			if (d->master_enabled) {
 				dev_master(d, val);
 				dev_midi_master(d);

@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1068 2020/06/11 19:43:34 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1073 2020/07/06 09:14:20 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -515,6 +515,7 @@ enum msgtype {
 	MSG_UNLOCK,
 	MSG_WAKEUP,
 	MSG_EXEC,
+	MSG_FLAGS,
 
 	MSG_READ_OPEN = 300,
 	MSG_READ,
@@ -1644,6 +1645,7 @@ struct client {
 #define CLIENT_NOFORK 0x40000000
 #define CLIENT_ACTIVEPANE 0x80000000ULL
 #define CLIENT_CONTROL_PAUSEAFTER 0x100000000ULL
+#define CLIENT_CONTROL_WAITEXIT 0x200000000ULL
 #define CLIENT_ALLREDRAWFLAGS		\
 	(CLIENT_REDRAWWINDOW|		\
 	 CLIENT_REDRAWSTATUS|		\
@@ -1719,6 +1721,15 @@ struct client {
 	TAILQ_ENTRY(client) entry;
 };
 TAILQ_HEAD(clients, client);
+
+/* Control mode subscription type. */
+enum control_sub_type {
+	CONTROL_SUB_SESSION,
+	CONTROL_SUB_PANE,
+	CONTROL_SUB_ALL_PANES,
+	CONTROL_SUB_WINDOW,
+	CONTROL_SUB_ALL_WINDOWS
+};
 
 /* Key binding and key table. */
 struct key_binding {
@@ -1988,7 +1999,6 @@ struct options	*options_owner(struct options_entry *);
 const struct options_table_entry *options_table_entry(struct options_entry *);
 struct options_entry *options_get_only(struct options *, const char *);
 struct options_entry *options_get(struct options *, const char *);
-void		 options_remove(struct options_entry *);
 void		 options_array_clear(struct options_entry *);
 union options_value *options_array_get(struct options_entry *, u_int);
 int		 options_array_set(struct options_entry *, u_int, const char *,
@@ -2025,6 +2035,8 @@ int		 options_from_string(struct options *,
 		     const struct options_table_entry *, const char *,
 		     const char *, int, char **);
 void		 options_push_changes(const char *);
+int		 options_remove_or_default(struct options_entry *, int,
+		     char **);
 
 /* options-table.c */
 extern const struct options_table_entry options_table[];
@@ -2325,7 +2337,9 @@ struct key_binding *key_bindings_next(struct key_table *, struct key_binding *);
 void	 key_bindings_add(const char *, key_code, const char *, int,
 	     struct cmd_list *);
 void	 key_bindings_remove(const char *, key_code);
+void	 key_bindings_reset(const char *, key_code);
 void	 key_bindings_remove_table(const char *);
+void	 key_bindings_reset_table(const char *);
 void	 key_bindings_init(void);
 struct cmdq_item *key_bindings_dispatch(struct key_binding *,
 	     struct cmdq_item *, struct client *, struct key_event *,
@@ -2415,7 +2429,9 @@ void	 server_lock(void);
 void	 server_lock_session(struct session *);
 void	 server_lock_client(struct client *);
 void	 server_kill_pane(struct window_pane *);
-void	 server_kill_window(struct window *);
+void	 server_kill_window(struct window *, int);
+void	 server_renumber_session(struct session *);
+void	 server_renumber_all(void);
 int	 server_link_window(struct session *,
 	     struct winlink *, struct session *, int, int, int, char **);
 void	 server_unlink_window(struct session *, struct winlink *);
@@ -2720,7 +2736,7 @@ void		 window_set_name(struct window *, const char *);
 void		 window_add_ref(struct window *, const char *);
 void		 window_remove_ref(struct window *, const char *);
 void		 winlink_clear_flags(struct winlink *);
-int		 winlink_shuffle_up(struct session *, struct winlink *);
+int		 winlink_shuffle_up(struct session *, struct winlink *, int);
 int		 window_pane_start_input(struct window_pane *,
 		     struct cmdq_item *, char **);
 void		*window_pane_get_new_data(struct window_pane *,
@@ -2802,6 +2818,7 @@ struct mode_tree_item *mode_tree_add(struct mode_tree_data *,
 	     struct mode_tree_item *, void *, uint64_t, const char *,
 	     const char *, int);
 void	 mode_tree_draw_as_parent(struct mode_tree_item *);
+void	 mode_tree_no_tag(struct mode_tree_item *);
 void	 mode_tree_remove(struct mode_tree_data *, struct mode_tree_item *);
 void	 mode_tree_draw(struct mode_tree_data *);
 int	 mode_tree_key(struct mode_tree_data *, struct client *, key_code *,
@@ -2854,6 +2871,9 @@ void	control_reset_offsets(struct client *);
 void printflike(2, 3) control_write(struct client *, const char *, ...);
 void	control_write_output(struct client *, struct window_pane *);
 int	control_all_done(struct client *);
+void	control_add_sub(struct client *, const char *, enum control_sub_type,
+    	   int, const char *);
+void	control_remove_sub(struct client *, const char *);
 
 /* control-notify.c */
 void	control_notify_input(struct client *, struct window_pane *,

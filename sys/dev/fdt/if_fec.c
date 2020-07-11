@@ -1,4 +1,4 @@
-/* $OpenBSD: if_fec.c,v 1.8 2019/02/06 22:59:06 patrick Exp $ */
+/* $OpenBSD: if_fec.c,v 1.10 2020/07/10 13:26:36 patrick Exp $ */
 /*
  * Copyright (c) 2012-2013,2019 Patrick Wildt <patrick@blueri.se>
  *
@@ -857,7 +857,7 @@ fec_start(struct ifnet *ifp)
 		return;
 	if (ifq_is_oactive(&ifp->if_snd))
 		return;
-	if (IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifq_empty(&ifp->if_snd))
 		return;
 
 	idx = sc->sc_tx_prod;
@@ -1016,7 +1016,7 @@ fec_intr(void *arg)
 		fec_tx_proc(sc);
 
 	/* Try to transmit. */
-	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
+	if (ifp->if_flags & IFF_RUNNING && !ifq_empty(&ifp->if_snd))
 		fec_start(ifp);
 
 	return 1;
@@ -1123,6 +1123,9 @@ fec_rx_proc(struct fec_softc *sc)
 			sc->sc_rx_cons++;
 	}
 
+	if (ifiq_input(&ifp->if_rcv, &ml))
+		if_rxr_livelocked(&sc->sc_rx_ring);
+
 	fec_fill_rx_ring(sc);
 
 	bus_dmamap_sync(sc->sc_dmat, ENET_DMA_MAP(sc->sc_rxring), 0,
@@ -1131,8 +1134,6 @@ fec_rx_proc(struct fec_softc *sc)
 
 	/* rx descriptors are ready */
 	HWRITE4(sc, ENET_RDAR, ENET_RDAR_RDAR);
-
-	if_input(ifp, &ml);
 }
 
 void

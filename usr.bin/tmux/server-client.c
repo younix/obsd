@@ -1,4 +1,4 @@
-/* $OpenBSD: server-client.c,v 1.357 2020/06/10 07:27:10 nicm Exp $ */
+/* $OpenBSD: server-client.c,v 1.359 2020/07/06 09:14:20 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1474,11 +1474,13 @@ server_client_check_pane_resize(struct window_pane *wp)
 		 * Otherwise resize to the force size and start the timer.
 		 */
 		if (wp->flags & PANE_RESIZENOW) {
-			log_debug("%s: resizing %%%u after forced resize", __func__, wp->id);
+			log_debug("%s: resizing %%%u after forced resize",
+			    __func__, wp->id);
 			window_pane_send_resize(wp, 0);
 			wp->flags &= ~(PANE_RESIZE|PANE_RESIZEFORCE|PANE_RESIZENOW);
 		} else if (!evtimer_pending(&wp->force_timer, NULL)) {
-			log_debug("%s: forcing resize of %%%u", __func__, wp->id);
+			log_debug("%s: forcing resize of %%%u", __func__,
+			    wp->id);
 			window_pane_send_resize(wp, 1);
 			server_client_start_force_timer(wp);
 		}
@@ -2370,6 +2372,8 @@ server_client_control_flags(struct client *c, const char *next)
 	}
 	if (strcmp(next, "no-output") == 0)
 		return (CLIENT_CONTROL_NOOUTPUT);
+	if (strcmp(next, "wait-exit") == 0)
+		return (CLIENT_CONTROL_WAITEXIT);
 	return (0);
 }
 
@@ -2409,6 +2413,7 @@ server_client_set_flags(struct client *c, const char *flags)
 			control_reset_offsets(c);
 	}
 	free(copy);
+	proc_send(c->peer, MSG_FLAGS, -1, &c->flags, sizeof c->flags);
 }
 
 /* Get client flags. This is only flags useful to show to users. */
@@ -2427,6 +2432,8 @@ server_client_get_flags(struct client *c)
 		strlcat(s, "ignore-size,", sizeof s);
 	if (c->flags & CLIENT_CONTROL_NOOUTPUT)
 		strlcat(s, "no-output,", sizeof s);
+	if (c->flags & CLIENT_CONTROL_WAITEXIT)
+		strlcat(s, "wait-exit,", sizeof s);
 	if (c->flags & CLIENT_CONTROL_PAUSEAFTER) {
 		xsnprintf(tmp, sizeof tmp, "pause-after=%u,",
 		    c->pause_age / 1000);

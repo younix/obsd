@@ -1,4 +1,4 @@
-/*	$OpenBSD: vioscsi.c,v 1.16 2020/02/14 15:56:47 krw Exp $	*/
+/*	$OpenBSD: vioscsi.c,v 1.20 2020/07/10 19:43:09 krw Exp $	*/
 /*
  * Copyright (c) 2013 Google Inc.
  *
@@ -154,20 +154,19 @@ vioscsi_attach(struct device *parent, struct device *self, void *aux)
 	mtx_init(&sc->sc_vr_mtx, IPL_BIO);
 	scsi_iopool_init(&sc->sc_iopool, sc, vioscsi_req_get, vioscsi_req_put);
 
-	sc->sc_link.openings = vioscsi_alloc_reqs(sc, vsc, qsize);
-	if (sc->sc_link.openings == 0) {
+	int nreqs = vioscsi_alloc_reqs(sc, vsc, qsize);
+	if (nreqs == 0) {
 		printf("\nCan't alloc reqs\n");
 		goto err;
-	} else if (sc->sc_link.openings > cmd_per_lun)
-		sc->sc_link.openings = cmd_per_lun;
+	}
 
+	sc->sc_link.openings = (nreqs > cmd_per_lun) ? cmd_per_lun : nreqs;
 	sc->sc_link.adapter = &vioscsi_switch;
 	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.adapter_target = max_target;
+	sc->sc_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
 	sc->sc_link.adapter_buswidth = max_target;
 	sc->sc_link.pool = &sc->sc_iopool;
 
-	bzero(&saa, sizeof(saa));
 	saa.saa_sc_link = &sc->sc_link;
 
 	sc->sc_scsibus = (struct scsibus *)config_found(self, &saa, scsiprint);
@@ -329,7 +328,7 @@ vioscsi_req_done(struct vioscsi_softc *sc, struct virtio_softc *vsc,
 	xs->status = vr->vr_res.status;
 	xs->resid = vr->vr_res.residual;
 
-	DPRINTF("vioscsi_req_done: done %d, %d, %zd\n", 
+	DPRINTF("vioscsi_req_done: done %d, %d, %zd\n",
 	    xs->error, xs->status, xs->resid);
 
 done:

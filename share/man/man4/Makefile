@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.778 2020/06/11 00:26:01 patrick Exp $
+#	$OpenBSD: Makefile,v 1.782 2020/06/25 12:26:31 patrick Exp $
 
 MAN=	aac.4 abcrtc.4 ac97.4 acphy.4 acrtc.4 \
 	acpi.4 acpiac.4 acpials.4 acpiasus.4 acpibat.4 \
@@ -20,7 +20,7 @@ MAN=	aac.4 abcrtc.4 ac97.4 acphy.4 acrtc.4 \
 	axe.4 axen.4 axppmic.4 azalia.4 \
 	bce.4 bcmaux.4 bcmbsc.4 bcmclock.4 bcmdmac.4 bcmdog.4 bcmgpio.4 \
 	bcmirng.4 bcmmbox.4 bcmpcie.4 bcmrng.4 bcmsdhost.4 bcmtemp.4 \
-	bdpmic.4 \
+	bcmtmon.4 bdpmic.4 \
 	berkwdt.4 bge.4 bgw.4 bio.4 bpe.4 bktr.4 bmtphy.4 bnx.4 bnxt.4 \
 	boca.4 bpf.4 brgphy.4 bridge.4 brswphy.4 bse.4 bwfm.4 bwi.4 bytgpio.4 \
 	cac.4 cas.4 cardbus.4 carp.4 ccp.4 ccpmic.4 cd.4 cdce.4 cfxga.4 \
@@ -51,12 +51,13 @@ MAN=	aac.4 abcrtc.4 ac97.4 acphy.4 acrtc.4 \
 	mfii.4 mlphy.4 moscom.4 mos.4 mpe.4 mpath.4 mpi.4 mpii.4 \
 	mpip.4 mpu.4 msk.4 mpw.4 msts.4 mtd.4 mtdphy.4 mtio.4 mue.4 \
 	multicast.4 mvclock.4 mvdog.4 mvgicp.4 mvgpio.4 mvicu.4 mviic.4 \
-	mvneta.4 mvpinctrl.4 mvrng.4 mvrtc.4 mvspi.4 mvtemp.4 mvuart.4 myx.4 \
-	ne.4 neo.4 nep.4 netintro.4 nfe.4 nge.4 nmea.4 \
+	mvneta.4 mvpinctrl.4 mvpp.4 mvrng.4 mvrtc.4 mvspi.4 mvtemp.4 mvuart.4 \
+	myx.4 ne.4 neo.4 nep.4 netintro.4 nfe.4 nge.4 nmea.4 \
 	nsclpcsio.4 nsgphy.4 nsphy.4 nsphyter.4 null.4 nviic.4 nvme.4 nvt.4 \
 	oce.4 ohci.4 onewire.4 oosiop.4 openprom.4 options.4 osiop.4 otus.4 \
 	owid.4 owctr.4 owsbm.4 owtemp.4 \
-	pair.4 pcagpio.4 pcaled.4 pcdisplay.4 pchb.4 pchtemp.4 pci.4 pcib.4 \
+	pair.4 pcagpio.4 pcaled.4 pcamux.4 \
+	pcdisplay.4 pchb.4 pchtemp.4 pci.4 pcib.4 \
 	pcfadc.4 pcfiic.4 pcfrtc.4 pcxrtc.4 pciide.4 pckbc.4 pckbd.4 \
 	pcmcia.4 pcn.4 pcppi.4 pcscp.4 pf.4 pflog.4 pflow.4 pfsync.4 \
 	pgt.4 piixpm.4 pinctrl.4 pipex.4 plgpio.4 plrtc.4 pluart.4 \
@@ -95,7 +96,8 @@ MAN=	aac.4 abcrtc.4 ac97.4 acphy.4 acrtc.4 \
 	vmmci.4 vmt.4 vmwpvs.4 vmx.4 vnd.4 vr.4 \
 	vscsi.4 vte.4 vxlan.4 \
 	watchdog.4 wb.4 wbenv.4 wbng.4 wbsd.4 wbsio.4 wd.4 wdc.4 wdsc.4 we.4 \
-	wi.4 witness.4 wpi.4 wscons.4 wsdisplay.4 wskbd.4 wsmouse.4 wsmux.4 \
+	wg.4 wi.4 witness.4 wpi.4 wscons.4 wsdisplay.4 wskbd.4 wsmouse.4 \
+	wsmux.4 \
 	xbf.4 xe.4 xen.4 xf86.4 xge.4 xhci.4 xl.4 xmphy.4 xnf.4 xspd.4 \
 	yds.4 zero.4 zyd.4
 

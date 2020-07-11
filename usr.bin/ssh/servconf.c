@@ -1,5 +1,5 @@
 
-/* $OpenBSD: servconf.c,v 1.365 2020/05/27 22:37:53 djm Exp $ */
+/* $OpenBSD: servconf.c,v 1.367 2020/07/05 23:59:45 djm Exp $ */
 /*
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
  *                    All rights reserved
@@ -15,6 +15,7 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
+#include <sys/stat.h>
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -122,7 +123,7 @@ initialize_server_options(ServerOptions *options)
 	options->challenge_response_authentication = -1;
 	options->permit_empty_passwd = -1;
 	options->permit_user_env = -1;
-	options->permit_user_env_whitelist = NULL;
+	options->permit_user_env_allowlist = NULL;
 	options->compression = -1;
 	options->rekey_limit = -1;
 	options->rekey_interval = -1;
@@ -194,11 +195,11 @@ assemble_algorithms(ServerOptions *o)
 	all_key = sshkey_alg_list(0, 0, 1, ',');
 	all_sig = sshkey_alg_list(0, 1, 1, ',');
 	/* remove unsupported algos from default lists */
-	def_cipher = match_filter_whitelist(KEX_SERVER_ENCRYPT, all_cipher);
-	def_mac = match_filter_whitelist(KEX_SERVER_MAC, all_mac);
-	def_kex = match_filter_whitelist(KEX_SERVER_KEX, all_kex);
-	def_key = match_filter_whitelist(KEX_DEFAULT_PK_ALG, all_key);
-	def_sig = match_filter_whitelist(SSH_ALLOWED_CA_SIGALGS, all_sig);
+	def_cipher = match_filter_allowlist(KEX_SERVER_ENCRYPT, all_cipher);
+	def_mac = match_filter_allowlist(KEX_SERVER_MAC, all_mac);
+	def_kex = match_filter_allowlist(KEX_SERVER_KEX, all_kex);
+	def_key = match_filter_allowlist(KEX_DEFAULT_PK_ALG, all_key);
+	def_sig = match_filter_allowlist(SSH_ALLOWED_CA_SIGALGS, all_sig);
 #define ASSEMBLE(what, defaults, all) \
 	do { \
 		if ((r = kex_assemble_names(&o->what, defaults, all)) != 0) \
@@ -364,7 +365,7 @@ fill_default_server_options(ServerOptions *options)
 		options->permit_empty_passwd = 0;
 	if (options->permit_user_env == -1) {
 		options->permit_user_env = 0;
-		options->permit_user_env_whitelist = NULL;
+		options->permit_user_env_allowlist = NULL;
 	}
 	if (options->compression == -1)
 #ifdef WITH_ZLIB
@@ -1562,7 +1563,7 @@ process_server_config_line_depth(ServerOptions *options, char *line,
 
 	case sPermitUserEnvironment:
 		intptr = &options->permit_user_env;
-		charptr = &options->permit_user_env_whitelist;
+		charptr = &options->permit_user_env_allowlist;
 		arg = strdelim(&cp);
 		if (!arg || *arg == '\0')
 			fatal("%s line %d: missing argument.",
@@ -2324,6 +2325,7 @@ process_server_config_line(ServerOptions *options, char *line,
 void
 load_server_config(const char *filename, struct sshbuf *conf)
 {
+	struct stat st;
 	char *line = NULL, *cp;
 	size_t linesize = 0;
 	FILE *f;
@@ -2335,6 +2337,10 @@ load_server_config(const char *filename, struct sshbuf *conf)
 		exit(1);
 	}
 	sshbuf_reset(conf);
+	/* grow buffer, so realloc is avoided for large config files */
+	if (fstat(fileno(f), &st) == 0 && st.st_size > 0 &&
+            (r = sshbuf_allocate(conf, st.st_size)) != 0)
+		fatal("%s: allocate failed: %s", __func__, ssh_err(r));
 	while (getline(&line, &linesize, f) != -1) {
 		lineno++;
 		/*
@@ -2839,11 +2845,11 @@ dump_config(ServerOptions *o)
 	}
 	printf("\n");
 
-	if (o->permit_user_env_whitelist == NULL) {
+	if (o->permit_user_env_allowlist == NULL) {
 		dump_cfg_fmtint(sPermitUserEnvironment, o->permit_user_env);
 	} else {
 		printf("permituserenvironment %s\n",
-		    o->permit_user_env_whitelist);
+		    o->permit_user_env_allowlist);
 	}
 
 	printf("pubkeyauthoptions");

@@ -1,4 +1,4 @@
-#	$OpenBSD: genassym.cf,v 1.3 2020/05/22 16:27:49 kettenis Exp $
+#	$OpenBSD: genassym.cf,v 1.11 2020/06/28 00:07:22 kettenis Exp $
 #
 # Copyright (c) 1982, 1990 The Regents of the University of California.
 # All rights reserved.
@@ -31,9 +31,17 @@
 #
 
 include <sys/param.h>
+include <sys/proc.h>
+
+include <machine/intr.h>
+include <machine/pcb.h>
 
 struct	cpu_info
+member	ci_curpcb
+member	ci_curproc
 member	ci_tempsave
+member	ci_kernel_slb
+member	ci_user_slb_pa
 define	CPUSAVE_SRR0	0
 define	CPUSAVE_SRR1	8
 define	CPUSAVE_R27	16
@@ -84,6 +92,46 @@ member	ctr
 member	xer
 member	srr0
 member	srr1
+member	vrsave
 member	dar
 member	dsisr
 member	exc
+
+struct	pcb
+member	pcb_onfault
+member	pcb_sp
+
+struct	proc
+member	p_addr
+member	p_stat
+member	P_MD_ASTPENDING	p_md.md_astpending
+member	P_MD_USER_SLB_PA p_md.md_user_slb_pa
+
+export	SONPROC
+
+struct	sigframe
+member	sf_sc
+
+define	SFRAMELEN	sizeof(struct switchframe)
+struct	switchframe
+member	sf_r14
+member	sf_r15
+member	sf_r16
+member	sf_r17
+member	sf_r18
+member	sf_r19
+member	sf_r20
+member	sf_r21
+member	sf_r22
+member	sf_r23
+member	sf_r24
+member	sf_r25
+member	sf_r26
+member	sf_r27
+member	sf_r28
+member	sf_r29
+member	sf_r30
+member	sf_r31
+member	sf_cr
+
+export	IPL_NONE

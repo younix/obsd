@@ -1,5 +1,3 @@
-/MAKEDEV/1.79/Sat Apr 18 21:29:57 2020//
-/MAKEDEV.md/1.34/Thu Jan 23 02:47:28 2020//
 /Makefile/1.2/Sun Jun 15 01:51:56 2008//
 /Makefile.inc/1.11/Sun May 17 17:04:29 2020//
 /disktab/1.5/Tue Aug 18 15:37:48 2015//
@@ -7,4 +5,6 @@
 /login.conf/1.8/Tue Nov  5 19:03:46 2019//
 /sysctl.conf/1.1/Wed Apr 21 18:23:44 2004//
 /ttys/1.2/Wed Jan  9 17:39:42 2008//
+/MAKEDEV/1.80/Sat Jul 11 07:57:02 2020//
+/MAKEDEV.md/1.35/Sat Jul 11 07:57:02 2020//
 D

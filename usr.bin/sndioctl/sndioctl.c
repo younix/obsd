@@ -1,4 +1,4 @@
-/*	$OpenBSD: sndioctl.c,v 1.11 2020/05/25 09:14:50 mestre Exp $	*/
+/*	$OpenBSD: sndioctl.c,v 1.15 2020/06/28 05:21:39 ratchov Exp $	*/
 /*
  * Copyright (c) 2014-2020 Alexandre Ratchov <alex@caoua.org>
  *
@@ -69,15 +69,11 @@ struct info *infolist;
 int i_flag = 0, v_flag = 0, m_flag = 0, n_flag = 0, q_flag = 0;
 
 static inline int
-isname_first(int c)
+isname(int c)
 {
-	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z');
-}
-
-static inline int
-isname_next(int c)
-{
-	return isname_first(c) || (c >= '0' && c <= '9') || (c == '_');
+	return (c == '_') ||
+	    (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+	    (c >= '0' && c <= '9');
 }
 
 static int
@@ -107,7 +103,8 @@ cmpdesc(struct sioctl_desc *d1, struct sioctl_desc *d2)
 	if (res != 0)
 		return res;
 	res = d1->node0.unit - d2->node0.unit;
-	if (d1->type == SIOCTL_VEC ||
+	if (d1->type == SIOCTL_SEL ||
+	    d1->type == SIOCTL_VEC ||
 	    d1->type == SIOCTL_LIST) {
 		if (res != 0)
 			return res;
@@ -297,6 +294,7 @@ ismono(struct info *g)
 				return 0;
 		}
 		break;
+	case SIOCTL_SEL:
 	case SIOCTL_VEC:
 	case SIOCTL_LIST:
 		for (p2 = g; p2 != NULL; p2 = nextpar(p2)) {
@@ -345,6 +343,7 @@ print_desc(struct info *p, int mono)
 	case SIOCTL_SW:
 		printf("*");
 		break;
+	case SIOCTL_SEL:
 	case SIOCTL_VEC:
 	case SIOCTL_LIST:
 		more = 0;
@@ -358,7 +357,8 @@ print_desc(struct info *p, int mono)
 			if (more)
 				printf(",");
 			print_node(&e->desc.node1, mono);
-			printf(":*");
+			if (p->desc.type != SIOCTL_SEL)
+				printf(":*");
 			more = 1;
 		}
 	}
@@ -394,6 +394,7 @@ print_ent(struct info *e, char *comment)
 	case SIOCTL_NONE:
 		printf("<removed>\n");
 		break;
+	case SIOCTL_SEL:
 	case SIOCTL_VEC:
 	case SIOCTL_LIST:
 		print_node(&e->desc.node1, 0);
@@ -422,6 +423,7 @@ print_val(struct info *p, int mono)
 	case SIOCTL_SW:
 		print_num(p);
 		break;
+	case SIOCTL_SEL:
 	case SIOCTL_VEC:
 	case SIOCTL_LIST:
 		more = 0;
@@ -481,11 +483,11 @@ parse_name(char **line, char *name)
 	char *p = *line;
 	unsigned len = 0;
 
-	if (!isname_first(*p)) {
-		fprintf(stderr, "letter expected near '%s'\n", p);
+	if (!isname(*p)) {
+		fprintf(stderr, "letter or digit expected near '%s'\n", p);
 		return 0;
 	}
-	while (isname_next(*p)) {
+	while (isname(*p)) {
 		if (len >= SIOCTL_NAMEMAX - 1) {
 			name[SIOCTL_NAMEMAX - 1] = '\0';
 			fprintf(stderr, "%s...: too long\n", name);
@@ -621,6 +623,9 @@ dump(void)
 		case SIOCTL_SW:
 			printf("0..%d (%u)", i->desc.maxval, i->curval);
 			break;
+		case SIOCTL_SEL:
+			print_node(&i->desc.node1, 0);
+			break;
 		case SIOCTL_VEC:
 		case SIOCTL_LIST:
 			print_node(&i->desc.node1, 0);
@@ -700,6 +705,7 @@ cmd(char *line)
 			npar++;
 		}
 		break;
+	case SIOCTL_SEL:
 	case SIOCTL_VEC:
 	case SIOCTL_LIST:
 		for (i = g; i != NULL; i = nextpar(i)) {
@@ -852,8 +858,16 @@ ondesc(void *arg, struct sioctl_desc *d, int curval)
 		}
 	}
 
-	if (d->type == SIOCTL_NONE)
+	switch (d->type) {
+	case SIOCTL_NUM:
+	case SIOCTL_SW:
+	case SIOCTL_VEC:
+	case SIOCTL_LIST:
+	case SIOCTL_SEL:
+		break;
+	default:
 		return;
+	}
 
 	/*
 	 * find the right position to insert the new widget
@@ -889,17 +903,36 @@ ondesc(void *arg, struct sioctl_desc *d, int curval)
 void
 onctl(void *arg, unsigned addr, unsigned val)
 {
-	struct info *i;
+	struct info *i, *j;
 
-	for (i = infolist; i != NULL; i = i->next) {
-		if (i->ctladdr != addr)
-			continue;
-		if (i->curval != val) {
-			i->curval = val;
-			if (m_flag)
-				print_ent(i, "changed");
-		}
+	i = infolist;
+	for (;;) {
+		if (i == NULL)
+			return;
+		if (i->ctladdr == addr)
+			break;
+		i = i->next;
 	}
+
+	if (i->curval == val) {
+		print_ent(i, "eq");
+		return;
+	}
+
+	if (i->desc.type == SIOCTL_SEL) {
+		for (j = infolist; j != NULL; j = j->next) {
+			if (strcmp(i->desc.group, j->desc.group) != 0 ||
+			    strcmp(i->desc.node0.name, j->desc.node0.name) != 0 ||
+			    strcmp(i->desc.func, j->desc.func) != 0 ||
+			    i->desc.node0.unit != j->desc.node0.unit)
+				continue;
+			j->curval = (i->ctladdr == j->ctladdr);
+		}
+	} else
+		i->curval = val;
+
+	if (m_flag)
+		print_ent(i, "changed");
 }
 
 int

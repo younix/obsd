@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.1 2020/05/16 17:11:14 kettenis Exp $	*/
+/*	$OpenBSD: proc.h,v 1.3 2020/06/22 16:58:20 kettenis Exp $	*/
 
 /*
  * Copyright (c) 1991 Regents of the University of California.
@@ -38,7 +38,9 @@
  * Machine-dependent part of the proc structure for arm64.
  */
 struct mdproc {
-	volatile int md_astpending;
+	struct trapframe *md_regs;
+	volatile int	md_astpending;
+	paddr_t		md_user_slb_pa;
 };
 
 #endif /* _MACHINE_PROC_H_ */

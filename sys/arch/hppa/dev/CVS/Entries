@@ -2,7 +2,6 @@
 /apic.c/1.19/Mon May 14 13:54:39 2018//
 /asp.c/1.15/Mon May 14 13:54:39 2018//
 /astro.c/1.17/Sun Nov 16 12:30:57 2014//
-/clock.c/1.30/Fri May  1 19:56:11 2020//
 /com_dino.c/1.4/Sun Jul 15 19:25:49 2007//
 /com_ssio.c/1.2/Sun Jun 24 16:28:39 2007//
 /cpudevs/1.44/Fri May 18 15:57:35 2007//
@@ -32,4 +31,5 @@
 /viper.h/1.6/Tue Apr 10 17:47:54 2007//
 /wax.c/1.11/Mon May 14 13:54:39 2018//
 /cpu.c/1.42/Mon Jun  1 06:23:24 2020//
+/clock.c/1.31/Sat Jul 11 07:57:46 2020//
 D

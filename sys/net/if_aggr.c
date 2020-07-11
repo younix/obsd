@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_aggr.c,v 1.30 2020/06/02 00:58:09 jmatthew Exp $ */
+/*	$OpenBSD: if_aggr.c,v 1.32 2020/07/10 13:26:41 patrick Exp $ */
 
 /*
  * Copyright (c) 2019 The University of Queensland
@@ -560,7 +560,7 @@ aggr_clone_create(struct if_clone *ifc, int unit)
 	ifp->if_flags = IFF_BROADCAST | IFF_MULTICAST | IFF_SIMPLEX;
 	ifp->if_xflags = IFXF_CLONED | IFXF_MPSAFE;
 	ifp->if_link_state = LINK_STATE_DOWN;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	ifq_set_maxlen(&ifp->if_snd, IFQ_MAXLEN);
 	ether_fakeaddr(ifp);
 
 	if_counters_alloc(ifp);
@@ -660,7 +660,7 @@ aggr_transmit(struct aggr_softc *sc, const struct aggr_map *map, struct mbuf *m)
 	}
 #endif
 
-	if (ISSET(m->m_pkthdr.ph_flowid, M_FLOWID_VALID))
+	if (ISSET(m->m_pkthdr.csum_flags, M_FLOWID))
 		flow = m->m_pkthdr.ph_flowid;
 
 	ifp0 = map->m_ifp0s[flow % AGGR_MAX_PORTS];
@@ -765,10 +765,8 @@ aggr_input(struct ifnet *ifp0, struct mbuf *m, void *cookie)
 	if (__predict_false(!p->p_collecting))
 		goto drop;
 
-	if (!ISSET(m->m_pkthdr.ph_flowid, M_FLOWID_VALID)) {
-		m->m_pkthdr.ph_flowid = M_FLOWID_VALID |
-		    (ifp0->if_index ^ sc->sc_mix);
-	}
+	if (!ISSET(m->m_pkthdr.csum_flags, M_FLOWID))
+		m->m_pkthdr.ph_flowid = ifp0->if_index ^ sc->sc_mix;
 
 	if_vinput(ifp, m);
 

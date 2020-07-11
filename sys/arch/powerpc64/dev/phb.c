@@ -1,4 +1,4 @@
-/*	$OpenBSD: phb.c,v 1.5 2020/06/10 19:02:41 kettenis Exp $	*/
+/*	$OpenBSD: phb.c,v 1.11 2020/07/05 17:12:59 kettenis Exp $	*/
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -18,6 +18,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/device.h>
+#include <sys/extent.h>
 
 #include <machine/bus.h>
 #include <machine/fdt.h>
@@ -64,6 +65,9 @@ struct phb_softc {
 	struct machine_bus_dma_tag sc_bus_dmat;
 
 	struct ppc64_pci_chipset sc_pc;
+	struct extent		*sc_busex;
+	struct extent		*sc_memex;
+	struct extent		*sc_ioex;
 	int			sc_bus;
 };
 
@@ -99,6 +103,8 @@ int	phb_bs_memmap(bus_space_tag_t, bus_addr_t, bus_size_t, int,
 	    bus_space_handle_t *);
 int	phb_dmamap_load_buffer(bus_dma_tag_t, bus_dmamap_t, void *,
 	    bus_size_t, struct proc *, int, paddr_t *, int *, int);
+int	phb_dmamap_load_raw(bus_dma_tag_t, bus_dmamap_t,
+	    bus_dma_segment_t *, int, bus_size_t, int);
 
 int
 phb_match(struct device *parent, void *match, void *aux)
@@ -114,11 +120,13 @@ phb_attach(struct device *parent, struct device *self, void *aux)
 	struct phb_softc *sc = (struct phb_softc *)self;
 	struct fdt_attach_args *faa = aux;
 	struct pcibus_attach_args pba;
+	uint32_t bus_range[2];
 	uint32_t *ranges;
 	uint32_t m64window[6];
 	uint32_t m64ranges[2];
 	int i, j, nranges, rangeslen;
-	int32_t window;
+	uint32_t window;
+	uint32_t chip_id;
 	int64_t error;
 
 	if (faa->fa_nreg < 1) {
@@ -131,6 +139,11 @@ phb_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_node = faa->fa_node;
 	sc->sc_phb_id = OF_getpropint64(sc->sc_node, "ibm,opal-phbid", 0);
 	sc->sc_pe_number = 0;
+
+	if (OF_getproplen(sc->sc_node, "ibm,chip-id") == sizeof(chip_id)) {
+		chip_id = OF_getpropint(sc->sc_node, "ibm,chip-id", 0);
+		printf(": chip 0x%x", chip_id);
+	}
 
 	/*
 	 * Reset the IODA tables.  Should clear any gunk left behind
@@ -273,6 +286,34 @@ phb_attach(struct device *parent, struct device *self, void *aux)
 	OF_getpropintarray(sc->sc_node, "ibm,opal-msi-ranges",
 	    sc->sc_msi_ranges, sizeof(sc->sc_msi_ranges));
 
+	/* Create extents for our address spaces. */
+	sc->sc_busex = extent_create("pcibus", 0, 255,
+	    M_DEVBUF, NULL, 0, EX_WAITOK | EX_FILLED);
+	sc->sc_memex = extent_create("pcimem", 0, (u_long)-1,
+	    M_DEVBUF, NULL, 0, EX_WAITOK | EX_FILLED);
+	sc->sc_ioex = extent_create("pciio", 0, 0xffffffff,
+	    M_DEVBUF, NULL, 0, EX_WAITOK | EX_FILLED);
+
+	/* Set up bus range. */
+	if (OF_getpropintarray(sc->sc_node, "bus-range", bus_range,
+	    sizeof(bus_range)) != sizeof(bus_range) ||
+	    bus_range[0] >= 256 || bus_range[1] >= 256) {
+		bus_range[0] = 0;
+		bus_range[1] = 255;
+	}
+	sc->sc_bus = bus_range[0];
+	extent_free(sc->sc_busex, bus_range[0],
+	    bus_range[1] - bus_range[0] + 1, EX_WAITOK);
+
+	/* Set up mmio ranges. */
+	for (i = 0; i < sc->sc_nranges; i++) {
+		if ((sc->sc_ranges[i].flags & 0x02000000) != 0x02000000)
+			continue;
+
+		extent_free(sc->sc_memex, sc->sc_ranges[i].pci_base,
+		    sc->sc_ranges[i].size, EX_WAITOK);
+	}
+
 	printf("\n");
 
 	memcpy(&sc->sc_bus_iot, sc->sc_iot, sizeof(sc->sc_bus_iot));
@@ -297,6 +338,7 @@ phb_attach(struct device *parent, struct device *self, void *aux)
 	memcpy(&sc->sc_bus_dmat, sc->sc_dmat, sizeof(sc->sc_bus_dmat));
 	sc->sc_bus_dmat._cookie = sc;
 	sc->sc_bus_dmat._dmamap_load_buffer = phb_dmamap_load_buffer;
+	sc->sc_bus_dmat._dmamap_load_raw = phb_dmamap_load_raw;
 
 	sc->sc_pc.pc_conf_v = sc;
 	sc->sc_pc.pc_attach_hook = phb_attach_hook;
@@ -321,6 +363,9 @@ phb_attach(struct device *parent, struct device *self, void *aux)
 	pba.pba_memt = &sc->sc_bus_memt;
 	pba.pba_dmat = &sc->sc_bus_dmat;
 	pba.pba_pc = &sc->sc_pc;
+	pba.pba_busex = sc->sc_busex;
+	pba.pba_memex = sc->sc_memex;
+	pba.pba_ioex = sc->sc_ioex;
 	pba.pba_domain = pci_ndomains++;
 	pba.pba_bus = sc->sc_bus;
 	pba.pba_flags |= PCI_FLAGS_MSI_ENABLED;
@@ -377,7 +422,8 @@ phb_conf_read(void *v, pcitag_t tag, int reg)
 	uint16_t pci_error_state;
 	uint8_t freeze_state;
 
-	error = opal_pci_config_read_word(sc->sc_phb_id, tag, reg, &data);
+	error = opal_pci_config_read_word(sc->sc_phb_id,
+	    tag, reg, opal_phys(&data));
 	if (error == OPAL_SUCCESS && data != 0xffffffff)
 		return data;
 
@@ -386,7 +432,7 @@ phb_conf_read(void *v, pcitag_t tag, int reg)
 	 * an error state.  Clear the error.
 	 */
 	error = opal_pci_eeh_freeze_status(sc->sc_phb_id, sc->sc_pe_number,
-	    &freeze_state, &pci_error_state, NULL);
+	    opal_phys(&freeze_state), opal_phys(&pci_error_state), NULL);
 	if (freeze_state)
 		opal_pci_eeh_freeze_clear(sc->sc_phb_id, sc->sc_pe_number,
 		    OPAL_EEH_ACTION_CLEAR_FREEZE_ALL);
@@ -440,7 +486,7 @@ phb_intr_establish(void *v, pci_intr_handle_t ih, int level,
     int (*func)(void *), void *arg, char *name)
 {
 	struct phb_softc *sc = v;
-	void *cookie;
+	void *cookie = NULL;
 
 	KASSERT(ih.ih_type != PCI_NONE);
 
@@ -463,23 +509,23 @@ phb_intr_establish(void *v, pci_intr_handle_t ih, int level,
 
 		if (ih.ih_type == PCI_MSI32) {
 			error = opal_get_msi_32(sc->sc_phb_id, 0, xive,
-			    1, &addr32, &data);
+			    1, opal_phys(&addr32), opal_phys(&data));
 			addr = addr32;
 		} else {
 			error = opal_get_msi_64(sc->sc_phb_id, 0, xive,
-			    1, &addr, &data);
+			    1, opal_phys(&addr), opal_phys(&data));
 		}
 		if (error != OPAL_SUCCESS)
 			return NULL;
 
 		cookie = intr_establish(sc->sc_msi_ranges[0] + xive,
-		    IST_EDGE, level, func, arg);
+		    IST_EDGE, level, func, arg, name);
 		if (cookie == NULL)
 			return NULL;
 
 		if (ih.ih_type == PCI_MSIX) {
 			pci_msix_enable(ih.ih_pc, ih.ih_tag,
-			    sc->sc_iot, ih.ih_intrpin, addr, data);
+			    &sc->sc_bus_memt, ih.ih_intrpin, addr, data);
 		} else
 			pci_msi_enable(ih.ih_pc, ih.ih_tag, addr, data);
 	}
@@ -552,6 +598,25 @@ phb_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 
 	/* For each segment. */
 	for (seg = firstseg; seg <= *segp; seg++)
+		map->dm_segs[seg].ds_addr |= IODA_TVE_SELECT;
+
+	return 0;
+}
+
+int
+phb_dmamap_load_raw(bus_dma_tag_t t, bus_dmamap_t map,
+    bus_dma_segment_t *segs, int nsegs, bus_size_t size, int flags)
+{
+	struct phb_softc *sc = t->_cookie;
+	int seg, error;
+
+	error = sc->sc_dmat->_dmamap_load_raw(sc->sc_dmat, map,
+	     segs, nsegs, size, flags);
+	if (error)
+		return error;
+
+	/* For each segment. */
+	for (seg = 0; seg < nsegs; seg++)
 		map->dm_segs[seg].ds_addr |= IODA_TVE_SELECT;
 
 	return 0;

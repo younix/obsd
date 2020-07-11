@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.606 2020/05/29 04:42:25 deraadt Exp $	*/
+/*	$OpenBSD: if.c,v 1.612 2020/07/10 13:23:34 patrick Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -70,6 +70,7 @@
 #include "ppp.h"
 #include "pppoe.h"
 #include "switch.h"
+#include "if_wg.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -230,9 +231,6 @@ int if_cloners_count;
 struct mutex if_hooks_mtx = MUTEX_INITIALIZER(IPL_NONE);
 void	if_hooks_run(struct task_list *);
 
-struct timeout net_tick_to;
-void	net_tick(void *);
-int	net_livelocked(void);
 int	ifq_congestion;
 
 int		 netisr;
@@ -262,15 +260,11 @@ ifinit(void)
 	 */
 	if_idxmap_init(8);
 
-	timeout_set(&net_tick_to, net_tick, &net_tick_to);
-
 	for (i = 0; i < NET_TASKQ; i++) {
 		nettqmp[i] = taskq_create("softnet", 1, IPL_NET, TASKQ_MPSAFE);
 		if (nettqmp[i] == NULL)
 			panic("unable to create network taskq %d", i);
 	}
-
-	net_tick(&net_tick_to);
 }
 
 static struct if_idxmap if_idxmap = {
@@ -803,8 +797,8 @@ if_output_local(struct ifnet *ifp, struct mbuf *m, sa_family_t af)
 	m->m_pkthdr.ph_ifidx = ifp->if_index;
 	m->m_pkthdr.ph_rtableid = ifp->if_rdomain;
 
-	if (ISSET(m->m_pkthdr.ph_flowid, M_FLOWID_VALID))
-		flow = m->m_pkthdr.ph_flowid & M_FLOWID_MASK;
+	if (ISSET(m->m_pkthdr.csum_flags, M_FLOWID))
+		flow = m->m_pkthdr.ph_flowid;
 
 	ifiq = ifp->if_iqs[flow % ifp->if_niqs];
 
@@ -1620,7 +1614,7 @@ if_down(struct ifnet *ifp)
 
 	ifp->if_flags &= ~IFF_UP;
 	getmicrotime(&ifp->if_lastchange);
-	IFQ_PURGE(&ifp->if_snd);
+	ifq_purge(&ifp->if_snd);
 
 	if_linkstate(ifp);
 }
@@ -2780,7 +2774,7 @@ if_delgroup(struct ifnet *ifp, const char *groupname)
 #if NPF > 0
 		pfi_detach_ifgroup(ifgl->ifgl_group);
 #endif
-		free(ifgl->ifgl_group, M_TEMP, 0);
+		free(ifgl->ifgl_group, M_TEMP, sizeof(*ifgl->ifgl_group));
 	}
 
 	free(ifgl, M_TEMP, sizeof(*ifgl));
@@ -3179,30 +3173,6 @@ if_addrhooks_run(struct ifnet *ifp)
 	if_hooks_run(&ifp->if_addrhooks);
 }
 
-int net_ticks;
-u_int net_livelocks;
-
-void
-net_tick(void *null)
-{
-	extern int ticks;
-
-	if (ticks - net_ticks > 1)
-		net_livelocks++;
-
-	net_ticks = ticks;
-
-	timeout_add(&net_tick_to, 1);
-}
-
-int
-net_livelocked(void)
-{
-	extern int ticks;
-
-	return (ticks - net_ticks > 1);
-}
-
 void
 if_rxr_init(struct if_rxring *rxr, u_int lwm, u_int hwm)
 {
@@ -3220,12 +3190,7 @@ if_rxr_adjust_cwm(struct if_rxring *rxr)
 {
 	extern int ticks;
 
-	if (net_livelocked()) {
-		if (rxr->rxr_cwm > rxr->rxr_lwm)
-			rxr->rxr_cwm--;
-		else
-			return;
-	} else if (rxr->rxr_alive >= rxr->rxr_lwm)
+	if (rxr->rxr_alive >= rxr->rxr_lwm)
 		return;
 	else if (rxr->rxr_cwm < rxr->rxr_hwm)
 		rxr->rxr_cwm++;

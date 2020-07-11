@@ -1,4 +1,4 @@
-/*	$OpenBSD: signal.h,v 1.2 2020/05/22 15:07:47 kettenis Exp $	*/
+/*	$OpenBSD: signal.h,v 1.4 2020/07/06 17:43:23 kettenis Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -59,15 +59,19 @@ struct trapframe {
 	__register_t ctr;
 	__register_t srr0;
 	__register_t srr1;
+	__register_t vrsave;
 	__register_t dar;	/* dar & dsisr are only filled on a DSI trap */
 	__register_t dsisr;
 	__register_t exc;
 };
 
 struct sigcontext {
-	long sc_cookie;
-	int sc_mask;			/* saved signal mask */
+	long		sc_cookie;
+	int		sc_mask;	/* saved signal mask */
 	struct trapframe sc_frame;	/* saved registers */
+	__uint128_t	sc_vsx[64];
+	__uint64_t	sc_fpscr;
+	__uint64_t	sc_vscr;
 };
 
 #endif /* __BSD_VISIBLE || __XPG_VISIBLE >= 420 */

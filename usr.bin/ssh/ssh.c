@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh.c,v 1.529 2020/06/05 03:15:26 dtucker Exp $ */
+/* $OpenBSD: ssh.c,v 1.531 2020/07/05 23:59:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -121,11 +121,11 @@ int stdin_null_flag = 0;
 
 /*
  * Flag indicating that the current process should be backgrounded and
- * a new slave launched in the foreground for ControlPersist.
+ * a new mux-client launched in the foreground for ControlPersist.
  */
 int need_controlpersist_detach = 0;
 
-/* Copies of flags for ControlPersist foreground slave */
+/* Copies of flags for ControlPersist foreground mux-client */
 int ostdin_null_flag, ono_shell_flag, otty_flag, orequest_tty;
 
 /*
@@ -629,7 +629,7 @@ main(int ac, char **av)
 	struct ssh *ssh = NULL;
 	int i, r, opt, exit_status, use_syslog, direct, timeout_ms;
 	int was_addr, config_test = 0, opt_terminated = 0, want_final_pass = 0;
-	char *p, *cp, *line, *argv0, buf[PATH_MAX], *logfile;
+	char *p, *cp, *line, *argv0, *logfile;
 	char cname[NI_MAXHOST];
 	struct stat st;
 	struct passwd *pw;
@@ -1551,16 +1551,6 @@ main(int ac, char **av)
 		}
 	}
 
-	/* Create ~/.ssh * directory if it doesn't already exist. */
-	if (config == NULL) {
-		r = snprintf(buf, sizeof buf, "%s%s%s", pw->pw_dir,
-		    strcmp(pw->pw_dir, "/") ? "/" : "", _PATH_SSH_USER_DIR);
-		if (r > 0 && (size_t)r < sizeof(buf) && stat(buf, &st) == -1)
-			if (mkdir(buf, 0700) == -1)
-				error("Could not create directory '%.200s'.",
-				    buf);
-	}
-
 	/* load options.identity_files */
 	load_public_identity_files(pw);
 
@@ -1680,7 +1670,7 @@ control_persist_detach(void)
 		/* Child: master process continues mainloop */
 		break;
 	default:
-		/* Parent: set up mux slave to connect to backgrounded master */
+		/* Parent: set up mux client to connect to backgrounded master */
 		debug2("%s: background process is %ld", __func__, (long)pid);
 		stdin_null_flag = ostdin_null_flag;
 		options.request_tty = orequest_tty;
@@ -2059,9 +2049,9 @@ ssh_session2(struct ssh *ssh, struct passwd *pw)
 	/*
 	 * If we are in control persist mode and have a working mux listen
 	 * socket, then prepare to background ourselves and have a foreground
-	 * client attach as a control slave.
+	 * client attach as a control client.
 	 * NB. we must save copies of the flags that we override for
-	 * the backgrounding, since we defer attachment of the slave until
+	 * the backgrounding, since we defer attachment of the client until
 	 * after the connection is fully established (in particular,
 	 * async rfwd replies have been received for ExitOnForwardFailure).
 	 */

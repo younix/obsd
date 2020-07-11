@@ -7,7 +7,6 @@
 /hpcdma.h/1.1/Wed Mar 28 20:44:23 2012//
 /hpcreg.h/1.2/Sat Sep  5 21:13:24 2015//
 /hpcvar.h/1.10/Fri Sep 18 20:50:02 2015//
-/if_sq.c/1.29/Wed Mar  8 15:07:10 2017//
 /if_sqvar.h/1.6/Fri Sep 18 20:50:02 2015//
 /iocreg.h/1.2/Sun Apr  8 22:08:25 2012//
 /makemap.awk/1.1/Thu May 22 19:39:37 2014//
@@ -18,4 +17,5 @@
 /z8530kbd.c/1.7/Sun Dec  7 13:10:45 2014//
 /z8530ms.c/1.2/Sun Jun  5 20:02:36 2016//
 /zs.c/1.16/Sat Dec 30 20:46:59 2017//
+/if_sq.c/1.30/Sat Jul 11 07:57:48 2020//
 D

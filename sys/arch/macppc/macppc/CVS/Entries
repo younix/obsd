@@ -1,6 +1,4 @@
 /autoconf.c/1.46/Tue Sep  3 17:51:52 2019//
-/clock.c/1.43/Fri May  1 20:00:26 2020//
-/conf.c/1.71/Thu Jan 23 02:40:21 2020//
 /disksubr.c/1.82/Tue Feb 28 10:49:37 2017//
 /genassym.cf/1.26/Mon Jan 22 10:04:46 2018//
 /locore.S/1.57/Tue Sep  3 14:34:53 2019//
@@ -17,4 +15,6 @@
 /wscons_machdep.c/1.6/Wed Jan 23 16:37:56 2008//
 /cpu.c/1.83/Mon Jun  1 06:23:24 2020//
 /machdep.c/1.192/Sat Jun  6 11:21:49 2020//
+/clock.c/1.44/Sat Jul 11 07:57:47 2020//
+/conf.c/1.72/Sat Jul 11 07:57:47 2020//
 D

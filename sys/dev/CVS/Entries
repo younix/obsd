@@ -35,7 +35,6 @@
 /video_if.h/1.18/Sat Oct 18 08:01:34 2014//
 /vnd.c/1.171/Wed Nov 27 16:12:13 2019//
 /vndioctl.h/1.11/Mon Nov 18 22:32:45 2019//
-/vscsi.c/1.49/Tue Apr  7 13:27:51 2020//
 /vscsivar.h/1.5/Tue Apr  5 15:28:49 2011//
 D/acpi////
 D/adb////
@@ -72,7 +71,9 @@ D/videomode////
 D/wscons////
 D/wsfont////
 D/x86emu////
-/rnd.c/1.220/Mon Jun  1 06:23:26 2020//
-/biovar.h/1.46/Fri Jun 12 23:41:49 2020//
-/kcov.c/1.20/Fri Jun 12 23:41:49 2020//
-/softraid.c/1.402/Fri Jun 12 23:41:49 2020//
+/biovar.h/1.46/Fri Jun 12 23:44:13 2020//
+/kcov.c/1.20/Fri Jun 12 23:44:13 2020//
+/kstat.c/1.1/Mon Jul  6 03:56:51 2020//
+/rnd.c/1.221/Sat Jul 11 07:57:48 2020//
+/softraid.c/1.405/Sat Jul 11 07:57:48 2020//
+/vscsi.c/1.52/Sat Jul 11 07:57:48 2020//

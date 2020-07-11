@@ -40,7 +40,6 @@
 /setjmp.h/1.4/Mon Jan  8 16:44:32 2018//
 /signal.h/1.13/Mon Jan  8 16:44:32 2018//
 /spinlock.h/1.5/Tue Sep  5 02:40:54 2017//
-/stdarg.h/1.8/Wed Mar 23 16:54:36 2011//
 /sysarch.h/1.2/Wed Dec  5 23:20:13 2012//
 /tcb.h/1.4/Thu Apr 20 16:07:52 2017//
 /trap.h/1.16/Wed Apr  9 21:10:34 2014//
