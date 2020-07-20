@@ -1,4 +1,4 @@
-/*	$OpenBSD: aic7xxx_openbsd.c,v 1.62 2020/07/05 21:54:44 krw Exp $	*/
+/*	$OpenBSD: aic7xxx_openbsd.c,v 1.66 2020/07/19 18:57:57 krw Exp $	*/
 /*	$NetBSD: aic7xxx_osm.c,v 1.14 2003/11/02 11:07:44 wiz Exp $	*/
 
 /*
@@ -75,21 +75,11 @@ ahc_attach(struct ahc_softc *ahc)
 
         s = splbio();
 
-	/*
-	 * fill in the prototype scsi_links.
-	 */
-	ahc->sc_channel.adapter_target = ahc->our_id;
-	if (ahc->features & AHC_WIDE)
-		ahc->sc_channel.adapter_buswidth = 16;
-	ahc->sc_channel.adapter_softc = ahc;
-	ahc->sc_channel.adapter = &ahc_switch;
 	ahc->sc_channel.openings = 16;
 	ahc->sc_channel.pool = &ahc->sc_iopool;
 
 	if (ahc->features & AHC_TWIN) {
-		/* Configure the second scsi bus */
 		ahc->sc_channel_b = ahc->sc_channel;
-		ahc->sc_channel_b.adapter_target = ahc->our_id_b;
 	}
 
 #ifndef DEBUG
@@ -107,22 +97,30 @@ ahc_attach(struct ahc_softc *ahc)
 	if ((ahc->features & AHC_TWIN) && ahc->flags & AHC_RESET_BUS_B)
 		ahc_reset_channel(ahc, 'B', TRUE);
 
+	saa.saa_adapter_buswidth = (ahc->features & AHC_WIDE) ? 16 :8;
+	saa.saa_adapter_softc = ahc;
+	saa.saa_adapter = &ahc_switch;
+	saa.saa_luns = saa.saa_adapter_buswidth = 8;
 	if ((ahc->flags & AHC_PRIMARY_CHANNEL) == 0) {
 		saa.saa_sc_link = &ahc->sc_channel;
+		saa.saa_adapter_target = ahc->our_id;
 		ahc->sc_child = (struct scsibus_softc *)config_found(
 		    (void *)&ahc->sc_dev, &saa, scsiprint);
 		if (ahc->features & AHC_TWIN) {
 			saa.saa_sc_link = &ahc->sc_channel_b;
+			saa.saa_adapter_target = ahc->our_id;
 			ahc->sc_child_b = (struct scsibus_softc *)config_found(
 			    (void *)&ahc->sc_dev, &saa, scsiprint);
 		}
 	} else {
 		if (ahc->features & AHC_TWIN) {
 			saa.saa_sc_link = &ahc->sc_channel_b;
+			saa.saa_adapter_target = ahc->our_id;
 			ahc->sc_child = (struct scsibus_softc *)config_found(
 			    (void *)&ahc->sc_dev, &saa, scsiprint);
 		}
 		saa.saa_sc_link = &ahc->sc_channel;
+		saa.saa_adapter_target = ahc->our_id;
 		ahc->sc_child_b = (struct scsibus_softc *)config_found(
 		    (void *)&ahc->sc_dev, &saa, scsiprint);
 	}
@@ -261,7 +259,7 @@ ahc_action(struct scsi_xfer *xs)
 	u_int our_id;
 
 	SC_DEBUG(xs->sc_link, SDEV_DB3, ("ahc_action\n"));
-	ahc = (struct ahc_softc *)xs->sc_link->adapter_softc;
+	ahc = xs->sc_link->bus->sb_adapter_softc;
 
 	target_id = xs->sc_link->target;
 	our_id = SCSI_SCSI_ID(ahc, xs->sc_link);
@@ -315,7 +313,7 @@ ahc_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments)
 	xs = scb->xs;
 	xs->error = CAM_REQ_INPROG;
 	xs->status = 0;
-	ahc = (struct ahc_softc *)xs->sc_link->adapter_softc;
+	ahc = xs->sc_link->bus->sb_adapter_softc;
 
 	if (nsegments != 0) {
 		struct	  ahc_dma_seg *sg;
@@ -557,8 +555,8 @@ ahc_timeout(void *arg)
 	int	found;
 	char	channel;
 
-	scb = (struct scb *)arg;
-	ahc = (struct ahc_softc *)scb->xs->sc_link->adapter_softc;
+	scb = arg;
+	ahc = scb->xs->sc_link->bus->sb_adapter_softc;
 
 	s = splbio();
 

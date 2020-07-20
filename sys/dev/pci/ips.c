@@ -1,4 +1,4 @@
-/*	$OpenBSD: ips.c,v 1.121 2020/06/27 17:28:58 krw Exp $	*/
+/*	$OpenBSD: ips.c,v 1.124 2020/07/19 18:57:58 krw Exp $	*/
 
 /*
  * Copyright (c) 2006, 2007, 2009 Alexander Yurchenko <grange@openbsd.org>
@@ -718,16 +718,17 @@ ips_attach(struct device *parent, struct device *self, void *aux)
 	    (sc->sc_nunits == 1 ? "" : "s"));
 	printf("\n");
 
-	/* Attach SCSI bus */
 	if (sc->sc_nunits > 0)
 		sc->sc_scsi_link.openings = sc->sc_nccbs / sc->sc_nunits;
-	sc->sc_scsi_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
-	sc->sc_scsi_link.adapter_buswidth = sc->sc_nunits;
-	sc->sc_scsi_link.adapter = &ips_switch;
-	sc->sc_scsi_link.adapter_softc = sc;
 	sc->sc_scsi_link.pool = &sc->sc_iopool;
 
 	saa.saa_sc_link = &sc->sc_scsi_link;
+	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
+	saa.saa_adapter_buswidth = sc->sc_nunits;
+	saa.saa_adapter = &ips_switch;
+	saa.saa_adapter_softc = sc;
+	saa.saa_luns = 8;
+
 	sc->sc_scsibus = (struct scsibus_softc *)config_found(self, &saa,
 	    scsiprint);
 
@@ -763,13 +764,15 @@ ips_attach(struct device *parent, struct device *self, void *aux)
 
 		link = &pt->pt_link;
 		link->openings = 1;
-		link->adapter_target = IPS_MAXTARGETS;
-		link->adapter_buswidth = lastarget + 1;
-		link->adapter = &ips_pt_switch;
-		link->adapter_softc = pt;
 		link->pool = &sc->sc_iopool;
 
 		saa.saa_sc_link = link;
+		saa.saa_adapter = &ips_pt_switch;
+		saa.saa_adapter_softc = pt;
+		saa.saa_adapter_buswidth =  lastarget + 1;
+		saa.saa_adapter_target = IPS_MAXTARGETS;
+		saa.saa_luns = 8;
+
 		config_found(self, &saa, scsiprint);
 	}
 
@@ -828,7 +831,7 @@ void
 ips_scsi_cmd(struct scsi_xfer *xs)
 {
 	struct scsi_link *link = xs->sc_link;
-	struct ips_softc *sc = link->adapter_softc;
+	struct ips_softc *sc = link->bus->sb_adapter_softc;
 	struct ips_driveinfo *di = &sc->sc_info->drive;
 	struct ips_drive *drive;
 	struct scsi_inquiry_data inq;
@@ -960,7 +963,7 @@ void
 ips_scsi_pt_cmd(struct scsi_xfer *xs)
 {
 	struct scsi_link *link = xs->sc_link;
-	struct ips_pt *pt = link->adapter_softc;
+	struct ips_pt *pt = link->bus->sb_adapter_softc;
 	struct ips_softc *sc = pt->pt_sc;
 	struct device *dev = link->device_softc;
 	struct ips_ccb *ccb = xs->io;
@@ -1046,7 +1049,7 @@ int
 ips_scsi_ioctl(struct scsi_link *link, u_long cmd, caddr_t addr, int flag)
 {
 #if NBIO > 0
-	return (ips_ioctl(link->adapter_softc, cmd, addr));
+	return (ips_ioctl(link->bus->sb_adapter_softc, cmd, addr));
 #else
 	return (ENOTTY);
 #endif

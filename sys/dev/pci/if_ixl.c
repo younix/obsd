@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ixl.c,v 1.65 2020/07/11 00:54:19 dlg Exp $ */
+/*	$OpenBSD: if_ixl.c,v 1.68 2020/07/16 03:04:50 dlg Exp $ */
 
 /*
  * Copyright (c) 2013-2015, Intel Corporation
@@ -1256,7 +1256,6 @@ struct ixl_softc {
 	const struct ixl_aq_regs *
 				 sc_aq_regs;
 
-	struct mutex		 sc_atq_mtx;
 	struct ixl_dmamem	 sc_atq;
 	unsigned int		 sc_atq_prod;
 	unsigned int		 sc_atq_cons;
@@ -1269,6 +1268,7 @@ struct ixl_softc {
 	unsigned int		 sc_arq_prod;
 	unsigned int		 sc_arq_cons;
 
+	struct mutex		 sc_link_state_mtx;
 	struct task		 sc_link_state_task;
 	struct ixl_atq		 sc_link_state_atq;
 
@@ -1692,8 +1692,6 @@ ixl_attach(struct device *parent, struct device *self, void *aux)
 
 	/* initialise the adminq */
 
-	mtx_init(&sc->sc_atq_mtx, IPL_NET);
-
 	if (ixl_dmamem_alloc(sc, &sc->sc_atq,
 	    sizeof(struct ixl_aq_desc) * IXL_AQ_NUM, IXL_AQ_ALIGN) != 0) {
 		printf("\n" "%s: unable to allocate atq\n", DEVNAME(sc));
@@ -1936,6 +1934,7 @@ ixl_attach(struct device *parent, struct device *self, void *aux)
 	if_attach_queues(ifp, nqueues);
 	if_attach_iqueues(ifp, nqueues);
 
+	mtx_init(&sc->sc_link_state_mtx, IPL_NET);
 	task_set(&sc->sc_link_state_task, ixl_link_state_update, sc);
 	ixl_wr(sc, I40E_PFINT_ICR0_ENA,
 	    I40E_PFINT_ICR0_ENA_LINK_STAT_CHANGE_MASK |
@@ -3352,6 +3351,7 @@ ixl_link_state_update_iaq(struct ixl_softc *sc, void *arg)
 	struct ixl_aq_desc *iaq = arg;
 	uint16_t retval;
 	int link_state;
+	int change = 0;
 
 	retval = lemtoh16(&iaq->iaq_retval);
 	if (retval != IXL_AQ_RC_OK) {
@@ -3359,13 +3359,16 @@ ixl_link_state_update_iaq(struct ixl_softc *sc, void *arg)
 		return;
 	}
 
-	NET_LOCK();
 	link_state = ixl_set_link_status(sc, iaq);
+	mtx_enter(&sc->sc_link_state_mtx);
 	if (ifp->if_link_state != link_state) {
 		ifp->if_link_state = link_state;
-		if_link_state_change(ifp);
+		change = 1;
 	}
-	NET_UNLOCK();
+	mtx_leave(&sc->sc_link_state_mtx);
+
+	if (change)
+		if_link_state_change(ifp);
 }
 
 static void
@@ -3918,7 +3921,11 @@ err:
 	return (rv);
 }
 
-/* this returns -1 on failure, or the sff module type */
+/*
+ * this returns -2 on software/driver failure, -1 for problems
+ * talking to the hardware, or the sff module type.
+ */
+
 static int
 ixl_get_module_type(struct ixl_softc *sc)
 {
@@ -3927,7 +3934,7 @@ ixl_get_module_type(struct ixl_softc *sc)
 	int rv;
 
 	if (ixl_dmamem_alloc(sc, &idm, IXL_AQ_BUFLEN, 0) != 0)
-		return (-1);
+		return (-2);
 
 	rv = ixl_get_phy_abilities(sc, &idm);
 	if (rv != IXL_AQ_RC_OK) {
@@ -4061,8 +4068,10 @@ ixl_get_sffpage(struct ixl_softc *sc, struct if_sffpage *sff)
 	int error;
 
 	switch (ixl_get_module_type(sc)) {
+	case -2:
+		return (ENOMEM);
 	case -1:
-		return (EIO);
+		return (ENXIO);
 	case IXL_SFF8024_ID_SFP:
 		ops = &ixl_sfp_ops;
 		break;

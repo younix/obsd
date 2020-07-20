@@ -10,7 +10,6 @@
 /intel_guc_log.c/1.1/Fri Jun 12 23:44:14 2020//
 /intel_guc_log.h/1.1/Fri Jun 12 23:44:14 2020//
 /intel_guc_reg.h/1.1/Fri Jun 12 23:44:14 2020//
-/intel_guc_submission.c/1.1/Fri Jun 12 23:44:14 2020//
 /intel_guc_submission.h/1.1/Fri Jun 12 23:44:14 2020//
 /intel_huc.c/1.1/Fri Jun 12 23:44:14 2020//
 /intel_huc.h/1.1/Fri Jun 12 23:44:14 2020//
@@ -21,4 +20,5 @@
 /intel_uc_fw.c/1.1/Fri Jun 12 23:44:14 2020//
 /intel_uc_fw.h/1.1/Fri Jun 12 23:44:14 2020//
 /intel_uc_fw_abi.h/1.1/Fri Jun 12 23:44:14 2020//
+/intel_guc_submission.c/1.2/Mon Jul 20 07:06:32 2020//
 D

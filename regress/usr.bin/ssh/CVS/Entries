@@ -94,9 +94,9 @@
 /yes-head.sh/1.6/Sun Apr 30 23:34:55 2017//
 D/misc////
 D/unittests////
-/percent.sh/1.7/Mon Jun  1 06:23:21 2020//
 /servcfginclude.sh/1.2/Mon Jun  1 06:23:21 2020//
 /Makefile/1.109/Sat Jul 11 07:57:43 2020//
 /agent-subprocess.sh/1.1/Fri Jun 19 05:07:09 2020//
-/agent.sh/1.18/Sat Jul 11 07:57:43 2020//
 /multiplex.sh/1.33/Sat Jul 11 07:57:43 2020//
+/agent.sh/1.19/Mon Jul 20 07:06:25 2020//
+/percent.sh/1.9/Mon Jul 20 07:06:25 2020//

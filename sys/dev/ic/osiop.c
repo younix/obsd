@@ -1,4 +1,4 @@
-/*	$OpenBSD: osiop.c,v 1.57 2020/06/27 14:29:45 krw Exp $	*/
+/*	$OpenBSD: osiop.c,v 1.60 2020/07/19 18:57:58 krw Exp $	*/
 /*	$NetBSD: osiop.c,v 1.9 2002/04/05 18:27:54 bouyer Exp $	*/
 
 /*
@@ -324,21 +324,16 @@ osiop_attach(sc)
 	 */
 	osiop_init(sc);
 
-	/*
-	 * Fill in the sc_link.
-	 */
-	sc->sc_link.adapter = &osiop_switch;
-	sc->sc_link.adapter_softc = sc;
 	sc->sc_link.openings = 4;
-	sc->sc_link.adapter_buswidth = OSIOP_NTGT;
-	sc->sc_link.adapter_target = sc->sc_id;
 	sc->sc_link.pool = &sc->sc_iopool;
 
 	saa.saa_sc_link = &sc->sc_link;
+	saa.saa_adapter = &osiop_switch;
+	saa.saa_adapter_softc = sc;
+	saa.saa_adapter_buswidth = OSIOP_NTGT;
+	saa.saa_adapter_target = sc->sc_id;
+	saa.saa_luns = 8;
 
-	/*
-	 * Now try to attach all the sub devices.
-	 */
 	config_found(&sc->sc_dev, &saa, scsiprint);
 }
 
@@ -378,7 +373,7 @@ osiop_scsicmd(xs)
 {
 	struct scsi_link *periph = xs->sc_link;
 	struct osiop_acb *acb;
-	struct osiop_softc *sc = periph->adapter_softc;
+	struct osiop_softc *sc = periph->bus->sb_adapter_softc;
 	int err, s;
 	int dopoll;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: adv.c,v 1.44 2020/07/09 22:34:25 krw Exp $	*/
+/*	$OpenBSD: adv.c,v 1.47 2020/07/19 18:57:57 krw Exp $	*/
 /*	$NetBSD: adv.c,v 1.6 1998/10/28 20:39:45 dante Exp $	*/
 
 /*
@@ -499,17 +499,15 @@ adv_attach(sc)
 		       sc->sc_dev.dv_xname, i, ADV_MAX_CCB);
 	}
 
-	/*
-         * fill in the prototype scsi_link.
-         */
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.adapter_target = sc->chip_scsi_id;
-	sc->sc_link.adapter = &adv_switch;
 	sc->sc_link.openings = 4;
 	sc->sc_link.pool = &sc->sc_iopool;
-	sc->sc_link.adapter_buswidth = 7;
 
 	saa.saa_sc_link = &sc->sc_link;
+	saa.saa_adapter_softc = sc;
+	saa.saa_adapter_target = sc->chip_scsi_id;
+	saa.saa_adapter = &adv_switch;
+	saa.saa_adapter_buswidth = 7;
+	saa.saa_luns = 8;
 
 	config_found(&sc->sc_dev, &saa, scsiprint);
 }
@@ -524,7 +522,7 @@ adv_scsi_cmd(xs)
 	struct scsi_xfer *xs;
 {
 	struct scsi_link *sc_link = xs->sc_link;
-	ASC_SOFTC      *sc = sc_link->adapter_softc;
+	ASC_SOFTC      *sc = sc_link->bus->sb_adapter_softc;
 	bus_dma_tag_t   dmat = sc->sc_dmat;
 	ADV_CCB        *ccb;
 	int             flags, error, nsegs;
@@ -708,7 +706,7 @@ adv_timeout(arg)
 	ADV_CCB        *ccb = arg;
 	struct scsi_xfer *xs = ccb->xs;
 	struct scsi_link *sc_link = xs->sc_link;
-	ASC_SOFTC      *sc = sc_link->adapter_softc;
+	ASC_SOFTC      *sc = sc_link->bus->sb_adapter_softc;
 	int             s;
 
 	sc_print_addr(sc_link);
@@ -749,7 +747,7 @@ adv_watchdog(arg)
 	ADV_CCB        *ccb = arg;
 	struct scsi_xfer *xs = ccb->xs;
 	struct scsi_link *sc_link = xs->sc_link;
-	ASC_SOFTC      *sc = sc_link->adapter_softc;
+	ASC_SOFTC      *sc = sc_link->bus->sb_adapter_softc;
 	int             s;
 
 	s = splbio();

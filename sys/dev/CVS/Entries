@@ -11,7 +11,6 @@
 /ipmi.c/1.112/Sun Mar 29 09:31:10 2020//
 /ipmi.h/1.1/Fri Feb  5 06:29:01 2016//
 /ipmivar.h/1.33/Sun Mar 29 09:31:10 2020//
-/ksyms.c/1.32/Fri Jan 25 00:19:26 2019//
 /midi.c/1.47/Tue Apr  7 13:27:51 2020//
 /midi_if.h/1.9/Sat May 16 10:04:20 2015//
 /midivar.h/1.11/Fri Jan 10 20:17:45 2020//
@@ -23,7 +22,6 @@
 /rd.c/1.13/Sat Dec 30 23:08:29 2017//
 /rndis.h/1.2/Tue Sep 20 10:34:41 2016//
 /softraid_concat.c/1.27/Sat Apr 25 14:37:43 2020//
-/softraid_crypto.c/1.138/Thu Jul  4 18:09:17 2019//
 /softraid_raid0.c/1.53/Wed Mar 25 21:29:04 2020//
 /softraid_raid1.c/1.65/Tue Apr 12 16:26:54 2016//
 /softraid_raid5.c/1.30/Thu Mar 26 11:28:23 2020//
@@ -75,5 +73,7 @@ D/x86emu////
 /kcov.c/1.20/Fri Jun 12 23:44:13 2020//
 /kstat.c/1.1/Mon Jul  6 03:56:51 2020//
 /rnd.c/1.221/Sat Jul 11 07:57:48 2020//
-/softraid.c/1.405/Sat Jul 11 07:57:48 2020//
-/vscsi.c/1.52/Sat Jul 11 07:57:48 2020//
+/ksyms.c/1.33/Mon Jul 20 07:06:30 2020//
+/softraid.c/1.409/Mon Jul 20 07:06:30 2020//
+/softraid_crypto.c/1.139/Mon Jul 20 07:06:30 2020//
+/vscsi.c/1.54/Mon Jul 20 07:06:30 2020//

@@ -74,7 +74,6 @@
 /select.h/1.17/Mon Sep 12 19:41:20 2016//
 /selinfo.h/1.5/Tue Jul 18 19:20:26 2017//
 /sem.h/1.24/Thu Sep  1 08:33:40 2016//
-/sensors.h/1.36/Mon Dec 10 13:35:54 2018//
 /shm.h/1.29/Sun Nov  3 20:16:01 2019//
 /siginfo.h/1.12/Fri Apr  7 04:48:44 2017//
 /sigio.h/1.4/Wed Jan  8 16:27:42 2020//
@@ -103,7 +102,6 @@
 /tprintf.h/1.6/Sun Aug 24 01:27:07 2003//
 /tracepoint.h/1.1/Tue Jan 21 16:16:23 2020//
 /tree.h/1.29/Sun Jul 30 19:27:20 2017//
-/tty.h/1.38/Fri Jul 19 00:17:16 2019//
 /ttycom.h/1.17/Sat Jun 16 13:55:03 2018//
 /ttydefaults.h/1.7/Tue Mar 12 11:01:25 2019//
 /types.h/1.48/Sat Feb  9 04:54:11 2019//
@@ -138,4 +136,6 @@
 /task.h/1.17/Fri Jun 12 23:44:15 2020//
 /time.h/1.55/Sat Jul 11 07:57:54 2020//
 /timetc.h/1.12/Sat Jul 11 07:57:54 2020//
+/sensors.h/1.37/Mon Jul 20 07:06:33 2020//
+/tty.h/1.39/Mon Jul 20 07:06:33 2020//
 D

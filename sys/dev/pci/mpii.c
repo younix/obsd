@@ -1,4 +1,4 @@
-/*	$OpenBSD: mpii.c,v 1.131 2020/07/09 22:48:05 krw Exp $	*/
+/*	$OpenBSD: mpii.c,v 1.136 2020/07/19 18:57:58 krw Exp $	*/
 /*
  * Copyright (c) 2010, 2012 Mike Belopuhov
  * Copyright (c) 2009 James Giannoules
@@ -590,18 +590,16 @@ mpii_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_pending = 1;
 	config_pending_incr();
 
-	/* we should be good to go now, attach scsibus */
-	sc->sc_link.adapter = &mpii_switch;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
-	sc->sc_link.adapter_buswidth = sc->sc_max_devices;
-	sc->sc_link.luns = 1;
 	sc->sc_link.openings = sc->sc_max_cmds - 1;
 	sc->sc_link.pool = &sc->sc_iopool;
 
 	saa.saa_sc_link = &sc->sc_link;
+	saa.saa_adapter = &mpii_switch;
+	saa.saa_adapter_softc = sc;
+	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
+	saa.saa_adapter_buswidth = sc->sc_max_devices;
+	saa.saa_luns = 1;
 
-	/* config_found() returns the scsibus attached to us */
 	sc->sc_scsibus = (struct scsibus_softc *) config_found(&sc->sc_dev,
 	    &saa, scsiprint);
 
@@ -885,7 +883,7 @@ mpii_load_xs(struct mpii_ccb *ccb)
 int
 mpii_scsi_probe(struct scsi_link *link)
 {
-	struct mpii_softc *sc = link->adapter_softc;
+	struct mpii_softc *sc = link->bus->sb_adapter_softc;
 	struct mpii_cfg_sas_dev_pg0 pg0;
 	struct mpii_ecfg_hdr ehdr;
 	struct mpii_device *dev;
@@ -2901,7 +2899,7 @@ void
 mpii_scsi_cmd(struct scsi_xfer *xs)
 {
 	struct scsi_link	*link = xs->sc_link;
-	struct mpii_softc	*sc = link->adapter_softc;
+	struct mpii_softc	*sc = link->bus->sb_adapter_softc;
 	struct mpii_ccb		*ccb = xs->io;
 	struct mpii_msg_scsi_io	*io;
 	struct mpii_device	*dev;
@@ -3196,7 +3194,7 @@ done:
 int
 mpii_scsi_ioctl(struct scsi_link *link, u_long cmd, caddr_t addr, int flag)
 {
-	struct mpii_softc	*sc = (struct mpii_softc *)link->adapter_softc;
+	struct mpii_softc	*sc = link->bus->sb_adapter_softc;
 	struct mpii_device	*dev = sc->sc_devs[link->target];
 
 	DNPRINTF(MPII_D_IOCTL, "%s: mpii_scsi_ioctl\n", DEVNAME(sc));
@@ -3212,7 +3210,7 @@ mpii_scsi_ioctl(struct scsi_link *link, u_long cmd, caddr_t addr, int flag)
 
 	default:
 		if (sc->sc_ioctl)
-			return (sc->sc_ioctl(link->adapter_softc, cmd, addr));
+			return (sc->sc_ioctl(&sc->sc_dev, cmd, addr));
 
 		break;
 	}
@@ -3223,7 +3221,7 @@ mpii_scsi_ioctl(struct scsi_link *link, u_long cmd, caddr_t addr, int flag)
 int
 mpii_ioctl_cache(struct scsi_link *link, u_long cmd, struct dk_cache *dc)
 {
-	struct mpii_softc *sc = (struct mpii_softc *)link->adapter_softc;
+	struct mpii_softc *sc = link->bus->sb_adapter_softc;
 	struct mpii_device *dev = sc->sc_devs[link->target];
 	struct mpii_cfg_raid_vol_pg0 *vpg;
 	struct mpii_msg_raid_action_request *req;

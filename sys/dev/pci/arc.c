@@ -1,4 +1,4 @@
-/*	$OpenBSD: arc.c,v 1.113 2020/06/27 17:28:58 krw Exp $ */
+/*	$OpenBSD: arc.c,v 1.116 2020/07/19 18:57:58 krw Exp $ */
 
 /*
  * Copyright (c) 2006 David Gwynne <dlg@openbsd.org>
@@ -771,7 +771,6 @@ arc_attach(struct device *parent, struct device *self, void *aux)
 	struct arc_softc		*sc = (struct arc_softc *)self;
 	struct pci_attach_args		*pa = aux;
 	struct scsibus_attach_args	saa;
-	struct device			*child;
 
 	sc->sc_talking = 0;
 	rw_init(&sc->sc_lock, "arcmsg");
@@ -802,17 +801,18 @@ arc_attach(struct device *parent, struct device *self, void *aux)
 		goto unmap_pci;
 	}
 
-	sc->sc_link.adapter = &arc_switch;
-	sc->sc_link.adapter_softc = sc;
-	sc->sc_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
-	sc->sc_link.adapter_buswidth = ARC_MAX_TARGET;
 	sc->sc_link.openings = sc->sc_req_count;
 	sc->sc_link.pool = &sc->sc_iopool;
 
 	saa.saa_sc_link = &sc->sc_link;
+	saa.saa_adapter = &arc_switch;
+	saa.saa_adapter_softc = sc;
+	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
+	saa.saa_adapter_buswidth = ARC_MAX_TARGET;
+	saa.saa_luns = 8;
 
-	child = config_found(self, &saa, scsiprint);
-	sc->sc_scsibus = (struct scsibus_softc *)child;
+	sc->sc_scsibus = (struct scsibus_softc *)config_found(self, &saa,
+	    scsiprint);
 
 	/* enable interrupts */
 	arc_enable_all_intr(sc);
@@ -1118,7 +1118,7 @@ void
 arc_scsi_cmd(struct scsi_xfer *xs)
 {
 	struct scsi_link		*link = xs->sc_link;
-	struct arc_softc		*sc = link->adapter_softc;
+	struct arc_softc		*sc = link->bus->sb_adapter_softc;
 	struct arc_ccb			*ccb;
 	struct arc_msg_scsicmd		*cmd;
 	u_int32_t			reg, cdb_len;

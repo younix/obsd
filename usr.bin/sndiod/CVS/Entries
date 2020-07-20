@@ -19,7 +19,6 @@
 /sysex.h/1.2/Fri Dec 20 08:47:37 2013//
 /utils.c/1.7/Thu Jan 23 05:40:09 2020//
 /utils.h/1.5/Thu Jan 23 05:40:09 2020//
-/dev.c/1.75/Sat Jul 11 07:57:56 2020//
 /dev.h/1.29/Sat Jul 11 07:57:56 2020//
 /dev_sioctl.c/1.6/Sat Jul 11 07:57:56 2020//
 /fdpass.c/1.10/Sat Jul 11 07:57:56 2020//
@@ -29,4 +28,5 @@
 /siofile.c/1.22/Sat Jul 11 07:57:56 2020//
 /sndiod.8/1.8/Sat Jul 11 07:57:56 2020//
 /sndiod.c/1.41/Sat Jul 11 07:57:56 2020//
+/dev.c/1.77/Mon Jul 20 07:06:35 2020//
 D

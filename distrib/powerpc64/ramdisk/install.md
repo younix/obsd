@@ -1,4 +1,4 @@
-#	$OpenBSD: install.md,v 1.3 2020/07/10 17:04:49 deraadt Exp $
+#	$OpenBSD: install.md,v 1.7 2020/07/19 15:06:49 deraadt Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -32,24 +32,15 @@
 # machine dependent section of installation/upgrade script.
 #
 
-NCPU=$(sysctl -n hw.ncpufound)
+NCPU=1 #$(sysctl -n hw.ncpufound)
 NEWFSARGS_msdos="-F 16 -L boot"
-MOUNT_ARGS_msdos="-o-l"
 
 md_installboot() {
-	local _disk=/dev/$1, _duid
-
-	_duid=$(disklabel $1 | sed -ne 's/^duid: \(.*\)/\1/p')
-	# Mount MSDOS partition, copy boot kernel and create menu entry
-	mount ${MOUNT_ARGS_msdos} ${_disk}i /mnt/mnt
-	cp /mnt/bsd /mnt/mnt/boot
-	cat > /mnt/mnt/grub.cfg <<-__EOT
-		menuentry "OpenBSD" {
-			linux /boot bootduid=${_duid}
-			initrd /boot
-		}
-	__EOT
-	umount /mnt/mnt
+	if ! installboot -r /mnt ${1}; then
+		echo "\nFailed to install bootblocks."
+		echo "You will not be able to boot OpenBSD from ${1}."
+		exit
+	fi
 }
 
 md_prep_fdisk() {

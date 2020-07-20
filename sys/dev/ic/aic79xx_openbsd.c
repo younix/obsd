@@ -1,4 +1,4 @@
-/*	$OpenBSD: aic79xx_openbsd.c,v 1.52 2020/07/02 15:58:17 krw Exp $	*/
+/*	$OpenBSD: aic79xx_openbsd.c,v 1.56 2020/07/19 18:57:57 krw Exp $	*/
 
 /*
  * Copyright (c) 2004 Milos Urbanek, Kenneth R. Westerback & Marco Peereboom
@@ -109,18 +109,15 @@ ahd_attach(struct ahd_softc *ahd)
 	if (ahd->flags & AHD_RESET_BUS_A)
 		ahd_reset_channel(ahd, 'A', TRUE);
 
-	/*
-	 * fill in the prototype scsi_links.
-	 */
-	ahd->sc_channel.adapter_target = ahd->our_id;
-	if (ahd->features & AHD_WIDE)
-		ahd->sc_channel.adapter_buswidth = 16;
-	ahd->sc_channel.adapter_softc = ahd;
-	ahd->sc_channel.adapter = &ahd_switch;
 	ahd->sc_channel.openings = 16; /* Must ALWAYS be < 256!! */
 	ahd->sc_channel.pool = &ahd->sc_iopool;
 
 	saa.saa_sc_link = &ahd->sc_channel;
+	saa.saa_adapter_target = ahd->our_id;
+	saa.saa_adapter_buswidth = (ahd->features & AHD_WIDE) ? 16 : 8;
+	saa.saa_adapter_softc = ahd;
+	saa.saa_adapter = &ahd_switch;
+	saa.saa_luns = 8;
 
 	ahd->sc_child = config_found((void *)&ahd->sc_dev, &saa, scsiprint);
 
@@ -260,7 +257,7 @@ ahd_action(struct scsi_xfer *xs)
 	u_int16_t quirks;
 
 	SC_DEBUG(xs->sc_link, SDEV_DB3, ("ahd_action\n"));
-	ahd = (struct ahd_softc *)xs->sc_link->adapter_softc;
+	ahd = xs->sc_link->bus->sb_adapter_softc;
 
 	target_id = xs->sc_link->target;
 	our_id = SCSI_SCSI_ID(ahd, xs->sc_link);
@@ -325,7 +322,7 @@ ahd_execute_scb(void *arg, bus_dma_segment_t *dm_segs, int nsegments)
 	xs = scb->xs;
 	xs->error = CAM_REQ_INPROG;
 	xs->status = 0;
-	ahd = (struct ahd_softc *)xs->sc_link->adapter_softc;
+	ahd = xs->sc_link->bus->sb_adapter_softc;
 
 	if (nsegments != 0) {
 		void *sg;

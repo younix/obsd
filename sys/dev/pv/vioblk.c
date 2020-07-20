@@ -1,4 +1,4 @@
-/*	$OpenBSD: vioblk.c,v 1.21 2020/07/10 19:43:09 krw Exp $	*/
+/*	$OpenBSD: vioblk.c,v 1.24 2020/07/19 18:57:58 krw Exp $	*/
 
 /*
  * Copyright (c) 2012 Stefan Fritsch.
@@ -235,21 +235,21 @@ vioblk_attach(struct device *parent, struct device *self, void *aux)
 		printf("\nCan't alloc reqs\n");
 		goto err;
 	}
+	DNPRINTF(1, "%s: qsize: %d\n", __func__, qsize);
+	printf("\n");
 
 	sc->sc_link.openings = sc->sc_nreqs;
-	sc->sc_link.adapter = &vioblk_switch;
 	sc->sc_link.pool = &sc->sc_iopool;
-	sc->sc_link.adapter_softc = self;
-	/* Only valid target/lun is 0/0. */
-	sc->sc_link.adapter_buswidth = 1;
-	sc->sc_link.luns = 1;
-	sc->sc_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
-	DNPRINTF(1, "%s: qsize: %d\n", __func__, qsize);
 	if (virtio_has_feature(vsc, VIRTIO_BLK_F_RO))
 		sc->sc_link.flags |= SDEV_READONLY;
 
 	saa.saa_sc_link = &sc->sc_link;
-	printf("\n");
+	saa.saa_adapter = &vioblk_switch;
+	saa.saa_adapter_softc = self;
+	saa.saa_adapter_buswidth = 1;
+	saa.saa_luns = 1;
+	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
+
 	config_found(self, &saa, scsiprint);
 
 	return;
@@ -391,7 +391,7 @@ vioblk_reset(struct vioblk_softc *sc)
 void
 vioblk_scsi_cmd(struct scsi_xfer *xs)
 {
-	struct vioblk_softc *sc = xs->sc_link->adapter_softc;
+	struct vioblk_softc *sc = xs->sc_link->bus->sb_adapter_softc;
 	struct virtqueue *vq = &sc->sc_vq[0];
 	struct virtio_softc *vsc = sc->sc_virtio;
 	struct virtio_blk_req *vr;
@@ -586,7 +586,7 @@ vioblk_scsi_inq(struct scsi_xfer *xs)
 void
 vioblk_scsi_capacity(struct scsi_xfer *xs)
 {
-	struct vioblk_softc *sc = xs->sc_link->adapter_softc;
+	struct vioblk_softc *sc = xs->sc_link->bus->sb_adapter_softc;
 	struct scsi_read_cap_data rcd;
 	uint64_t capacity;
 
@@ -606,7 +606,7 @@ vioblk_scsi_capacity(struct scsi_xfer *xs)
 void
 vioblk_scsi_capacity16(struct scsi_xfer *xs)
 {
-	struct vioblk_softc *sc = xs->sc_link->adapter_softc;
+	struct vioblk_softc *sc = xs->sc_link->bus->sb_adapter_softc;
 	struct scsi_read_cap_data_16 rcd;
 
 	bzero(&rcd, sizeof(rcd));

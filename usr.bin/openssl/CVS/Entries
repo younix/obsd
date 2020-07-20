@@ -24,7 +24,6 @@
 /genrsa.c/1.17/Wed Jul 24 14:23:25 2019//
 /nseq.c/1.9/Sun Jul 14 03:30:46 2019//
 /ocsp.c/1.15/Wed Feb  7 05:49:36 2018//
-/openssl.1/1.122/Wed May 13 10:19:25 2020//
 /openssl.c/1.30/Mon Nov  4 15:25:54 2019//
 /passwd.c/1.10/Sun Jul 14 03:30:46 2019//
 /pkcs12.c/1.14/Fri Jul 26 12:35:59 2019//
@@ -52,8 +51,9 @@
 /testrsa.h/1.1/Tue Aug 26 17:47:25 2014//
 /timeouts.h/1.1/Tue Aug 26 17:47:25 2014//
 /ts.c/1.15/Wed Feb  7 05:47:55 2018//
-/verify.c/1.7/Wed Feb  7 05:47:55 2018//
 /version.c/1.9/Sun Jul 14 03:30:46 2019//
 /x509.c/1.18/Sun May 10 17:13:31 2020//
 /s_client.c/1.51/Sat Jul 11 07:57:55 2020//
+/openssl.1/1.125/Mon Jul 20 07:06:34 2020//
+/verify.c/1.8/Mon Jul 20 07:06:34 2020//
 D

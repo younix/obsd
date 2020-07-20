@@ -15,11 +15,11 @@
 /pftop.c/1.45/Thu Oct 17 21:54:29 2019//
 /pigs.c/1.32/Fri Jun 28 13:35:04 2019//
 /pool.c/1.19/Fri Jun 28 13:35:04 2019//
-/sensors.c/1.31/Mon Dec 10 13:35:54 2018//
 /swap.c/1.28/Fri Jun 28 13:35:04 2019//
 /systat.h/1.23/Mon Mar  4 21:27:35 2019//
 /uvm.c/1.5/Fri Jun 28 13:35:04 2019//
 /vmstat.c/1.91/Fri Jun 28 13:35:04 2019//
 /mbufs.c/1.43/Sat Jul 11 07:57:56 2020//
 /systat.1/1.119/Sat Jul 11 07:57:56 2020//
+/sensors.c/1.32/Mon Jul 20 07:06:35 2020//
 D

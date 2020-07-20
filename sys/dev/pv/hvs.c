@@ -308,15 +308,16 @@ hvs_attach(struct device *parent, struct device *self, void *aux)
 
 	task_set(&sc->sc_probetask, hvs_scsi_probe, sc);
 
-	sc->sc_link.adapter = &hvs_switch;
-	sc->sc_link.adapter_softc = self;
-	sc->sc_link.luns = sc->sc_flags & HVSF_SCSI ? 64 : 1;
-	sc->sc_link.adapter_buswidth = 2;
-	sc->sc_link.adapter_target = SDEV_NO_ADAPTER_TARGET;
 	sc->sc_link.openings = sc->sc_nccb;
 	sc->sc_link.pool = &sc->sc_iopool;
 
 	saa.saa_sc_link = &sc->sc_link;
+	saa.saa_adapter = &hvs_switch;
+	saa.saa_adapter_softc = self;
+	saa.saa_luns = sc->sc_flags & HVSF_SCSI ? 64 : 1;
+	saa.saa_adapter_buswidth = 2;
+	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
+
 	sc->sc_scsibus = config_found(self, &saa, scsiprint);
 
 	/*
@@ -333,7 +334,7 @@ void
 hvs_scsi_cmd(struct scsi_xfer *xs)
 {
 	struct scsi_link *link = xs->sc_link;
-	struct hvs_softc *sc = link->adapter_softc;
+	struct hvs_softc *sc = link->bus->sb_adapter_softc;
 	struct hvs_ccb *ccb = xs->io;
 	union hvs_cmd cmd;
 	struct hvs_cmd_io *io = &cmd.io;
@@ -585,7 +586,7 @@ is_inquiry_valid(struct scsi_inquiry_data *inq)
 static inline void
 fixup_inquiry(struct scsi_xfer *xs, struct hvs_srb *srb)
 {
-	struct hvs_softc *sc = xs->sc_link->adapter_softc;
+	struct hvs_softc *sc = xs->sc_link->bus->sb_adapter_softc;
 	struct scsi_inquiry_data *inq = (struct scsi_inquiry_data *)xs->data;
 	int datalen, resplen;
 	char vendor[8];
@@ -619,7 +620,7 @@ void
 hvs_scsi_cmd_done(struct hvs_ccb *ccb)
 {
 	struct scsi_xfer *xs = ccb->ccb_xfer;
-	struct hvs_softc *sc = xs->sc_link->adapter_softc;
+	struct hvs_softc *sc = xs->sc_link->bus->sb_adapter_softc;
 	union hvs_cmd *cmd = ccb->ccb_cmd;
 	struct hvs_srb *srb;
 	bus_dmamap_t map;
