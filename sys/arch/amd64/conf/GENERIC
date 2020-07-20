@@ -13,6 +13,9 @@ machine		amd64
 include		"../../../conf/GENERIC"
 maxusers	80			# estimated number of users
 
+makeoptions	PROF="-pg"
+option		GPROF
+
 option		USER_PCICONF	# user-space PCI configuration
 
 option		APERTURE	# in-kernel aperture driver for XFree86

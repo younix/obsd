@@ -2295,8 +2295,10 @@ aml_register_regionspace(struct aml_node *node, int iospace, void *cookie,
 	arg[1].type = AML_OBJTYPE_INTEGER;
 	arg[1].v_integer = 1;
 	node = aml_searchname(node, "_REG");
-	if (node)
+	if (node) {
+printf("%s:%d call aml_evalnode()\n", __func__, __LINE__);
 		aml_evalnode(acpi_softc, node, 2, arg, NULL);
+	}
 }
 
 void aml_rwgen(struct aml_value *, int, int, struct aml_value *, int, int);
@@ -2840,6 +2842,7 @@ aml_parsefieldlist(struct aml_scope *mscope, int opcode, int flags,
 		case 0x02: /* ConnectionField */
 			mscope->pos++;
 			blen = 0;
+printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 			conn = aml_parse(mscope, 'o', "Connection");
 			if (conn == NULL)
 				aml_die("Could not parse connection");
@@ -3443,6 +3446,7 @@ aml_eval(struct aml_scope *scope, struct aml_value *my_ret, int ret_type,
 				aml_copyvalue(sp, &argv[idx]);
 			} else {
 				_aml_setvalue(sp, AML_OBJTYPE_OBJREF, AMLOP_ARG0 + idx, 0);
+printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 				sp->v_objref.ref = aml_parse(scope, 't', "ARGX");
 			}
 		}
@@ -3455,6 +3459,7 @@ aml_eval(struct aml_scope *scope, struct aml_value *my_ret, int ret_type,
 		if (tmp->v_method.fneval != NULL) {
 			my_ret = tmp->v_method.fneval(ms, NULL);
 		} else {
+printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 			aml_parse(ms, 'T', "METHEVAL");
 			my_ret = ms->retv;
 		}
@@ -3809,6 +3814,7 @@ aml_parse(struct aml_scope *scope, int ret_type, const char *stype)
 				scope->pos++;
 			}
 			else {
+//printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 				rv = aml_parse(scope, *ch, htab->mnem);
 				if (rv == NULL || aml_error)
 					goto parse_error;
@@ -3903,6 +3909,7 @@ aml_parse(struct aml_scope *scope, int ret_type, const char *stype)
 		}
 		if (ret_type == 'i' || ret_type == 't' || ret_type == 'T') {
 			/* Return TermArg or Integer: Evaluate object */
+//printf("%s:%d call aml_eval()\n", __func__, __LINE__);
 			my_ret = aml_eval(scope, my_ret, ret_type, 0, NULL);
 		} else if (my_ret->type == AML_OBJTYPE_METHOD) {
 			/* This should only happen with CondRef */
@@ -3941,6 +3948,7 @@ aml_parse(struct aml_scope *scope, int ret_type, const char *stype)
 
 		/* Recursively parse package contents */
 		for (idx=0; idx<my_ret->length; idx++) {
+//printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 			rv = aml_parse(mscope, 'o', "Package");
 			if (rv != NULL) {
 				aml_delref(&my_ret->v_package[idx], "pkginit");
@@ -3994,6 +4002,7 @@ aml_parse(struct aml_scope *scope, int ret_type, const char *stype)
 	case AMLOP_INCREMENT:
 	case AMLOP_DECREMENT:
 		/* Inc/Dec: S => I */
+//printf("%s:%d call aml_eval()\n", __func__, __LINE__);
 		my_ret = aml_eval(scope, opargs[0], AML_ARG_INTEGER, 0, NULL);
 		ival = aml_evalexpr(my_ret->v_integer, 1, opcode);
 		aml_store(scope, opargs[0], ival, NULL);
@@ -4481,6 +4490,7 @@ acpi_parse_aml(struct acpi_softc *sc, uint8_t *start, uint32_t length)
 	aml_error = 0;
 	scope = aml_pushscope(NULL, &res, &aml_root, AMLOP_SCOPE);
 	aml_busy++;
+printf("%s:%d call aml_parse()\n", __func__, __LINE__);
 	aml_parse(scope, 'T', "TopLevel");
 	aml_busy--;
 	aml_popscope(scope);
@@ -4511,6 +4521,7 @@ aml_evalnode(struct acpi_softc *sc, struct aml_node *node,
 	dnprintf(12,"EVALNODE: %s %lx\n", aml_nodename(node), acpi_nalloc);
 
 	aml_error = 0;
+printf("%s:%d call aml_eval()\n", __func__, __LINE__);
 	xres = aml_eval(NULL, node->value, 't', argc, argv);
 	if (xres) {
 		if (res)
@@ -4537,6 +4548,7 @@ aml_node_setval(struct acpi_softc *sc, struct aml_node *node, int64_t val)
 	env.type = AML_OBJTYPE_INTEGER;
 	env.v_integer = val;
 
+printf("%s:%d call aml_evalnode()\n", __func__, __LINE__);
 	return aml_evalnode(sc, node, 1, &env, NULL);
 }
 
@@ -4549,6 +4561,7 @@ aml_evalname(struct acpi_softc *sc, struct aml_node *parent, const char *name,
     int argc, struct aml_value *argv, struct aml_value *res)
 {
 	parent = aml_searchname(parent, name);
+printf("%s:%d call aml_evalnode()\n", __func__, __LINE__);
 	return aml_evalnode(sc, parent, argc, argv, res);
 }
 
@@ -4563,6 +4576,7 @@ aml_evalinteger(struct acpi_softc *sc, struct aml_node *parent,
 	int rc;
 
 	parent = aml_searchname(parent, name);
+printf("%s:%d call aml_evalnode()\n", __func__, __LINE__);
 	rc = aml_evalnode(sc, parent, argc, argv, &res);
 	if (rc == 0) {
 		*ival = aml_val2int(&res);
