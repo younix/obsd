@@ -795,8 +795,10 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 	int		 error = 0;
 	int		 s;
 
-	if (card >= rp_cd.cd_ndevs || (sc = rp_cd.cd_devs[card]) == NULL)
+	if (card >= rp_cd.cd_ndevs || (sc = rp_cd.cd_devs[card]) == NULL) {
+printf("%s:%d return\n", __func__, __LINE__);
 		return (ENXIO);
+	}
 
 #ifdef RP_DEBUG
 	printf("%s open port %d flag 0x%x mode 0x%x\n", DEVNAME(sc), port, flag,
@@ -868,6 +870,7 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 		timeout_set(&rp->rp_timer, rp_poll, rp);
 		timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
+printf("%s:%d return\n", __func__, __LINE__);
 		return (EBUSY);
 	} else {
 		s = spltty();
@@ -877,6 +880,7 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
+printf("%s:%d return\n", __func__, __LINE__);
 			return (EBUSY);
 		}
 		rp->rp_cua = 1;
@@ -886,6 +890,7 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 			if (rp->rp_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
+printf("%s:%d return\n", __func__, __LINE__);
 				return (EBUSY);
 			}
 		} else {
@@ -903,6 +908,7 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 				if (error && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
 					splx(s);
+printf("%s:%d return\n", __func__, __LINE__);
 					return (error);
 				}
 			}
@@ -910,6 +916,7 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 	}
 	splx(s);
 
+printf("%s:%d return\n", __func__, __LINE__);
 	return ((*linesw[tp->t_line].l_open)(dev, tp, p));
 }
 

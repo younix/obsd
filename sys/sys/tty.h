@@ -176,17 +176,17 @@ struct itty {
 #endif
 
 /* These flags are kept in t_state. */
-#define	TS_ASLEEP	0x00001		/* Process waiting for tty. */
-#define	TS_ASYNC	0x00002		/* Tty in async I/O mode. */
-#define	TS_BUSY		0x00004		/* Draining output. */
-#define	TS_CARR_ON	0x00008		/* Carrier is present. */
-#define	TS_FLUSH	0x00010		/* Outq has been flushed during DMA. */
-#define	TS_ISOPEN	0x00020		/* Open has completed. */
-#define	TS_TBLOCK	0x00040		/* Further input blocked. */
-#define	TS_TIMEOUT	0x00080		/* Wait for output char processing. */
-#define	TS_TTSTOP	0x00100		/* Output paused. */
-#define	TS_WOPEN	0x00200		/* Open in progress. */
-#define	TS_XCLUDE	0x00400		/* Tty requires exclusivity. */
+#define	TS_ASLEEP	0x00001		/*    1 Process waiting for tty. */
+#define	TS_ASYNC	0x00002		/*    2 Tty in async I/O mode. */
+#define	TS_BUSY		0x00004		/*    4 Draining output. */
+#define	TS_CARR_ON	0x00008		/*    8 Carrier is present. */
+#define	TS_FLUSH	0x00010		/*   16 Outq has been flushed during DMA. */
+#define	TS_ISOPEN	0x00020		/*   32 Open has completed. */
+#define	TS_TBLOCK	0x00040		/*   64 Further input blocked. */
+#define	TS_TIMEOUT	0x00080		/*  128 Wait for output char processing. */
+#define	TS_TTSTOP	0x00100		/*  256 Output paused. */
+#define	TS_WOPEN	0x00200		/*  512 Open in progress. */
+#define	TS_XCLUDE	0x00400		/* 1024 Tty requires exclusivity. */
 
 /* State for intra-line fancy editing work. */
 #define	TS_BKSL		0x00800		/* State for lowercase \ work. */
