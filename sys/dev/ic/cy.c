@@ -377,7 +377,7 @@ cyopen(dev, flag, mode, p)
 	} else {
 		/* tty (not cua) device; wait for carrier if necessary. */
 		/* wait for carrier if necessary */
-		if (!ISSET(flag, O_NONBLOCK)) {
+		if (ISSET(flag, O_NONBLOCK)) {
 			if (cy->cy_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
