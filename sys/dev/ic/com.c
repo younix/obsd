@@ -241,11 +241,15 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 	int s;
 	int error = 0;
 
-	if (unit >= com_cd.cd_ndevs)
+	if (unit >= com_cd.cd_ndevs) {
+printf("%s:%d return\n", __func__, __LINE__);
 		return ENXIO;
+	}
 	sc = com_cd.cd_devs[unit];
-	if (!sc)
+	if (!sc) {
+printf("%s:%d return\n", __func__, __LINE__);
 		return ENXIO;
+	}
 
 	s = spltty();
 	if (!sc->sc_tty) {
@@ -368,20 +372,38 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 		com_write_reg(sc, com_ier, sc->sc_ier);
 
 		sc->sc_msr = com_read_reg(sc, com_msr);
-		if (ISSET(sc->sc_swflags, COM_SW_SOFTCAR) || DEVCUA(dev) ||
-		    ISSET(sc->sc_msr, MSR_DCD) || ISSET(tp->t_cflag, MDMBUF))
+
+printf("%s %s:%d %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, sc->sc_msr);
+
+
+printf("%s %s:%d %d, %d, %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+	DEVCUA(dev),
+	ISSET(sc->sc_swflags, COM_SW_SOFTCAR),
+	ISSET(sc->sc_msr, MSR_DCD),
+	ISSET(tp->t_cflag, MDMBUF));
+
+		if (DEVCUA(dev) ||
+		    ISSET(sc->sc_swflags, COM_SW_SOFTCAR) ||
+		    ISSET(sc->sc_msr, MSR_DCD) ||
+		    ISSET(tp->t_cflag, MDMBUF)) {
+printf("%s %s:%d set carrier on\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			SET(tp->t_state, TS_CARR_ON);
-		else
+		} else {
+printf("%s %s:%d clear carrier\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			CLR(tp->t_state, TS_CARR_ON);
-	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0)
+		}
+	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		return EBUSY;
-	else
+	} else
 		s = spltty();
+
 
 	if (DEVCUA(dev)) {
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			return EBUSY;
 		}
 		sc->sc_cua = 1;		/* We go into CUA mode. */
@@ -391,14 +413,25 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 			if (sc->sc_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
 			while (sc->sc_cua ||
 			    (!ISSET(tp->t_cflag, CLOCAL) &&
-				!ISSET(tp->t_state, TS_CARR_ON))) {
+			     !ISSET(tp->t_state, TS_CARR_ON))) {
+
 				SET(tp->t_state, TS_WOPEN);
+
+
+
 				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen);
+
+
+
+
+
+
 				/*
 				 * If TS_WOPEN has been reset, that means the cua device
 				 * has been closed.  We don't want to fail in that case,
@@ -409,6 +442,7 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 					if (!sc->sc_cua && !ISSET(tp->t_state, TS_ISOPEN))
 						compwroff(sc);
 					splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 					return error;
 				}
 			}
@@ -416,6 +450,7 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 	}
 	splx(s);
 
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 	return (*linesw[tp->t_line].l_open)(dev, tp, p);
 }
 
@@ -436,8 +471,10 @@ comclose(dev_t dev, int flag, int mode, struct proc *p)
 	if(sc->sc_swflags & COM_SW_DEAD)
 		return 0;
 
+
 	(*linesw[tp->t_line].l_close)(tp, flag, p);
 	s = spltty();
+
 	if (ISSET(tp->t_state, TS_WOPEN)) {
 		/* tty device is waiting for carrier; drop dtr then re-raise */
 		CLR(sc->sc_mcr, MCR_DTR | MCR_RTS);
@@ -470,7 +507,7 @@ compwroff(struct com_softc *sc)
 
 	CLR(sc->sc_lcr, LCR_SBREAK);
 	com_write_reg(sc, com_lcr, sc->sc_lcr);
-	com_write_reg(sc, com_ier, 0);
+	com_write_reg(sc, com_ier, 0);		/* disable interrupt */
 	if (ISSET(tp->t_cflag, HUPCL) &&
 	    !ISSET(sc->sc_swflags, COM_SW_SOFTCAR)) {
 		/* XXX perhaps only clear DTR */
@@ -1055,6 +1092,8 @@ comintr(void *arg)
 	struct com_softc *sc = arg;
 	struct tty *tp;
 	u_char lsr, data, msr, delta;
+
+//printf("%s:%d\n", __func__, __LINE__);
 
 	if (!sc->sc_tty)
 		return (0);		/* Can't do squat. */

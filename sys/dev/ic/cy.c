@@ -67,8 +67,7 @@
 #include <dev/ic/cd1400reg.h>
 #include <dev/ic/cyreg.h>
 
-#define DEVCUA(x) (minor(x) & 0x80)
-
+void	cypwroff(struct cy_port *);
 int	cy_intr(void *);
 int	cyparam(struct tty *, struct termios *);
 void	cystart(struct tty *);
@@ -268,10 +267,11 @@ cyopen(dev, flag, mode, p)
 	struct cy_softc *sc;
 	struct cy_port *cy;
 	struct tty *tp;
-	int s, error;
+	int s, error = 0;
 
 	if (card >= cy_cd.cd_ndevs ||
 	    (sc = cy_cd.cd_devs[card]) == NULL) {
+printf("%s:%d return\n", __func__, __LINE__);
 		return (ENXIO);
 	}
 
@@ -292,13 +292,21 @@ cyopen(dev, flag, mode, p)
 	tp->t_oproc = cystart;
 	tp->t_param = cyparam;
 	tp->t_dev = dev;
-
 	if (!ISSET(tp->t_state, TS_ISOPEN)) {
 		SET(tp->t_state, TS_WOPEN);
 		ttychars(tp);
 		tp->t_iflag = TTYDEF_IFLAG;
 		tp->t_oflag = TTYDEF_OFLAG;
 		tp->t_cflag = TTYDEF_CFLAG;
+
+
+
+
+
+
+
+		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
+
 		if (ISSET(cy->cy_openflags, TIOCFLAG_CLOCAL))
 			SET(tp->t_cflag, CLOCAL);
 		if (ISSET(cy->cy_openflags, TIOCFLAG_CRTSCTS))
@@ -306,9 +314,12 @@ cyopen(dev, flag, mode, p)
 		if (ISSET(cy->cy_openflags, TIOCFLAG_MDMBUF))
 			SET(tp->t_cflag, MDMBUF);
 		tp->t_lflag = TTYDEF_LFLAG;
-		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 
 		s = spltty();
+
+		/* this sets parameters and raises DTR */
+		cyparam(tp, &tp->t_termios);
+		ttsetwater(tp);
 
 		/*
 		 * Allocate input ring buffer if we don't already have one
@@ -319,6 +330,7 @@ cyopen(dev, flag, mode, p)
 				printf("%s: (port %d) can't allocate input buffer\n",
 				       sc->sc_dev.dv_xname, port);
 				splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return (ENOMEM);
 			}
 			cy->cy_ibuf_end = cy->cy_ibuf + IBUF_SIZE;
@@ -340,59 +352,85 @@ cyopen(dev, flag, mode, p)
 		if (!timeout_pending(&sc->sc_poll_to))
 			timeout_add(&sc->sc_poll_to, 1);
 
-		/* this sets parameters and raises DTR */
-		cyparam(tp, &tp->t_termios);
-
-		ttsetwater(tp);
-
-		/* raise RTS too */
-		cy_modem_control(cy, TIOCM_RTS, DMBIS);
+		/* raise RTS and DTR too */
+		cy_modem_control(cy, TIOCM_RTS | TIOCM_DTR, DMBIS);
 
 		cy->cy_carrier_stat = cd_read_reg(cy, CD1400_MSVR2);
 
 		/* enable receiver and modem change interrupts */
 		cd_write_reg(cy, CD1400_SRER,
-		    CD1400_SRER_MDMCH | CD1400_SRER_RXDATA);
+		    CD1400_SRER_MDMCH | CD1400_SRER_RXDATA | CD1400_SRER_TXRDY |
+		    CD1400_SRER_TXMPTY | CD1400_SRER_NNDT);
+
+printf("%s %s:%d %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, cy->cy_carrier_stat);
+
+printf("%s %s:%d %d, %d, %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+	CY_DIALOUT(dev),
+	ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR),
+	ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD),
+	ISSET(tp->t_cflag, MDMBUF));
 
 		if (CY_DIALOUT(dev) ||
 		    ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR) ||
-		    ISSET(tp->t_cflag, MDMBUF) ||
-		    ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD))
+		    ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD) ||
+		    ISSET(tp->t_cflag, MDMBUF)) {
+printf("%s %s:%d set carrier on\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			SET(tp->t_state, TS_CARR_ON);
-		else
+		} else {
+printf("%s %s:%d clear carrier\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			CLR(tp->t_state, TS_CARR_ON);
+		}
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		return (EBUSY);
 	} else {
 		s = spltty();
 	}
 
-	if (DEVCUA(dev)) {
+	if (CY_DIALOUT(dev)) {
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			return EBUSY;
 		}
 		cy->cy_cua = 1;
 	} else {
 		/* tty (not cua) device; wait for carrier if necessary. */
 		/* wait for carrier if necessary */
-		if (!ISSET(flag, O_NONBLOCK)) {
+		if (ISSET(flag, O_NONBLOCK)) {
 			if (cy->cy_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
 			while (cy->cy_cua ||
 			    (!ISSET(tp->t_cflag, CLOCAL) &&
-			    !ISSET(tp->t_state, TS_CARR_ON))) {
+			     !ISSET(tp->t_state, TS_CARR_ON))) {
+
 				SET(tp->t_state, TS_WOPEN);
-				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
-				    "cydcd");
-				if (error != 0 && ISSET(tp->t_state, TS_WOPEN)) {
+
+printf("%s %s:%d error:%x cflag:%x state:%x\n",
+    sc->sc_dev.dv_xname, __func__, __LINE__, error, tp->t_cflag, tp->t_state);
+
+				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen);
+
+printf("%s %s:%d error:%x cflag:%x state:%x\n",
+    sc->sc_dev.dv_xname, __func__, __LINE__, error, tp->t_cflag, tp->t_state);
+
+				/*
+				 * If TS_WOPEN has been reset, that means the cua device
+				 * has been closed.  We don't want to fail in that case,
+				 * so just go around again.
+				 */
+				if (error && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
+					if (!cy->cy_cua && !ISSET(tp->t_state, TS_ISOPEN))
+						cypwroff(cy);
 					splx(s);
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 					return (error);
 				}
 			}
@@ -400,6 +438,7 @@ cyopen(dev, flag, mode, p)
 	}
 	splx(s);
 
+printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 	return (*linesw[tp->t_line].l_open)(dev, tp, p);
 }
 
@@ -419,31 +458,48 @@ cyclose(dev, flag, mode, p)
 	struct tty *tp = cy->cy_tty;
 	int s;
 
-#ifdef CY_DEBUG
+//#ifdef CY_DEBUG
 	printf("%s close port %d, flag 0x%x, mode 0x%x\n", sc->sc_dev.dv_xname,
 	    port, flag, mode);
-#endif
+//#endif
 
 	(*linesw[tp->t_line].l_close)(tp, flag, p);
 	s = spltty();
 
-	if (ISSET(tp->t_cflag, HUPCL) &&
-	    !ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR)) {
-		/* drop DTR and RTS
-		   (should we wait for output buffer to become empty first?) */
-		cy_modem_control(cy, 0, DMSET);
+	if (ISSET(tp->t_state, TS_WOPEN)) {
+		/* tty device is waiting for carrier; drop dtr then re-raise */
+		cy_modem_control(cy, TIOCM_RTS | TIOCM_DTR, DMBIC);
+		//XXX:timeout_add_sec(&sc->sc_dtr_tmo, 2);
+	} else {
+		/* no one else waiting; turn off the uart */
+		cypwroff(cy);
 	}
 
-	/*
-	 * XXX should we disable modem change and
-	 * receive interrupts here or somewhere ?
-	 */
 	CLR(tp->t_state, TS_BUSY | TS_FLUSH);
 	cy->cy_cua = 0;
 	splx(s);
 	ttyclose(tp);
 
 	return (0);
+}
+
+void
+cypwroff(struct cy_port *cy)
+{
+	struct tty *tp = cy->cy_tty;
+
+	/* clear break on line */
+	SET(cy->cy_flags, CYF_END_BREAK);
+	cy_enable_transmitter(cy);
+
+	/* disable receiver and modem change interrupts */
+	cd_write_reg(cy, CD1400_SRER, 0);
+	if (ISSET(tp->t_cflag, HUPCL) &&
+	    !ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR)) {
+		/* drop DTR and RTS
+		   (should we wait for output buffer to become empty first?) */
+		cy_modem_control(cy, 0, DMSET);
+	}
 }
 
 /*
@@ -701,7 +757,7 @@ cyparam(tp, t)
 
 	s = spltty();
 
-	/* hang up the line is ospeed is zero, else turn DTR on */
+	/* hang up the line if ospeed is zero, else turn DTR on */
 	cy_modem_control(cy, TIOCM_DTR, (t->c_ospeed == 0 ? DMBIC : DMBIS));
 
 	/* channel was selected by the above call to cy_modem_control() */
@@ -1098,6 +1154,8 @@ cy_intr(arg)
 	int cy_chip, stat;
 	int int_serviced = -1;
 
+printf("%s:%d enter ", __func__, __LINE__);
+
 	/*
 	 * Check interrupt status of each CD1400 chip on this card
 	 * (multiple cards cannot share the same interrupt)
@@ -1109,6 +1167,7 @@ cy_intr(arg)
 			continue;
 
 		if (ISSET(stat, CD1400_SVRR_RXRDY)) {
+printf("RXRDY");
 			u_char save_car, save_rir, serv_type;
 			u_char line_stat, recv_data, n_chars;
 			u_char *buf_p;
@@ -1220,6 +1279,7 @@ cy_intr(arg)
 		} /* if(rx_service...) */
 
 		if (ISSET(stat, CD1400_SVRR_MDMCH)) {
+printf("MDMCH");
 			u_char save_car, save_mir, serv_type, modem_stat;
 
 			save_mir = cd_read_reg_sc(sc, cy_chip, CD1400_MIR);
@@ -1255,6 +1315,7 @@ cy_intr(arg)
 		} /* if(modem_service...) */
 
 		if (ISSET(stat, CD1400_SVRR_TXRDY)) {
+printf("TXRDY");
 			u_char save_car, save_tir, serv_type, count, ch;
 			struct tty *tp;
 
@@ -1351,6 +1412,8 @@ cy_intr(arg)
 			int_serviced = 1;
 		} /* if(tx_service...) */
 	} /* for(...all CD1400s on a card) */
+
+printf("\n");
 
 	/* ensure an edge for next interrupt */
 	bus_space_write_1(sc->sc_memt, sc->sc_memh,
