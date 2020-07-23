@@ -58,10 +58,10 @@
 /cpu.c/1.149/Mon Jun  1 06:23:23 2020//
 /via.c/1.33/Mon Jun  1 06:23:23 2020//
 /machdep.c/1.267/Sat Jun  6 11:21:49 2020//
-/acpi_machdep.c/1.91/Sat Jul 11 07:57:46 2020//
-/conf.c/1.71/Sat Jul 11 07:57:46 2020//
-/efifb.c/1.33/Sat Jul 11 07:57:46 2020//
-/identcpu.c/1.116/Sat Jul 11 07:57:46 2020//
-/intr.c/1.54/Sat Jul 11 07:57:46 2020//
-/tsc.c/1.19/Sat Jul 11 07:57:46 2020//
+/acpi_machdep.c/1.92/Thu Jul 23 19:26:28 2020//
+/conf.c/1.71/Thu Jul 23 19:24:34 2020//
+/efifb.c/1.33/Mon Jul 20 09:32:29 2020//
+/identcpu.c/1.116/Mon Jul 20 09:32:29 2020//
+/intr.c/1.54/Mon Jul 20 09:32:29 2020//
+/tsc.c/1.19/Mon Jul 20 09:32:29 2020//
 D

@@ -89,7 +89,6 @@
 /vbusvar.h/1.4/Wed Jun 27 11:38:59 2018//
 /vcc.c/1.1/Sun May 10 12:24:04 2009//
 /vcctty.c/1.14/Mon Feb 19 08:59:52 2018//
-/vcons.c/1.17/Wed Jun 27 11:38:59 2018//
 /vds.c/1.1/Thu Dec 31 11:58:41 2009//
 /vdsp.c/1.47/Thu Jan 16 13:03:28 2020//
 /vgafb.c/1.66/Thu Dec 27 11:06:38 2018//
@@ -104,13 +103,14 @@
 /z8530kbd.c/1.29/Thu Dec 27 11:06:38 2018//
 /zs.c/1.31/Thu Dec 27 11:06:38 2018//
 /vrng.c/1.6/Mon Jun  1 06:23:25 2020//
-/msi.c/1.5/Sat Jul 11 07:57:48 2020//
-/msivar.h/1.2/Sat Jul 11 07:57:48 2020//
-/pci_machdep.c/1.51/Sat Jul 11 07:57:48 2020//
-/psycho.c/1.77/Sat Jul 11 07:57:48 2020//
-/pyro.c/1.35/Sat Jul 11 07:57:48 2020//
-/pyrovar.h/1.5/Sat Jul 11 07:57:48 2020//
-/vnet.c/1.62/Sat Jul 11 07:57:48 2020//
-/vpci.c/1.31/Sat Jul 11 07:57:48 2020//
-/vdsk.c/1.59/Mon Jul 20 07:06:30 2020//
+/msi.c/1.5/Mon Jul 20 09:32:29 2020//
+/msivar.h/1.2/Mon Jul 20 09:32:29 2020//
+/pci_machdep.c/1.51/Mon Jul 20 09:32:29 2020//
+/psycho.c/1.77/Mon Jul 20 09:32:29 2020//
+/pyro.c/1.35/Mon Jul 20 09:32:29 2020//
+/pyrovar.h/1.5/Mon Jul 20 09:32:29 2020//
+/vcons.c/1.18/Thu Jul 23 19:26:35 2020//
+/vdsk.c/1.63/Thu Jul 23 19:26:35 2020//
+/vnet.c/1.62/Mon Jul 20 09:32:29 2020//
+/vpci.c/1.31/Mon Jul 20 09:32:29 2020//
 D

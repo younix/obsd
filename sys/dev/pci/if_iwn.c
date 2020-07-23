@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwn.c,v 1.234 2020/07/10 13:22:20 patrick Exp $	*/
+/*	$OpenBSD: if_iwn.c,v 1.239 2020/07/20 08:22:06 stsp Exp $	*/
 
 /*-
  * Copyright (c) 2007-2010 Damien Bergamini <damien.bergamini@free.fr>
@@ -2379,19 +2379,22 @@ iwn_rx_compressed_ba(struct iwn_softc *sc, struct iwn_rx_desc *desc,
 	 * Multiple BA notifications in a row may be using this number, with
 	 * additional bits being set in cba->bitmap. It is unclear how the
 	 * firmware decides to shift this window forward.
+	 * We rely on ba->ba_winstart instead.
 	 */
 	seq = le16toh(cba->seq) >> IEEE80211_SEQ_SEQ_SHIFT;
 
 	/*
 	 * The firmware's new BA window starting sequence number
 	 * corresponds to the first hole in cba->bitmap, implying
-	 * that all frames between 'seq' and 'ssn' have been acked.
+	 * that all frames between 'seq' and 'ssn' (non-inclusive)
+	 * have been acked.
 	 */
 	ssn = le16toh(cba->ssn);
 
 	/* Skip rate control if our Tx rate is fixed. */
-	if (ic->ic_fixed_mcs != -1)
-		iwn_ampdu_rate_control(sc, ni, txq, cba->tid, seq, ssn);
+	if (ic->ic_fixed_mcs == -1)
+		iwn_ampdu_rate_control(sc, ni, txq, cba->tid, ba->ba_winstart,
+		    ssn);
 
 	/*
 	 * SSN corresponds to the first (perhaps not yet transmitted) frame
@@ -2569,6 +2572,7 @@ iwn_ampdu_tx_done(struct iwn_softc *sc, struct iwn_tx_ring *txq,
 	int txfail = (status != IWN_TX_STATUS_SUCCESS &&
 	    status != IWN_TX_STATUS_DIRECT_DONE);
 	struct ieee80211_tx_ba *ba;
+	uint16_t seq;
 
 	sc->sc_tx_timer = 0;
 
@@ -2654,10 +2658,8 @@ iwn_ampdu_tx_done(struct iwn_softc *sc, struct iwn_tx_ring *txq,
 	if (ba->ba_state != IEEE80211_BA_AGREED)
 		return;
 
-	/* This is a final single-frame Tx attempt. */
-	DPRINTFN(3, ("%s: final tx status=0x%x qid=%d queued=%d idx=%d ssn=%u "
-	    "bitmap=0x%llx\n", __func__, status, desc->qid, txq->queued,
-	    desc->idx, ssn, ba->ba_bitmap));
+	/* This was a final single-frame Tx attempt for frame SSN-1. */
+	seq = (ssn - 1) & 0xfff;
 
 	/*
 	 * Skip rate control if our Tx rate is fixed.
@@ -2677,22 +2679,22 @@ iwn_ampdu_tx_done(struct iwn_softc *sc, struct iwn_tx_ring *txq,
 
 	if (txfail)
 		ieee80211_tx_compressed_bar(ic, ni, tid, ssn);
-	else if (!SEQ_LT(ssn, ba->ba_winstart)) {
+	else if (!SEQ_LT(seq, ba->ba_winstart)) {
 		/*
-		 * Move window forward if SSN lies beyond end of window,
+		 * Move window forward if SEQ lies beyond end of window,
 		 * otherwise we can't record the ACK for this frame.
 		 * Non-acked frames which left holes in the bitmap near
 		 * the beginning of the window must be discarded.
 		 */
-		uint16_t s = ssn;
+		uint16_t s = seq;
 		while (SEQ_LT(ba->ba_winend, s)) {
 			ieee80211_output_ba_move_window(ic, ni, tid, s);
 			iwn_ampdu_txq_advance(sc, txq, desc->qid,
 			    IWN_AGG_SSN_TO_TXQ_IDX(s));
 			s = (s + 1) % 0xfff;
 		}
-		/* SSN should now be within window; set corresponding bit. */
-		ieee80211_output_ba_record_ack(ic, ni, tid, ssn);
+		/* SEQ should now be within window; set corresponding bit. */
+		ieee80211_output_ba_record_ack(ic, ni, tid, seq);
 	}
 
 	/* Move window forward up to the first hole in the bitmap. */
@@ -4596,22 +4598,28 @@ iwn5000_set_gains(struct iwn_softc *sc)
 	cmd.code = sc->noise_gain;
 	cmd.ngroups = 1;
 	cmd.isvalid = 1;
-	/* Get first available RX antenna as referential. */
-	ant = IWN_LSB(sc->rxchainmask);
+	/*
+	 * Get first available RX antenna as referential.
+	 * IWN_LSB() return values start with 1, but antenna gain array
+	 * cmd.gain[] and noise array calib->noise[] start with 0.
+	 */
+	ant = IWN_LSB(sc->rxchainmask) - 1;
+
 	/* Set differential gains for other antennas. */
 	for (i = ant + 1; i < 3; i++) {
 		if (sc->chainmask & (1 << i)) {
 			/* The delta is relative to antenna "ant". */
 			delta = ((int32_t)calib->noise[ant] -
 			    (int32_t)calib->noise[i]) / div;
+			DPRINTF(("Ant[%d] vs. Ant[%d]: delta %d\n", ant, i, delta));
 			/* Limit to [-4.5dB,+4.5dB]. */
-			cmd.gain[i - 1] = MIN(abs(delta), 3);
+			cmd.gain[i] = MIN(abs(delta), 3);
 			if (delta < 0)
-				cmd.gain[i - 1] |= 1 << 2;	/* sign bit */
+				cmd.gain[i] |= 1 << 2;	/* sign bit */
+			DPRINTF(("Setting differential gains for antenna %d: %x\n",
+				i, cmd.gain[i]));
 		}
 	}
-	DPRINTF(("setting differential gains: %x/%x (%x)\n",
-	    cmd.gain[0], cmd.gain[1], sc->chainmask));
 	return iwn_cmd(sc, IWN_CMD_PHY_CALIB, &cmd, sizeof cmd, 1);
 }
 

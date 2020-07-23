@@ -1,4 +1,4 @@
-/*	$OpenBSD: rasops.c,v 1.64 2020/07/17 07:58:46 fcambus Exp $	*/
+/*	$OpenBSD: rasops.c,v 1.66 2020/07/23 09:17:03 tim Exp $	*/
 /*	$NetBSD: rasops.c,v 1.35 2001/02/02 06:01:01 marcus Exp $	*/
 
 /*-
@@ -216,11 +216,11 @@ rasops_init(struct rasops_info *ri, int wantrows, int wantcols)
 		wsfont_init();
 
 		if (ri->ri_width >= 120 * 32)
-			/* Screen width larger than 3840px, 32px wide font */
+			/* Screen width of at least 3840px, 32px wide font */
 			cookie = wsfont_find(NULL, 32, 0, 0);
 
 		if (cookie <= 0 && ri->ri_width >= 120 * 16)
-			/* Screen width larger than 1920px, 16px wide font */
+			/* Screen width of at least 1920px, 16px wide font */
 			cookie = wsfont_find(NULL, 16, 0, 0);
 
 		if (cookie <= 0 && ri->ri_width > 80 * 12)
@@ -523,12 +523,9 @@ rasops_mapchar(void *cookie, int c, u_int *cp)
 		panic("rasops_mapchar: no font selected");
 #endif
 	if (ri->ri_font->encoding != WSDISPLAY_FONTENC_ISO) {
-
-		if ( (c = wsfont_map_unichar(ri->ri_font, c)) < 0) {
-
+		if ((c = wsfont_map_unichar(ri->ri_font, c)) < 0) {
 			*cp = '?';
 			return (0);
-
 		}
 	}
 
@@ -990,7 +987,7 @@ rasops_do_cursor(struct rasops_info *ri)
 		/* Rotate rows/columns */
 		row = ri->ri_cols - ri->ri_ccol - 1;
 		col = ri->ri_crow;
-	} else		
+	} else
 #endif
 	{
 		row = ri->ri_crow;
@@ -1646,7 +1643,7 @@ rasops_vcons_copyrows(void *cookie, int src, int dst, int num)
 	/* smart update, only redraw characters that are different */
 	srcofs = (src - dst) * cols;
 
-	for (move = 0 ; move < num ; move++) {
+	for (move = 0; move < num; move++) {
 		row = srcofs > 0 ? dst + move : dst + num - 1 - move;
 		for (col = 0; col < cols; col++) {
 			int off = row * cols + col + scr->rs_dispoffset;

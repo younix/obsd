@@ -1,4 +1,4 @@
-/*	$OpenBSD: sdmmc_scsi.c,v 1.50 2020/07/19 18:57:58 krw Exp $	*/
+/*	$OpenBSD: sdmmc_scsi.c,v 1.52 2020/07/22 13:16:05 krw Exp $	*/
 
 /*
  * Copyright (c) 2006 Uwe Stuehler <uwe@openbsd.org>
@@ -68,7 +68,6 @@ struct sdmmc_ccb {
 TAILQ_HEAD(sdmmc_ccb_list, sdmmc_ccb);
 
 struct sdmmc_scsi_softc {
-	struct scsi_link sc_link;
 	struct device *sc_child;
 	struct sdmmc_scsi_target *sc_tgt;
 	int sc_ntargets;
@@ -137,16 +136,16 @@ sdmmc_scsi_attach(struct sdmmc_softc *sc)
 
 	sc->sc_scsibus = scbus;
 
-	scbus->sc_link.openings = 1;
-	scbus->sc_link.pool = &scbus->sc_iopool;
-
 	bzero(&saa, sizeof(saa));
-	saa.saa.saa_sc_link = &scbus->sc_link;
 	saa.saa.saa_adapter_target = SDMMC_SCSIID_HOST;
 	saa.saa.saa_adapter_buswidth = scbus->sc_ntargets;
 	saa.saa.saa_adapter_softc = sc;
 	saa.saa.saa_luns = 1;
 	saa.saa.saa_adapter = &sdmmc_switch;
+	saa.saa.saa_openings = 1;
+	saa.saa.saa_pool = &scbus->sc_iopool;
+	saa.saa.saa_quirks = saa.saa.saa_flags = 0;
+	saa.saa.saa_wwpn = saa.saa.saa_wwnn = 0;
 
 	scbus->sc_child = config_found(&sc->sc_dev, &saa, scsiprint);
 	if (scbus->sc_child == NULL) {

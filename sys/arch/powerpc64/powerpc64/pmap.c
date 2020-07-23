@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.32 2020/07/18 13:16:32 kettenis Exp $ */
+/*	$OpenBSD: pmap.c,v 1.37 2020/07/23 18:51:24 kettenis Exp $ */
 
 /*
  * Copyright (c) 2015 Martin Pieuchot
@@ -62,6 +62,45 @@
 
 extern char _start[], _etext[], _erodata[], _end[];
 
+#ifdef MULTIPROCESSOR
+
+struct mutex pmap_hash_lock;
+
+#define PMAP_HASH_LOCK_INIT()	mtx_init(&pmap_hash_lock, IPL_HIGH)
+
+#define	PMAP_HASH_LOCK(s)						\
+do {									\
+	(void)s;							\
+	mtx_enter(&pmap_hash_lock);					\
+} while (0)
+
+#define	PMAP_HASH_UNLOCK(s)						\
+do {									\
+	mtx_leave(&pmap_hash_lock);					\
+} while (0)
+
+#define	PMAP_VP_LOCK_INIT(pm)	mtx_init(&pm->pm_mtx, IPL_VM)
+
+#define	PMAP_VP_LOCK(pm)						\
+do {									\
+	if (pm != pmap_kernel())					\
+		mtx_enter(&pm->pm_mtx);					\
+} while (0)
+
+#define	PMAP_VP_UNLOCK(pm)						\
+do {									\
+	if (pm != pmap_kernel())					\
+		mtx_leave(&pm->pm_mtx);					\
+} while (0)
+
+#define PMAP_VP_ASSERT_LOCKED(pm)					\
+do {									\
+	if (pm != pmap_kernel())					\
+		MUTEX_ASSERT_LOCKED(&pm->pm_mtx);			\
+} while (0)
+
+#else
+
 #define	PMAP_HASH_LOCK_INIT()		/* nothing */
 #define	PMAP_HASH_LOCK(s)		(void)s
 #define	PMAP_HASH_UNLOCK(s)		/* nothing */
@@ -70,6 +109,8 @@ extern char _start[], _etext[], _erodata[], _end[];
 #define	PMAP_VP_LOCK(pm)		/* nothing */
 #define	PMAP_VP_UNLOCK(pm)		/* nothing */
 #define	PMAP_VP_ASSERT_LOCKED(pm)	/* nothing */
+
+#endif
 
 struct pmap kernel_pmap_store;
 
@@ -279,6 +320,8 @@ pmap_slbd_lookup(pmap_t pm, vaddr_t va)
 	uint64_t esid = va >> ADDR_ESID_SHIFT;
 	struct slb_desc *slbd;
 
+	PMAP_VP_ASSERT_LOCKED(pm);
+
 	LIST_FOREACH(slbd, &pm->pm_slbd, slbd_list) {
 		if (slbd->slbd_esid == esid)
 			return slbd;
@@ -292,6 +335,8 @@ pmap_slbd_cache(pmap_t pm, struct slb_desc *slbd)
 {
 	uint64_t slbe, slbv;
 	int idx;
+
+	PMAP_VP_ASSERT_LOCKED(pm);
 
 	for (idx = 0; idx < nitems(pm->pm_slb); idx++) {
 		if (pm->pm_slb[idx].slb_slbe == 0)
@@ -307,7 +352,24 @@ pmap_slbd_cache(pmap_t pm, struct slb_desc *slbd)
 	pm->pm_slb[idx].slb_slbv = slbv;
 }
 
-int pmap_vsid = 1;
+int
+pmap_slbd_fault(pmap_t pm, vaddr_t va)
+{
+	struct slb_desc *slbd;
+
+	PMAP_VP_LOCK(pm);
+	slbd = pmap_slbd_lookup(pm, va);
+	if (slbd) {
+		pmap_slbd_cache(pm, slbd);
+		PMAP_VP_UNLOCK(pm);
+		return 0;
+	}
+	PMAP_VP_UNLOCK(pm);
+
+	return EFAULT;
+}
+
+u_int pmap_vsid;
 
 struct slb_desc *
 pmap_slbd_alloc(pmap_t pm, vaddr_t va)
@@ -316,13 +378,14 @@ pmap_slbd_alloc(pmap_t pm, vaddr_t va)
 	struct slb_desc *slbd;
 
 	KASSERT(pm != pmap_kernel());
+	PMAP_VP_ASSERT_LOCKED(pm);
 
 	slbd = pool_get(&pmap_slbd_pool, PR_NOWAIT | PR_ZERO);
 	if (slbd == NULL)
 		return NULL;
 
 	slbd->slbd_esid = esid;
-	slbd->slbd_vsid = pmap_vsid++;
+	slbd->slbd_vsid = atomic_inc_int_nv(&pmap_vsid);
 	KASSERT((slbd->slbd_vsid & KERNEL_VSID_BIT) == 0);
 	LIST_INSERT_HEAD(&pm->pm_slbd, slbd, slbd_list);
 
@@ -338,15 +401,21 @@ pmap_set_user_slb(pmap_t pm, vaddr_t va, vaddr_t *kva, vsize_t *len)
 	struct cpu_info *ci = curcpu();
 	struct slb_desc *slbd;
 	uint64_t slbe, slbv;
+	uint64_t vsid;
 
 	KASSERT(pm != pmap_kernel());
 
+	PMAP_VP_LOCK(pm);
 	slbd = pmap_slbd_lookup(pm, va);
 	if (slbd == NULL) {
 		slbd = pmap_slbd_alloc(pm, va);
-		if (slbd == NULL)
+		if (slbd == NULL) {
+			PMAP_VP_UNLOCK(pm);
 			return EFAULT;
+		}
 	}
+	vsid = slbd->slbd_vsid;
+	PMAP_VP_UNLOCK(pm);
 
 	/*
 	 * We might get here while another process is sleeping while
@@ -360,7 +429,7 @@ pmap_set_user_slb(pmap_t pm, vaddr_t va, vaddr_t *kva, vsize_t *len)
 	}
 
 	slbe = (USER_ESID << SLBE_ESID_SHIFT) | SLBE_VALID | 31;
-	slbv = slbd->slbd_vsid << SLBV_VSID_SHIFT;
+	slbv = vsid << SLBV_VSID_SHIFT;
 
 	ci->ci_kernel_slb[31].slb_slbe = slbe;
 	ci->ci_kernel_slb[31].slb_slbv = slbv;
@@ -663,8 +732,6 @@ pte_insert(struct pte_desc *pted)
 		goto out;
 	}
 
-	printf("%s: replacing!\n", __func__);
-
 	/* need decent replacement algorithm */
 	off = mftb();
 
@@ -678,6 +745,8 @@ pte_insert(struct pte_desc *pted)
 
 		if ((pte->pte_hi & PTE_WIRED) == 0)
 			break;
+
+		off++;
 	}
 	/*
 	 * Since we only wire unmanaged kernel mappings, we should
@@ -841,7 +910,7 @@ pmap_vp_destroy(pmap_t pm)
 	struct pte_desc *pted;
 	int i, j;
 
-	LIST_FOREACH(slbd, &pm->pm_slbd, slbd_list) {
+	while ((slbd = LIST_FIRST(&pm->pm_slbd))) {
 		vp1 = slbd->slbd_vp;
 		if (vp1 == NULL)
 			continue;
@@ -864,9 +933,11 @@ pmap_vp_destroy(pmap_t pm)
 		}
 		slbd->slbd_vp = NULL;
 		pool_put(&pmap_vp_pool, vp1);
-	}
 
-	/* XXX Free SLB descriptors. */
+		LIST_REMOVE(slbd, slbd_list);
+		pool_put(&pmap_slbd_pool, slbd);
+		/* XXX Free VSID. */
+	}
 }
 
 void
@@ -1011,14 +1082,14 @@ pmap_pted_syncicache(struct pte_desc *pted)
 	vaddr_t va = pted->pted_va & ~PAGE_MASK;
 
 	if (pted->pted_pmap != pmap_kernel()) {
-		pmap_kenter_pa(zero_page, pa, PROT_READ | PROT_WRITE);
-		va = zero_page;
+		va = zero_page + cpu_number() * PAGE_SIZE;
+		pmap_kenter_pa(va, pa, PROT_READ | PROT_WRITE);
 	}
 
 	__syncicache((void *)va, PAGE_SIZE);
 
 	if (pted->pted_pmap != pmap_kernel())
-		pmap_kremove(zero_page, PAGE_SIZE);
+		pmap_kremove(va, PAGE_SIZE);
 }
 
 void
@@ -1272,7 +1343,9 @@ pmap_extract(pmap_t pm, vaddr_t va, paddr_t *pa)
 		return 1;
 	}
 
+	PMAP_VP_LOCK(pm);
 	vsid = pmap_va2vsid(pm, va);
+	PMAP_VP_UNLOCK(pm);
 	if (vsid == 0)
 		return 0;
 
@@ -1354,11 +1427,9 @@ pmap_set_kernel_slb(int idx, vaddr_t va)
 }
 
 void
-pmap_bootstrap(void)
+pmap_bootstrap_cpu(void)
 {
-	paddr_t start, end, pa;
 	vaddr_t va;
-	vm_prot_t prot;
 	int idx = 0;
 
 	/* Clear SLB. */
@@ -1367,6 +1438,29 @@ pmap_bootstrap(void)
 
 	/* Clear TLB. */
 	tlbia();
+
+	/* Set partition table. */
+	mtptcr((paddr_t)pmap_pat | PATSIZE);
+
+	/* SLB entry for the kernel. */
+	pmap_set_kernel_slb(idx++, (vaddr_t)_start);
+
+	/* SLB entries for the page tables. */
+	for (va = (vaddr_t)pmap_ptable; va < (vaddr_t)pmap_ptable + HTABMEMSZ;
+	     va += SEGMENT_SIZE)
+		pmap_set_kernel_slb(idx++, va);
+
+	/* SLB entries for kernel VA. */
+	for (va = VM_MIN_KERNEL_ADDRESS; va < VM_MAX_KERNEL_ADDRESS;
+	     va += SEGMENT_SIZE)
+		pmap_set_kernel_slb(idx++, va);
+}
+
+void
+pmap_bootstrap(void)
+{
+	paddr_t start, end, pa;
+	vm_prot_t prot;
 
 #define HTABENTS 2048
 
@@ -1412,20 +1506,8 @@ pmap_bootstrap(void)
 	pmap_pat = pmap_steal_avail(PATMEMSZ, PATMEMSZ);
 	memset(pmap_pat, 0, PATMEMSZ);
 	pmap_pat[0].pate_htab = (paddr_t)pmap_ptable | HTABSIZE;
-	mtptcr((paddr_t)pmap_pat | PATSIZE);
 
-	/* SLB entry for the kernel. */
-	pmap_set_kernel_slb(idx++, (vaddr_t)_start);
-
-	/* SLB entries for the page tables. */
-	for (va = (vaddr_t)pmap_ptable; va < (vaddr_t)pmap_ptable + HTABMEMSZ;
-	     va += SEGMENT_SIZE)
-		pmap_set_kernel_slb(idx++, va);
-
-	/* SLB entries for kernel VA. */
-	for (va = VM_MIN_KERNEL_ADDRESS; va < VM_MAX_KERNEL_ADDRESS;
-	     va += SEGMENT_SIZE)
-		pmap_set_kernel_slb(idx++, va);
+	pmap_bootstrap_cpu();
 
 	vmmap = virtual_avail;
 	virtual_avail += PAGE_SIZE;

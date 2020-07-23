@@ -1,4 +1,4 @@
-/*	$OpenBSD: ips.c,v 1.124 2020/07/19 18:57:58 krw Exp $	*/
+/*	$OpenBSD: ips.c,v 1.126 2020/07/22 13:16:04 krw Exp $	*/
 
 /*
  * Copyright (c) 2006, 2007, 2009 Alexander Yurchenko <grange@openbsd.org>
@@ -383,14 +383,11 @@ struct dmamem {
 struct ips_softc {
 	struct device		sc_dev;
 
-	struct scsi_link	sc_scsi_link;
 	struct scsibus_softc *	sc_scsibus;
 
 	struct ips_pt {
 		struct ips_softc *	pt_sc;
 		int			pt_chan;
-
-		struct scsi_link	pt_link;
 
 		int			pt_proctgt;
 		char			pt_procdev[16];
@@ -718,16 +715,18 @@ ips_attach(struct device *parent, struct device *self, void *aux)
 	    (sc->sc_nunits == 1 ? "" : "s"));
 	printf("\n");
 
-	if (sc->sc_nunits > 0)
-		sc->sc_scsi_link.openings = sc->sc_nccbs / sc->sc_nunits;
-	sc->sc_scsi_link.pool = &sc->sc_iopool;
-
-	saa.saa_sc_link = &sc->sc_scsi_link;
 	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
 	saa.saa_adapter_buswidth = sc->sc_nunits;
 	saa.saa_adapter = &ips_switch;
 	saa.saa_adapter_softc = sc;
 	saa.saa_luns = 8;
+	if (sc->sc_nunits > 0)
+		saa.saa_openings = sc->sc_nccbs / sc->sc_nunits;
+	else
+		saa.saa_openings = 0;
+	saa.saa_pool = &sc->sc_iopool;
+	saa.saa_quirks = saa.saa_flags = 0;
+	saa.saa_wwpn = saa.saa_wwnn = 0;
 
 	sc->sc_scsibus = (struct scsibus_softc *)config_found(self, &saa,
 	    scsiprint);
@@ -735,7 +734,6 @@ ips_attach(struct device *parent, struct device *self, void *aux)
 	/* For each channel attach SCSI pass-through bus */
 	for (i = 0; i < IPS_MAXCHANS; i++) {
 		struct ips_pt *pt;
-		struct scsi_link *link;
 		int target, lastarget;
 
 		pt = &sc->sc_pt[i];
@@ -762,16 +760,15 @@ ips_attach(struct device *parent, struct device *self, void *aux)
 		if (lastarget == -1)
 			continue;
 
-		link = &pt->pt_link;
-		link->openings = 1;
-		link->pool = &sc->sc_iopool;
-
-		saa.saa_sc_link = link;
 		saa.saa_adapter = &ips_pt_switch;
 		saa.saa_adapter_softc = pt;
 		saa.saa_adapter_buswidth =  lastarget + 1;
 		saa.saa_adapter_target = IPS_MAXTARGETS;
 		saa.saa_luns = 8;
+		saa.saa_openings = 1;
+		saa.saa_pool = &sc->sc_iopool;
+		saa.saa_quirks = saa.saa_flags = 0;
+		saa.saa_wwpn = saa.saa_wwnn = 0;
 
 		config_found(self, &saa, scsiprint);
 	}

@@ -49,8 +49,8 @@
 /vmparam.h/1.7/Sat Jun  1 18:38:27 2019//
 /armreg.h/1.11/Sat Jun  6 11:21:49 2020//
 /cpu.h/1.18/Sat Jun  6 11:21:49 2020//
-/fdt.h/1.7/Mon Jul 20 07:06:28 2020//
-/intr.h/1.16/Mon Jul 20 07:06:28 2020//
-/pci_machdep.h/1.7/Mon Jul 20 07:06:28 2020//
-/timetc.h/1.2/Mon Jul 20 07:06:28 2020//
+/fdt.h/1.7/Mon Jul 20 09:32:29 2020//
+/intr.h/1.16/Mon Jul 20 09:32:29 2020//
+/pci_machdep.h/1.7/Mon Jul 20 09:32:29 2020//
+/timetc.h/1.2/Mon Jul 20 09:32:29 2020//
 D

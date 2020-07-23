@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.c,v 1.160 2020/07/15 02:29:26 deraadt Exp $	*/
+/*	$OpenBSD: tty.c,v 1.163 2020/07/22 17:39:50 deraadt Exp $	*/
 /*	$NetBSD: tty.c,v 1.68.4.2 1996/06/06 16:04:52 thorpej Exp $	*/
 
 /*-
@@ -228,8 +228,8 @@ ttyclose(struct tty *tp)
 
 
 /*
- * Process input of a single character received on a tty.  Returns 0 for
- * simple operations, 1 for costly ones (ptcwrite needs to know).
+ * Process input of a single character received on a tty.  Returns 0 normally,
+ * 1 if a costly operation was reached.
  */
 int
 ttyinput(int c, struct tty *tp)
@@ -1334,21 +1334,18 @@ ttyblock(struct tty *tp)
 }
 
 void
-ttrstrt(void *tp_arg)
+ttrstrt(void *arg)
 {
-	struct tty *tp;
+	struct tty *tp = (struct tty *)arg;
 	int s;
 
 #ifdef DIAGNOSTIC
-	if (tp_arg == NULL)
+	if (tp == NULL)
 		panic("ttrstrt");
 #endif
-	tp = tp_arg;
 	s = spltty();
-
 	CLR(tp->t_state, TS_TIMEOUT);
 	ttstart(tp);
-
 	splx(s);
 }
 
@@ -2019,11 +2016,7 @@ ttyretype(struct tty *tp)
 
 	tp->t_rocount = tp->t_rawq.c_cc;
 	tp->t_rocol = 0;
-	/*
-	 * Yield because of expense, or possible ptcwrite() injection flood.
-	 * Also check for interrupt, and return upwards.
-	 */
-	return tsleep(tp, TTIPRI | PCATCH, "ttyretype", 1);
+	return (1);
 }
 
 /*
@@ -2415,7 +2408,8 @@ ttystats_init(struct itty **ttystats, int *ttycp, size_t *ttystatssiz)
 		itp->t_outq_c_cc = tp->t_outq.c_cc;
 		itp->t_hiwat = tp->t_hiwat;
 		itp->t_lowat = tp->t_lowat;
-		itp->t_column = tp->t_column;
+		if (ISSET(tp->t_oflag, OPOST))
+			itp->t_column = tp->t_column;
 		itp->t_state = tp->t_state;
 		itp->t_session = tp->t_session;
 		if (tp->t_pgrp)

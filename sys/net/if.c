@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.613 2020/07/17 08:56:41 mvs Exp $	*/
+/*	$OpenBSD: if.c,v 1.615 2020/07/22 02:16:01 dlg Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -523,8 +523,9 @@ void
 if_attachhead(struct ifnet *ifp)
 {
 	if_attach_common(ifp);
-	NET_LOCK();
+	KERNEL_ASSERT_LOCKED();
 	TAILQ_INSERT_HEAD(&ifnet, ifp, if_list);
+	NET_LOCK();
 	if_attachsetup(ifp);
 	NET_UNLOCK();
 }
@@ -533,8 +534,9 @@ void
 if_attach(struct ifnet *ifp)
 {
 	if_attach_common(ifp);
-	NET_LOCK();
+	KERNEL_ASSERT_LOCKED();
 	TAILQ_INSERT_TAIL(&ifnet, ifp, if_list);
+	NET_LOCK();
 	if_attachsetup(ifp);
 	NET_UNLOCK();
 }
@@ -631,8 +633,6 @@ if_attach_common(struct ifnet *ifp)
 	if (ifp->if_enqueue == NULL)
 		ifp->if_enqueue = if_enqueue_ifq;
 	ifp->if_llprio = IFQ_DEFPRIO;
-
-	SRPL_INIT(&ifp->if_inputs);
 }
 
 void
@@ -805,109 +805,6 @@ if_output_local(struct ifnet *ifp, struct mbuf *m, sa_family_t af)
 	return (ifiq_enqueue(ifiq, m) == 0 ? 0 : ENOBUFS);
 }
 
-struct ifih {
-	SRPL_ENTRY(ifih)	  ifih_next;
-	int			(*ifih_input)(struct ifnet *, struct mbuf *,
-				      void *);
-	void			 *ifih_cookie;
-	int			  ifih_refcnt;
-	struct refcnt		  ifih_srpcnt;
-};
-
-void	if_ih_ref(void *, void *);
-void	if_ih_unref(void *, void *);
-
-struct srpl_rc ifih_rc = SRPL_RC_INITIALIZER(if_ih_ref, if_ih_unref, NULL);
-
-void
-if_ih_insert(struct ifnet *ifp, int (*input)(struct ifnet *, struct mbuf *,
-    void *), void *cookie)
-{
-	struct ifih *ifih;
-
-	/* the kernel lock guarantees serialised modifications to if_inputs */
-	KERNEL_ASSERT_LOCKED();
-
-	SRPL_FOREACH_LOCKED(ifih, &ifp->if_inputs, ifih_next) {
-		if (ifih->ifih_input == input && ifih->ifih_cookie == cookie) {
-			ifih->ifih_refcnt++;
-			break;
-		}
-	}
-
-	if (ifih == NULL) {
-		ifih = malloc(sizeof(*ifih), M_DEVBUF, M_WAITOK);
-
-		ifih->ifih_input = input;
-		ifih->ifih_cookie = cookie;
-		ifih->ifih_refcnt = 1;
-		refcnt_init(&ifih->ifih_srpcnt);
-		SRPL_INSERT_HEAD_LOCKED(&ifih_rc, &ifp->if_inputs,
-		    ifih, ifih_next);
-	}
-}
-
-void
-if_ih_ref(void *null, void *i)
-{
-	struct ifih *ifih = i;
-
-	refcnt_take(&ifih->ifih_srpcnt);
-}
-
-void
-if_ih_unref(void *null, void *i)
-{
-	struct ifih *ifih = i;
-
-	refcnt_rele_wake(&ifih->ifih_srpcnt);
-}
-
-void
-if_ih_remove(struct ifnet *ifp, int (*input)(struct ifnet *, struct mbuf *,
-    void *), void *cookie)
-{
-	struct ifih *ifih;
-
-	/* the kernel lock guarantees serialised modifications to if_inputs */
-	KERNEL_ASSERT_LOCKED();
-
-	SRPL_FOREACH_LOCKED(ifih, &ifp->if_inputs, ifih_next) {
-		if (ifih->ifih_input == input && ifih->ifih_cookie == cookie)
-			break;
-	}
-
-	KASSERT(ifih != NULL);
-
-	if (--ifih->ifih_refcnt == 0) {
-		SRPL_REMOVE_LOCKED(&ifih_rc, &ifp->if_inputs, ifih,
-		    ifih, ifih_next);
-
-		refcnt_finalize(&ifih->ifih_srpcnt, "ifihrm");
-		free(ifih, M_DEVBUF, sizeof(*ifih));
-	}
-}
-
-static void
-if_ih_input(struct ifnet *ifp, struct mbuf *m)
-{
-	struct ifih *ifih;
-	struct srp_ref sr;
-
-	/*
-	 * Pass this mbuf to all input handlers of its
-	 * interface until it is consumed.
-	 */
-	SRPL_FOREACH(ifih, &sr, &ifp->if_inputs, ifih_next) {
-		if ((*ifih->ifih_input)(ifp, m, ifih->ifih_cookie))
-			break;
-	}
-	SRPL_LEAVE(&sr);
-
-	if (ifih == NULL)
-		m_freem(m);
-}
-
 void
 if_input_process(struct ifnet *ifp, struct mbuf_list *ml)
 {
@@ -933,7 +830,7 @@ if_input_process(struct ifnet *ifp, struct mbuf_list *ml)
 	 */
 	NET_LOCK();
 	while ((m = ml_dequeue(ml)) != NULL)
-		if_ih_input(ifp, m);
+		(*ifp->if_input)(ifp, m);
 	NET_UNLOCK();
 }
 
@@ -960,7 +857,7 @@ if_vinput(struct ifnet *ifp, struct mbuf *m)
 	}
 #endif
 
-	if_ih_input(ifp, m);
+	(*ifp->if_input)(ifp, m);
 }
 
 void
@@ -1145,6 +1042,7 @@ if_detach(struct ifnet *ifp)
 	pfi_detach_ifnet(ifp);
 #endif
 
+	KERNEL_ASSERT_LOCKED();
 	/* Remove the interface from the list of all interfaces.  */
 	TAILQ_REMOVE(&ifnet, ifp, if_list);
 

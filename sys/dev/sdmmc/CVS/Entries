@@ -14,8 +14,8 @@
 /sdmmcdevs/1.8/Fri May 11 17:16:16 2007//
 /sdmmcdevs.h/1.8/Fri May 11 17:16:35 2007//
 /sdmmcreg.h/1.11/Thu May  5 11:01:08 2016//
-/if_bwfm_sdio.c/1.38/Sat Jul 11 07:57:53 2020//
-/sdhc.c/1.68/Sat Jul 11 07:57:53 2020//
-/sdmmcvar.h/1.33/Sat Jul 11 07:57:53 2020//
-/sdmmc_scsi.c/1.50/Mon Jul 20 07:06:32 2020//
+/if_bwfm_sdio.c/1.38/Mon Jul 20 09:32:33 2020//
+/sdhc.c/1.68/Mon Jul 20 09:32:33 2020//
+/sdmmc_scsi.c/1.52/Thu Jul 23 19:26:46 2020//
+/sdmmcvar.h/1.33/Mon Jul 20 09:32:33 2020//
 D

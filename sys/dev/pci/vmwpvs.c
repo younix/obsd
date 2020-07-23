@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmwpvs.c,v 1.21 2020/07/19 18:57:58 krw Exp $ */
+/*	$OpenBSD: vmwpvs.c,v 1.23 2020/07/22 13:16:05 krw Exp $ */
 
 /*
  * Copyright (c) 2013 David Gwynne <dlg@openbsd.org>
@@ -321,7 +321,6 @@ struct vmwpvs_softc {
 
 	u_int			sc_bus_width;
 
-	struct scsi_link	sc_link;
 	struct scsi_iopool	sc_iopool;
 	struct scsibus_softc	*sc_scsibus;
 };
@@ -558,15 +557,15 @@ vmwpvs_attach(struct device *parent, struct device *self, void *aux)
 
 	scsi_iopool_init(&sc->sc_iopool, sc, vmwpvs_ccb_get, vmwpvs_ccb_put);
 
-	sc->sc_link.openings = VMWPVS_OPENINGS;
-	sc->sc_link.pool = &sc->sc_iopool;
-
-	saa.saa_sc_link = &sc->sc_link;
 	saa.saa_adapter = &vmwpvs_switch;
 	saa.saa_adapter_softc = sc;
 	saa.saa_adapter_target = SDEV_NO_ADAPTER_TARGET;
 	saa.saa_adapter_buswidth = sc->sc_bus_width;
 	saa.saa_luns = 8;
+	saa.saa_openings = VMWPVS_OPENINGS;
+	saa.saa_pool = &sc->sc_iopool;
+	saa.saa_quirks = saa.saa_flags = 0;
+	saa.saa_wwpn = saa.saa_wwnn = 0;
 
 	sc->sc_scsibus = (struct scsibus_softc *)config_found(&sc->sc_dev, &saa,
 	    scsiprint);
