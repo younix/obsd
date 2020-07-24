@@ -59,7 +59,6 @@
 /menu.c/1.30/Mon May 25 11:59:50 2020//
 /names.c/1.42/Sat May 16 15:01:31 2020//
 /notify.c/1.36/Thu May 21 07:24:13 2020//
-/options-table.c/1.132/Fri May 22 15:08:38 2020//
 /paste.c/1.42/Sat May 16 15:35:19 2020//
 /popup.c/1.19/Sat May 16 16:35:13 2020//
 /proc.c/1.17/Sat May 16 16:07:55 2020//
@@ -100,12 +99,10 @@
 /cmd-refresh-client.c/1.39/Mon Jul 20 09:32:33 2020//
 /cmd-run-shell.c/1.69/Mon Jul 20 09:32:33 2020//
 /cmd-save-buffer.c/1.51/Thu Jul 23 19:26:51 2020//
-/cmd-select-pane.c/1.63/Mon Jul 20 09:32:33 2020//
 /cmd-set-option.c/1.137/Mon Jul 20 09:32:33 2020//
 /cmd.c/1.163/Mon Jul 20 09:32:33 2020//
 /control.c/1.44/Mon Jul 20 09:32:33 2020//
 /format.c/1.259/Mon Jul 20 09:32:33 2020//
-/input.c/1.181/Mon Jul 20 09:32:33 2020//
 /key-bindings.c/1.130/Mon Jul 20 09:32:33 2020//
 /key-string.c/1.63/Mon Jul 20 09:32:33 2020//
 /mode-tree.c/1.50/Mon Jul 20 09:32:33 2020//
@@ -125,4 +122,7 @@
 /window-customize.c/1.5/Thu Jul 23 19:26:51 2020//
 /window-tree.c/1.52/Mon Jul 20 09:32:33 2020//
 /window.c/1.266/Mon Jul 20 09:32:33 2020//
+/cmd-select-pane.c/1.64/Fri Jul 24 10:23:30 2020//
+/input.c/1.182/Fri Jul 24 10:23:30 2020//
+/options-table.c/1.133/Fri Jul 24 10:23:30 2020//
 D

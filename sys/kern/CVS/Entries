@@ -87,7 +87,6 @@
 /kern_task.c/1.30/Mon Jul 20 09:32:33 2020//
 /kern_tc.c/1.68/Thu Jul 23 19:26:48 2020//
 /kern_time.c/1.133/Mon Jul 20 09:32:33 2020//
-/kern_timeout.c/1.73/Mon Jul 20 09:32:33 2020//
 /spec_vnops.c/1.102/Mon Jul 20 09:32:33 2020//
 /subr_prf.c/1.100/Thu Jul 23 19:26:48 2020//
 /sys_pipe.c/1.123/Mon Jul 20 09:32:33 2020//
@@ -103,4 +102,5 @@
 /vfs_bio.c/1.201/Mon Jul 20 09:32:33 2020//
 /vfs_sync.c/1.64/Mon Jul 20 09:32:33 2020//
 /vfs_syscalls.c/1.345/Mon Jul 20 09:32:33 2020//
+/kern_timeout.c/1.74/Fri Jul 24 10:23:27 2020//
 D

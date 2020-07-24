@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tpmr.c,v 1.14 2020/07/22 04:08:46 dlg Exp $ */
+/*	$OpenBSD: if_tpmr.c,v 1.17 2020/07/24 03:20:50 kn Exp $ */
 
 /*
  * Copyright (c) 2019 The University of Queensland
@@ -49,9 +49,6 @@
 #include <netinet/if_ether.h>
 
 #include <net/if_bridge.h>
-#include <net/if_media.h> /* if_trunk.h uses ifmedia bits */
-#include <crypto/siphash.h> /* if_trunk.h uses siphash bits */
-#include <net/if_trunk.h>
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -76,7 +73,6 @@ static const uint8_t	ether_8021_prefix[ETHER_ADDR_LEN - 1] =
  */
 
 #define TPMR_NUM_PORTS		2
-#define TPMR_TRUNK_PROTO	TRUNK_PROTO_NONE
 
 struct tpmr_softc;
 
@@ -128,12 +124,10 @@ static int	tpmr_p_ioctl(struct ifnet *, u_long, caddr_t);
 static int	tpmr_p_output(struct ifnet *, struct mbuf *,
 		    struct sockaddr *, struct rtentry *);
 
-static int	tpmr_get_trunk(struct tpmr_softc *, struct trunk_reqall *);
 static void	tpmr_p_dtor(struct tpmr_softc *, struct tpmr_port *,
 		    const char *);
 static int	tpmr_add_port(struct tpmr_softc *,
 		    const struct ifbreq *);
-static int	tpmr_get_port(struct tpmr_softc *, struct trunk_reqport *);
 static int	tpmr_del_port(struct tpmr_softc *,
 		    const struct ifbreq *);
 
@@ -429,37 +423,6 @@ tpmr_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 		}
 		break;
 
-	case SIOCSTRUNK:
-		error = suser(curproc);
-		if (error != 0)
-			break;
-
-		if (((struct trunk_reqall *)data)->ra_proto !=
-		    TRUNK_PROTO_LACP) {
-			error = EPROTONOSUPPORT;
-			break;
-		}
-
-		/* nop */
-		break;
-	case SIOCGTRUNK:
-		error = tpmr_get_trunk(sc, (struct trunk_reqall *)data);
-		break;
-
-	case SIOCSTRUNKOPTS:
-		error = suser(curproc);
-		if (error != 0)
-			break;
-
-		error = EPROTONOSUPPORT;
-		break;
-
-	case SIOCGTRUNKOPTS:
-		break;
-
-	case SIOCGTRUNKPORT:
-		error = tpmr_get_port(sc, (struct trunk_reqport *)data);
-		break;
 	case SIOCBRDGADD:
 		error = suser(curproc);
 		if (error != 0)
@@ -482,59 +445,6 @@ tpmr_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 
 	if (error == ENETRESET)
 		error = tpmr_iff(sc);
-
-	return (error);
-}
-
-static int
-tpmr_get_trunk(struct tpmr_softc *sc, struct trunk_reqall *ra)
-{
-	struct ifnet *ifp = &sc->sc_if;
-	size_t size = ra->ra_size;
-	caddr_t ubuf = (caddr_t)ra->ra_port;
-	int error = 0;
-	int i;
-
-	ra->ra_proto = TPMR_TRUNK_PROTO;
-	memset(&ra->ra_psc, 0, sizeof(ra->ra_psc));
-
-	ra->ra_ports = sc->sc_nports;
-	for (i = 0; i < nitems(sc->sc_ports); i++) {
-		struct trunk_reqport rp;
-		struct ifnet *ifp0;
-		struct tpmr_port *p = SMR_PTR_GET_LOCKED(&sc->sc_ports[i]);
-		if (p == NULL)
-			continue;
-
-		if (size < sizeof(rp))
-			break;
-
-		ifp0 = p->p_ifp0;
-
-		CTASSERT(sizeof(rp.rp_ifname) == sizeof(ifp->if_xname));
-		CTASSERT(sizeof(rp.rp_portname) == sizeof(ifp0->if_xname));
-
-		memset(&rp, 0, sizeof(rp));
-		memcpy(rp.rp_ifname, ifp->if_xname, sizeof(rp.rp_ifname));
-		memcpy(rp.rp_portname, ifp0->if_xname, sizeof(rp.rp_portname));
-
-		if (!ISSET(ifp0->if_flags, IFF_RUNNING))
-			SET(rp.rp_flags, TRUNK_PORT_DISABLED);
-		else {
-			SET(rp.rp_flags, TRUNK_PORT_ACTIVE);
-			if (LINK_STATE_IS_UP(ifp0->if_link_state)) {
-				SET(rp.rp_flags, TRUNK_PORT_COLLECTING |
-				    TRUNK_PORT_DISTRIBUTING);
-			}
-		}
-
-		error = copyout(&rp, ubuf, sizeof(rp));
-		if (error != 0)
-			break;
-
-		ubuf += sizeof(rp);
-		size -= sizeof(rp);
-	}
 
 	return (error);
 }
@@ -652,21 +562,6 @@ tpmr_trunkport(struct tpmr_softc *sc, const char *name)
 }
 
 static int
-tpmr_get_port(struct tpmr_softc *sc, struct trunk_reqport *rp)
-{
-	struct tpmr_port *p;
-
-	NET_ASSERT_LOCKED();
-	p = tpmr_trunkport(sc, rp->rp_portname);
-	if (p == NULL)
-		return (EINVAL);
-
-	/* XXX */
-
-	return (0);
-}
-
-static int
 tpmr_del_port(struct tpmr_softc *sc, const struct ifbreq *req)
 {
 	struct tpmr_port *p;
@@ -701,21 +596,6 @@ tpmr_p_ioctl(struct ifnet *ifp0, u_long cmd, caddr_t data)
 	case SIOCSIFADDR:
 		error = EBUSY;
 		break;
-
-	case SIOCGTRUNKPORT: {
-		struct trunk_reqport *rp = (struct trunk_reqport *)data;
-		struct tpmr_softc *sc = p->p_tpmr;
-		struct ifnet *ifp = &sc->sc_if;
-
-		if (strncmp(rp->rp_ifname, rp->rp_portname,
-		    sizeof(rp->rp_ifname)) != 0)
-			return (EINVAL);
-
-		CTASSERT(sizeof(rp->rp_ifname) == sizeof(ifp->if_xname));
-		memcpy(rp->rp_ifname, ifp->if_xname, sizeof(rp->rp_ifname));
-
-		break;
-	}
 
 	default:
 		error = (*p->p_ioctl)(ifp0, cmd, data);
