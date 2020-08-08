@@ -1,4 +1,4 @@
-/*	$OpenBSD: brconfig.c,v 1.25 2020/01/22 06:24:07 tedu Exp $	*/
+/*	$OpenBSD: brconfig.c,v 1.28 2020/08/05 06:22:11 kn Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -54,6 +54,7 @@ void bridge_ifclrflag(const char *, u_int32_t);
 
 void bridge_list(char *);
 void bridge_cfg(const char *);
+void switch_cfg(const char *);
 void bridge_badrule(int, char **, int);
 void bridge_showrule(struct ifbrlreq *);
 int is_switch(void);
@@ -762,13 +763,7 @@ bridge_holdcnt(const char *value, int d)
 int
 is_bridge()
 {
-	struct ifreq ifr;
 	struct ifbaconf ifbac;
-
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-
-	if (ioctl(sock, SIOCGIFFLAGS, (caddr_t)&ifr) == -1)
-		return (0);
 
 	ifbac.ifbac_len = 0;
 	strlcpy(ifbac.ifbac_name, ifname, sizeof(ifbac.ifbac_name));
@@ -780,24 +775,39 @@ is_bridge()
 	return (1);
 }
 
+/* no tpmr(4) specific ioctls, name is enough if ifconfig.c:printif() passed */
+int
+is_tpmr(void)
+{
+	return (strncmp(ifname, "tpmr", sizeof("tpmr") - 1) == 0);
+}
+
 void
 bridge_status(void)
 {
-	struct ifreq ifr;
 	struct ifbrparam bp1, bp2;
+	int isswitch;
 
-	if (!is_bridge() || is_switch())
+	if (is_tpmr()) {
+		bridge_list("\t");
+		return;
+	}
+
+	if (!is_bridge())
 		return;
 
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(sock, SIOCGIFFLAGS, (caddr_t)&ifr) == -1)
-		return;
-
-	bridge_cfg("\t");
+	isswitch = is_switch();
+	if (isswitch)
+		switch_cfg("\t");
+	else
+		bridge_cfg("\t");
 
 	bridge_list("\t");
 
 	if (aflag && !ifaliases)
+		return;
+
+	if (isswitch)
 		return;
 
 	strlcpy(bp1.ifbrp_name, ifname, sizeof(bp1.ifbrp_name));
@@ -1157,8 +1167,8 @@ is_switch()
 	return (1);
 }
 
-static void
-switch_cfg(char *delim)
+void
+switch_cfg(const char *delim)
 {
 	struct ifbrparam bp;
 
@@ -1179,26 +1189,6 @@ switch_cfg(char *delim)
 		err(1, "%s", ifname);
 
 	printf(" maxgroup %d\n", bp.ifbrp_maxgroup);
-}
-
-void
-switch_status(void)
-{
-	struct ifreq ifr;
-
-	if (!is_switch())
-		return;
-
-	strlcpy(ifr.ifr_name, ifname, sizeof(ifr.ifr_name));
-	if (ioctl(sock, SIOCGIFFLAGS, (caddr_t)&ifr) == -1)
-		return;
-
-	switch_cfg("\t");
-
-	bridge_list("\t");
-
-	if (aflag && !ifaliases)
-		return;
 }
 
 void

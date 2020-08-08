@@ -74,7 +74,6 @@
 /intel_gmbus.h/1.1/Mon Jul 20 09:32:32 2020//
 /intel_hdcp.c/1.1/Mon Jul 20 09:32:32 2020//
 /intel_hdcp.h/1.1/Mon Jul 20 09:32:32 2020//
-/intel_hdmi.c/1.2/Thu Jul 23 19:26:44 2020//
 /intel_hdmi.h/1.1/Mon Jul 20 09:32:32 2020//
 /intel_hotplug.c/1.1/Mon Jul 20 09:32:32 2020//
 /intel_hotplug.h/1.1/Mon Jul 20 09:32:32 2020//
@@ -112,4 +111,5 @@
 /intel_vga.h/1.1/Mon Jul 20 09:32:32 2020//
 /vlv_dsi.c/1.1/Mon Jul 20 09:32:32 2020//
 /vlv_dsi_pll.c/1.1/Mon Jul 20 09:32:32 2020//
+/intel_hdmi.c/1.2/Fri Jul 24 10:26:29 2020//
 D

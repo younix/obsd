@@ -1,4 +1,4 @@
-/*	$OpenBSD: tls13_legacy.c,v 1.10 2020/07/14 18:55:59 jsing Exp $ */
+/*	$OpenBSD: tls13_legacy.c,v 1.12 2020/07/30 16:57:53 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  *
@@ -208,6 +208,9 @@ tls13_legacy_read_bytes(SSL *ssl, int type, unsigned char *buf, int len, int pee
 		return tls13_legacy_return_code(ssl, TLS13_IO_WANT_POLLIN);
 	}
 
+	tls13_record_layer_set_retry_after_phh(ctx->rl,
+	    (ctx->ssl->internal->mode & SSL_MODE_AUTO_RETRY) != 0);
+
 	if (type != SSL3_RT_APPLICATION_DATA) {
 		SSLerror(ssl, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
 		return -1;
@@ -292,11 +295,8 @@ tls13_use_legacy_stack(struct tls13_ctx *ctx)
 		return 0;
 	if (!ssl3_setup_buffers(s))
 		return 0;
-	if (!ssl_init_wbio_buffer(s, 0))
+	if (!ssl_init_wbio_buffer(s, 1))
 		return 0;
-
-	if (s->bbio != s->wbio)
-		s->wbio = BIO_push(s->bbio, s->wbio);
 
 	/* Stash any unprocessed data from the last record. */
 	tls13_record_layer_rbuf(ctx->rl, &cbs);

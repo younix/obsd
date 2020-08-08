@@ -1,4 +1,4 @@
-/*	$OpenBSD: cac.c,v 1.65 2020/07/20 14:41:13 krw Exp $	*/
+/*	$OpenBSD: cac.c,v 1.67 2020/07/28 22:26:32 krw Exp $	*/
 /*	$NetBSD: cac.c,v 1.15 2000/11/08 19:20:35 ad Exp $	*/
 
 /*
@@ -722,8 +722,9 @@ cac_scsi_cmd(xs)
 		return;
 
 	default:
-		SC_DEBUG(link, SDEV_DB1, ("unsupported scsi command %#x "
-		    "tgt %d ", xs->cmd->opcode, target));
+#ifdef CAC_DEBUG
+		printf("unsupported scsi command %#x tgt %d ", xs->cmd->opcode, target);
+#endif
 		xs->error = XS_DRIVER_STUFFUP;
 	}
 
@@ -746,7 +747,7 @@ void
 cac_l0_submit(struct cac_softc *sc, struct cac_ccb *ccb)
 {
 #ifdef CAC_DEBUG
-	printf("submit-%x ", ccb->ccb_paddr);
+	printf("submit-%lx ", ccb->ccb_paddr);
 #endif
 	bus_dmamap_sync(sc->sc_dmat, sc->sc_dmamap, 0,
 	    sc->sc_dmamap->dm_mapsize,
@@ -764,7 +765,7 @@ cac_l0_completed(sc)
 	if (!(off = cac_inl(sc, CAC_REG_DONE_FIFO)))
 		return NULL;
 #ifdef CAC_DEBUG
-	printf("compl-%x ", off);
+	printf("compl-%lx ", off);
 #endif
 	orig_off = off;
 

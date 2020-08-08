@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.615 2020/07/22 02:16:01 dlg Exp $	*/
+/*	$OpenBSD: if.c,v 1.618 2020/08/05 11:07:34 mvs Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -523,9 +523,8 @@ void
 if_attachhead(struct ifnet *ifp)
 {
 	if_attach_common(ifp);
-	KERNEL_ASSERT_LOCKED();
-	TAILQ_INSERT_HEAD(&ifnet, ifp, if_list);
 	NET_LOCK();
+	TAILQ_INSERT_HEAD(&ifnet, ifp, if_list);
 	if_attachsetup(ifp);
 	NET_UNLOCK();
 }
@@ -534,9 +533,8 @@ void
 if_attach(struct ifnet *ifp)
 {
 	if_attach_common(ifp);
-	KERNEL_ASSERT_LOCKED();
-	TAILQ_INSERT_TAIL(&ifnet, ifp, if_list);
 	NET_LOCK();
+	TAILQ_INSERT_TAIL(&ifnet, ifp, if_list);
 	if_attachsetup(ifp);
 	NET_UNLOCK();
 }
@@ -909,13 +907,6 @@ if_netisr(void *unused)
 			KERNEL_UNLOCK();
 		}
 #endif
-#ifdef PIPEX
-		if (n & (1 << NETISR_PIPEX)) {
-			KERNEL_LOCK();
-			pipexintr();
-			KERNEL_UNLOCK();
-		}
-#endif
 		t |= n;
 	}
 
@@ -1042,7 +1033,6 @@ if_detach(struct ifnet *ifp)
 	pfi_detach_ifnet(ifp);
 #endif
 
-	KERNEL_ASSERT_LOCKED();
 	/* Remove the interface from the list of all interfaces.  */
 	TAILQ_REMOVE(&ifnet, ifp, if_list);
 
@@ -1125,8 +1115,9 @@ if_isconnected(const struct ifnet *ifp0, unsigned int ifidx)
 		connected = 1;
 #endif
 #if NCARP > 0
-	if ((ifp0->if_type == IFT_CARP && ifp0->if_carpdev == ifp) ||
-	    (ifp->if_type == IFT_CARP && ifp->if_carpdev == ifp0))
+	if ((ifp0->if_type == IFT_CARP &&
+	    ifp0->if_carpdevidx == ifp->if_index) ||
+	    (ifp->if_type == IFT_CARP && ifp->if_carpdevidx == ifp0->if_index))
 		connected = 1;
 #endif
 

@@ -1,5 +1,4 @@
 /Makefile/1.3/Mon Sep  7 01:38:32 2015//
-/Makefile.common/1.20/Thu Mar  5 16:36:30 2020//
 /Makefile.inc/1.1/Wed Sep  2 01:52:25 2015//
 /cmd_i386.c/1.1/Fri May 10 21:20:42 2019//
 /dev_i386.c/1.1/Fri May 10 21:20:42 2019//
@@ -27,3 +26,4 @@
 D/bootia32////
 D/bootx64////
 /conf.c/1.29/Mon Jul 20 09:32:29 2020//
+/Makefile.common/1.21/Sat Aug  8 08:19:31 2020//

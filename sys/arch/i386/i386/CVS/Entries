@@ -60,8 +60,8 @@
 /bios.c/1.125/Mon Jun  1 06:23:24 2020//
 /cpu.c/1.104/Mon Jun  1 06:23:24 2020//
 /via.c/1.46/Mon Jun  1 06:23:24 2020//
-/acpi_machdep.c/1.74/Thu Jul 23 19:26:31 2020//
 /apm.c/1.125/Mon Jul 20 09:32:29 2020//
 /conf.c/1.170/Mon Jul 20 09:32:29 2020//
-/machdep.c/1.637/Thu Jul 23 19:26:31 2020//
+/acpi_machdep.c/1.74/Fri Jul 24 10:26:29 2020//
+/machdep.c/1.637/Fri Jul 24 10:26:29 2020//
 D

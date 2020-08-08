@@ -1,4 +1,4 @@
-/*	$OpenBSD: lex.c,v 1.23 2020/07/13 14:03:52 millert Exp $	*/
+/*	$OpenBSD: lex.c,v 1.25 2020/07/30 17:45:44 millert Exp $	*/
 /****************************************************************
 Copyright (C) Lucent Technologies 1997
 All Rights Reserved
@@ -28,7 +28,7 @@ THIS SOFTWARE.
 #include <string.h>
 #include <ctype.h>
 #include "awk.h"
-#include "ytab.h"
+#include "awkgram.tab.h"
 
 extern YYSTYPE	yylval;
 extern bool	infunc;
@@ -551,7 +551,9 @@ int regexpr(void)
 			 */
 			if (!do_posix) {
 				if (c == '[') {
-					if (openclass == 0 || peek() == ':') {
+					int nextc = peek();
+					if (openclass == 0 || nextc == ':' ||
+					    nextc == '.' || nextc == '=') {
 						if (++openclass == 1)
 							cstart = bp;
 					}
