@@ -102,7 +102,6 @@
 /revoke.2/1.14/Mon Nov 16 19:26:21 2015//
 /rmdir.2/1.15/Fri Jan 11 06:10:13 2019//
 /sched_yield.2/1.1/Fri Nov 14 00:24:28 2014//
-/select.2/1.42/Sat Sep 17 01:01:42 2016//
 /semctl.2/1.16/Sat Nov 15 22:19:53 2014//
 /semctl.c/1.9/Mon Sep 14 12:08:22 2015//
 /semget.2/1.19/Sat Nov 15 22:19:53 2014//
@@ -196,4 +195,5 @@
 /w_gettimeofday.c/1.1/Mon Jul 20 09:32:24 2020//
 /acct.2/1.19/Sat Aug  8 08:19:17 2020//
 /sysctl.2/1.41/Sat Aug  8 08:19:17 2020//
+/select.2/1.43/Fri Aug 21 07:46:32 2020//
 D

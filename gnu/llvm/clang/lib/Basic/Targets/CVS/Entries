@@ -27,7 +27,6 @@
 /PNaCl.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /PNaCl.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /PPC.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
-/PPC.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /RISCV.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /RISCV.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /SPIR.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
@@ -44,4 +43,5 @@
 /X86.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /XCore.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /XCore.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
+/PPC.h/1.1.1.2/Fri Aug 21 07:45:47 2020/-ko/
 D

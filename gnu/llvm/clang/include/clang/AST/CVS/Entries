@@ -49,7 +49,6 @@
 /DataCollection.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /Decl.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /DeclAccessPair.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
-/DeclBase.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /DeclCXX.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /DeclContextInternals.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /DeclFriend.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
@@ -118,4 +117,5 @@
 /UnresolvedSet.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /VTTBuilder.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /VTableBuilder.h/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
+/DeclBase.h/1.1.1.2/Fri Aug 21 07:45:47 2020/-ko/
 D

@@ -26,7 +26,6 @@
 /Formatters.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /FunctionId.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /GUID.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
-/GlobalTypeTableBuilder.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /LazyRandomTypeCollection.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /Line.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /MergingTypeTableBuilder.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
@@ -58,4 +57,5 @@
 /TypeTableCollection.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /TypeVisitorCallbackPipeline.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /TypeVisitorCallbacks.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
+/GlobalTypeTableBuilder.h/1.1.1.2/Fri Aug 21 07:45:56 2020/-ko/
 D

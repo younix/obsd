@@ -18,7 +18,6 @@
 /SortJavaScriptImports.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /TokenAnalyzer.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /TokenAnalyzer.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
-/TokenAnnotator.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /TokenAnnotator.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /UnwrappedLineFormatter.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /UnwrappedLineFormatter.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
@@ -28,4 +27,5 @@
 /UsingDeclarationsSorter.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /WhitespaceManager.cpp/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
 /WhitespaceManager.h/1.1.1.1/Mon Aug  3 14:31:33 2020/-ko/
+/TokenAnnotator.cpp/1.1.1.2/Fri Aug 21 07:45:47 2020/-ko/
 D

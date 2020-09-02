@@ -13,7 +13,6 @@
 /rc.d.8/1.35/Tue Aug 27 20:05:02 2019//
 /rc.shutdown.8/1.16/Sat May 16 16:58:12 2020//
 /rc.subr.8/1.37/Fri Feb 21 00:47:21 2020//
-/release.8/1.95/Wed Apr 29 15:02:51 2020//
 /security.8/1.26/Thu Jul 13 19:16:33 2017//
 /ssl.8/1.68/Fri May 10 12:41:49 2019//
 /starttls.8/1.27/Mon Aug 12 19:49:14 2019//
@@ -34,3 +33,4 @@ D/man8.sgi////
 D/man8.sparc64////
 D/man8.powerpc64////
 /daily.8/1.28/Sat Aug  8 08:19:31 2020//
+/release.8/1.96/Fri Aug 21 07:46:49 2020//

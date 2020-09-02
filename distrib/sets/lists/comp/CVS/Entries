@@ -23,16 +23,16 @@
 /md.octeon/1.32/Mon Jul 20 09:32:24 2020//
 /md.sgi/1.86/Mon Jul 20 09:32:24 2020//
 /md.sparc64/1.120/Mon Jul 20 09:32:24 2020//
-/clang.amd64/1.29/Sat Aug  8 08:18:14 2020//
-/clang.arm64/1.22/Sat Aug  8 08:18:14 2020//
-/clang.armv7/1.21/Sat Aug  8 08:18:14 2020//
-/clang.i386/1.29/Sat Aug  8 08:18:14 2020//
-/clang.loongson/1.12/Sat Aug  8 08:18:14 2020//
-/clang.macppc/1.8/Sat Aug  8 08:18:14 2020//
-/clang.octeon/1.13/Sat Aug  8 08:18:14 2020//
-/clang.powerpc64/1.2/Sat Aug  8 08:18:14 2020//
-/clang.sgi/1.12/Sat Aug  8 08:18:14 2020//
-/clang.sparc64/1.16/Sat Aug  8 08:18:14 2020//
 /md.powerpc64/1.6/Fri Jul 24 10:26:28 2020//
-/mi/1.1524/Sat Aug  8 08:18:14 2020//
+/clang.amd64/1.31/Fri Aug 21 07:45:40 2020//
+/clang.arm64/1.24/Fri Aug 21 07:45:40 2020//
+/clang.armv7/1.23/Fri Aug 21 07:45:40 2020//
+/clang.i386/1.31/Fri Aug 21 07:45:40 2020//
+/clang.loongson/1.14/Fri Aug 21 07:45:40 2020//
+/clang.macppc/1.10/Fri Aug 21 07:45:40 2020//
+/clang.octeon/1.15/Fri Aug 21 07:45:40 2020//
+/clang.powerpc64/1.4/Fri Aug 21 07:45:40 2020//
+/clang.sgi/1.14/Fri Aug 21 07:45:40 2020//
+/clang.sparc64/1.18/Fri Aug 21 07:45:40 2020//
+/mi/1.1525/Fri Aug 21 07:45:40 2020//
 D

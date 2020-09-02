@@ -21,7 +21,6 @@
 /BugpointRedesign.md/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
 /BuildingADistribution.rst/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
 /CFIVerify.rst/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
-/CMake.rst/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
 /CMakeLists.txt/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
 /CMakePrimer.rst/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
 /CodeGenerator.rst/1.1.1.1/Mon Aug  3 14:30:22 2020/-ko/
@@ -147,3 +146,4 @@ D/_static////
 D/_templates////
 D/_themes////
 D/tutorial////
+/CMake.rst/1.1.1.2/Fri Aug 21 07:45:55 2020/-ko/

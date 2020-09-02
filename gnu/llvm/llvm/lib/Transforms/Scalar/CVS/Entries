@@ -17,7 +17,6 @@
 /GVNSink.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /GuardWidening.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /IVUsersPrinter.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
-/IndVarSimplify.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /InductiveRangeCheckElimination.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /InferAddressSpaces.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /InstSimplifyPass.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
@@ -67,7 +66,6 @@
 /Scalarizer.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /SeparateConstOffsetFromGEP.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /SimpleLoopUnswitch.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
-/SimplifyCFGPass.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /Sink.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /SpeculateAroundPHIs.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /SpeculativeExecution.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
@@ -75,4 +73,6 @@
 /StructurizeCFG.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /TailRecursionElimination.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
 /WarnMissedTransforms.cpp/1.1.1.1/Mon Aug  3 14:30:25 2020/-ko/
+/IndVarSimplify.cpp/1.1.1.2/Fri Aug 21 07:45:59 2020/-ko/
+/SimplifyCFGPass.cpp/1.1.1.2/Fri Aug 21 07:45:59 2020/-ko/
 D

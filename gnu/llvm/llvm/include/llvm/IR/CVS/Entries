@@ -57,7 +57,6 @@
 /IntrinsicsHexagon.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /IntrinsicsMips.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /IntrinsicsNVVM.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
-/IntrinsicsPowerPC.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /IntrinsicsRISCV.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /IntrinsicsSystemZ.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /IntrinsicsWebAssembly.td/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
@@ -103,4 +102,5 @@
 /ValueMap.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /ValueSymbolTable.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 /Verifier.h/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
+/IntrinsicsPowerPC.td/1.1.1.2/Fri Aug 21 07:45:56 2020/-ko/
 D

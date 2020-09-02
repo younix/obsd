@@ -1,4 +1,4 @@
-/*	$OpenBSD: ocsp.c,v 1.9 2019/06/28 13:32:44 deraadt Exp $ */
+/*	$OpenBSD: ocsp.c,v 1.12 2020/08/18 21:02:49 tobhe Exp $ */
 
 /*
  * Copyright (c) 2014 Markus Friedl
@@ -205,11 +205,12 @@ ocsp_connect_finish(struct iked *env, int fd, struct ocsp_connect *oc)
 
 /* validate the certifcate stored in 'data' by querying the ocsp-responder */
 int
-ocsp_validate_cert(struct iked *env, struct iked_static_id *id,
-    void *data, size_t len, struct iked_sahdr sh, uint8_t type)
+ocsp_validate_cert(struct iked *env, void *data, size_t len,
+    struct iked_sahdr sh, uint8_t type)
 {
 	struct iked_ocsp_entry	*ioe;
 	struct iked_ocsp	*ocsp;
+	OCSP_CERTID		*id = NULL;
 	BIO			*rawcert = NULL, *bissuer = NULL;
 	X509			*cert = NULL, *issuer = NULL;
 
@@ -230,9 +231,12 @@ ocsp_validate_cert(struct iked *env, struct iked_static_id *id,
 	    (issuer = PEM_read_bio_X509(bissuer, NULL, NULL, NULL)) == NULL ||
 	    (ocsp->ocsp_cbio = BIO_new(BIO_s_socket())) == NULL ||
 	    (ocsp->ocsp_req = OCSP_REQUEST_new()) == NULL ||
-	    !(ocsp->ocsp_id = OCSP_cert_to_id(NULL, cert, issuer)) ||
-	    !OCSP_request_add0_id(ocsp->ocsp_req, ocsp->ocsp_id))
+	    (id = OCSP_cert_to_id(NULL, cert, issuer)) == NULL ||
+	    !OCSP_request_add0_id(ocsp->ocsp_req, id))
 		goto err;
+
+	/* id is owned by and freed together with ocsp_req */
+	ocsp->ocsp_id = id;
 
 	BIO_free(rawcert);
 	BIO_free(bissuer);
@@ -253,6 +257,8 @@ ocsp_validate_cert(struct iked *env, struct iked_static_id *id,
 		BIO_free(rawcert);
 	if (cert != NULL)
 		X509_free(cert);
+	if (id != NULL)
+		OCSP_CERTID_free(id);
 	if (bissuer != NULL)
 		BIO_free(bissuer);
 	if (issuer != NULL)
@@ -410,14 +416,13 @@ ocsp_callback(int fd, short event, void *arg)
 void
 ocsp_parse_response(struct iked_ocsp *ocsp, OCSP_RESPONSE *resp)
 {
-	int status;
-	X509_STORE *store = NULL;
-	STACK_OF(X509) *verify_other = NULL;
-	OCSP_BASICRESP *bs = NULL;
-	int verify_flags = 0;
-	ASN1_GENERALIZEDTIME *rev, *thisupd, *nextupd;
-	int reason = 0;
-	int error = 1;
+	struct iked		*env = ocsp->ocsp_env;
+	X509_STORE		*store = NULL;
+	STACK_OF(X509)		*verify_other = NULL;
+	OCSP_BASICRESP		*bs = NULL;
+	ASN1_GENERALIZEDTIME	*rev, *thisupd, *nextupd;
+	int			 reason = 0, error = 1, verify_flags = 0;
+	int			 status;
 
 	if (!resp) {
 		log_warnx("%s: error querying OCSP responder", __func__);
@@ -469,8 +474,14 @@ ocsp_parse_response(struct iked_ocsp *ocsp, OCSP_RESPONSE *resp)
 		log_warnx("%s: no status found", __func__);
 		goto done;
 	}
+	if (env->sc_ocsp_tolerate &&
+	    !OCSP_check_validity(thisupd, nextupd, env->sc_ocsp_tolerate,
+	    env->sc_ocsp_maxage)) {
+		log_warnx("%s: status times invalid", __func__);
+		ca_sslerror(__func__);
+		goto done;
+	}
 	log_debug("%s: status: %s", __func__, OCSP_cert_status_str(status));
-
 	if (status == V_OCSP_CERTSTATUS_GOOD)
 		error = 0;
 

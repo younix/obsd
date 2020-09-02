@@ -29,7 +29,6 @@
 /MCMachOStreamer.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 /MCMachObjectTargetWriter.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 /MCNullStreamer.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
-/MCObjectFileInfo.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 /MCObjectStreamer.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 /MCObjectWriter.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 /MCRegisterInfo.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
@@ -61,3 +60,4 @@
 /XCOFFObjectWriter.cpp/1.1.1.1/Mon Aug  3 14:30:24 2020/-ko/
 D/MCDisassembler////
 D/MCParser////
+/MCObjectFileInfo.cpp/1.1.1.2/Fri Aug 21 07:45:57 2020/-ko/

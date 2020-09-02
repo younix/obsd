@@ -159,8 +159,6 @@
 /hardclock.9/1.13/Mon Jul 20 09:32:29 2020//
 /inittodr.9/1.12/Mon Jul 20 09:32:29 2020//
 /intrmap_create.9/1.3/Mon Jul 20 09:32:29 2020//
-/kstat_create.9/1.1/Mon Jul 20 09:32:29 2020//
-/kstat_kv_init.9/1.1/Mon Jul 20 09:32:29 2020//
 /mbuf_tags.9/1.41/Mon Jul 20 09:32:29 2020//
 /microtime.9/1.22/Mon Jul 20 09:32:29 2020//
 /mq_init.9/1.12/Mon Jul 20 09:32:29 2020//
@@ -179,4 +177,6 @@
 /timeout.9/1.51/Sat Aug  8 08:19:31 2020//
 /vgone.9/1.10/Sat Aug  8 08:19:31 2020//
 /vrecycle.9/1.11/Sat Aug  8 08:19:31 2020//
+/kstat_create.9/1.2/Fri Aug 21 07:46:49 2020//
+/kstat_kv_init.9/1.2/Fri Aug 21 07:46:49 2020//
 D

@@ -35,7 +35,6 @@
 /prime.c/1.13/Sun Jul 14 03:30:46 2019//
 /progs.h/1.9/Mon Nov  4 15:25:54 2019//
 /rand.c/1.14/Sun Jul 14 03:30:46 2019//
-/req.c/1.18/Wed Nov  6 11:16:16 2019//
 /rsa.c/1.14/Sun Jul 14 03:30:46 2019//
 /rsautl.c/1.18/Sun Jul 14 03:30:46 2019//
 /s_apps.h/1.5/Wed Apr 25 07:12:33 2018//
@@ -56,4 +55,5 @@
 /s_client.c/1.51/Mon Jul 20 09:32:33 2020//
 /verify.c/1.8/Mon Jul 20 09:32:33 2020//
 /s_server.c/1.43/Sat Aug  8 08:19:39 2020//
+/req.c/1.19/Fri Aug 21 07:46:59 2020//
 D

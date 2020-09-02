@@ -6,7 +6,6 @@
 /BlockLanguageSpec.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /CMakeLists.txt/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /ClangCheck.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
-/ClangCommandLineReference.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /ClangFormat.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /ClangFormatStyleOptions.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /ClangPlugins.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
@@ -51,7 +50,6 @@
 /RAVFrontendAction.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /README.txt/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /RefactoringEngine.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
-/ReleaseNotes.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /SafeStack.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /SanitizerCoverage.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
 /SanitizerSpecialCaseList.rst/1.1.1.1/Mon Aug  3 14:31:32 2020/-ko/
@@ -73,3 +71,5 @@
 D/CommandGuide////
 D/analyzer////
 D/tools////
+/ClangCommandLineReference.rst/1.1.1.2/Fri Aug 21 07:45:47 2020/-ko/
+/ReleaseNotes.rst/1.1.1.2/Fri Aug 21 07:45:47 2020/-ko/

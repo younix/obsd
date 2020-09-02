@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.h,v 1.154 2020/07/21 08:03:38 tobhe Exp $	*/
+/*	$OpenBSD: iked.h,v 1.157 2020/08/18 21:02:49 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -525,9 +525,9 @@ RB_HEAD(iked_addrpool6, iked_sa);
 struct iked_certreq {
 	struct ibuf			*cr_data;
 	uint8_t				 cr_type;
-	SLIST_ENTRY(iked_certreq)	 cr_entry;
+	SIMPLEQ_ENTRY(iked_certreq)	 cr_entry;
 };
-SLIST_HEAD(iked_certreqs, iked_certreq);
+SIMPLEQ_HEAD(iked_certreqs, iked_certreq);
 
 struct iked_message {
 	struct ibuf		*msg_data;
@@ -713,6 +713,8 @@ struct iked {
 
 	struct iked_ocsp_requests	 sc_ocsp;
 	char				*sc_ocsp_url;
+	long				 sc_ocsp_tolerate;
+	long				 sc_ocsp_maxage;
 
 	struct iked_addrpool		 sc_addrpool;
 	struct iked_addrpool6		 sc_addrpool6;
@@ -779,7 +781,7 @@ int	 config_getpfkey(struct iked *, struct imsg *);
 int	 config_setuser(struct iked *, struct iked_user *, enum privsep_procid);
 int	 config_getuser(struct iked *, struct imsg *);
 int	 config_setcompile(struct iked *, enum privsep_procid);
-int	 config_getcompile(struct iked *, struct imsg *);
+int	 config_getcompile(struct iked *);
 int	 config_setocsp(struct iked *);
 int	 config_getocsp(struct iked *, struct imsg *);
 int	 config_setkeys(struct iked *);
@@ -1128,8 +1130,8 @@ __dead void fatalx(const char *, ...)
 /* ocsp.c */
 int	 ocsp_connect(struct iked *env);
 int	 ocsp_receive_fd(struct iked *, struct imsg *);
-int	 ocsp_validate_cert(struct iked *, struct iked_static_id *,
-    void *, size_t, struct iked_sahdr, uint8_t);
+int	 ocsp_validate_cert(struct iked *, void *, size_t,
+    struct iked_sahdr, uint8_t);
 
 /* parse.y */
 int	 parse_config(const char *, struct iked *);

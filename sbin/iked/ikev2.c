@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.237 2020/07/21 08:03:38 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.244 2020/08/16 09:09:17 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -162,7 +162,7 @@ ssize_t	 ikev2_add_notify(struct ibuf *, struct ikev2_payload **, ssize_t,
 	    uint16_t);
 ssize_t	 ikev2_add_mobike(struct ibuf *, struct ikev2_payload **, ssize_t);
 ssize_t	 ikev2_add_fragmentation(struct ibuf *, struct ikev2_payload **,
-	    struct iked_message *, ssize_t);
+	    ssize_t);
 ssize_t	 ikev2_add_transport_mode(struct iked *, struct ibuf *,
 	    struct ikev2_payload **, ssize_t, struct iked_sa *);
 int	 ikev2_update_sa_addresses(struct iked *, struct iked_sa *);
@@ -170,7 +170,7 @@ int	 ikev2_resp_informational(struct iked *, struct iked_sa *,
 	    struct iked_message *);
 
 void	ikev2_ctl_reset_id(struct iked *, struct imsg *, unsigned int);
-void	ikev2_ctl_show_sa(struct iked *, struct imsg *);
+void	ikev2_ctl_show_sa(struct iked *);
 
 static struct privsep_proc procs[] = {
 	{ "parent",	PROC_PARENT,	ikev2_dispatch_parent },
@@ -253,7 +253,7 @@ ikev2_dispatch_parent(int fd, struct privsep_proc *p, struct imsg *imsg)
 	case IMSG_CFG_USER:
 		return (config_getuser(env, imsg));
 	case IMSG_COMPILE:
-		return (config_getcompile(env, imsg));
+		return (config_getcompile(env));
 	default:
 		break;
 	}
@@ -428,7 +428,7 @@ ikev2_dispatch_control(int fd, struct privsep_proc *p, struct imsg *imsg)
 		ikev2_ctl_reset_id(env, imsg, imsg->hdr.type);
 		break;
 	case IMSG_CTL_SHOW_SA:
-		ikev2_ctl_show_sa(env, imsg);
+		ikev2_ctl_show_sa(env);
 		break;
 	default:
 		return (-1);
@@ -485,7 +485,7 @@ ikev2_ctl_reset_id(struct iked *env, struct imsg *imsg, unsigned int type)
 }
 
 void
-ikev2_ctl_show_sa(struct iked *env, struct imsg *imsg)
+ikev2_ctl_show_sa(struct iked *env)
 {
 	ikev2_info(env, 0);
 }
@@ -815,9 +815,9 @@ int
 ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
     struct iked_message *msg)
 {
-	struct iked_id		*id, *certid;
+	struct iked_id		*id;
 	struct ibuf		*authmsg;
-	struct iked_policy	*policy = sa->sa_policy;
+	struct iked_policy	*old;
 	uint8_t			*cert = NULL;
 	size_t			 certlen = 0;
 	int			 certtype = IKEV2_CERT_NONE;
@@ -832,16 +832,14 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 	    sa->sa_policy->pol_auth.auth_eap)
 		sa_state(env, sa, IKEV2_STATE_EAP);
 
-	if (sa->sa_hdr.sh_initiator) {
+	if (sa->sa_hdr.sh_initiator)
 		id = &sa->sa_rid;
-		certid = &sa->sa_rcert;
-	} else {
+	else
 		id = &sa->sa_iid;
-		certid = &sa->sa_icert;
-	}
+
 	/* try to relookup the policy based on the peerid */
 	if (msg->msg_id.id_type && !sa->sa_hdr.sh_initiator) {
-		struct iked_policy	*old = sa->sa_policy;
+		old = sa->sa_policy;
 
 		sa->sa_policy = NULL;
 		if (policy_lookup(env, msg, &sa->sa_proposals) != 0 ||
@@ -868,7 +866,6 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 				ikev2_send_auth_failed(env, sa);
 				return (-1);
 			}
-			policy = sa->sa_policy;
 		} else {
 			/* restore */
 			msg->msg_policy = sa->sa_policy = old;
@@ -1228,7 +1225,7 @@ ikev2_init_ike_sa_peer(struct iked *env, struct iked_policy *pol,
 
 	/* Fragmentation Notify */
 	if (env->sc_frag) {
-		if ((len = ikev2_add_fragmentation(buf, &pld, &req, len))
+		if ((len = ikev2_add_fragmentation(buf, &pld, len))
 		    == -1)
 			goto done;
 	}
@@ -1897,7 +1894,7 @@ ikev2_add_mobike(struct ibuf *e, struct ikev2_payload **pld, ssize_t len)
 
 ssize_t
 ikev2_add_fragmentation(struct ibuf *buf, struct ikev2_payload **pld,
-    struct iked_message *msg, ssize_t len)
+    ssize_t len)
 {
 	return ikev2_add_notify(buf, pld, len, IKEV2_N_FRAGMENTATION_SUPPORTED);
 }
@@ -2792,7 +2789,7 @@ ikev2_resp_ike_sa_init(struct iked *env, struct iked_message *msg)
 
 	/* Fragmentation Notify*/
 	if (sa->sa_frag) {
-		if ((len = ikev2_add_fragmentation(buf, &pld, &resp, len))
+		if ((len = ikev2_add_fragmentation(buf, &pld, len))
 		    == -1)
 			goto done;
 	}
@@ -2967,14 +2964,13 @@ ikev2_send_error(struct iked *env, struct iked_sa *sa,
     struct iked_message *msg, uint8_t exchange)
 {
 	struct ibuf			*buf = NULL;
-	ssize_t				 len;
 	int				 ret = -1;
 
 	if (msg->msg_error == 0)
 		return (0);
 	if ((buf = ibuf_static()) == NULL)
 		goto done;
-	if ((len = ikev2_add_error(env, buf, msg)) == 0)
+	if (ikev2_add_error(env, buf, msg) == 0)
 		goto done;
 	ret = ikev2_send_ike_e(env, sa, buf, IKEV2_PAYLOAD_NOTIFY,
 	    exchange, 1);
@@ -3066,7 +3062,7 @@ ikev2_handle_certreq(struct iked* env, struct iked_message *msg)
 	 * We could alternatively extract the CA from the peer certificate
 	 * to find a matching local one.
 	 */
-	if (SLIST_EMPTY(&msg->msg_certreqs)) {
+	if (SIMPLEQ_EMPTY(&msg->msg_certreqs)) {
 		if (sa->sa_policy->pol_certreqtype)
 			crtype = sa->sa_policy->pol_certreqtype;
 		else
@@ -3075,9 +3071,8 @@ ikev2_handle_certreq(struct iked* env, struct iked_message *msg)
 		    crtype, 0, ibuf_data(env->sc_certreq),
 		    ibuf_size(env->sc_certreq), PROC_CERT);
 	} else {
-		while ((cr = SLIST_FIRST(&msg->msg_certreqs))) {
-
-			if (SLIST_NEXT(cr, cr_entry) != NULL)
+		while ((cr = SIMPLEQ_FIRST(&msg->msg_certreqs))) {
+			if (SIMPLEQ_NEXT(cr, cr_entry) != NULL)
 				more = 1;
 			else
 				more = 0;
@@ -3088,7 +3083,7 @@ ikev2_handle_certreq(struct iked* env, struct iked_message *msg)
 			    PROC_CERT);
 
 			ibuf_release(cr->cr_data);
-			SLIST_REMOVE_HEAD(&msg->msg_certreqs, cr_entry);
+			SIMPLEQ_REMOVE_HEAD(&msg->msg_certreqs, cr_entry);
 			free(cr);
 		}
 	}
@@ -4668,7 +4663,7 @@ ikev2_sa_initiator_dh(struct iked_sa *sa, struct iked_message *msg,
 		if ((sa->sa_dhiexchange = ibuf_new(NULL,
 		    dh_getlen(sa->sa_dhgroup))) == NULL) {
 			log_info("%s: failed to alloc dh exchange",
-			    SPI_SA(msg->msg_sa, __func__));
+			    SPI_SA(sa, __func__));
 			return (-1);
 		}
 		if (dh_create_exchange(sa->sa_dhgroup,

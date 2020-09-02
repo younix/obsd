@@ -95,7 +95,6 @@
 /cmd-set-option.c/1.137/Mon Jul 20 09:32:33 2020//
 /cmd.c/1.163/Mon Jul 20 09:32:33 2020//
 /control.c/1.44/Mon Jul 20 09:32:33 2020//
-/format.c/1.259/Mon Jul 20 09:32:33 2020//
 /key-bindings.c/1.130/Mon Jul 20 09:32:33 2020//
 /key-string.c/1.63/Mon Jul 20 09:32:33 2020//
 /options.c/1.59/Mon Jul 20 09:32:33 2020//
@@ -104,14 +103,12 @@
 /tty-keys.c/1.140/Mon Jul 20 09:32:33 2020//
 /window-tree.c/1.52/Mon Jul 20 09:32:33 2020//
 /window.c/1.266/Mon Jul 20 09:32:33 2020//
-/alerts.c/1.31/Sat Aug  8 08:19:40 2020//
 /cmd-display-message.c/1.55/Sat Aug  8 08:19:40 2020//
 /cmd-list-keys.c/1.61/Sat Aug  8 08:19:40 2020//
 /cmd-queue.c/1.99/Sat Aug  8 08:19:40 2020//
 /cmd-save-buffer.c/1.51/Fri Jul 24 10:26:29 2020//
 /cmd-select-pane.c/1.64/Fri Jul 24 10:26:29 2020//
 /grid.c/1.119/Sat Aug  8 08:19:40 2020//
-/input.c/1.182/Fri Jul 24 10:26:29 2020//
 /mode-tree.c/1.51/Sat Aug  8 08:19:40 2020//
 /options-table.c/1.133/Fri Jul 24 10:26:29 2020//
 /proc.c/1.18/Sat Aug  8 08:19:40 2020//
@@ -120,9 +117,12 @@
 /server-client.c/1.360/Sat Aug  8 08:19:40 2020//
 /server-fn.c/1.128/Sat Aug  8 08:19:40 2020//
 /status.c/1.218/Sat Aug  8 08:19:40 2020//
-/tmux.1/1.790/Sat Aug  8 08:19:40 2020//
 /tmux.h/1.1075/Sat Aug  8 08:19:40 2020//
 /utf8.c/1.56/Fri Jul 24 10:26:29 2020//
 /window-copy.c/1.302/Sat Aug  8 08:19:40 2020//
 /window-customize.c/1.6/Sat Aug  8 08:19:40 2020//
+/alerts.c/1.32/Fri Aug 21 07:46:59 2020//
+/format.c/1.260/Fri Aug 21 07:46:59 2020//
+/input.c/1.183/Fri Aug 21 07:46:59 2020//
+/tmux.1/1.791/Fri Aug 21 07:46:59 2020//
 D
