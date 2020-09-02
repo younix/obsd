@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_base.c,v 1.268 2020/07/27 19:19:49 krw Exp $	*/
+/*	$OpenBSD: scsi_base.c,v 1.270 2020/08/19 22:46:19 krw Exp $	*/
 /*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 
 /*
@@ -45,6 +45,7 @@
 #include <sys/task.h>
 
 #include <scsi/scsi_all.h>
+#include <scsi/scsi_debug.h>
 #include <scsi/scsi_disk.h>
 #include <scsi/scsiconf.h>
 
@@ -1301,7 +1302,7 @@ scsi_do_mode_sense(struct scsi_link *link, int pg_code,
 	 * non-ATAPI, non-USB devices that don't support SCSI-2 commands
 	 * (i.e. MODE SENSE (10)) are done.
 	 */
-	if ((link->flags & (SDEV_ATAPI | SDEV_UMASS)) == 0 &&
+	if (!ISSET(link->flags, (SDEV_ATAPI | SDEV_UMASS)) &&
 	    SID_ANSII_REV(&link->inqdata) < SCSI_REV_2)
 		return error;
 

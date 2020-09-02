@@ -1,4 +1,4 @@
-/*	$OpenBSD: sd.c,v 1.313 2020/07/16 14:44:55 krw Exp $	*/
+/*	$OpenBSD: sd.c,v 1.317 2020/08/20 01:47:45 krw Exp $	*/
 /*	$NetBSD: sd.c,v 1.111 1997/04/02 02:29:41 mycroft Exp $	*/
 
 /*-
@@ -70,6 +70,7 @@
 #include <sys/reboot.h>
 
 #include <scsi/scsi_all.h>
+#include <scsi/scsi_debug.h>
 #include <scsi/scsi_disk.h>
 #include <scsi/scsiconf.h>
 #include <scsi/sdvar.h>
@@ -729,9 +730,7 @@ sdstart(struct scsi_xfer *xs)
 	scsi_xs_exec(xs);
 
 	/* Move onto the next io. */
-	if (ISSET(sc->flags, SDF_WAITING))
-		CLR(sc->flags, SDF_WAITING);
-	else if (bufq_peek(&sc->sc_bufq))
+	if (bufq_peek(&sc->sc_bufq))
 		scsi_xsh_add(&sc->sc_xsh);
 }
 

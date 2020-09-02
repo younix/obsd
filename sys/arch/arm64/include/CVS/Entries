@@ -40,17 +40,17 @@
 /setjmp.h/1.1/Sat Dec 17 23:38:33 2016//
 /signal.h/1.2/Sun Mar 12 17:57:12 2017//
 /smbiosvar.h/1.4/Thu Feb 20 06:12:14 2020//
-/softintr.h/1.1/Sat Dec 17 23:38:33 2016//
 /spinlock.h/1.2/Tue Sep  5 02:40:54 2017//
 /sysarch.h/1.1/Sat Dec 17 23:38:33 2016//
 /tcb.h/1.2/Tue Jan 10 13:13:12 2017//
 /trap.h/1.1/Sat Dec 17 23:38:33 2016//
 /vfp.h/1.4/Mon Jul  2 07:23:37 2018//
 /vmparam.h/1.7/Sat Jun  1 18:38:27 2019//
-/armreg.h/1.11/Sat Jun  6 11:21:49 2020//
 /cpu.h/1.18/Sat Jun  6 11:21:49 2020//
 /fdt.h/1.7/Mon Jul 20 09:32:29 2020//
 /intr.h/1.16/Mon Jul 20 09:32:29 2020//
 /pci_machdep.h/1.7/Mon Jul 20 09:32:29 2020//
 /timetc.h/1.2/Mon Jul 20 09:32:29 2020//
+/armreg.h/1.12/Fri Aug 21 07:46:50 2020//
+/softintr.h/1.2/Fri Aug 21 07:46:50 2020//
 D

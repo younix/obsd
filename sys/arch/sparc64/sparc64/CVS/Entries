@@ -10,7 +10,6 @@
 /db_interface.c/1.55/Thu Jan 30 08:51:27 2020//
 /db_trace.c/1.22/Sat Apr 18 04:45:20 2020//
 /disksubr.c/1.72/Tue Feb 28 10:49:37 2017//
-/emul.c/1.24/Wed Aug  8 08:42:49 2018//
 /genassym.cf/1.38/Tue Jun 11 15:23:41 2019//
 /hvcall.S/1.12/Sun Oct 20 16:27:19 2019//
 /in4_cksum.c/1.7/Sun Aug 24 20:06:57 2014//
@@ -27,7 +26,6 @@
 /rbus_machdep.c/1.5/Wed Sep 22 02:28:37 2010//
 /sys_machdep.c/1.4/Sat Dec 30 20:46:59 2017//
 /timerreg.h/1.5/Tue May 29 09:54:23 2007//
-/trap.c/1.102/Fri Sep  6 12:22:01 2019//
 /vm_machdep.c/1.39/Thu Aug 17 20:50:51 2017//
 /autoconf.c/1.137/Mon Jul 20 09:32:29 2020//
 /conf.c/1.84/Mon Jul 20 09:32:29 2020//
@@ -36,4 +34,6 @@
 /clock.c/1.66/Sat Aug  8 08:19:34 2020//
 /cpu.c/1.71/Sat Aug  8 08:19:34 2020//
 /locore.s/1.190/Sat Aug  8 08:19:34 2020//
+/emul.c/1.25/Fri Aug 21 07:46:53 2020//
+/trap.c/1.103/Fri Aug 21 07:46:53 2020//
 D

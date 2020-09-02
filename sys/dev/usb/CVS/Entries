@@ -49,7 +49,6 @@
 /uftdi.c/1.76/Sat Feb 22 14:01:34 2020//
 /uftdireg.h/1.13/Tue Sep 11 16:04:44 2012//
 /ugen.c/1.106/Wed May 13 08:13:42 2020//
-/ugold.c/1.14/Thu Oct  5 17:29:00 2017//
 /uhci.c/1.152/Fri Apr  3 20:11:47 2020//
 /uhcireg.h/1.16/Tue Dec 27 14:41:45 2016//
 /uhcivar.h/1.33/Sun May 18 17:10:27 2014//
@@ -178,3 +177,4 @@ D/dwc2////
 /uvscom.c/1.39/Sat Aug  8 08:19:37 2020//
 /uxrcom.c/1.2/Sat Aug  8 08:19:37 2020//
 /xhci.c/1.119/Sat Aug  8 08:19:37 2020//
+/ugold.c/1.15/Fri Aug 21 07:46:56 2020//

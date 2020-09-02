@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_mvpp.c,v 1.16 2020/07/23 10:10:15 patrick Exp $	*/
+/*	$OpenBSD: if_mvpp.c,v 1.19 2020/08/17 22:03:32 patrick Exp $	*/
 /*
  * Copyright (c) 2008, 2019 Mark Kettenis <kettenis@openbsd.org>
  * Copyright (c) 2017, 2020 Patrick Wildt <patrick@blueri.se>
@@ -524,7 +524,7 @@ mvpp2_axi_config(struct mvpp2_softc *sc)
 {
 	uint32_t reg;
 
-	mvpp2_write(sc, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG, 0);
+	mvpp2_write(sc, MVPP22_BM_ADDR_HIGH_RLS_REG, 0);
 
 	reg = (MVPP22_AXI_CODE_CACHE_WR_CACHE << MVPP22_AXI_ATTR_CACHE_OFFS) |
 	    (MVPP22_AXI_CODE_DOMAIN_OUTER_DOM << MVPP22_AXI_ATTR_DOMAIN_OFFS);
@@ -626,11 +626,10 @@ mvpp2_bm_pool_init(struct mvpp2_softc *sc)
 			bm->free_cons = (bm->free_cons + 1) % MVPP2_BM_SIZE;
 
 			phys = rxb->mb_map->dm_segs[0].ds_addr;
-			mvpp2_write(sc, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
+			mvpp2_write(sc, MVPP22_BM_ADDR_HIGH_RLS_REG,
 			    (((virt >> 32) & MVPP22_ADDR_HIGH_MASK)
-			    << MVPP22_BM_VIRT_HIGH_RLS_OFFST) |
-			    (((phys >> 32) & MVPP22_ADDR_HIGH_MASK)
-			    << MVPP22_BM_PHY_HIGH_RLS_OFFSET));
+			    << MVPP22_BM_ADDR_HIGH_VIRT_RLS_SHIFT) |
+			    ((phys >> 32) & MVPP22_ADDR_HIGH_MASK));
 			mvpp2_write(sc, MVPP2_BM_VIRT_RLS_REG,
 			    virt & 0xffffffff);
 			mvpp2_write(sc, MVPP2_BM_PHY_RLS_REG(i),
@@ -1426,16 +1425,16 @@ mvpp2_port_attach(struct device *parent, struct device *self, void *aux)
 	/* Reset Mac */
 	mvpp2_gmac_write(sc, MVPP2_PORT_CTRL2_REG,
 	    mvpp2_gmac_read(sc, MVPP2_PORT_CTRL2_REG) |
-	    MVPP2_PORT_CTRL2_PORTMACRESET_MASK);
+	    MVPP2_PORT_CTRL2_PORTMACRESET);
 	if (sc->sc_gop_id == 0) {
 		mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL0_REG,
 		    mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG) &
-		    ~MV_XLG_MAC_CTRL0_MACRESETN_MASK);
+		    ~MV_XLG_MAC_CTRL0_MACRESETN);
 		reg = mvpp2_mpcs_read(sc, MVPP22_MPCS_CLOCK_RESET);
-		reg |= MVPP22_MPCS_CLK_DIV_PHASE_SET_MASK;
-		reg &= ~MVPP22_MPCS_TX_SD_CLK_RESET_MASK;
-		reg &= ~MVPP22_MPCS_RX_SD_CLK_RESET_MASK;
-		reg &= ~MVPP22_MPCS_MAC_CLK_RESET_MASK;
+		reg |= MVPP22_MPCS_CLK_DIV_PHASE_SET;
+		reg &= ~MVPP22_MPCS_TX_SD_CLK_RESET;
+		reg &= ~MVPP22_MPCS_RX_SD_CLK_RESET;
+		reg &= ~MVPP22_MPCS_MAC_CLK_RESET;
 		mvpp2_mpcs_write(sc, MVPP22_MPCS_CLOCK_RESET, reg);
 		reg = mvpp2_xpcs_read(sc, MVPP22_XPCS_GLOBAL_CFG_0_REG);
 		reg &= ~MVPP22_XPCS_PCSRESET;
@@ -1498,26 +1497,26 @@ mvpp2_port_attach(struct device *parent, struct device *self, void *aux)
 	    sc->sc_phy_mode == PHY_MODE_RGMII_ID ||
 	    sc->sc_phy_mode == PHY_MODE_RGMII_RXID ||
 	    sc->sc_phy_mode == PHY_MODE_RGMII_TXID) {
-		reg = mvpp2_gmac_read(sc, MV_GMAC_INTERRUPT_MASK_REG);
-		reg |= MV_GMAC_INTERRUPT_CAUSE_LINK_CHANGE_MASK;
-		mvpp2_gmac_write(sc, MV_GMAC_INTERRUPT_MASK_REG, reg);
-		reg = mvpp2_gmac_read(sc, MV_GMAC_INTERRUPT_SUM_MASK_REG);
-		reg |= MV_GMAC_INTERRUPT_SUM_CAUSE_LINK_CHANGE_MASK;
-		mvpp2_gmac_write(sc, MV_GMAC_INTERRUPT_SUM_MASK_REG, reg);
+		reg = mvpp2_gmac_read(sc, MVPP2_GMAC_INT_MASK_REG);
+		reg |= MVPP2_GMAC_INT_CAUSE_LINK_CHANGE;
+		mvpp2_gmac_write(sc, MVPP2_GMAC_INT_MASK_REG, reg);
+		reg = mvpp2_gmac_read(sc, MVPP2_GMAC_INT_SUM_MASK_REG);
+		reg |= MVPP2_GMAC_INT_SUM_CAUSE_LINK_CHANGE;
+		mvpp2_gmac_write(sc, MVPP2_GMAC_INT_SUM_MASK_REG, reg);
 	}
 
 	if (sc->sc_gop_id == 0) {
 		reg = mvpp2_xlg_read(sc, MV_XLG_INTERRUPT_MASK_REG);
-		reg |= MV_XLG_INTERRUPT_LINK_CHANGE_MASK;
+		reg |= MV_XLG_INTERRUPT_LINK_CHANGE;
 		mvpp2_xlg_write(sc, MV_XLG_INTERRUPT_MASK_REG, reg);
 		reg = mvpp2_xlg_read(sc, MV_XLG_EXTERNAL_INTERRUPT_MASK_REG);
-		reg &= ~MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_XLG_MASK;
-		reg &= ~MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_GIG_MASK;
+		reg &= ~MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_XLG;
+		reg &= ~MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_GIG;
 		if (sc->sc_phy_mode == PHY_MODE_10GBASER ||
 		    sc->sc_phy_mode == PHY_MODE_XAUI)
-			reg |= MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_XLG_MASK;
+			reg |= MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_XLG;
 		else
-			reg |= MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_GIG_MASK;
+			reg |= MV_XLG_EXTERNAL_INTERRUPT_LINK_CHANGE_GIG;
 		mvpp2_xlg_write(sc, MV_XLG_EXTERNAL_INTERRUPT_MASK_REG, reg);
 	}
 
@@ -1864,23 +1863,23 @@ mvpp2_inband_statchg(struct mvpp2_port *sc)
 	if (sc->sc_gop_id == 0 && (sc->sc_phy_mode == PHY_MODE_10GBASER ||
 	    sc->sc_phy_mode == PHY_MODE_XAUI)) {
 		reg = mvpp2_xlg_read(sc, MV_XLG_MAC_PORT_STATUS_REG);
-		if (reg & MV_XLG_MAC_PORT_STATUS_LINKSTATUS_MASK)
+		if (reg & MV_XLG_MAC_PORT_STATUS_LINKSTATUS)
 			sc->sc_mii.mii_media_status |= IFM_ACTIVE;
 		sc->sc_mii.mii_media_active |= IFM_FDX;
 		sc->sc_mii.mii_media_active |= IFM_10G_SR;
 	} else {
 		reg = mvpp2_gmac_read(sc, MVPP2_PORT_STATUS0_REG);
-		if (reg & MVPP2_PORT_STATUS0_LINKUP_MASK)
+		if (reg & MVPP2_PORT_STATUS0_LINKUP)
 			sc->sc_mii.mii_media_status |= IFM_ACTIVE;
-		if (reg & MVPP2_PORT_STATUS0_FULLDX_MASK)
+		if (reg & MVPP2_PORT_STATUS0_FULLDX)
 			sc->sc_mii.mii_media_active |= IFM_FDX;
 		if (sc->sc_phy_mode == PHY_MODE_2500BASEX)
 			sc->sc_mii.mii_media_active |= IFM_2500_SX;
 		else if (sc->sc_phy_mode == PHY_MODE_1000BASEX)
 			sc->sc_mii.mii_media_active |= IFM_1000_SX;
-		else if (reg & MVPP2_PORT_STATUS0_GMIISPEED_MASK)
+		else if (reg & MVPP2_PORT_STATUS0_GMIISPEED)
 			sc->sc_mii.mii_media_active |= IFM_1000_T;
-		else if (reg & MVPP2_PORT_STATUS0_MIISPEED_MASK)
+		else if (reg & MVPP2_PORT_STATUS0_MIISPEED)
 			sc->sc_mii.mii_media_active |= IFM_100_TX;
 		else
 			sc->sc_mii.mii_media_active |= IFM_10_T;
@@ -1906,8 +1905,8 @@ mvpp2_port_change(struct mvpp2_port *sc)
 		if (sc->sc_phy_mode == PHY_MODE_10GBASER ||
 		    sc->sc_phy_mode == PHY_MODE_XAUI) {
 			reg = mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG);
-			reg &= ~MV_XLG_MAC_CTRL0_FORCELINKDOWN_MASK;
-			reg |= MV_XLG_MAC_CTRL0_FORCELINKPASS_MASK;
+			reg &= ~MV_XLG_MAC_CTRL0_FORCELINKDOWN;
+			reg |= MV_XLG_MAC_CTRL0_FORCELINKPASS;
 			mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL0_REG, reg);
 		} else {
 			reg = mvpp2_gmac_read(sc, MVPP2_GMAC_AUTONEG_CONFIG);
@@ -1930,8 +1929,8 @@ mvpp2_port_change(struct mvpp2_port *sc)
 		if (sc->sc_phy_mode == PHY_MODE_10GBASER ||
 		    sc->sc_phy_mode == PHY_MODE_XAUI) {
 			reg = mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG);
-			reg &= ~MV_XLG_MAC_CTRL0_FORCELINKPASS_MASK;
-			reg |= MV_XLG_MAC_CTRL0_FORCELINKDOWN_MASK;
+			reg &= ~MV_XLG_MAC_CTRL0_FORCELINKPASS;
+			reg |= MV_XLG_MAC_CTRL0_FORCELINKDOWN;
 			mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL0_REG, reg);
 		} else {
 			reg = mvpp2_gmac_read(sc, MVPP2_GMAC_AUTONEG_CONFIG);
@@ -1965,7 +1964,7 @@ mvpp2_link_intr(void *arg)
 	if (sc->sc_gop_id == 0 && (sc->sc_phy_mode == PHY_MODE_10GBASER ||
 	    sc->sc_phy_mode == PHY_MODE_XAUI)) {
 		reg = mvpp2_xlg_read(sc, MV_XLG_INTERRUPT_CAUSE_REG);
-		if (reg & MV_XLG_INTERRUPT_LINK_CHANGE_MASK)
+		if (reg & MV_XLG_INTERRUPT_LINK_CHANGE)
 			event = 1;
 	} else if (sc->sc_phy_mode == PHY_MODE_2500BASEX ||
 	    sc->sc_phy_mode == PHY_MODE_1000BASEX ||
@@ -1974,8 +1973,8 @@ mvpp2_link_intr(void *arg)
 	    sc->sc_phy_mode == PHY_MODE_RGMII_ID ||
 	    sc->sc_phy_mode == PHY_MODE_RGMII_RXID ||
 	    sc->sc_phy_mode == PHY_MODE_RGMII_TXID) {
-		reg = mvpp2_gmac_read(sc, MV_GMAC_INTERRUPT_CAUSE_REG);
-		if (reg & MV_GMAC_INTERRUPT_CAUSE_LINK_CHANGE_MASK)
+		reg = mvpp2_gmac_read(sc, MVPP2_GMAC_INT_CAUSE_REG);
+		if (reg & MVPP2_GMAC_INT_CAUSE_LINK_CHANGE)
 			event = 1;
 	}
 
@@ -2168,11 +2167,10 @@ mvpp2_rx_refill(struct mvpp2_port *sc)
 		bm->free_cons = (bm->free_cons + 1) % MVPP2_BM_SIZE;
 
 		phys = rxb->mb_map->dm_segs[0].ds_addr;
-		mvpp2_write(sc->sc, MVPP22_BM_PHY_VIRT_HIGH_RLS_REG,
+		mvpp2_write(sc->sc, MVPP22_BM_ADDR_HIGH_RLS_REG,
 		    (((virt >> 32) & MVPP22_ADDR_HIGH_MASK)
-		    << MVPP22_BM_VIRT_HIGH_RLS_OFFST) |
-		    (((phys >> 32) & MVPP22_ADDR_HIGH_MASK)
-		    << MVPP22_BM_PHY_HIGH_RLS_OFFSET));
+		    << MVPP22_BM_ADDR_HIGH_VIRT_RLS_SHIFT) |
+		    ((phys >> 32) & MVPP22_ADDR_HIGH_MASK));
 		mvpp2_write(sc->sc, MVPP2_BM_VIRT_RLS_REG,
 		    virt & 0xffffffff);
 		mvpp2_write(sc->sc, MVPP2_BM_PHY_RLS_REG(pool),
@@ -2255,7 +2253,7 @@ mvpp2_aggr_txq_hw_init(struct mvpp2_softc *sc, struct mvpp2_tx_queue *txq)
 
 	txq->prod = mvpp2_read(sc, MVPP2_AGGR_TXQ_INDEX_REG(txq->id));
 	mvpp2_write(sc, MVPP2_AGGR_TXQ_DESC_ADDR_REG(txq->id),
-	    MVPP2_DMA_DVA(txq->ring) >> MVPP22_DESC_ADDR_SHIFT);
+	    MVPP2_DMA_DVA(txq->ring) >> MVPP22_DESC_ADDR_OFFS);
 	mvpp2_write(sc, MVPP2_AGGR_TXQ_DESC_SIZE_REG(txq->id),
 	    MVPP2_AGGR_TXQ_SIZE);
 }
@@ -2340,7 +2338,7 @@ mvpp2_rxq_hw_init(struct mvpp2_port *sc, struct mvpp2_rx_queue *rxq)
 	mvpp2_write(sc->sc, MVPP2_RXQ_STATUS_REG(rxq->id), 0);
 	mvpp2_write(sc->sc, MVPP2_RXQ_NUM_REG, rxq->id);
 	mvpp2_write(sc->sc, MVPP2_RXQ_DESC_ADDR_REG,
-	    MVPP2_DMA_DVA(rxq->ring) >> MVPP22_DESC_ADDR_SHIFT);
+	    MVPP2_DMA_DVA(rxq->ring) >> MVPP22_DESC_ADDR_OFFS);
 	mvpp2_write(sc->sc, MVPP2_RXQ_DESC_SIZE_REG, MVPP2_NRXDESC);
 	mvpp2_write(sc->sc, MVPP2_RXQ_INDEX_REG, 0);
 	mvpp2_rxq_offset_set(sc, rxq->id, 0);
@@ -2358,16 +2356,16 @@ mvpp2_mac_config(struct mvpp2_port *sc)
 
 	mvpp2_gmac_write(sc, MVPP2_PORT_CTRL2_REG,
 	    mvpp2_gmac_read(sc, MVPP2_PORT_CTRL2_REG) |
-	    MVPP2_PORT_CTRL2_PORTMACRESET_MASK);
+	    MVPP2_PORT_CTRL2_PORTMACRESET);
 	if (sc->sc_gop_id == 0) {
 		mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL0_REG,
 		    mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG) &
-		    ~MV_XLG_MAC_CTRL0_MACRESETN_MASK);
+		    ~MV_XLG_MAC_CTRL0_MACRESETN);
 		reg = mvpp2_mpcs_read(sc, MVPP22_MPCS_CLOCK_RESET);
-		reg |= MVPP22_MPCS_CLK_DIV_PHASE_SET_MASK;
-		reg &= ~MVPP22_MPCS_TX_SD_CLK_RESET_MASK;
-		reg &= ~MVPP22_MPCS_RX_SD_CLK_RESET_MASK;
-		reg &= ~MVPP22_MPCS_MAC_CLK_RESET_MASK;
+		reg |= MVPP22_MPCS_CLK_DIV_PHASE_SET;
+		reg &= ~MVPP22_MPCS_TX_SD_CLK_RESET;
+		reg &= ~MVPP22_MPCS_RX_SD_CLK_RESET;
+		reg &= ~MVPP22_MPCS_MAC_CLK_RESET;
 		mvpp2_mpcs_write(sc, MVPP22_MPCS_CLOCK_RESET, reg);
 		reg = mvpp2_xpcs_read(sc, MVPP22_XPCS_GLOBAL_CFG_0_REG);
 		reg &= ~MVPP22_XPCS_PCSRESET;
@@ -2380,10 +2378,10 @@ mvpp2_mac_config(struct mvpp2_port *sc)
 	if (sc->sc_gop_id == 0) {
 		if (sc->sc_phy_mode == PHY_MODE_10GBASER) {
 			reg = mvpp2_mpcs_read(sc, MVPP22_MPCS_CLOCK_RESET);
-			reg &= ~MVPP22_MPCS_CLK_DIV_PHASE_SET_MASK;
-			reg |= MVPP22_MPCS_TX_SD_CLK_RESET_MASK;
-			reg |= MVPP22_MPCS_RX_SD_CLK_RESET_MASK;
-			reg |= MVPP22_MPCS_MAC_CLK_RESET_MASK;
+			reg &= ~MVPP22_MPCS_CLK_DIV_PHASE_SET;
+			reg |= MVPP22_MPCS_TX_SD_CLK_RESET;
+			reg |= MVPP22_MPCS_RX_SD_CLK_RESET;
+			reg |= MVPP22_MPCS_MAC_CLK_RESET;
 			mvpp2_mpcs_write(sc, MVPP22_MPCS_CLOCK_RESET, reg);
 		} else if (sc->sc_phy_mode == PHY_MODE_XAUI) {
 			reg = mvpp2_xpcs_read(sc, MVPP22_XPCS_GLOBAL_CFG_0_REG);
@@ -2433,17 +2431,17 @@ mvpp2_xlg_config(struct mvpp2_port *sc)
 	ctl0 = mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG);
 	ctl4 = mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL4_REG);
 
-	ctl0 |= MV_XLG_MAC_CTRL0_MACRESETN_MASK;
+	ctl0 |= MV_XLG_MAC_CTRL0_MACRESETN;
 	ctl4 &= ~MV_XLG_MAC_CTRL4_EN_IDLE_CHECK_FOR_LINK;
-	ctl4 |= MV_XLG_MAC_CTRL4_FORWARD_PFC_EN_OFFS;
-	ctl4 |= MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN_MASK;
+	ctl4 |= MV_XLG_MAC_CTRL4_FORWARD_PFC_EN;
+	ctl4 |= MV_XLG_MAC_CTRL4_FORWARD_802_3X_FC_EN;
 
 	mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL0_REG, ctl0);
 	mvpp2_xlg_write(sc, MV_XLG_PORT_MAC_CTRL4_REG, ctl0);
 
 	/* Port reset */
 	while ((mvpp2_xlg_read(sc, MV_XLG_PORT_MAC_CTRL0_REG) &
-	    MV_XLG_MAC_CTRL0_MACRESETN_MASK) == 0)
+	    MV_XLG_MAC_CTRL0_MACRESETN) == 0)
 		;
 }
 
@@ -2478,27 +2476,27 @@ mvpp2_gmac_config(struct mvpp2_port *sc)
 	case PHY_MODE_2500BASEX:
 	case PHY_MODE_1000BASEX:
 		ctl2 |= MVPP2_GMAC_PCS_ENABLE_MASK;
-		ctl4 &= ~MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_DP_CLK_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
+		ctl4 &= ~MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS;
+		ctl4 |= MVPP2_PORT_CTRL4_DP_CLK_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE;
 		break;
 	case PHY_MODE_SGMII:
 		ctl2 |= MVPP2_GMAC_PCS_ENABLE_MASK;
 		ctl2 |= MVPP2_GMAC_INBAND_AN_MASK;
-		ctl4 &= ~MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_DP_CLK_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
+		ctl4 &= ~MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS;
+		ctl4 |= MVPP2_PORT_CTRL4_DP_CLK_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE;
 		break;
 	case PHY_MODE_RGMII:
 	case PHY_MODE_RGMII_ID:
 	case PHY_MODE_RGMII_RXID:
 	case PHY_MODE_RGMII_TXID:
-		ctl4 &= ~MVPP2_PORT_CTRL4_DP_CLK_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS_MASK;
-		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE_MASK;
+		ctl4 &= ~MVPP2_PORT_CTRL4_DP_CLK_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_EXT_PIN_GMII_SEL;
+		ctl4 |= MVPP2_PORT_CTRL4_SYNC_BYPASS;
+		ctl4 |= MVPP2_PORT_CTRL4_QSGMII_BYPASS_ACTIVE;
 		break;
 	}
 
@@ -2530,7 +2528,7 @@ mvpp2_gmac_config(struct mvpp2_port *sc)
 
 	/* Port reset */
 	while (mvpp2_gmac_read(sc, MVPP2_PORT_CTRL2_REG) &
-	    MVPP2_PORT_CTRL2_PORTMACRESET_MASK)
+	    MVPP2_PORT_CTRL2_PORTMACRESET)
 		;
 }
 
@@ -3038,8 +3036,8 @@ mvpp2_port_enable(struct mvpp2_port *port)
 	if (port->sc_gop_id == 0 && (port->sc_phy_mode == PHY_MODE_10GBASER ||
 	    port->sc_phy_mode == PHY_MODE_XAUI)) {
 		val = mvpp2_xlg_read(port, MV_XLG_PORT_MAC_CTRL0_REG);
-		val |= MV_XLG_MAC_CTRL0_PORTEN_MASK;
-		val &= ~MV_XLG_MAC_CTRL0_MIBCNTDIS_MASK;
+		val |= MV_XLG_MAC_CTRL0_PORTEN;
+		val &= ~MV_XLG_MAC_CTRL0_MIBCNTDIS;
 		mvpp2_xlg_write(port, MV_XLG_PORT_MAC_CTRL0_REG, val);
 	} else {
 		val = mvpp2_gmac_read(port, MVPP2_GMAC_CTRL_0_REG);
@@ -3057,7 +3055,7 @@ mvpp2_port_disable(struct mvpp2_port *port)
 	if (port->sc_gop_id == 0 && (port->sc_phy_mode == PHY_MODE_10GBASER ||
 	    port->sc_phy_mode == PHY_MODE_XAUI)) {
 		val = mvpp2_xlg_read(port, MV_XLG_PORT_MAC_CTRL0_REG);
-		val &= ~MV_XLG_MAC_CTRL0_PORTEN_MASK;
+		val &= ~MV_XLG_MAC_CTRL0_PORTEN;
 		mvpp2_xlg_write(port, MV_XLG_PORT_MAC_CTRL0_REG, val);
 	}
 

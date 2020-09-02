@@ -17,7 +17,6 @@
 /acpithinkpad.c/1.68/Tue Dec 31 01:38:33 2019//
 /acpitoshiba.c/1.13/Mon Mar 16 08:51:48 2020//
 /acpitz.c/1.54/Fri Jun 29 17:39:18 2018//
-/acpivar.h/1.109/Thu May 14 13:07:10 2020//
 /acpivideo.c/1.13/Mon Apr  6 00:01:08 2020//
 /acpivout.c/1.23/Tue May 19 14:26:59 2020//
 /ahci_acpi.c/1.3/Fri May  8 11:18:01 2020//
@@ -40,7 +39,6 @@
 /tipmic.c/1.5/Thu Jan  9 14:35:19 2020//
 /tpm.c/1.10/Fri May 22 10:16:37 2020//
 /xhci_acpi.c/1.3/Fri May  8 11:18:01 2020//
-/acpicpu.c/1.85/Mon Jun  1 06:23:26 2020//
 /acpihve.c/1.3/Mon Jun  1 06:23:26 2020//
 /acpihid.c/1.2/Sat Jun  6 11:21:49 2020//
 /files.acpi/1.55/Sat Jun  6 11:21:49 2020//
@@ -51,8 +49,10 @@
 /acpitimer.c/1.13/Mon Jul 20 09:32:29 2020//
 /acpiutil.c/1.9/Mon Jul 20 09:32:29 2020//
 /amdgpio.c/1.4/Mon Jul 20 09:32:29 2020//
-/acpi.c/1.389/Fri Jul 24 10:26:29 2020//
 /acpiec.c/1.61/Fri Jul 24 10:26:29 2020//
 /dsdt.c/1.252/Fri Jul 24 10:26:29 2020//
 /dwiic_acpi.c/1.15/Fri Jul 24 10:26:29 2020//
+/acpi.c/1.390/Fri Aug 21 07:46:54 2020//
+/acpicpu.c/1.86/Fri Aug 21 07:46:54 2020//
+/acpivar.h/1.110/Fri Aug 21 07:46:54 2020//
 D
