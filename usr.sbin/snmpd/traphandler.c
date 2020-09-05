@@ -1,4 +1,4 @@
-/*	$OpenBSD: traphandler.c,v 1.16 2020/03/11 06:53:42 martijn Exp $	*/
+/*	$OpenBSD: traphandler.c,v 1.17 2020/08/23 07:39:57 martijn Exp $	*/
 
 /*
  * Copyright (c) 2014 Bret Stephen Lambert <blambert@openbsd.org>

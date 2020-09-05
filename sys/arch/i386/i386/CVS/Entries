@@ -56,12 +56,12 @@
 /vector.s/1.23/Mon Jun 18 23:15:05 2018//
 /vm_machdep.c/1.70/Sat Mar 31 13:45:03 2018//
 /wscons_machdep.c/1.19/Mon Mar  7 05:32:47 2016//
-/bios.c/1.125/Mon Jun  1 06:23:24 2020//
 /cpu.c/1.104/Mon Jun  1 06:23:24 2020//
 /via.c/1.46/Mon Jun  1 06:23:24 2020//
 /apm.c/1.125/Mon Jul 20 09:32:29 2020//
 /conf.c/1.170/Mon Jul 20 09:32:29 2020//
 /acpi_machdep.c/1.74/Fri Jul 24 10:26:29 2020//
-/machdep.c/1.637/Fri Jul 24 10:26:29 2020//
-/trap.c/1.143/Fri Aug 21 07:46:51 2020//
+/bios.c/1.126/Sat Sep  5 08:08:10 2020//
+/machdep.c/1.638/Sat Sep  5 08:08:10 2020//
+/trap.c/1.143/Sat Sep  5 08:05:01 2020//
 D

@@ -1,5 +1,3 @@
-/CMakeLists.txt/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
-/LLVMBuild.txt/1.1.1.1/Mon Aug  3 14:30:23 2020/-ko/
 D/BrainF////
 D/Bye////
 D/ExceptionDemo////
@@ -13,3 +11,5 @@ D/ModuleMaker////
 D/OCaml-Kaleidoscope////
 D/ParallelJIT////
 D/SpeculativeJIT////
+/CMakeLists.txt/1.1.1.1/Sat Sep  5 08:04:57 2020/-ko/
+/LLVMBuild.txt/1.1.1.1/Sat Sep  5 08:04:57 2020/-ko/

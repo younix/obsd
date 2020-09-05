@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.h,v 1.157 2020/08/18 21:02:49 tobhe Exp $	*/
+/*	$OpenBSD: iked.h,v 1.164 2020/08/28 13:37:52 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -508,7 +508,10 @@ struct iked_sa {
 #define IKED_RESPONSE_TIMEOUT		 120		/* 2 minutes */
 
 	TAILQ_ENTRY(iked_sa)		 sa_peer_entry;
-	RB_ENTRY(iked_sa)		 sa_entry;
+	RB_ENTRY(iked_sa)		 sa_entry;	/* all SAs */
+
+	RB_ENTRY(iked_sa)		 sa_dstid_entry;	/* SAs by DSTID */
+	int				 sa_dstid_entry_valid;		/* sa_dstid_entry valid */
 
 	struct iked_addr		*sa_addrpool;	/* address from pool */
 	RB_ENTRY(iked_sa)		 sa_addrpool_entry;	/* pool entries */
@@ -519,6 +522,7 @@ struct iked_sa {
 #define IKED_IKE_SA_LAST_RECVD_TIMEOUT	 300		/* 5 minutes */
 };
 RB_HEAD(iked_sas, iked_sa);
+RB_HEAD(iked_dstid_sas, iked_sa);
 RB_HEAD(iked_addrpool, iked_sa);
 RB_HEAD(iked_addrpool6, iked_sa);
 
@@ -675,22 +679,35 @@ enum natt_mode {
 	NATT_FORCE,	/* send/recv with only NAT-T port */
 };
 
+struct iked_static {
+	uint64_t		 st_alive_timeout;
+	int			 st_enforcesingleikesa;
+	uint8_t			 st_frag;	/* fragmentation */
+	uint8_t			 st_mobike;	/* MOBIKE */
+	in_port_t		 st_nattport;
+};
+
 struct iked {
 	char				 sc_conffile[PATH_MAX];
 
 	uint32_t			 sc_opts;
-	enum natt_mode			 natt_mode;
+	enum natt_mode			 sc_nattmode;
 	uint8_t				 sc_passive;
 	uint8_t				 sc_decoupled;
-	in_port_t			 sc_nattport;
 
-	uint8_t				 sc_mobike;	/* MOBIKE */
-	uint8_t				 sc_frag;	/* fragmentation */
+	struct iked_static		 sc_static;
+
+#define sc_alive_timeout	sc_static.st_alive_timeout
+#define sc_enforcesingleikesa	sc_static.st_enforcesingleikesa
+#define sc_frag			sc_static.st_frag
+#define sc_mobike		sc_static.st_mobike
+#define sc_nattport		sc_static.st_nattport
 
 	struct iked_policies		 sc_policies;
 	struct iked_policy		*sc_defaultcon;
 
 	struct iked_sas			 sc_sas;
+	struct iked_dstid_sas		 sc_dstid_sas;
 	struct iked_activesas		 sc_activesas;
 	struct iked_flows		 sc_activeflows;
 	struct iked_users		 sc_users;
@@ -718,6 +735,7 @@ struct iked {
 
 	struct iked_addrpool		 sc_addrpool;
 	struct iked_addrpool6		 sc_addrpool6;
+
 };
 
 struct iked_socket {
@@ -786,12 +804,8 @@ int	 config_setocsp(struct iked *);
 int	 config_getocsp(struct iked *, struct imsg *);
 int	 config_setkeys(struct iked *);
 int	 config_getkey(struct iked *, struct imsg *);
-int	 config_setmobike(struct iked *);
-int	 config_getmobike(struct iked *, struct imsg *);
-int	 config_setfragmentation(struct iked *);
-int	 config_getfragmentation(struct iked *, struct imsg *);
-int	 config_setnattport(struct iked *);
-int	 config_getnattport(struct iked *, struct imsg *);
+int	 config_setstatic(struct iked *);
+int	 config_getstatic(struct iked *, struct imsg *);
 
 /* policy.c */
 void	 policy_init(struct iked *);
@@ -821,9 +835,15 @@ struct iked_sa *
 	 sa_lookup(struct iked *, uint64_t, uint64_t, unsigned int);
 struct iked_user *
 	 user_lookup(struct iked *, const char *);
+struct iked_sa *
+	 sa_dstid_lookup(struct iked *, struct iked_sa *);
+struct iked_sa *
+	 sa_dstid_insert(struct iked *, struct iked_sa *);
+void	 sa_dstid_remove(struct iked *, struct iked_sa *);
 int	 proposals_negotiate(struct iked_proposals *, struct iked_proposals *,
 	    struct iked_proposals *, int);
 RB_PROTOTYPE(iked_sas, iked_sa, sa_entry, sa_cmp);
+RB_PROTOTYPE(iked_dstid_sas, iked_sa, sa_dstid_entry, sa_dstid_cmp);
 RB_PROTOTYPE(iked_addrpool, iked_sa, sa_addrpool_entry, sa_addrpool_cmp);
 RB_PROTOTYPE(iked_addrpool6, iked_sa, sa_addrpool6_entry, sa_addrpool6_cmp);
 RB_PROTOTYPE(iked_users, iked_user, user_entry, user_cmp);
@@ -889,6 +909,7 @@ int	 ikev2_childsa_delete(struct iked *, struct iked_sa *,
 void	 ikev2_ikesa_recv_delete(struct iked *, struct iked_sa *);
 void	 ikev2_ike_sa_timeout(struct iked *env, void *);
 void	 ikev2_ike_sa_setreason(struct iked_sa *, char *);
+void	 ikev2_reset_alive_timer(struct iked *);
 int	 ikev2_ike_sa_delete(struct iked *, struct iked_sa *);
 
 struct ibuf *
@@ -908,10 +929,10 @@ struct ikev2_payload *
 	 ikev2_add_payload(struct ibuf *);
 int	 ikev2_next_payload(struct ikev2_payload *, size_t,
 	    uint8_t);
-int	 ikev2_acquire_sa(struct iked *, struct iked_flow *);
+int	 ikev2_child_sa_acquire(struct iked *, struct iked_flow *);
+int	 ikev2_child_sa_drop(struct iked *, struct iked_spi *);
+int	 ikev2_child_sa_rekey(struct iked *, struct iked_spi *);
 void	 ikev2_disable_rekeying(struct iked *, struct iked_sa *);
-int	 ikev2_rekey_sa(struct iked *, struct iked_spi *);
-int	 ikev2_drop_sa(struct iked *, struct iked_spi *);
 int	 ikev2_print_id(struct iked_id *, char *, size_t);
 int	 ikev2_print_static_id(struct iked_static_id *, char *, size_t);
 
@@ -1128,10 +1149,10 @@ __dead void fatalx(const char *, ...)
 	    __attribute__((__format__ (printf, 1, 2)));
 
 /* ocsp.c */
-int	 ocsp_connect(struct iked *env);
+int	 ocsp_connect(struct iked *env, struct imsg *);
 int	 ocsp_receive_fd(struct iked *, struct imsg *);
-int	 ocsp_validate_cert(struct iked *, void *, size_t,
-    struct iked_sahdr, uint8_t);
+int	 ocsp_validate_cert(struct iked *, void *, size_t, struct iked_sahdr,
+    uint8_t, X509 *);
 
 /* parse.y */
 int	 parse_config(const char *, struct iked *);

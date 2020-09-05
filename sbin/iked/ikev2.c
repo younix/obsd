@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.244 2020/08/16 09:09:17 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.253 2020/09/04 19:32:27 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -80,6 +80,8 @@ int	 ikev2_init_ike_sa_peer(struct iked *, struct iked_policy *,
 int	 ikev2_init_ike_auth(struct iked *, struct iked_sa *);
 int	 ikev2_init_auth(struct iked *, struct iked_message *);
 int	 ikev2_init_done(struct iked *, struct iked_sa *);
+
+int	 ikev2_record_dstid(struct iked *, struct iked_sa *);
 
 void	 ikev2_enable_timer(struct iked *, struct iked_sa *);
 void	 ikev2_disable_timer(struct iked *, struct iked_sa *);
@@ -236,12 +238,6 @@ ikev2_dispatch_parent(int fd, struct privsep_proc *p, struct imsg *imsg)
 			    IKED_INITIATOR_INITIAL);
 		}
 		return (0);
-	case IMSG_CTL_MOBIKE:
-		return (config_getmobike(env, imsg));
-	case IMSG_CTL_FRAGMENTATION:
-		return (config_getfragmentation(env, imsg));
-	case IMSG_CTL_NATTPORT:
-		return (config_getnattport(env, imsg));
 	case IMSG_UDP_SOCKET:
 		return (config_getsocket(env, imsg, ikev2_msg_cb));
 	case IMSG_PFKEY_SOCKET:
@@ -254,6 +250,8 @@ ikev2_dispatch_parent(int fd, struct privsep_proc *p, struct imsg *imsg)
 		return (config_getuser(env, imsg));
 	case IMSG_COMPILE:
 		return (config_getcompile(env));
+	case IMSG_CTL_STATIC:
+		return (config_getstatic(env, imsg));
 	default:
 		break;
 	}
@@ -292,6 +290,7 @@ ikev2_dispatch_cert(int fd, struct privsep_proc *p, struct imsg *imsg)
 
 		break;
 	case IMSG_CERTVALID:
+	case IMSG_CERTINVALID:
 		/* Ignore invalid or unauthenticated SAs */
 		if ((sa = ikev2_getimsgdata(env, imsg,
 		    &sh, &type, &ptr, &len)) == NULL ||
@@ -314,24 +313,20 @@ ikev2_dispatch_cert(int fd, struct privsep_proc *p, struct imsg *imsg)
 			break;
 		}
 
-		if (sa->sa_peerauth.id_type && ikev2_auth_verify(env, sa))
-			break;
+		if (imsg->hdr.type == IMSG_CERTVALID) {
+			if (sa->sa_peerauth.id_type && ikev2_auth_verify(env, sa))
+				break;
 
-		log_debug("%s: peer certificate is valid", __func__);
-		sa_stateflags(sa, IKED_REQ_CERTVALID);
+			log_debug("%s: peer certificate is valid", __func__);
+			sa_stateflags(sa, IKED_REQ_CERTVALID);
 
-		if (ikev2_ike_auth(env, sa) != 0)
-			log_debug("%s: failed to send ike auth", __func__);
-		break;
-	case IMSG_CERTINVALID:
-		/* Ignore invalid or unauthenticated SAs */
-		if ((sa = ikev2_getimsgdata(env, imsg,
-		    &sh, &type, &ptr, &len)) == NULL ||
-		    sa->sa_state < IKEV2_STATE_EAP)
-			break;
-		log_warnx("%s: peer certificate is invalid",
-			SPI_SA(sa, __func__));
-		ikev2_send_auth_failed(env, sa);
+			if (ikev2_ike_auth(env, sa) != 0)
+				log_debug("%s: failed to send ike auth", __func__);
+		} else {
+			log_warnx("%s: peer certificate is invalid",
+				SPI_SA(sa, __func__));
+			ikev2_send_auth_failed(env, sa);
+		}
 		break;
 	case IMSG_CERT:
 		if ((sa = ikev2_getimsgdata(env, imsg,
@@ -1230,7 +1225,7 @@ ikev2_init_ike_sa_peer(struct iked *env, struct iked_policy *pol,
 			goto done;
 	}
 
-	if (env->natt_mode != NATT_DISABLE) {
+	if (env->sc_nattmode != NATT_DISABLE) {
 		if (ntohs(port) == env->sc_nattport) {
 			/* Enforce NAT-T on the initiator side */
 			log_debug("%s: enforcing NAT-T", __func__);
@@ -1430,7 +1425,8 @@ ikev2_enable_timer(struct iked *env, struct iked_sa *sa)
 {
 	sa->sa_last_recvd = gettime();
 	timer_set(env, &sa->sa_timer, ikev2_ike_sa_alive, sa);
-	timer_add(env, &sa->sa_timer, IKED_IKE_SA_ALIVE_TIMEOUT);
+	if (env->sc_alive_timeout > 0)
+		timer_add(env, &sa->sa_timer, env->sc_alive_timeout);
 	timer_set(env, &sa->sa_keepalive, ikev2_ike_sa_keepalive, sa);
 	if (sa->sa_usekeepalive)
 		timer_add(env, &sa->sa_keepalive,
@@ -1438,6 +1434,20 @@ ikev2_enable_timer(struct iked *env, struct iked_sa *sa)
 	timer_set(env, &sa->sa_rekey, ikev2_ike_sa_rekey, sa);
 	if (sa->sa_policy->pol_rekey)
 		ikev2_ike_sa_rekey_schedule(env, sa);
+}
+
+void
+ikev2_reset_alive_timer(struct iked *env)
+{
+	struct iked_sa			*sa;
+
+	RB_FOREACH(sa, iked_sas, &env->sc_sas) {
+		if (sa->sa_state != IKEV2_STATE_ESTABLISHED)
+			continue;
+		timer_del(env, &sa->sa_timer);
+		if (env->sc_alive_timeout > 0)
+			timer_add(env, &sa->sa_timer, env->sc_alive_timeout);
+	}
 }
 
 void
@@ -1466,6 +1476,7 @@ ikev2_init_done(struct iked *env, struct iked_sa *sa)
 		timer_del(env, &sa->sa_timer);
 		ikev2_enable_timer(env, sa);
 		ikev2_log_established(sa);
+		ikev2_record_dstid(env, sa);
 	}
 
 	if (ret)
@@ -2050,7 +2061,7 @@ ikev2_nat_detection(struct iked *env, struct iked_message *msg,
 		goto done;
 	}
 
-	if (env->natt_mode == NATT_FORCE) {
+	if (env->sc_nattmode == NATT_FORCE) {
 		/* Enforce NAT-T/UDP-encapsulation by distorting the digest */
 		rnd = arc4random();
 		EVP_DigestUpdate(&ctx, &rnd, sizeof(rnd));
@@ -2794,7 +2805,7 @@ ikev2_resp_ike_sa_init(struct iked *env, struct iked_message *msg)
 			goto done;
 	}
 
-	if ((env->natt_mode != NATT_DISABLE) &&
+	if ((env->sc_nattmode != NATT_DISABLE) &&
 	    msg->msg_local.ss_family != AF_UNSPEC) {
 		if ((len = ikev2_add_nat_detection(env, buf, &pld, &resp, len))
 		    == -1)
@@ -2957,6 +2968,40 @@ ikev2_add_error(struct iked *env, struct ibuf *buf, struct iked_message *msg)
 	log_debug("%s: done", __func__);
 
 	return (len);
+}
+
+int
+ikev2_record_dstid(struct iked *env, struct iked_sa *sa)
+{
+	struct iked_sa *osa;
+
+	osa = sa_dstid_lookup(env, sa);
+	if (osa == sa)
+		return (0);
+	if (osa != NULL) {
+		sa_dstid_remove(env, osa);
+		if (env->sc_enforcesingleikesa &&
+		    osa->sa_state != IKEV2_STATE_CLOSED) {
+			log_info("%sreplaced by IKESA %s (identical DSTID)",
+			    SPI_SA(osa, NULL),
+			    print_spi(sa->sa_hdr.sh_ispi, 8));
+			if (osa->sa_state == IKEV2_STATE_ESTABLISHED)
+				ikev2_disable_timer(env, osa);
+			ikev2_ike_sa_setreason(osa, "sa replaced");
+			ikev2_ikesa_delete(env, osa, 1);
+			timer_add(env, &sa->sa_timer,
+			    3 * IKED_RETRANSMIT_TIMEOUT);
+		}
+	}
+	osa = sa_dstid_insert(env, sa);
+	if (osa != NULL) {
+		/* XXX how can this fail */
+		log_info("%s: could not replace old IKESA %s",
+		    SPI_SA(sa, __func__),
+		    print_spi(osa->sa_hdr.sh_ispi, 8));
+		return (-1);
+	}
+	return (0);
 }
 
 int
@@ -3228,6 +3273,7 @@ ikev2_resp_ike_auth(struct iked *env, struct iked_sa *sa)
 		timer_del(env, &sa->sa_timer);
 		ikev2_enable_timer(env, sa);
 		ikev2_log_established(sa);
+		ikev2_record_dstid(env, sa);
 	}
 
  done:
@@ -3407,8 +3453,8 @@ ikev2_send_create_child_sa(struct iked *env, struct iked_sa *sa,
 		log_debug("%s: creating new CHILD SAs", __func__);
 
 	/* XXX cannot initiate multiple concurrent CREATE_CHILD_SA exchanges */
-	if (sa->sa_stateflags & IKED_REQ_CHILDSA) {
-		log_debug("%s: another CREATE_CHILD_SA exchange already active",
+	if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF)) {
+		log_debug("%s: another exchange already active",
 		    __func__);
 		return (-1);
 	}
@@ -3573,7 +3619,7 @@ ikev2_ike_sa_rekey(struct iked *env, void *arg)
 		goto done;
 	}
 
-	if (sa->sa_stateflags & IKED_REQ_CHILDSA) {
+	if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF)) {
 		/*
 		 * We cannot initiate multiple concurrent CREATE_CHILD_SA
 		 * exchanges, so retry again fast.
@@ -3694,7 +3740,7 @@ ikev2_init_create_child_sa(struct iked *env, struct iked_message *msg)
 	int				 pfs = 0, ret = -1;
 
 	if (!ikev2_msg_frompeer(msg) ||
-	    (sa->sa_stateflags & IKED_REQ_CHILDSA) == 0)
+	    (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF)) == 0)
 		return (0);
 
 	if (sa->sa_nexti != NULL && sa->sa_tmpfail) {
@@ -4008,6 +4054,10 @@ ikev2_ikesa_enable(struct iked *env, struct iked_sa *sa, struct iked_sa *nsa)
 		RB_INSERT(iked_addrpool6, &env->sc_addrpool6, nsa);
 	}
 	/* Transfer other attributes */
+        if (sa->sa_dstid_entry_valid) {
+		sa_dstid_remove(env, sa);
+		sa_dstid_insert(env, nsa);
+	}
 	if (sa->sa_tag) {
 		nsa->sa_tag = sa->sa_tag;
 		sa->sa_tag = NULL;
@@ -4430,6 +4480,9 @@ ikev2_ike_sa_alive(struct iked *env, void *arg)
 	int				 foundin = 0, foundout = 0;
 	int				 ikeidle = 0;
 
+	if (env->sc_alive_timeout == 0)
+		return;
+
 	/* check for incoming traffic on any child SA */
 	TAILQ_FOREACH(csa, &sa->sa_childsas, csa_entry) {
 		if (!csa->csa_loaded)
@@ -4441,7 +4494,7 @@ ikev2_ike_sa_alive(struct iked *env, void *arg)
 		    __func__,
 		    csa->csa_dir == IPSP_DIRECTION_IN ? "incoming" : "outgoing",
 		    print_spi(csa->csa_spi.spi, csa->csa_spi.spi_size), diff);
-		if (diff < IKED_IKE_SA_ALIVE_TIMEOUT) {
+		if (diff < env->sc_alive_timeout) {
 			if (csa->csa_dir == IPSP_DIRECTION_IN) {
 				foundin = 1;
 				break;
@@ -4474,7 +4527,7 @@ ikev2_ike_sa_alive(struct iked *env, void *arg)
 	}
 
 	/* re-register */
-	timer_add(env, &sa->sa_timer, IKED_IKE_SA_ALIVE_TIMEOUT);
+	timer_add(env, &sa->sa_timer, env->sc_alive_timeout);
 }
 
 void
@@ -5954,7 +6007,7 @@ ikev2_valid_proposal(struct iked_proposal *prop,
 
 /* return 0 if processed, -1 if busy */
 int
-ikev2_acquire_sa(struct iked *env, struct iked_flow *acquire)
+ikev2_child_sa_acquire(struct iked *env, struct iked_flow *acquire)
 {
 	struct iked_flow	*flow;
 	struct iked_sa		*sa;
@@ -5996,7 +6049,7 @@ ikev2_acquire_sa(struct iked *env, struct iked_flow *acquire)
 			log_warnx("%s: flow without SA", __func__);
 			return (0);
 		}
-		if (sa->sa_stateflags & IKED_REQ_CHILDSA)
+		if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF))
 			return (-1);	/* busy, retry later */
 		if (ikev2_send_create_child_sa(env, sa, NULL,
 		    flow->flow_saproto) != 0)
@@ -6021,7 +6074,7 @@ ikev2_disable_rekeying(struct iked *env, struct iked_sa *sa)
 
 /* return 0 if processed, -1 if busy */
 int
-ikev2_rekey_sa(struct iked *env, struct iked_spi *rekey)
+ikev2_child_sa_rekey(struct iked *env, struct iked_spi *rekey)
 {
 	struct iked_childsa		*csa, key;
 	struct iked_sa			*sa;
@@ -6045,7 +6098,7 @@ ikev2_rekey_sa(struct iked *env, struct iked_spi *rekey)
 		    print_spi(rekey->spi, rekey->spi_size));
 		return (0);
 	}
-	if (sa->sa_stateflags & IKED_REQ_CHILDSA)
+	if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF))
 		return (-1);	/* busy, retry later */
 	if (sa->sa_tmpfail)
 		return (-1);	/* peer is busy, retry later */
@@ -6059,14 +6112,13 @@ ikev2_rekey_sa(struct iked *env, struct iked_spi *rekey)
 
 /* return 0 if processed, -1 if busy */
 int
-ikev2_drop_sa(struct iked *env, struct iked_spi *drop)
+ikev2_child_sa_drop(struct iked *env, struct iked_spi *drop)
 {
 	struct ibuf			*buf = NULL;
 	struct iked_childsa		*csa, key;
 	struct iked_sa			*sa;
 	struct ikev2_delete		*del;
 	uint32_t			 spi32;
-	int				 acquired;
 
 	key.csa_spi = *drop;
 	csa = RB_FIND(iked_activesas, &env->sc_activesas, &key);
@@ -6074,7 +6126,7 @@ ikev2_drop_sa(struct iked *env, struct iked_spi *drop)
 		return (0);
 
 	sa = csa->csa_ikesa;
-	if (sa && (sa->sa_stateflags & IKED_REQ_CHILDSA)) {
+	if (sa && (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF))) {
 		/* XXXX might loop, should we add a counter? */
 		log_debug("%s: parent SA busy", __func__);
 		return (-1);	/* busy, retry later */
@@ -6092,7 +6144,6 @@ ikev2_drop_sa(struct iked *env, struct iked_spi *drop)
 		spi32 = htobe32(csa->csa_spi.spi);
 	else
 		spi32 = htobe32(csa->csa_peerspi);
-	acquired = csa->csa_acquired;
 
 	if (ikev2_childsa_delete(env, sa, csa->csa_saproto,
 	    csa->csa_peerspi, NULL, 0))
@@ -6116,15 +6167,6 @@ ikev2_drop_sa(struct iked *env, struct iked_spi *drop)
 		goto done;
 
 	sa->sa_stateflags |= IKED_REQ_INF;
-
-	/* Don't automatically re-initiate Child SAs that have been acquired */
-	if (acquired)
-		goto done;
-
-	/* Initiate Child SA creation */
-	if (ikev2_send_create_child_sa(env, sa, NULL, drop->spi_protoid))
-		log_warnx("%s: failed to initiate a CREATE_CHILD_SA exchange",
-		    __func__);
 
 done:
 	ibuf_release(buf);
@@ -6628,6 +6670,9 @@ ikev2_info(struct iked *env, int dolog)
 	}
 	RB_FOREACH(flow, iked_flows, &env->sc_activeflows) {
 		ikev2_info_flow(env, dolog, "iked_flows", flow);
+	}
+	RB_FOREACH(sa, iked_dstid_sas, &env->sc_dstid_sas) {
+		ikev2_info_sa(env, dolog, "iked_dstid_sas", sa);
 	}
 	if (dolog)
 		return;

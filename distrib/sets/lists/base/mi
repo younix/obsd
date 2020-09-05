@@ -217,10 +217,6 @@
 ./etc/rpki/ripe.tal
 ./etc/services
 ./etc/signify
-./etc/signify/openbsd-65-base.pub
-./etc/signify/openbsd-65-fw.pub
-./etc/signify/openbsd-65-pkg.pub
-./etc/signify/openbsd-65-syspatch.pub
 ./etc/signify/openbsd-66-base.pub
 ./etc/signify/openbsd-66-fw.pub
 ./etc/signify/openbsd-66-pkg.pub
@@ -233,6 +229,8 @@
 ./etc/signify/openbsd-68-fw.pub
 ./etc/signify/openbsd-68-pkg.pub
 ./etc/signify/openbsd-68-syspatch.pub
+./etc/signify/openbsd-69-base.pub
+./etc/signify/openbsd-69-pkg.pub
 ./etc/skel
 ./etc/skel/.ssh
 ./etc/ssh
@@ -642,7 +640,7 @@
 ./usr/lib/libelf.so.3.0
 ./usr/lib/libevent.so.4.1
 ./usr/lib/libexpat.so.12.0
-./usr/lib/libfido2.so.3.0
+./usr/lib/libfido2.so.4.0
 ./usr/lib/libform.so.6.0
 ./usr/lib/libformw.so.6.0
 ./usr/lib/libfuse.so.2.0

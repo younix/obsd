@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.41 2020/08/17 16:55:41 kettenis Exp $ */
+/*	$OpenBSD: pmap.c,v 1.46 2020/09/04 17:27:42 kettenis Exp $ */
 
 /*
  * Copyright (c) 2015 Martin Pieuchot
@@ -372,7 +372,7 @@ pmap_slbd_fault(pmap_t pm, vaddr_t va)
 	return EFAULT;
 }
 
-u_int pmap_vsid;
+u_long pmap_vsid;
 
 struct slb_desc *
 pmap_slbd_alloc(pmap_t pm, vaddr_t va)
@@ -388,7 +388,7 @@ pmap_slbd_alloc(pmap_t pm, vaddr_t va)
 		return NULL;
 
 	slbd->slbd_esid = esid;
-	slbd->slbd_vsid = atomic_inc_int_nv(&pmap_vsid);
+	slbd->slbd_vsid = atomic_inc_long_nv(&pmap_vsid);
 	KASSERT((slbd->slbd_vsid & KERNEL_VSID_BIT) == 0);
 	LIST_INSERT_HEAD(&pm->pm_slbd, slbd, slbd_list);
 
@@ -452,11 +452,9 @@ pmap_set_user_slb(pmap_t pm, vaddr_t va, vaddr_t *kva, vsize_t *len)
 }
 
 void
-pmap_unset_user_slb(void)
+pmap_clear_user_slb(void)
 {
 	struct cpu_info *ci = curcpu();
-
-	curpcb->pcb_userva = 0;
 
 	if (ci->ci_kernel_slb[31].slb_slbe != 0) {
 		isync();
@@ -466,6 +464,13 @@ pmap_unset_user_slb(void)
 
 	ci->ci_kernel_slb[31].slb_slbe = 0;
 	ci->ci_kernel_slb[31].slb_slbv = 0;
+}
+
+void
+pmap_unset_user_slb(void)
+{
+	curpcb->pcb_userva = 0;
+	pmap_clear_user_slb();
 }
 
 /*
@@ -656,6 +661,9 @@ pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
 
 	pte->pte_hi = (pmap_pted2avpn(pted) & PTE_AVPN) | PTE_VALID;
 	pte->pte_lo = (pa & PTE_RPGN);
+
+	if (pm == pmap_kernel())
+		pte->pte_hi |= PTE_WIRED;
 
 	if (prot & PROT_WRITE)
 		pte->pte_lo |= PTE_RW;
@@ -1451,8 +1459,13 @@ pmap_bootstrap_cpu(void)
 	/* Clear TLB. */
 	tlbia();
 
-	/* Set partition table. */
-	mtptcr((paddr_t)pmap_pat | PATSIZE);
+	if (cpu_features2 & PPC_FEATURE2_ARCH_3_00) {
+		/* Set partition table. */
+		mtptcr((paddr_t)pmap_pat | PATSIZE);
+	} else {
+		/* Set page table. */
+		mtsdr1((paddr_t)pmap_ptable | HTABSIZE);
+	}
 
 	/* Load SLB. */
 	for (idx = 0; idx < 31; idx++) {
@@ -1483,6 +1496,10 @@ pmap_bootstrap(void)
 	pmap_ptab_cnt = HTABENTS;
 	while (pmap_ptab_cnt * 2 < physmem)
 		pmap_ptab_cnt <<= 1;
+
+	/* Make sure the page tables don't use more than 8 SLB entries. */
+	while (HTABMEMSZ > 8 * SEGMENT_SIZE)
+		pmap_ptab_cnt >>= 1;
 
 	/*
 	 * allocate suitably aligned memory for HTAB

@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.56 2020/08/17 16:55:41 kettenis Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.59 2020/09/01 20:06:49 gkoehler Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -171,11 +171,8 @@ init_powernv(void *fdt, void *tocbase)
 	msr = mfmsr();
 	mtmsr(msr | (PSL_ME|PSL_RI));
 
-#define LPCR_LPES	0x0000000000000008UL
-#define LPCR_HVICE	0x0000000000000002UL
-
-	mtlpcr(LPCR_LPES | LPCR_HVICE);
-	isync();
+	cpu_init_features();
+	cpu_init();
 
 	/* Add all memory. */
 	node = fdt_find_node("/");
@@ -877,6 +874,17 @@ sys_sigreturn(struct proc *p, void *v, register_t *retval)
 	return EJUSTRETURN;
 }
 
+/*
+ * Notify the current process (p) that it has a signal pending,
+ * process as soon as possible.
+ */
+void
+signotify(struct proc *p)
+{
+	aston(p);
+	cpu_kick(p->p_cpu);
+}
+
 void	cpu_switchto_asm(struct proc *, struct proc *);
 
 void
@@ -891,6 +899,8 @@ cpu_switchto(struct proc *old, struct proc *new)
 			tf->srr1 &= ~(PSL_FP|PSL_VEC|PSL_VSX);
 			save_vsx(old);
 		}
+
+		pmap_clear_user_slb();
 	}
 
 	cpu_switchto_asm(old, new);

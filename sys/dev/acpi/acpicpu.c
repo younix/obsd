@@ -1,4 +1,4 @@
-/* $OpenBSD: acpicpu.c,v 1.86 2020/08/10 04:11:48 jmatthew Exp $ */
+/* $OpenBSD: acpicpu.c,v 1.88 2020/08/27 01:08:55 jmatthew Exp $ */
 /*
  * Copyright (c) 2005 Marco Peereboom <marco@openbsd.org>
  * Copyright (c) 2015 Philip Guenther <guenther@openbsd.org>
@@ -184,6 +184,11 @@ struct cfattach acpicpu_ca = {
 
 struct cfdriver acpicpu_cd = {
 	NULL, "acpicpu", DV_DULL
+};
+
+const char *acpicpu_hids[] = {
+	"ACPI0007",
+	NULL
 };
 
 extern int setperf_prio;
@@ -647,6 +652,16 @@ acpicpu_match(struct device *parent, void *match, void *aux)
 {
 	struct acpi_attach_args	*aa = aux;
 	struct cfdata		*cf = match;
+	struct acpi_softc	*acpi = (struct acpi_softc *)parent;
+
+	if (acpi_matchhids(aa, acpicpu_hids, cf->cf_driver->cd_name)) {
+		/*
+		 * Record that we've seen a Device() CPU object,
+		 * so we won't attach any Processor() nodes.
+		 */
+		acpi->sc_skip_processor = 1;
+		return (1);
+	}
 
 	/* sanity */
 	if (aa->aaa_name == NULL ||
@@ -663,6 +678,7 @@ acpicpu_attach(struct device *parent, struct device *self, void *aux)
 	struct acpicpu_softc	*sc = (struct acpicpu_softc *)self;
 	struct acpi_attach_args *aa = aux;
 	struct aml_value	res;
+	int64_t			uid;
 	int			i;
 	uint32_t		status = 0;
 	CPU_INFO_ITERATOR	cii;
@@ -672,6 +688,10 @@ acpicpu_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_devnode = aa->aaa_node;
 
 	SLIST_INIT(&sc->sc_cstates);
+
+	if (aml_evalinteger(sc->sc_acpi, sc->sc_devnode,
+	    "_UID", 0, NULL, &uid) == 0)
+		sc->sc_cpu = uid;
 
 	if (aml_evalnode(sc->sc_acpi, sc->sc_devnode, 0, NULL, &res) == 0) {
 		if (res.type == AML_OBJTYPE_PROCESSOR) {

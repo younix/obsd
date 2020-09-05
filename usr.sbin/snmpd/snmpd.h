@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpd.h,v 1.88 2020/08/08 13:39:57 martijn Exp $	*/
+/*	$OpenBSD: snmpd.h,v 1.89 2020/08/23 07:39:57 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>

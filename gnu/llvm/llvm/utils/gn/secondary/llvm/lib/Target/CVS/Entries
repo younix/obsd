@@ -1,8 +1,3 @@
-/BUILD.gn/1.1.1.1/Mon Aug  3 14:30:26 2020/-ko/
-/targets.gni/1.1.1.1/Mon Aug  3 14:30:26 2020/-ko/
-/targets_string.gni/1.1.1.1/Mon Aug  3 14:30:26 2020/-ko/
-/targets_with_asm_parsers.gni/1.1.1.1/Mon Aug  3 14:30:26 2020/-ko/
-/targets_with_disassemblers.gni/1.1.1.1/Mon Aug  3 14:30:26 2020/-ko/
 D/AArch64////
 D/AMDGPU////
 D/ARM////
@@ -18,3 +13,8 @@ D/Sparc////
 D/SystemZ////
 D/WebAssembly////
 D/X86////
+/BUILD.gn/1.1.1.1/Sat Sep  5 08:05:00 2020/-ko/
+/targets.gni/1.1.1.1/Sat Sep  5 08:05:00 2020/-ko/
+/targets_string.gni/1.1.1.1/Sat Sep  5 08:05:00 2020/-ko/
+/targets_with_asm_parsers.gni/1.1.1.1/Sat Sep  5 08:05:00 2020/-ko/
+/targets_with_disassemblers.gni/1.1.1.1/Sat Sep  5 08:05:00 2020/-ko/

@@ -1,4 +1,4 @@
-/* $OpenBSD: if_vether.c,v 1.34 2020/08/09 14:33:49 mvs Exp $ */
+/* $OpenBSD: if_vether.c,v 1.36 2020/08/28 12:01:48 mvs Exp $ */
 
 /*
  * Copyright (c) 2009 Theo de Raadt
@@ -84,7 +84,6 @@ vether_clone_create(struct if_clone *ifc, int unit)
 	ifp->if_softc = sc;
 	ifp->if_ioctl = vetherioctl;
 	ifp->if_qstart = vetherqstart;
-	ifq_set_maxlen(&ifp->if_snd, IFQ_MAXLEN);
 
 	ifp->if_hardmtu = ETHER_MAX_HARDMTU_LEN;
 	ifp->if_capabilities = IFCAP_VLAN_MTU;
@@ -119,11 +118,12 @@ vether_clone_destroy(struct ifnet *ifp)
 void
 vetherqstart(struct ifqueue *ifq)
 {
-	struct ifnet		*ifp = ifq->ifq_if;
 	struct mbuf		*m;
 
 	while ((m = ifq_dequeue(ifq)) != NULL) {
 #if NBPFILTER > 0
+		struct ifnet	*ifp = ifq->ifq_if;
+
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m, BPF_DIRECTION_OUT);
 #endif /* NBPFILTER > 0 */

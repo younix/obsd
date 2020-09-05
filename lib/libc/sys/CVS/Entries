@@ -193,7 +193,7 @@
 /pledge.2/1.60/Mon Jul 20 09:32:24 2020//
 /w_clock_gettime.c/1.1/Mon Jul 20 09:32:24 2020//
 /w_gettimeofday.c/1.1/Mon Jul 20 09:32:24 2020//
-/acct.2/1.19/Sat Aug  8 08:19:17 2020//
-/sysctl.2/1.41/Sat Aug  8 08:19:17 2020//
-/select.2/1.43/Fri Aug 21 07:46:32 2020//
+/acct.2/1.19/Sat Sep  5 08:05:01 2020//
+/select.2/1.43/Sat Sep  5 08:05:01 2020//
+/sysctl.2/1.41/Sat Sep  5 08:05:01 2020//
 D

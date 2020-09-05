@@ -1,4 +1,4 @@
-/*	$OpenBSD: httpd.h,v 1.149 2020/08/03 11:05:24 benno Exp $	*/
+/*	$OpenBSD: httpd.h,v 1.152 2020/08/29 07:53:48 florian Exp $	*/
 
 /*
  * Copyright (c) 2006 - 2015 Reyk Floeter <reyk@openbsd.org>
@@ -96,6 +96,7 @@
 #define CONFIG_ALL		0xff
 
 #define FCGI_CONTENT_SIZE	65535
+#define FCGI_DEFAULT_PORT	"9000"
 
 #define PROC_PARENT_SOCK_FILENO	3
 #define PROC_MAX_INSTANCES	32
@@ -375,7 +376,6 @@ SPLAY_HEAD(client_tree, client);
 #define SRVFLAG_NO_FCGI		0x00000080
 #define SRVFLAG_LOG		0x00000100
 #define SRVFLAG_NO_LOG		0x00000200
-#define SRVFLAG_SOCKET		0x00000400
 #define SRVFLAG_SYSLOG		0x00000800
 #define SRVFLAG_NO_SYSLOG	0x00001000
 #define SRVFLAG_TLS		0x00002000
@@ -394,7 +394,7 @@ SPLAY_HEAD(client_tree, client);
 
 #define SRVFLAG_BITS							\
 	"\10\01INDEX\02NO_INDEX\03AUTO_INDEX\04NO_AUTO_INDEX"		\
-	"\05ROOT\06LOCATION\07FCGI\10NO_FCGI\11LOG\12NO_LOG\13SOCKET"	\
+	"\05ROOT\06LOCATION\07FCGI\10NO_FCGI\11LOG\12NO_LOG"		\
 	"\14SYSLOG\15NO_SYSLOG\16TLS\17ACCESS_LOG\20ERROR_LOG"		\
 	"\21AUTH\22NO_AUTH\23BLOCK\24NO_BLOCK\25LOCATION_MATCH"		\
 	"\26SERVER_MATCH\27SERVER_HSTS\30DEFAULT_TYPE\31PATH\32NO_PATH"
@@ -475,10 +475,11 @@ struct server_config {
 	char			 root[PATH_MAX];
 	char			 path[PATH_MAX];
 	char			 index[PATH_MAX];
-	char			 socket[PATH_MAX];
 	char			 accesslog[PATH_MAX];
 	char			 errorlog[PATH_MAX];
 	struct media_type	 default_type;
+
+	struct sockaddr_storage	 fastcgi_ss;
 
 	in_port_t		 port;
 	struct sockaddr_storage	 ss;

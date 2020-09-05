@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpe.c,v 1.64 2020/08/17 15:48:28 martijn Exp $	*/
+/*	$OpenBSD: snmpe.c,v 1.65 2020/08/23 07:39:57 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>

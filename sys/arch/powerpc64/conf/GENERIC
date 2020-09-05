@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.15 2020/08/03 19:05:46 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.17 2020/08/24 13:20:34 kettenis Exp $
 #
 # For further information on compiling OpenBSD kernels, see the config(8)
 # man page.
@@ -27,6 +27,7 @@ opalsens*	at fdt?
 phb*		at fdt?
 pci*		at phb?
 xics*		at fdt?
+xicp*		at fdt?
 xive*		at fdt?
 
 ppb*		at pci?
@@ -51,9 +52,16 @@ uhub*		at usb?			# USB Hubs
 uhub*		at uhub?		# USB Hubs
 uaudio*		at uhub?		# USB Audio
 audio*		at uaudio?
+uhidev*		at uhub?		# Human Interface Devices
+uhid*		at uhidev?		# USB generic HID support
+ukbd*		at uhidev?		# USB keyboard
+wskbd*		at ukbd? mux 1
+ums*		at uhidev?		# USB mouse
+wsmouse* 	at ums? mux 0
 umass*		at uhub?		# USB Mass Storage devices
 
 brgphy*		at mii?			# Broadcom Gigabit PHYs
 
 # Pseudo-Devices
 pseudo-device	openprom
+pseudo-device	wsmux 2

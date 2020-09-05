@@ -68,7 +68,6 @@
 /var.c/1.103/Sun Dec 22 09:26:23 2019//
 /var.h/1.20/Sat Dec 21 15:31:54 2019//
 /var_int.h/1.2/Mon Jul 19 19:46:44 2010//
-/varmodifiers.c/1.47/Mon Jul 10 07:10:29 2017//
 /varmodifiers.h/1.12/Mon Jul 19 19:46:44 2010//
 /varname.c/1.6/Sat Aug 25 08:12:56 2012//
 /varname.h/1.4/Mon Jul 19 19:30:38 2010//
@@ -77,3 +76,4 @@ D/lst.lib////
 /job.c/1.162/Sat Jun  6 11:21:49 2020//
 /job.h/1.38/Sat Jun  6 11:21:49 2020//
 /lst.h/1.32/Sat Jun  6 11:21:49 2020//
+/varmodifiers.c/1.48/Sat Sep  5 08:08:20 2020//
