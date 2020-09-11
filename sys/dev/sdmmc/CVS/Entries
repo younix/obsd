@@ -14,8 +14,8 @@
 /sdhc.c/1.69/Sat Sep  5 08:05:01 2020//
 /sdmmc.c/1.58/Sat Sep  5 08:08:17 2020//
 /sdmmc_mem.c/1.35/Sat Sep  5 08:08:17 2020//
-/sdmmc_scsi.c/1.56/Sat Sep  5 08:08:17 2020//
 /sdmmcchip.h/1.14/Sat Sep  5 08:05:01 2020//
 /sdmmcreg.h/1.13/Sat Sep  5 08:08:17 2020//
 /sdmmcvar.h/1.34/Sat Sep  5 08:05:01 2020//
+/sdmmc_scsi.c/1.57/Sun Sep  6 20:22:14 2020//
 D

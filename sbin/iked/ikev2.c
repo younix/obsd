@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.253 2020/09/04 19:32:27 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.255 2020/09/06 19:08:58 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -4763,7 +4763,8 @@ ikev2_sa_negotiate_common(struct iked *env, struct iked_sa *sa, struct iked_mess
 	    &msg->msg_policy->pol_proposals, &msg->msg_proposals, 0) != 0) {
 		log_info("%s: proposals_negotiate", __func__);
 		return (-1);
-	} else if (sa_stateok(sa, IKEV2_STATE_SA_INIT))
+	}
+	if (sa_stateok(sa, IKEV2_STATE_SA_INIT))
 		sa_stateflags(sa, IKED_REQ_SA);
 
 	if (sa->sa_encr == NULL) {
@@ -6038,7 +6039,7 @@ ikev2_child_sa_acquire(struct iked *env, struct iked_flow *acquire)
 		    p->pol_name);
 
 		if (ikev2_init_ike_sa_peer(env, p,
-		    acquire->flow_peer, NULL) != 0)
+		    &p->pol_peer, NULL) != 0)
 			log_warnx("%s: failed to initiate a "
 			    "IKE_SA_INIT exchange for policy '%s'",
 			    __func__, p->pol_name);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsi_base.c,v 1.273 2020/09/01 12:17:53 krw Exp $	*/
+/*	$OpenBSD: scsi_base.c,v 1.275 2020/09/08 12:36:42 krw Exp $	*/
 /*	$NetBSD: scsi_base.c,v 1.43 1997/04/02 02:29:36 mycroft Exp $	*/
 
 /*
@@ -849,7 +849,7 @@ scsi_inquire(struct scsi_link *link, struct scsi_inquiry_data *inqbuf,
 	 * information. This avoids problems with devices that choke trying to
 	 * supply more.
 	 */
-	bytes = 36;
+	bytes = SID_SCSI2_HDRLEN + SID_SCSI2_ALEN;
 
 #ifdef SCSIDEBUG
 again:
@@ -872,13 +872,14 @@ again:
 
 #ifdef SCSIDEBUG
 	sc_print_addr(link);
-	if (bytes > inqbuf->additional_length + 4)
-		bytes = inqbuf->additional_length + 4;
+	if (bytes > SID_SCSI2_HDRLEN + inqbuf->additional_length)
+		bytes = SID_SCSI2_HDRLEN + inqbuf->additional_length;
 	printf("got %zu of %u bytes of inquiry data:\n",
-	    bytes, inqbuf->additional_length + 4);
+	    bytes, SID_SCSI2_HDRLEN + inqbuf->additional_length);
 	scsi_show_mem((u_char *)inqbuf, bytes);
-	if (bytes == 36 && bytes < inqbuf->additional_length + 4) {
-		bytes = inqbuf->additional_length + 4;
+	if (bytes == SID_SCSI2_HDRLEN + SID_SCSI2_ALEN && bytes <
+	    SID_SCSI2_HDRLEN + inqbuf->additional_length) {
+		bytes = SID_SCSI2_HDRLEN + inqbuf->additional_length;
 		if (bytes > sizeof(*inqbuf))
 			bytes = sizeof(*inqbuf);
 		goto again;
@@ -1101,6 +1102,9 @@ scsi_mode_sense(struct scsi_link *link, int pg_code,
 	error = scsi_xs_sync(xs);
 	scsi_xs_put(xs);
 
+	if (error == 0 && !VALID_MODE_HDR(&data->hdr))
+		error = EIO;
+
 #ifdef SCSIDEBUG
 	sc_print_addr(link);
 	if (error == 0) {
@@ -1157,7 +1161,7 @@ scsi_mode_sense_big(struct scsi_link *link, int pg_code,
 	error = scsi_xs_sync(xs);
 	scsi_xs_put(xs);
 
-	if (_2btol(data->hdr_big.data_length) < 6)
+	if (error == 0 && !VALID_MODE_HDR_BIG(&data->hdr_big))
 		error = EIO;
 
 #ifdef SCSIDEBUG

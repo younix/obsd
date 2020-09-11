@@ -30,7 +30,6 @@
 /man.conf.5/1.8/Mon Feb 10 14:42:03 2020//
 /man.h/1.59/Thu Aug 23 19:32:03 2018//
 /man_html.c/1.131/Sat Apr  4 20:23:06 2020//
-/man_macro.c/1.106/Sat Jan  5 18:59:37 2019//
 /man_term.c/1.188/Fri Mar 13 00:31:05 2020//
 /man_validate.c/1.124/Fri Apr 24 11:58:02 2020//
 /mandoc.c/1.85/Sun Jan 19 16:16:32 2020//
@@ -78,8 +77,6 @@
 /tbl_parse.h/1.2/Fri Dec 14 06:33:03 2018//
 /tbl_term.c/1.61/Sat Jan 11 16:24:33 2020//
 /term.h/1.75/Fri Jan  4 03:20:44 2019//
-/term_ascii.c/1.50/Fri Jul 19 21:45:37 2019//
-/term_ps.c/1.55/Fri Nov 10 14:16:28 2017//
 /term_tab.c/1.4/Sat Jun 17 14:55:02 2017//
 /tree.c/1.56/Wed Apr  8 11:54:14 2020//
 /arch.c/1.12/Mon Jul 20 09:32:33 2020//
@@ -98,4 +95,7 @@
 /roff_term.c/1.21/Sat Sep  5 08:08:20 2020//
 /tbl_layout.c/1.36/Sat Sep  5 08:08:20 2020//
 /term.c/1.142/Sat Sep  5 08:08:20 2020//
+/term_ps.c/1.56/Sun Sep  6 20:22:16 2020//
+/man_macro.c/1.107/Fri Sep 11 08:20:51 2020//
+/term_ascii.c/1.52/Fri Sep 11 08:20:51 2020//
 D

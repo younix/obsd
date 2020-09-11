@@ -76,7 +76,6 @@
 /siginfo.h/1.12/Fri Apr  7 04:48:44 2017//
 /sigio.h/1.4/Wed Jan  8 16:27:42 2020//
 /signal.h/1.29/Wed Apr 18 16:05:20 2018//
-/signalvar.h/1.41/Sun May 10 00:56:06 2020//
 /socket.h/1.98/Mon Jul 22 15:34:07 2019//
 /socketvar.h/1.91/Wed Jan 15 13:17:35 2020//
 /sockio.h/1.83/Wed Nov 13 11:54:01 2019//
@@ -138,4 +137,5 @@
 /task.h/1.18/Sat Sep  5 08:05:01 2020//
 /timeout.h/1.39/Sat Sep  5 08:05:01 2020//
 /tty.h/1.39/Sat Sep  5 08:05:01 2020//
+/signalvar.h/1.42/Fri Sep 11 08:20:50 2020//
 D

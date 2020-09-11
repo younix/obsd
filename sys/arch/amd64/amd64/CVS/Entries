@@ -49,7 +49,6 @@
 /ucode.c/1.5/Fri Jun 28 21:54:05 2019//
 /vector.S/1.80/Wed Aug  7 18:53:28 2019//
 /vm_machdep.c/1.43/Tue Aug 21 13:10:13 2018//
-/vmm.c/1.273/Sun Apr 19 19:29:52 2020//
 /vmm_support.S/1.16/Fri May 17 19:07:16 2019//
 /wscons_machdep.c/1.14/Sat Oct 14 04:44:43 2017//
 /cpu.c/1.149/Mon Jun  1 06:23:23 2020//
@@ -60,8 +59,9 @@
 /acpi_machdep.c/1.92/Fri Jul 24 10:26:29 2020//
 /bios.c/1.43/Sat Sep  5 08:08:08 2020//
 /conf.c/1.71/Sat Sep  5 08:05:01 2020//
-/lapic.c/1.56/Sat Sep  5 08:08:08 2020//
 /machdep.c/1.269/Sat Sep  5 08:05:01 2020//
 /trap.c/1.80/Sat Sep  5 08:05:01 2020//
-/tsc.c/1.20/Sat Sep  5 08:08:08 2020//
+/lapic.c/1.57/Fri Sep 11 08:20:43 2020//
+/tsc.c/1.21/Fri Sep 11 08:20:43 2020//
+/vmm.c/1.274/Fri Sep 11 08:20:43 2020//
 D

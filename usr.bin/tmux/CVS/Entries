@@ -1,7 +1,6 @@
 /Makefile/1.106/Sat May 16 16:30:59 2020//
 /attributes.c/1.11/Sat May 16 14:13:37 2020//
 /cfg.c/1.81/Sat May 16 14:26:33 2020//
-/cmd-bind-key.c/1.37/Mon Apr 13 08:26:27 2020//
 /cmd-choose-tree.c/1.47/Sat May 16 16:02:24 2020//
 /cmd-command-prompt.c/1.53/Sat May 16 16:16:07 2020//
 /cmd-confirm-before.c/1.42/Sat May 16 16:16:07 2020//
@@ -86,7 +85,6 @@
 /cmd-set-option.c/1.137/Mon Jul 20 09:32:33 2020//
 /cmd.c/1.163/Mon Jul 20 09:32:33 2020//
 /control.c/1.44/Mon Jul 20 09:32:33 2020//
-/key-bindings.c/1.130/Mon Jul 20 09:32:33 2020//
 /key-string.c/1.63/Mon Jul 20 09:32:33 2020//
 /server.c/1.194/Mon Jul 20 09:32:33 2020//
 /tty-features.c/1.17/Mon Jul 20 09:32:33 2020//
@@ -125,4 +123,6 @@
 /tty.c/1.384/Sat Sep  5 08:08:22 2020//
 /window-copy.c/1.302/Sat Sep  5 08:05:01 2020//
 /window-customize.c/1.6/Sat Sep  5 08:05:01 2020//
+/cmd-bind-key.c/1.38/Fri Sep 11 08:20:52 2020//
+/key-bindings.c/1.131/Fri Sep 11 08:20:53 2020//
 D

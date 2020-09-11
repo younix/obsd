@@ -4,7 +4,6 @@
 /control.c/1.28/Wed Jan  1 10:09:34 2020//
 /control.h/1.6/Sat Sep  1 19:21:10 2018//
 /iso_cksum.c/1.1/Mon Oct  8 10:44:50 2007//
-/kroute.c/1.64/Sun May 17 18:29:25 2020//
 /log.c/1.15/Sat Aug 12 16:27:50 2017//
 /log.h/1.12/Sat Aug 12 16:27:50 2017//
 /logmsg.c/1.1/Fri Sep  2 14:08:50 2016//
@@ -31,4 +30,5 @@
 /neighbor.c/1.17/Mon Jul 20 09:32:33 2020//
 /ospf6d.c/1.47/Mon Jul 20 09:32:33 2020//
 /rde_lsdb.c/1.45/Sat Sep  5 08:05:01 2020//
+/kroute.c/1.65/Fri Sep 11 08:20:55 2020//
 D
