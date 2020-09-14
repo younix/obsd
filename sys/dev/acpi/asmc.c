@@ -1,4 +1,4 @@
-/*	$OpenBSD: asmc.c,v 1.33 2020/08/26 03:29:06 visa Exp $	*/
+/*	$OpenBSD: asmc.c,v 1.2 2020/09/13 14:11:28 mglocker Exp $	*/
 /*
  * Copyright (c) 2015 Joerg Jung <jung@openbsd.org>
  *
@@ -29,11 +29,12 @@
 
 #include <machine/bus.h>
 
-#include <dev/isa/isavar.h>
-#include <dev/wscons/wsconsio.h>
+#include <dev/acpi/acpivar.h>
+#include <dev/acpi/acpidev.h>
+#include <dev/acpi/amltypes.h>
+#include <dev/acpi/dsdt.h>
 
-#define ASMC_BASE	0x300	/* SMC base address */
-#define ASMC_IOSIZE	32	/* I/O region size 0x300-0x31f */
+#include <dev/wscons/wsconsio.h>
 
 #define ASMC_DATA	0x00	/* SMC data port offset */
 #define ASMC_COMMAND	0x04	/* SMC command port offset */
@@ -65,6 +66,9 @@ struct asmc_prod {
 
 struct asmc_softc {
 	struct device		 sc_dev;
+
+	struct acpi_softc       *sc_acpi;
+	struct aml_node         *sc_devnode;
 
 	bus_space_tag_t		 sc_iot;
 	bus_space_handle_t	 sc_ioh;
@@ -107,6 +111,10 @@ const struct cfattach asmc_ca = {
 
 struct cfdriver asmc_cd = {
 	NULL, "asmc", DV_DULL
+};
+
+const char *asmc_hids[] = {
+	"APP0001", NULL
 };
 
 static struct asmc_prod asmc_prods[] = {
@@ -229,55 +237,66 @@ static const char *asmc_light_desc[ASMC_MAXLIGHT] = {
 int
 asmc_match(struct device *parent, void *match, void *aux)
 {
-	struct asmc_softc *sc = match;
-	struct isa_attach_args *ia = aux;
-	bus_space_handle_t ioh;
-	int i;
+	struct acpi_attach_args *aa = aux;
+	struct cfdata *cf = match;
 
-	if (!hw_vendor || !hw_prod || strncmp(hw_vendor, "Apple", 5))
-		return 0;
-
-	for (i = 0; asmc_prods[i].pr_name && !sc->sc_prod; i++)
-		if (!strncasecmp(asmc_prods[i].pr_name, hw_prod,
-		    strlen(asmc_prods[i].pr_name)))
-			sc->sc_prod = &asmc_prods[i];
-	if (!sc->sc_prod)
-		return 0;
-
-	if (ia->ia_iobase != ASMC_BASE ||
-	    bus_space_map(ia->ia_iot, ia->ia_iobase, ASMC_IOSIZE, 0, &ioh))
-		return 0;
-
-	bus_space_unmap(ia->ia_iot, ioh, ASMC_IOSIZE);
-	ia->ia_iosize = ASMC_IOSIZE;
-	ia->ipa_nio = 1;
-	ia->ipa_nmem = 0;
-	ia->ipa_nirq = 0;
-	ia->ipa_ndrq = 0;
-
-	return 1;
+	return acpi_matchhids(aa, asmc_hids, cf->cf_driver->cd_name);
 }
 
 void
 asmc_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct asmc_softc *sc = (struct asmc_softc *)self;
-	struct isa_attach_args *ia = aux;
+	struct acpi_attach_args *aaa = aux;
+	struct aml_value res;
+	int64_t sta;
 	uint8_t buf[6];
 	int i, r;
 
-	if (bus_space_map(ia->ia_iot, ia->ia_iobase, ia->ia_iosize, 0,
-	    &sc->sc_ioh)) {
-		printf(": can't map i/o space\n");
+	if (!hw_vendor || !hw_prod || strncmp(hw_vendor, "Apple", 5))
+		return;
+
+	for (i = 0; asmc_prods[i].pr_name && !sc->sc_prod; i++)
+		if (!strncasecmp(asmc_prods[i].pr_name, hw_prod,
+		    strlen(asmc_prods[i].pr_name)))
+			sc->sc_prod = &asmc_prods[i];
+	if (!sc->sc_prod)
+		return;
+
+	sc->sc_acpi = (struct acpi_softc *)parent;
+	sc->sc_devnode = aaa->aaa_node;
+
+	printf(": %s", sc->sc_devnode->name);
+
+	sta = acpi_getsta(sc->sc_acpi, sc->sc_devnode);
+	if ((sta & (STA_PRESENT | STA_ENABLED | STA_DEV_OK)) !=
+	    (STA_PRESENT | STA_ENABLED | STA_DEV_OK)) {
+		printf(": not enabled\n");
 		return;
 	}
-	sc->sc_iot = ia->ia_iot;
+
+	if (!(aml_evalname(sc->sc_acpi, sc->sc_devnode, "_CID", 0, NULL, &res)))
+		printf(" (%s)", res.v_string);
+
+	if (aaa->aaa_naddr < 1) {
+		printf(": no registers\n");
+		return;
+	}
+
+	printf (" addr 0x%llx/0x%llx", aaa->aaa_addr[0], aaa->aaa_size[0]);
+
+	sc->sc_iot = aaa->aaa_bst[0];
+	if (bus_space_map(sc->sc_iot, aaa->aaa_addr[0], aaa->aaa_size[0], 0,
+	    &sc->sc_ioh)) {
+		printf(": can't map registers\n");
+		return;
+	}
 
 	rw_init(&sc->sc_lock, sc->sc_dev.dv_xname);
 
 	if ((r = asmc_try(sc, ASMC_READ, "REV ", buf, 6))) {
 		printf(": revision failed (0x%x)\n", r);
-		bus_space_unmap(ia->ia_iot, ia->ia_iobase, ASMC_IOSIZE);
+		bus_space_unmap(sc->sc_iot, aaa->aaa_addr[0], aaa->aaa_size[0]);
 		return;
 	}
 	printf(": rev %x.%x%x%x", buf[0], buf[1], buf[2],
@@ -285,7 +304,7 @@ asmc_attach(struct device *parent, struct device *self, void *aux)
 
 	if ((r = asmc_try(sc, ASMC_READ, "#KEY", buf, 4))) {
 		printf(", no of keys failed (0x%x)\n", r);
-		bus_space_unmap(ia->ia_iot, ia->ia_iobase, ASMC_IOSIZE);
+		bus_space_unmap(sc->sc_iot, aaa->aaa_addr[0], aaa->aaa_size[0]);
 		return;
 	}
 	printf(", %u key%s\n", ntohl(*(uint32_t *)buf),
@@ -325,7 +344,7 @@ asmc_attach(struct device *parent, struct device *self, void *aux)
 
 	if (!(sc->sc_sensor_task = sensor_task_register(sc, asmc_update, 5))) {
 		printf("%s: unable to register task\n", sc->sc_dev.dv_xname);
-		bus_space_unmap(ia->ia_iot, ia->ia_iobase, ASMC_IOSIZE);
+		bus_space_unmap(sc->sc_iot, aaa->aaa_addr[0], aaa->aaa_size[0]);
 		return;
 	}
 	sensordev_install(&sc->sc_sensor_dev);

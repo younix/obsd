@@ -34,7 +34,6 @@
 
 #include <isc/list.h>
 #include <isc/log.h>
-#include <isc/net.h>
 #include <isc/region.h>
 #include <isc/socket.h>
 #include <isc/task.h>
@@ -1348,8 +1347,7 @@ socket_create(isc_socketmgr_t *manager0, int pf, isc_sockettype_t type,
 
 	switch (sock->type) {
 	case isc_sockettype_udp:
-#define DCSPPKT(pf) ((pf == AF_INET) ? ISC_NET_DSCPPKTV4 : ISC_NET_DSCPPKTV6)
-		sock->pktdscp = (isc_net_probedscp() & DCSPPKT(pf)) != 0;
+		sock->pktdscp = 1;
 		break;
 	case isc_sockettype_tcp:
 		break;
@@ -1419,7 +1417,7 @@ isc_socket_attach(isc_socket_t *sock0, isc_socket_t **socketp) {
 void
 isc_socket_detach(isc_socket_t **socketp) {
 	isc_socket_t *sock;
-	isc_boolean_t kill_socket = ISC_FALSE;
+	int kill_socket = 0;
 
 	REQUIRE(socketp != NULL);
 	sock = (isc_socket_t *)*socketp;
@@ -1427,7 +1425,7 @@ isc_socket_detach(isc_socket_t **socketp) {
 	REQUIRE(sock->references > 0);
 	sock->references--;
 	if (sock->references == 0)
-		kill_socket = ISC_TRUE;
+		kill_socket = 1;
 
 	if (kill_socket)
 		destroy(&sock);
@@ -1681,11 +1679,11 @@ internal_send(isc_task_t *me, isc_event_t *ev) {
  * and unlocking twice if both reads and writes are possible.
  */
 static void
-process_fd(isc_socketmgr_t *manager, int fd, isc_boolean_t readable,
-	   isc_boolean_t writeable)
+process_fd(isc_socketmgr_t *manager, int fd, int readable,
+	   int writeable)
 {
 	isc_socket_t *sock;
-	isc_boolean_t unwatch_read = ISC_FALSE, unwatch_write = ISC_FALSE;
+	int unwatch_read = 0, unwatch_write = 0;
 
 	/*
 	 * If the socket is going to be closed, don't do more I/O.
@@ -1699,18 +1697,18 @@ process_fd(isc_socketmgr_t *manager, int fd, isc_boolean_t readable,
 	sock = manager->fds[fd];
 	if (readable) {
 		if (sock == NULL) {
-			unwatch_read = ISC_TRUE;
+			unwatch_read = 1;
 			goto check_write;
 		}
 		if (!SOCK_DEAD(sock)) {
 			dispatch_recv(sock);
 		}
-		unwatch_read = ISC_TRUE;
+		unwatch_read = 1;
 	}
 check_write:
 	if (writeable) {
 		if (sock == NULL) {
-			unwatch_write = ISC_TRUE;
+			unwatch_write = 1;
 			goto unlock_fd;
 		}
 		if (!SOCK_DEAD(sock)) {
@@ -1719,7 +1717,7 @@ check_write:
 			else
 				dispatch_send(sock);
 		}
-		unwatch_write = ISC_TRUE;
+		unwatch_write = 1;
 	}
 
  unlock_fd:

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.221 2020/08/30 15:40:19 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.227 2020/09/14 18:34:12 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -216,8 +216,6 @@ SSL_clear(SSL *s)
 	} else
 		s->method->internal->ssl_clear(s);
 
-	S3I(s)->hs.state = SSL_ST_BEFORE|((s->server) ? SSL_ST_ACCEPT : SSL_ST_CONNECT);
-
 	return (1);
 }
 
@@ -225,13 +223,13 @@ SSL_clear(SSL *s)
 int
 SSL_CTX_set_ssl_version(SSL_CTX *ctx, const SSL_METHOD *meth)
 {
-	STACK_OF(SSL_CIPHER)	*sk;
+	STACK_OF(SSL_CIPHER) *ciphers;
 
 	ctx->method = meth;
 
-	sk = ssl_create_cipher_list(ctx->method, &(ctx->cipher_list),
-	    &(ctx->internal->cipher_list_by_id), SSL_DEFAULT_CIPHER_LIST);
-	if ((sk == NULL) || (sk_SSL_CIPHER_num(sk) <= 0)) {
+	ciphers = ssl_create_cipher_list(ctx->method, &ctx->cipher_list,
+	    ctx->internal->cipher_list_tls13, SSL_DEFAULT_CIPHER_LIST);
+	if (ciphers == NULL || sk_SSL_CIPHER_num(ciphers) <= 0) {
 		SSLerrorx(SSL_R_SSL_LIBRARY_HAS_NO_CIPHERS);
 		return (0);
 	}
@@ -529,9 +527,8 @@ SSL_free(SSL *s)
 
 	BUF_MEM_free(s->internal->init_buf);
 
-	/* add extra stuff */
 	sk_SSL_CIPHER_free(s->cipher_list);
-	sk_SSL_CIPHER_free(s->internal->cipher_list_by_id);
+	sk_SSL_CIPHER_free(s->internal->cipher_list_tls13);
 
 	/* Make the next call work :-) */
 	if (s->session != NULL) {
@@ -1240,34 +1237,15 @@ ssl_cipher_id_cmp(const SSL_CIPHER *a, const SSL_CIPHER *b)
 		return ((l > 0) ? 1:-1);
 }
 
-int
-ssl_cipher_ptr_id_cmp(const SSL_CIPHER * const *ap,
-    const SSL_CIPHER * const *bp)
-{
-	long	l;
-
-	l = (*ap)->id - (*bp)->id;
-	if (l == 0L)
-		return (0);
-	else
-		return ((l > 0) ? 1:-1);
-}
-
-/*
- * Return a STACK of the ciphers available for the SSL and in order of
- * preference.
- */
 STACK_OF(SSL_CIPHER) *
 SSL_get_ciphers(const SSL *s)
 {
-	if (s != NULL) {
-		if (s->cipher_list != NULL) {
-			return (s->cipher_list);
-		} else if ((s->ctx != NULL) && (s->ctx->cipher_list != NULL)) {
-			return (s->ctx->cipher_list);
-		}
-	}
-	return (NULL);
+	if (s == NULL)
+		return (NULL);
+	if (s->cipher_list != NULL)
+		return (s->cipher_list);
+
+	return (s->ctx->cipher_list);
 }
 
 STACK_OF(SSL_CIPHER) *
@@ -1298,7 +1276,8 @@ SSL_get1_supported_ciphers(SSL *s)
 	for (i = 0; i < sk_SSL_CIPHER_num(ciphers); i++) {
 		if ((cipher = sk_SSL_CIPHER_value(ciphers, i)) == NULL)
 			goto err;
-		if (!ssl_cipher_is_permitted(cipher, min_vers, max_vers))
+		if (!ssl_cipher_allowed_in_version_range(cipher, min_vers,
+		    max_vers))
 			continue;
 		if (!sk_SSL_CIPHER_push(supported_ciphers, cipher))
 			goto err;
@@ -1310,24 +1289,6 @@ SSL_get1_supported_ciphers(SSL *s)
  err:
 	sk_SSL_CIPHER_free(supported_ciphers);
 	return NULL;
-}
-
-/*
- * Return a STACK of the ciphers available for the SSL and in order of
- * algorithm id.
- */
-STACK_OF(SSL_CIPHER) *
-ssl_get_ciphers_by_id(SSL *s)
-{
-	if (s != NULL) {
-		if (s->internal->cipher_list_by_id != NULL) {
-			return (s->internal->cipher_list_by_id);
-		} else if ((s->ctx != NULL) &&
-		    (s->ctx->internal->cipher_list_by_id != NULL)) {
-			return (s->ctx->internal->cipher_list_by_id);
-		}
-	}
-	return (NULL);
 }
 
 /* See if we have any ECC cipher suites. */
@@ -1361,18 +1322,15 @@ ssl_has_ecc_ciphers(SSL *s)
 const char *
 SSL_get_cipher_list(const SSL *s, int n)
 {
-	SSL_CIPHER		*c;
-	STACK_OF(SSL_CIPHER)	*sk;
+	STACK_OF(SSL_CIPHER) *ciphers;
+	const SSL_CIPHER *cipher;
 
-	if (s == NULL)
+	if ((ciphers = SSL_get_ciphers(s)) == NULL)
 		return (NULL);
-	sk = SSL_get_ciphers(s);
-	if ((sk == NULL) || (sk_SSL_CIPHER_num(sk) <= n))
+	if ((cipher = sk_SSL_CIPHER_value(ciphers, n)) == NULL)
 		return (NULL);
-	c = sk_SSL_CIPHER_value(sk, n);
-	if (c == NULL)
-		return (NULL);
-	return (c->name);
+
+	return (cipher->name);
 }
 
 STACK_OF(SSL_CIPHER) *
@@ -1385,68 +1343,101 @@ SSL_CTX_get_ciphers(const SSL_CTX *ctx)
 int
 SSL_CTX_set_cipher_list(SSL_CTX *ctx, const char *str)
 {
-	STACK_OF(SSL_CIPHER)	*sk;
+	STACK_OF(SSL_CIPHER) *ciphers;
 
-	sk = ssl_create_cipher_list(ctx->method, &ctx->cipher_list,
-	    &ctx->internal->cipher_list_by_id, str);
 	/*
-	 * ssl_create_cipher_list may return an empty stack if it
-	 * was unable to find a cipher matching the given rule string
-	 * (for example if the rule string specifies a cipher which
-	 * has been disabled). This is not an error as far as
-	 * ssl_create_cipher_list is concerned, and hence
-	 * ctx->cipher_list and ctx->internal->cipher_list_by_id has been
-	 * updated.
+	 * ssl_create_cipher_list may return an empty stack if it was unable to
+	 * find a cipher matching the given rule string (for example if the
+	 * rule string specifies a cipher which has been disabled). This is not
+	 * an error as far as ssl_create_cipher_list is concerned, and hence
+	 * ctx->cipher_list has been updated.
 	 */
-	if (sk == NULL)
+	ciphers = ssl_create_cipher_list(ctx->method, &ctx->cipher_list,
+	    ctx->internal->cipher_list_tls13, str);
+	if (ciphers == NULL) {
 		return (0);
-	else if (sk_SSL_CIPHER_num(sk) == 0) {
+	} else if (sk_SSL_CIPHER_num(ciphers) == 0) {
 		SSLerrorx(SSL_R_NO_CIPHER_MATCH);
 		return (0);
 	}
 	return (1);
 }
 
+int
+SSL_CTX_set_ciphersuites(SSL_CTX *ctx, const char *str)
+{
+	if (!ssl_parse_ciphersuites(&ctx->internal->cipher_list_tls13, str)) {
+		SSLerrorx(SSL_R_NO_CIPHER_MATCH);
+		return 0;
+	}
+	if (!ssl_merge_cipherlists(ctx->cipher_list,
+	    ctx->internal->cipher_list_tls13, &ctx->cipher_list))
+		return 0;
+
+	return 1;
+}
+
 /* Specify the ciphers to be used by the SSL. */
 int
 SSL_set_cipher_list(SSL *s, const char *str)
 {
-	STACK_OF(SSL_CIPHER)	*sk;
+	STACK_OF(SSL_CIPHER) *ciphers, *ciphers_tls13;
 
-	sk = ssl_create_cipher_list(s->ctx->method, &s->cipher_list,
-	&s->internal->cipher_list_by_id, str);
-	/* see comment in SSL_CTX_set_cipher_list */
-	if (sk == NULL)
+	if ((ciphers_tls13 = s->internal->cipher_list_tls13) == NULL)
+		ciphers_tls13 = s->ctx->internal->cipher_list_tls13;
+
+	/* See comment in SSL_CTX_set_cipher_list. */
+	ciphers = ssl_create_cipher_list(s->ctx->method, &s->cipher_list,
+	    ciphers_tls13, str);
+	if (ciphers == NULL) {
 		return (0);
-	else if (sk_SSL_CIPHER_num(sk) == 0) {
+	} else if (sk_SSL_CIPHER_num(ciphers) == 0) {
 		SSLerror(s, SSL_R_NO_CIPHER_MATCH);
 		return (0);
 	}
 	return (1);
 }
 
-/* works well for SSLv2, not so good for SSLv3 */
+int
+SSL_set_ciphersuites(SSL *s, const char *str)
+{
+	STACK_OF(SSL_CIPHER) *ciphers;
+
+	if ((ciphers = s->cipher_list) == NULL)
+		ciphers = s->ctx->cipher_list;
+
+	if (!ssl_parse_ciphersuites(&s->internal->cipher_list_tls13, str)) {
+		SSLerrorx(SSL_R_NO_CIPHER_MATCH);
+		return (0);
+	}
+	if (!ssl_merge_cipherlists(ciphers, s->internal->cipher_list_tls13,
+	    &s->cipher_list))
+		return 0;
+
+	return 1;
+}
+
 char *
 SSL_get_shared_ciphers(const SSL *s, char *buf, int len)
 {
-	char			*end;
-	STACK_OF(SSL_CIPHER)	*sk;
-	SSL_CIPHER		*c;
-	size_t			 curlen = 0;
-	int			 i;
+	STACK_OF(SSL_CIPHER) *ciphers;
+	const SSL_CIPHER *cipher;
+	size_t curlen = 0;
+	char *end;
+	int i;
 
 	if (s->session == NULL || s->session->ciphers == NULL || len < 2)
 		return (NULL);
 
-	sk = s->session->ciphers;
-	if (sk_SSL_CIPHER_num(sk) == 0)
+	ciphers = s->session->ciphers;
+	if (sk_SSL_CIPHER_num(ciphers) == 0)
 		return (NULL);
 
 	buf[0] = '\0';
-	for (i = 0; i < sk_SSL_CIPHER_num(sk); i++) {
-		c = sk_SSL_CIPHER_value(sk, i);
+	for (i = 0; i < sk_SSL_CIPHER_num(ciphers); i++) {
+		cipher = sk_SSL_CIPHER_value(ciphers, i);
 		end = buf + curlen;
-		if (strlcat(buf, c->name, len) >= len ||
+		if (strlcat(buf, cipher->name, len) >= len ||
 		    (curlen = strlcat(buf, ":", len)) >= len) {
 			/* remove truncated cipher from list */
 			*end = '\0';
@@ -1804,7 +1795,7 @@ SSL_CTX_new(const SSL_METHOD *meth)
 		goto err;
 
 	ssl_create_cipher_list(ret->method, &ret->cipher_list,
-	    &ret->internal->cipher_list_by_id, SSL_DEFAULT_CIPHER_LIST);
+	    NULL, SSL_DEFAULT_CIPHER_LIST);
 	if (ret->cipher_list == NULL ||
 	    sk_SSL_CIPHER_num(ret->cipher_list) <= 0) {
 		SSLerrorx(SSL_R_LIBRARY_HAS_NO_CIPHERS);
@@ -1901,7 +1892,7 @@ SSL_CTX_free(SSL_CTX *ctx)
 
 	X509_STORE_free(ctx->cert_store);
 	sk_SSL_CIPHER_free(ctx->cipher_list);
-	sk_SSL_CIPHER_free(ctx->internal->cipher_list_by_id);
+	sk_SSL_CIPHER_free(ctx->internal->cipher_list_tls13);
 	ssl_cert_free(ctx->internal->cert);
 	sk_X509_NAME_pop_free(ctx->internal->client_CA, X509_NAME_free);
 	sk_X509_pop_free(ctx->extra_certs, X509_free);
@@ -2493,15 +2484,14 @@ SSL_dup(SSL *s)
 
 	X509_VERIFY_PARAM_inherit(ret->param, s->param);
 
-	/* dup the cipher_list and cipher_list_by_id stacks */
 	if (s->cipher_list != NULL) {
 		if ((ret->cipher_list =
 		    sk_SSL_CIPHER_dup(s->cipher_list)) == NULL)
 			goto err;
 	}
-	if (s->internal->cipher_list_by_id != NULL) {
-		if ((ret->internal->cipher_list_by_id =
-		    sk_SSL_CIPHER_dup(s->internal->cipher_list_by_id)) == NULL)
+	if (s->internal->cipher_list_tls13 != NULL) {
+		if ((ret->internal->cipher_list_tls13 =
+		    sk_SSL_CIPHER_dup(s->internal->cipher_list_tls13)) == NULL)
 			goto err;
 	}
 
