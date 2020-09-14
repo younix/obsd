@@ -784,6 +784,13 @@ printf("free(%p, %d, %zu * %d);\n",
 }
 
 int
+rp_intr(void *arg)
+{
+	printf("rp: INTERRUPT INTERRUPT INTERRUPT INTERRUPT INTERRUPT INTERRUPT");
+	return 1;
+}
+
+int
 rpopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	int		 card = RP_CARD(dev);
@@ -870,7 +877,7 @@ printf("%s:%d return\n", __func__, __LINE__);
 		timeout_set(&rp->rp_timer, rp_poll, rp);
 		timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
-printf("%s:%d return\n", __func__, __LINE__);
+printf("%s:%d return EBUSY\n", __func__, __LINE__);
 		return (EBUSY);
 	} else {
 		s = spltty();
@@ -880,7 +887,7 @@ printf("%s:%d return\n", __func__, __LINE__);
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
-printf("%s:%d return\n", __func__, __LINE__);
+printf("%s:%d return EBUSY\n", __func__, __LINE__);
 			return (EBUSY);
 		}
 		rp->rp_cua = 1;
@@ -890,14 +897,16 @@ printf("%s:%d return\n", __func__, __LINE__);
 			if (rp->rp_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
-printf("%s:%d return\n", __func__, __LINE__);
+printf("%s:%d return EBUSY\n", __func__, __LINE__);
 				return (EBUSY);
 			}
 		} else {
 			while (rp->rp_cua) {
 				SET(tp->t_state, TS_WOPEN);
+printf("%s %s:%d before ttysleep", DEVNAME(rp->rp_sc), __func__, __LINE__);
 				error = ttysleep(tp, &tp->t_rawq,
 				    TTIPRI | PCATCH, ttopen);
+printf("%s %s:%d before ttysleep", DEVNAME(rp->rp_sc), __func__, __LINE__);
 
 				/*
 				 * If TS_WOPEN has been reset, that means the
@@ -908,7 +917,7 @@ printf("%s:%d return\n", __func__, __LINE__);
 				if (error && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
 					splx(s);
-printf("%s:%d return\n", __func__, __LINE__);
+printf("%s:%d return error:%d\n", __func__, __LINE__, error);
 					return (error);
 				}
 			}
@@ -916,8 +925,9 @@ printf("%s:%d return\n", __func__, __LINE__);
 	}
 	splx(s);
 
-printf("%s:%d return\n", __func__, __LINE__);
-	return ((*linesw[tp->t_line].l_open)(dev, tp, p));
+int ret = ((*linesw[tp->t_line].l_open)(dev, tp, p));
+printf("%s:%d return %d\n", __func__, __LINE__, ret);
+	return ret;
 }
 
 int

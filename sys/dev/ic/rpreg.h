@@ -362,9 +362,10 @@ struct rp_softc {
 //	int		free;
 	int		num_ports;
 
-	bus_space_tag_t		sc_iot;
-	bus_space_handle_t	sc_ioh;
-	bus_size_t		sc_ios;
+	void			*sc_ih;
+	bus_space_tag_t		 sc_iot;
+	bus_space_handle_t	 sc_ioh;
+	bus_size_t		 sc_ios;
 
 	struct rp_port	*sc_rp;		/* port */
 	struct cdev    **dev_nodes;	/* Device nodes */
@@ -741,6 +742,7 @@ void rp_stop_rx_processor(struct rp_chan *);
 void rp_flush_rx_fifo(struct rp_chan *);
 void rp_flush_tx_fifo(struct rp_chan *);
 int rp_write_tx_prio_byte(struct rp_chan *, uint8_t);
+int rp_intr(void *);
 void rp_enable_interrupts(struct rp_chan *, uint16_t);
 void rp_disable_interrupts(struct rp_chan *, uint16_t);
 int rp_attach(struct rp_softc* sc, int, int);

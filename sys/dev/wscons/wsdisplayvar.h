@@ -247,7 +247,7 @@ extern int (*ws_get_param)(struct wsdisplay_param *);
 extern int (*ws_set_param)(struct wsdisplay_param *);
 
 void wsdisplay_brightness_step(struct device *, int);
-void wsdisplay_brightness_zero(struct device *);
+unsigned int wsdisplay_brightness_zero(struct device *);
 void wsdisplay_brightness_cycle(struct device *);
 
 /*

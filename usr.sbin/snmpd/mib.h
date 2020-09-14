@@ -843,7 +843,7 @@
 	{ MIBDECL(hrStorageEntry) },			\
 	{ MIBDECL(hrStorageIndex) },			\
 	{ MIBDECL(hrStorageType) },			\
-	{ MIBDECL(hrStorageDescr) },			\
+	{ MIBDECL(hrStorageDescr), "DisplayString" },	\
 	{ MIBDECL(hrStorageAllocationUnits) },		\
 	{ MIBDECL(hrStorageSize) },			\
 	{ MIBDECL(hrStorageUsed) },			\

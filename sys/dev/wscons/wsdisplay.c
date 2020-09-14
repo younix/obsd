@@ -144,6 +144,8 @@ void	wsdisplay_suspend_device(struct device *);
 void	wsdisplay_addscreen_print(struct wsdisplay_softc *, int, int);
 void	wsdisplay_closescreen(struct wsdisplay_softc *, struct wsscreen *);
 int	wsdisplay_delscreen(struct wsdisplay_softc *, int, int);
+int	wsdisplay_get_param(struct wsdisplay_softc *, struct wsdisplay_param *);
+int	wsdisplay_set_param(struct wsdisplay_softc *, struct wsdisplay_param *);
 
 void	wsdisplay_burner_setup(struct wsdisplay_softc *, struct wsscreen *);
 void	wsdisplay_burner(void *v);
@@ -170,6 +172,7 @@ struct wsdisplay_softc {
 #endif
 
 	int	sc_isconsole;
+	unsigned int sc_savebrightness;
 
 	int sc_flags;
 #define SC_SWITCHPENDING	0x01
@@ -2249,6 +2252,9 @@ retry:
 	s = spltty();
 	sc->sc_resumescreen = active; /* block other vt switches until resume */
 	splx(s);
+
+	sc->sc_savebrightness = wsdisplay_brightness_zero(NULL);
+
 	/*
 	 * This will either return ENXIO (invalid (shouldn't happen) or
 	 * wsdisplay disappeared (problem solved)), or EINTR/ERESTART.
@@ -2273,6 +2279,7 @@ wsdisplay_resume_device(struct device *dev)
 {
 	struct wsdisplay_softc	*sc = (struct wsdisplay_softc *)dev;
 	int			 idx, s;
+	struct wsdisplay_param dp;
 
 	if (sc->sc_resumescreen != WSDISPLAY_NULLSCREEN) {
 		s = spltty();
@@ -2281,6 +2288,10 @@ wsdisplay_resume_device(struct device *dev)
 		wakeup(&sc->sc_resumescreen);
 		splx(s);
 		(void)wsdisplay_switch((struct device *)sc, idx, 1);
+
+		dp.param = WSDISPLAYIO_PARAM_BRIGHTNESS;
+		dp.curval = sc->sc_savebrightness;
+		wsdisplay_set_param(sc, &dp);
 	}
 }
 
@@ -2455,18 +2466,21 @@ wsdisplay_brightness_step(struct device *dev, int dir)
 	wsdisplay_set_param(sc, &dp);
 }
 
-void
+unsigned int
 wsdisplay_brightness_zero(struct device *dev)
 {
 	struct wsdisplay_softc *sc = (struct wsdisplay_softc *)dev;
 	struct wsdisplay_param dp;
+	unsigned int oldval;
 
 	dp.param = WSDISPLAYIO_PARAM_BRIGHTNESS;
 	if (wsdisplay_get_param(sc, &dp))
-		return;
+		return 100;
 
+	oldval = dp.curval;
 	dp.curval = dp.min;
 	wsdisplay_set_param(sc, &dp);
+	return oldval;
 }
 
 void

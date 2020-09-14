@@ -67,6 +67,10 @@
 #include <dev/ic/cd1400reg.h>
 #include <dev/ic/cyreg.h>
 
+/* We encode the cyclom unit number (cyu) in spare bits in the IVR's. */
+#define CD1400_xIVR_CHAN_SHIFT	3
+#define CD1400_xIVR_CHAN	0x1F
+
 void	cypwroff(struct cy_port *);
 int	cy_intr(void *);
 int	cyparam(struct tty *, struct termios *);
@@ -157,9 +161,9 @@ cy_probe_common(bus_space_tag_t memt, bus_space_handle_t memh, int bustype)
 			if ((firmware_ver & 0xf0) == 0x40) /* found a CD1400 */
 				break;
 		}
-#ifdef CY_DEBUG
+//#ifdef CY_DEBUG
 		printf("firmware version 0x%x\n", firmware_ver);
-#endif      
+//#endif      
 
 		if ((firmware_ver & 0xf0) != 0x40)
 			break;
@@ -242,7 +246,22 @@ cy_attach(parent, self)
 
 	/* ensure an edge for the next interrupt */
 	bus_space_write_1(sc->sc_memt, sc->sc_memh,
-	    CY_CLEAR_INTR<<sc->sc_bustype, 0);
+	    CY_CLEAR_INTR << sc->sc_bustype, 0);
+
+
+//cd_write_reg(cy, reg, val)
+//bus_space_write_1(cy->cy_memt, cy->cy_memh,
+//	cy->cy_chip_offs + (((reg << 1)) << cy->cy_bustype), (val))
+
+//cd_write_reg_sc(sc, chip, reg, val)
+//bus_space_write_1(sc->sc_memt, sc->sc_memh,
+//	sc->sc_cd1400_offs[chip] + (((reg<<1))<<sc->sc_bustype), (val))
+
+
+
+
+
+
 }
 
 /*
@@ -339,13 +358,14 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		/* mark the ring buffer as empty */
 		cy->cy_ibuf_rd_ptr = cy->cy_ibuf_wr_ptr = cy->cy_ibuf;
 
-		/* select CD1400 channel */
-		cd_write_reg(cy, CD1400_CAR, port & CD1400_CAR_CHAN);
-		/* reset the channel */
-		cd1400_channel_cmd(cy, CD1400_CCR_CMDRESET);
+	/* select CD1400 channel */
+	cd_write_reg(cy, CD1400_CAR, port & CD1400_CAR_CHAN);
+
 		/* encode unit (port) number in LIVR */
 		/* there is just enough space for 5 bits (32 ports) */
-		cd_write_reg(cy, CD1400_LIVR, port << 3);
+		cd_write_reg(cy, CD1400_LIVR, port << CD1400_xIVR_CHAN_SHIFT);
+		/* reset the channel */
+		cd1400_channel_cmd(cy, CD1400_CCR_CMDRESET);
 
 		cy->cy_channel_control = 0;
 
@@ -357,10 +377,10 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 
 		cy->cy_carrier_stat = cd_read_reg(cy, CD1400_MSVR2);
 
-		/* enable receiver and modem change interrupts */
-		cd_write_reg(cy, CD1400_SRER,
-		    CD1400_SRER_MDMCH | CD1400_SRER_RXDATA | CD1400_SRER_TXRDY |
-		    CD1400_SRER_TXMPTY | CD1400_SRER_NNDT);
+	/* enable receiver and modem change interrupts */
+int srer = CD1400_SRER_MDMCH | CD1400_SRER_RXDATA;
+printf("%s:%d SRER: %x\n", __func__, __LINE__, srer);
+	cd_write_reg(cy, CD1400_SRER, srer);
 
 printf("%s %s:%d %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, cy->cy_carrier_stat);
 
@@ -391,7 +411,7 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			return EBUSY;
 		}
 		cy->cy_cua = 1;
@@ -402,7 +422,7 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			if (cy->cy_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
@@ -412,12 +432,12 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 
 				SET(tp->t_state, TS_WOPEN);
 
-printf("%s %s:%d error:%x cflag:%x state:%x\n",
+printf("%s %s:%d before ttysleep error:%x cflag:%x state:%x\n",
     sc->sc_dev.dv_xname, __func__, __LINE__, error, tp->t_cflag, tp->t_state);
 
 				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH, ttopen);
 
-printf("%s %s:%d error:%x cflag:%x state:%x\n",
+printf("%s %s:%d after ttysleep error:%x cflag:%x state:%x\n",
     sc->sc_dev.dv_xname, __func__, __LINE__, error, tp->t_cflag, tp->t_state);
 
 				/*
@@ -430,7 +450,8 @@ printf("%s %s:%d error:%x cflag:%x state:%x\n",
 					if (!cy->cy_cua && !ISSET(tp->t_state, TS_ISOPEN))
 						cypwroff(cy);
 					splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+printf("%s %s:%d return error: %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+    error);
 					return (error);
 				}
 			}
@@ -493,6 +514,7 @@ cypwroff(struct cy_port *cy)
 	cy_enable_transmitter(cy);
 
 	/* disable receiver and modem change interrupts */
+printf("%s:%d SRER: %x\n", __func__, __LINE__, 0);
 	cd_write_reg(cy, CD1400_SRER, 0);
 	if (ISSET(tp->t_cflag, HUPCL) &&
 	    !ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR)) {
@@ -1153,8 +1175,9 @@ cy_intr(arg)
 	struct cy_port *cy;
 	int cy_chip, stat;
 	int int_serviced = -1;
+	int srer = 0;
 
-printf("%s:%d enter ", __func__, __LINE__);
+printf("%s %s:%d enter ", sc->sc_dev.dv_xname, __func__, __LINE__);
 
 	/*
 	 * Check interrupt status of each CD1400 chip on this card
@@ -1167,7 +1190,7 @@ printf("%s:%d enter ", __func__, __LINE__);
 			continue;
 
 		if (ISSET(stat, CD1400_SVRR_RXRDY)) {
-printf("RXRDY");
+printf("RXRDY\n");
 			u_char save_car, save_rir, serv_type;
 			u_char line_stat, recv_data, n_chars;
 			u_char *buf_p;
@@ -1178,7 +1201,7 @@ printf("RXRDY");
 			cd_write_reg_sc(sc, cy_chip, CD1400_CAR, save_rir);
 
 			serv_type = cd_read_reg_sc(sc, cy_chip, CD1400_RIVR);
-			cy = &sc->sc_ports[serv_type >> 3];
+			cy = &sc->sc_ports[serv_type >> CD1400_xIVR_CHAN_SHIFT];
 
 #ifdef CY_DEBUG1
 			cy->cy_rx_int_count++;
@@ -1394,9 +1417,9 @@ printf("TXRDY");
 				 * No data to send or requested to stop.
 				 * Disable transmit interrupt
 				 */
-				cd_write_reg(cy, CD1400_SRER,
-				    cd_read_reg(cy, CD1400_SRER)
-				    & ~CD1400_SRER_TXRDY);
+srer = cd_read_reg(cy, CD1400_SRER) & ~CD1400_SRER_TXRDY;
+printf("%s:%d SRER: %x\n", __func__, __LINE__, srer);
+				cd_write_reg(cy, CD1400_SRER, srer);
 				CLR(cy->cy_flags, CYF_STOP);
 				CLR(tp->t_state, TS_BUSY);
 			}
@@ -1413,7 +1436,7 @@ printf("TXRDY");
 		} /* if(tx_service...) */
 	} /* for(...all CD1400s on a card) */
 
-printf("\n");
+printf("\n%s %s:%d return %d\n", sc->sc_dev.dv_xname, __func__, __LINE__, int_serviced);
 
 	/* ensure an edge for next interrupt */
 	bus_space_write_1(sc->sc_memt, sc->sc_memh,
@@ -1431,8 +1454,11 @@ cy_enable_transmitter(cy)
 	int s;
 	s = spltty();
 	cd_write_reg(cy, CD1400_CAR, cy->cy_port_num & CD1400_CAR_CHAN);
-	cd_write_reg(cy, CD1400_SRER, cd_read_reg(cy, CD1400_SRER)
-	    | CD1400_SRER_TXRDY);
+
+int srer = cd_read_reg(cy, CD1400_SRER) | CD1400_SRER_TXRDY;
+printf("%s:%d SRER: %x\n", __func__, __LINE__, srer);
+
+	cd_write_reg(cy, CD1400_SRER, srer);
 	splx(s);
 }
 
