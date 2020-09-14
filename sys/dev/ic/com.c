@@ -78,6 +78,8 @@
 #include <ddb/db_var.h>
 #endif
 
+#include <sys/proc.h>
+
 #include <machine/bus.h>
 #include <machine/intr.h>
 
@@ -241,15 +243,22 @@ comopen(dev_t dev, int flag, int mode, struct proc *p)
 	int s;
 	int error = 0;
 
+//printf("%s:%d pid: %d name:%s\n", __func__, __LINE__,
+//    curproc->p_p->ps_pid, curproc->p_p->ps_comm);
+
 	if (unit >= com_cd.cd_ndevs) {
-printf("%s:%d return\n", __func__, __LINE__);
+//printf("%s:%d return ENXIO\n", __func__, __LINE__);
 		return ENXIO;
 	}
 	sc = com_cd.cd_devs[unit];
 	if (!sc) {
-printf("%s:%d return\n", __func__, __LINE__);
+//printf("%s %s:%d return ENXIO\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+//printf("%s:%d return ENXIO\n", __func__, __LINE__);
 		return ENXIO;
 	}
+
+printf("%s %s:%d pid: %d name:%s\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+    curproc->p_p->ps_pid, curproc->p_p->ps_comm);
 
 	s = spltty();
 	if (!sc->sc_tty) {
@@ -373,10 +382,12 @@ printf("%s:%d return\n", __func__, __LINE__);
 
 		sc->sc_msr = com_read_reg(sc, com_msr);
 
-printf("%s %s:%d %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, sc->sc_msr);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d sc_msr: %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, sc->sc_msr);
 
 
-printf("%s %s:%d %d, %d, %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d %d, devcua: %d, softcar: %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
 	DEVCUA(dev),
 	ISSET(sc->sc_swflags, COM_SW_SOFTCAR),
 	ISSET(sc->sc_msr, MSR_DCD),
@@ -386,14 +397,17 @@ printf("%s %s:%d %d, %d, %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
 		    ISSET(sc->sc_swflags, COM_SW_SOFTCAR) ||
 		    ISSET(sc->sc_msr, MSR_DCD) ||
 		    ISSET(tp->t_cflag, MDMBUF)) {
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
 printf("%s %s:%d set carrier on\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			SET(tp->t_state, TS_CARR_ON);
 		} else {
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
 printf("%s %s:%d clear carrier\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			CLR(tp->t_state, TS_CARR_ON);
 		}
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		return EBUSY;
 	} else
 		s = spltty();
@@ -403,7 +417,8 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			return EBUSY;
 		}
 		sc->sc_cua = 1;		/* We go into CUA mode. */
@@ -413,7 +428,8 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			if (sc->sc_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
@@ -442,7 +458,8 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 					if (!sc->sc_cua && !ISSET(tp->t_state, TS_ISOPEN))
 						compwroff(sc);
 					splx(s);
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d return %d\n", sc->sc_dev.dv_xname, __func__, __LINE__, error);
 					return error;
 				}
 			}
@@ -450,8 +467,10 @@ printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 	}
 	splx(s);
 
-printf("%s %s:%d return\n", sc->sc_dev.dv_xname, __func__, __LINE__);
-	return (*linesw[tp->t_line].l_open)(dev, tp, p);
+	int r = (*linesw[tp->t_line].l_open)(dev, tp, p);
+if (strcmp(sc->sc_dev.dv_xname, "com1") != 0)
+printf("%s %s:%d return %d\n", sc->sc_dev.dv_xname, __func__, __LINE__, r);
+	return r;
 }
 
 int
@@ -1093,7 +1112,8 @@ comintr(void *arg)
 	struct tty *tp;
 	u_char lsr, data, msr, delta;
 
-//printf("%s:%d\n", __func__, __LINE__);
+if (strcmp(sc->sc_dev.dv_xname, "com1") == 0)
+printf("%s %s:%d\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 
 	if (!sc->sc_tty)
 		return (0);		/* Can't do squat. */
@@ -1149,6 +1169,11 @@ comintr(void *arg)
 		msr = com_read_reg(sc, com_msr);
 
 		if (msr != sc->sc_msr) {
+
+if (strcmp(sc->sc_dev.dv_xname, "com1") == 0)
+printf("%s %s:%d modem change: from: %x to: %x\n",
+    sc->sc_dev.dv_xname, __func__, __LINE__, sc->sc_msr, msr);
+
 			delta = msr ^ sc->sc_msr;
 
 			ttytstamp(tp, sc->sc_msr & MSR_CTS, msr & MSR_CTS,
