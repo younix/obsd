@@ -184,6 +184,7 @@ rp_pci_init_controller(struct rp_softc *sc, int AiopNum, int IRQNum,
 	int i;
 
 	/* Strobe the MUDBAC's End Of Interrupt bit */
+	//rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB);
 	rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB | INTR_EN_PCI);
 
 	/* Init AIOPs */

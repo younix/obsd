@@ -650,9 +650,9 @@ rp_handle_port(struct rp_port *rp)
 }
 
 void
-rp_poll(void *arg)
+rp_poll(struct rp_port *rp)
 {
-	struct rp_port	*rp = arg;
+	//struct rp_port	*rp = arg;
 	struct rp_softc	*sc = rp->rp_sc;
 	struct tty	*tp = rp->rp_tty;
 	int		 count;
@@ -673,7 +673,7 @@ rp_poll(void *arg)
 	if (count > 0)
 		rpstart(tp);
 
-	timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
+//	timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 }
 
 #if 0
@@ -786,7 +786,23 @@ printf("free(%p, %d, %zu * %d);\n",
 int
 rp_intr(void *arg)
 {
-	printf("rp: INTERRUPT INTERRUPT INTERRUPT INTERRUPT INTERRUPT INTERRUPT");
+	struct rp_softc *sc = arg;
+	int i;
+
+	printf("%s: interrupt\n", DEVNAME(sc));
+
+	if (sc->sc_rp == NULL)
+		return 0;
+
+	for (i = 0; i < sc->num_ports; i++)
+		rp_poll(sc->sc_rp + i);
+
+#define _PCI_INT_FUNC	0x3A
+#define PCI_STROB	0x2000
+#define INTR_EN_PCI	0x0010
+
+	rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB | INTR_EN_PCI);
+
 	return 1;
 }
 
@@ -874,8 +890,8 @@ printf("%s:%d return\n", __func__, __LINE__);
 //		rp_set_RTS(&rp->rp_channel);
 
 //XXX:		callout_reset(&rp->rp_timer, POLL_INTERVAL, rp_poll, rp);
-		timeout_set(&rp->rp_timer, rp_poll, rp);
-		timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
+//		timeout_set(&rp->rp_timer, rp_poll, rp);
+//		timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
 printf("%s:%d return EBUSY\n", __func__, __LINE__);
 		return (EBUSY);
@@ -953,7 +969,7 @@ rpclose(dev_t dev, int flag, int mode, struct proc *p)
 	s = spltty();
 
 	if (!ISSET(tp->t_state, TS_WOPEN)) {
-		timeout_del(&rp->rp_timer);
+//		timeout_del(&rp->rp_timer);
 		rphardclose(tp, rp);
 	}
 
