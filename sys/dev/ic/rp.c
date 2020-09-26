@@ -620,16 +620,23 @@ rp_handle_port(struct rp_port *rp)
 	cp = &rp->rp_channel;
 	tp = rp->rp_tty;
 	IntMask = rp_chan_intr_id(cp);
+printf("%s:%d IntMask: %x\n", __func__, __LINE__, IntMask);
 	IntMask = IntMask & rp->rp_intmask;
+printf("%s:%d IntMask: %x\n", __func__, __LINE__, IntMask);
 	ChanStatus = rp_chan_status(cp);
+printf("%s:%d ChanStatus: %x\n", __func__, __LINE__, ChanStatus);
 	if (IntMask & RXF_TRIG)
 		rp_do_receive(rp, tp, cp, ChanStatus);
 
+printf("%s:%d IntMask: %x DELTA_CD: %x\n", __func__, __LINE__, IntMask, DELTA_CD);
 	if (IntMask & DELTA_CD) {
-		if (ChanStatus & CD_ACT)
+		if (ChanStatus & CD_ACT) {
+printf("%s:%d ttymodem(tp, 1)\n", __func__, __LINE__);
 			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
-		else
+		} else {
+printf("%s:%d ttymodem(tp, 0)\n", __func__, __LINE__);
 			(void)(*linesw[tp->t_line].l_modem)(tp, 0);
+		}
 	}
 /*	oldcts = rp->rp_cts;
 	rp->rp_cts = ((ChanStatus & CTS_ACT) != 0);
@@ -797,6 +804,7 @@ rp_intr(void *arg)
 	for (i = 0; i < sc->num_ports; i++)
 		rp_poll(sc->sc_rp + i);
 
+// TODO: redundant code
 #define _PCI_INT_FUNC	0x3A
 #define PCI_STROB	0x2000
 #define INTR_EN_PCI	0x0010
@@ -900,6 +908,7 @@ printf("%s:%d return EBUSY\n", __func__, __LINE__);
 	}
 
 	if (DEVCUA(dev)) {
+printf("%s:%d cua true\n", __func__, __LINE__);
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
@@ -908,8 +917,10 @@ printf("%s:%d return EBUSY\n", __func__, __LINE__);
 		}
 		rp->rp_cua = 1;
 	} else {
+printf("%s:%d cua false\n", __func__, __LINE__);
 		/* tty (not cua) device; wait for carrier if necessary. */
 		if (ISSET(flag, O_NONBLOCK)) {
+printf("%s:%d isset O_NONBLOCK\n", __func__, __LINE__);
 			if (rp->rp_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
@@ -917,7 +928,10 @@ printf("%s:%d return EBUSY\n", __func__, __LINE__);
 				return (EBUSY);
 			}
 		} else {
-			while (rp->rp_cua) {
+printf("%s:%d while cua: %d\n", __func__, __LINE__, rp->rp_cua);
+			while (rp->rp_cua || (!ISSET(tp->t_cflag, CLOCAL) &&
+			    !ISSET(tp->t_state, TS_CARR_ON))) {
+
 				SET(tp->t_state, TS_WOPEN);
 printf("%s %s:%d before ttysleep", DEVNAME(rp->rp_sc), __func__, __LINE__);
 				error = ttysleep(tp, &tp->t_rawq,
@@ -942,7 +956,7 @@ printf("%s:%d return error:%d\n", __func__, __LINE__, error);
 	splx(s);
 
 int ret = ((*linesw[tp->t_line].l_open)(dev, tp, p));
-printf("%s:%d return %d\n", __func__, __LINE__, ret);
+printf("%s:%d return l_open:%d\n", __func__, __LINE__, ret);
 	return ret;
 }
 
