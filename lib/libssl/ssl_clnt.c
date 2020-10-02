@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.71 2020/09/11 17:36:27 jsing Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.73 2020/09/24 18:12:00 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -588,10 +588,8 @@ ssl3_connect(SSL *s)
 				goto end;
 			}
 
-			if (!SSL_IS_DTLS(s)) {
-				BUF_MEM_free(s->internal->init_buf);
-				s->internal->init_buf = NULL;
-			}
+			if (!SSL_IS_DTLS(s))
+				ssl3_release_init_buffer(s);
 
 			ssl_free_wbio_buffer(s);
 
@@ -857,9 +855,7 @@ ssl3_get_server_hello(SSL *s)
 	}
 	s->version = server_version;
 
-	if ((method = tls1_get_client_method(server_version)) == NULL)
-		method = dtls1_get_client_method(server_version);
-	if (method == NULL) {
+	if ((method = ssl_get_client_method(server_version)) == NULL) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		goto err;
 	}

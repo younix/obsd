@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2_pld.c,v 1.94 2020/08/20 19:28:01 tobhe Exp $	*/
+/*	$OpenBSD: ikev2_pld.c,v 1.100 2020/10/01 18:38:49 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -692,6 +692,12 @@ ikev2_validate_id(struct iked_message *msg, size_t offset, size_t left,
 	}
 	memcpy(id, msgbuf + offset, sizeof(*id));
 
+	if (id->id_type == IKEV2_ID_NONE) {
+		log_debug("%s: malformed payload: invalid ID type.",
+		    __func__);
+		return (-1);
+	}
+
 	return (0);
 }
 
@@ -893,6 +899,12 @@ ikev2_validate_auth(struct iked_message *msg, size_t offset, size_t left,
 		return (-1);
 	}
 	memcpy(auth, msgbuf + offset, sizeof(*auth));
+
+	if (auth->auth_method == 0) {
+		log_info("%s: malformed payload: invalid auth method",
+		    __func__);
+		return (-1);
+	}
 
 	return (0);
 }
@@ -1344,13 +1356,14 @@ ikev2_pld_delete(struct iked *env, struct ikev2_payload *pld,
 	size_t			 found = 0, failed = 0;
 	int			 cnt, i, len, sz, ret = -1;
 
+	if (ikev2_validate_delete(msg, offset, left, &del))
+		return (-1);
+
 	/* Skip if it's a response, then we don't have to deal with it */
 	if (ikev2_msg_frompeer(msg) &&
 	    msg->msg_parent->msg_response)
 		return (0);
 
-	if (ikev2_validate_delete(msg, offset, left, &del))
-		return (-1);
 	cnt = betoh16(del.del_nspi);
 	sz = del.del_spisize;
 
@@ -1721,7 +1734,6 @@ ikev2_pld_ef(struct iked *env, struct ikev2_payload *pld,
 			goto done;
 		}
 		sa_frag->frag_total = frag_total;
-		sa_frag->frag_nextpayload = pld->pld_nextpayload;
 	}
 
 	/* Drop all fragments if frag_num or frag_total don't match */
@@ -1731,6 +1743,10 @@ ikev2_pld_ef(struct iked *env, struct ikev2_payload *pld,
 	/* Silent drop if fragment already stored */
 	if (sa_frag->frag_arr[frag_num-1] != NULL)
 		goto done;
+
+	/* The first fragments IKE header determines pld_nextpayload */
+	if (frag_num == 1)
+		sa_frag->frag_nextpayload = pld->pld_nextpayload;
 
         /* Decrypt fragment */
 	if ((e = ibuf_new(buf, len)) == NULL)
@@ -1790,6 +1806,7 @@ ikev2_frags_reassemble(struct iked *env, struct ikev2_payload *pld,
 	struct iked_frag		*sa_frag = &msg->msg_sa->sa_fragments;
 	struct ibuf			*e = NULL;
 	struct iked_frag_entry		*el;
+	uint8_t				*ptr;
 	size_t				 offset;
 	size_t				 i;
 	struct iked_message		 emsg;
@@ -1806,7 +1823,12 @@ ikev2_frags_reassemble(struct iked *env, struct ikev2_payload *pld,
 	for (i = 0; i < sa_frag->frag_total; i++) {
 		if ((el = sa_frag->frag_arr[i]) == NULL)
 			fatalx("Tried to reassemble shallow frag_arr");
-		memcpy(ibuf_seek(e, offset, 0), el->frag_data, el->frag_size);
+		ptr = ibuf_seek(e, offset, el->frag_size);
+		if (ptr == NULL) {
+			log_info("%s: failed to reassemble fragments", __func__);
+			goto done;
+		}
+		memcpy(ptr, el->frag_data, el->frag_size);
 		offset += el->frag_size;
 	}
 
@@ -2005,8 +2027,9 @@ ikev2_pld_eap(struct iked *env, struct ikev2_payload *pld,
 		    eap->eap_id, betoh16(eap->eap_length),
 		    print_map(eap->eap_type, eap_type_map));
 
-		if (eap_parse(env, sa, eap, msg->msg_response) == -1)
+		if (eap_parse(env, sa, msg, eap, msg->msg_response) == -1)
 			return (-1);
+		msg->msg_parent->msg_eap.eam_found = 1;
 	}
 
 	return (0);

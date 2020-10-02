@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vfy.c,v 1.78 2020/09/14 09:09:08 beck Exp $ */
+/* $OpenBSD: x509_vfy.c,v 1.81 2020/09/26 02:06:28 deraadt Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1664,9 +1664,10 @@ check_crl(X509_STORE_CTX *ctx, X509_CRL *crl)
 	if (ctx->current_issuer) {
 		issuer = ctx->current_issuer;
 	} else if (cnum < chnum) {
-		/* Else find CRL issuer: if not last certificate then issuer
-	 	* is next certificate in chain.
-	 	*/
+		/*
+		 * Else find CRL issuer: if not last certificate then issuer
+		 * is next certificate in chain.
+		 */
 		issuer = sk_X509_value(ctx->chain, cnum + 1);
 	} else {
 		issuer = sk_X509_value(ctx->chain, chnum);
@@ -1888,7 +1889,7 @@ x509_check_cert_time(X509_STORE_CTX *ctx, X509 *x, int depth)
 	    X509_V_ERR_ERROR_IN_CERT_NOT_BEFORE_FIELD))
 		return 0;
 	if (i > 0 && !verify_cb_cert(ctx, x, depth,
-		X509_V_ERR_CERT_NOT_YET_VALID))
+	    X509_V_ERR_CERT_NOT_YET_VALID))
 		return 0;
 
 	i = X509_cmp_time_internal(X509_get_notAfter(x), ptime, 1);
@@ -1940,16 +1941,16 @@ internal_verify(X509_STORE_CTX *ctx)
 		 * certificate and its depth (rather than the depth of
 		 * the subject).
 		 */
-		if (xs != xi || (ctx->param->flags &
-			X509_V_FLAG_CHECK_SS_SIGNATURE)) {
+		if (xs != xi ||
+		    (ctx->param->flags & X509_V_FLAG_CHECK_SS_SIGNATURE)) {
 			EVP_PKEY *pkey;
 			if ((pkey = X509_get_pubkey(xi)) == NULL) {
 				if (!verify_cb_cert(ctx, xi, xi != xs ? n+1 : n,
-					X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY))
+				    X509_V_ERR_UNABLE_TO_DECODE_ISSUER_PUBLIC_KEY))
 					return 0;
 			} else if (X509_verify(xs, pkey) <= 0) {
 				if (!verify_cb_cert(ctx, xs, n,
-					X509_V_ERR_CERT_SIGNATURE_FAILURE)) {
+				    X509_V_ERR_CERT_SIGNATURE_FAILURE)) {
 					EVP_PKEY_free(pkey);
 					return 0;
 				}
@@ -2004,7 +2005,6 @@ X509_cmp_time_internal(const ASN1_TIME *ctm, time_t *cmp_time, int clamp_notafte
 	time_t compare;
 	struct tm tm1, tm2;
 	int ret = 0;
-	int type;
 
 	if (cmp_time == NULL)
 		compare = time(NULL);
@@ -2013,29 +2013,8 @@ X509_cmp_time_internal(const ASN1_TIME *ctm, time_t *cmp_time, int clamp_notafte
 
 	memset(&tm1, 0, sizeof(tm1));
 
-	type = ASN1_time_parse(ctm->data, ctm->length, &tm1, ctm->type);
-	if (type == -1)
+	if (!x509_verify_asn1_time_to_tm(ctm, &tm1, clamp_notafter))
 		goto out; /* invalid time */
-
-	/* RFC 5280 section 4.1.2.5 */
-	if (tm1.tm_year < 150 && type != V_ASN1_UTCTIME)
-		goto out;
-	if (tm1.tm_year >= 150 && type != V_ASN1_GENERALIZEDTIME)
-		goto out;
-
-	if (clamp_notafter) {
-		/* Allow for completely broken operating systems. */
-		if (!ASN1_time_tm_clamp_notafter(&tm1))
-			goto out;
-	}
-
-	/*
-	 * Defensively fail if the time string is not representable as
-	 * a time_t. A time_t must be sane if you care about times after
-	 * Jan 19 2038.
-	 */
-	if (timegm(&tm1) == -1)
-		goto out;
 
 	if (gmtime_r(&compare, &tm2) == NULL)
 		goto out;

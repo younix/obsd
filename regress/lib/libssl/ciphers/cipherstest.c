@@ -22,6 +22,16 @@
 
 int ssl_parse_ciphersuites(STACK_OF(SSL_CIPHER) **out_ciphers, const char *str);
 
+static inline int
+ssl_aes_is_accelerated(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+	return ((OPENSSL_cpu_caps() & (1ULL << 57)) != 0);
+#else
+	return (0);
+#endif
+}
+
 static int
 get_put_test(const char *name, const SSL_METHOD *method)
 {
@@ -281,12 +291,14 @@ struct cipher_set_test {
 	int ssl_ciphersuites_first;
 	const char *ssl_ciphersuites;
 	const char *ssl_rulestr;
-	const unsigned long cids[32];
+	int cids_aes_accel_fixup;
+	unsigned long cids[32];
 };
 
 struct cipher_set_test cipher_set_tests[] = {
 	{
 		.ctx_rulestr = "TLSv1.2+ECDHE+AEAD+AES",
+		.cids_aes_accel_fixup = 1,
 		.cids = {
 			TLS1_3_CK_AES_256_GCM_SHA384,
 			TLS1_3_CK_CHACHA20_POLY1305_SHA256,
@@ -299,6 +311,7 @@ struct cipher_set_test cipher_set_tests[] = {
 	},
 	{
 		.ssl_rulestr = "TLSv1.2+ECDHE+AEAD+AES",
+		.cids_aes_accel_fixup = 1,
 		.cids = {
 			TLS1_3_CK_AES_256_GCM_SHA384,
 			TLS1_3_CK_CHACHA20_POLY1305_SHA256,
@@ -362,6 +375,28 @@ struct cipher_set_test cipher_set_tests[] = {
 		},
 	},
 	{
+		.ssl_ciphersuites_first = 1,
+		.ssl_ciphersuites = "",
+		.ssl_rulestr = "TLSv1.2+ECDHE+AEAD+AES",
+		.cids = {
+			TLS1_CK_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			TLS1_CK_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		},
+	},
+	{
+		.ssl_ciphersuites_first = 0,
+		.ssl_ciphersuites = "",
+		.ssl_rulestr = "TLSv1.2+ECDHE+AEAD+AES",
+		.cids = {
+			TLS1_CK_ECDHE_RSA_WITH_AES_256_GCM_SHA384,
+			TLS1_CK_ECDHE_ECDSA_WITH_AES_256_GCM_SHA384,
+			TLS1_CK_ECDHE_RSA_WITH_AES_128_GCM_SHA256,
+			TLS1_CK_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256,
+		},
+	},
+	{
 		.ctx_ciphersuites = "AEAD-AES256-GCM-SHA384:AEAD-CHACHA20-POLY1305-SHA256",
 		.ssl_rulestr = "TLSv1.2+ECDHE+AEAD+AES",
 		.cids = {
@@ -398,12 +433,17 @@ cipher_set_test()
 	SSL_CIPHER *cipher;
 	SSL_CTX *ctx = NULL;
 	SSL *ssl = NULL;
-	int failed = 1;
+	int failed = 0;
 	size_t i;
 	int j;
 
 	for (i = 0; i < N_CIPHER_SET_TESTS; i++) {
 		cst = &cipher_set_tests[i];
+
+		if (!ssl_aes_is_accelerated() && cst->cids_aes_accel_fixup) {
+			cst->cids[0] = TLS1_3_CK_CHACHA20_POLY1305_SHA256;
+			cst->cids[1] = TLS1_3_CK_AES_256_GCM_SHA384;
+		}
 
 		if ((ctx = SSL_CTX_new(TLS_method())) == NULL)
 			errx(1, "SSL_CTX_new");
@@ -448,25 +488,17 @@ cipher_set_test()
 			fprintf(stderr, "FAIL: test %zu - got cipher %d with "
 			    "id %lx, want %lx\n", i, j,
 			    SSL_CIPHER_get_id(cipher), cst->cids[j]);
-			goto failed;
+			failed |= 1;
 		}
 		if (cst->cids[j] != 0) {
 			fprintf(stderr, "FAIL: test %zu - got %d ciphers, "
 			    "expected more", i, sk_SSL_CIPHER_num(ciphers));
-			goto failed;
+			failed |= 1;
 		}
 
 		SSL_CTX_free(ctx);
-		ctx = NULL;
 		SSL_free(ssl);
-		ssl = NULL;
 	}
-
-	failed = 0;
-
- failed:
-	SSL_CTX_free(ctx);
-	SSL_free(ssl);
 
 	return failed;
 }

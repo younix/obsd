@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.266 2020/09/12 17:08:50 mpi Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.268 2020/09/22 14:31:08 mpi Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /*
@@ -167,7 +167,7 @@ boolean_t		 uvm_map_inentry_fix(struct proc *, struct p_inentry *,
  * Tree management functions.
  */
 
-static __inline void	 uvm_mapent_copy(struct vm_map_entry*,
+static inline void	 uvm_mapent_copy(struct vm_map_entry*,
 			    struct vm_map_entry*);
 static inline int	 uvm_mapentry_addrcmp(const struct vm_map_entry*,
 			    const struct vm_map_entry*);
@@ -361,7 +361,7 @@ uvm_mapentry_addrcmp(const struct vm_map_entry *e1,
 /*
  * Copy mapentry.
  */
-static __inline void
+static inline void
 uvm_mapent_copy(struct vm_map_entry *src, struct vm_map_entry *dst)
 {
 	caddr_t csrc, cdst;
@@ -563,7 +563,7 @@ uvm_map_entrybyaddr(struct uvm_map_addr *atree, vaddr_t addr)
  * *head must be initialized to NULL before the first call to this macro.
  * uvm_unmap_detach(*head, 0) will remove dead entries.
  */
-static __inline void
+static inline void
 dead_entry_push(struct uvm_map_deadq *deadq, struct vm_map_entry *entry)
 {
 	TAILQ_INSERT_TAIL(deadq, entry, dfree.deadq);
@@ -1893,16 +1893,16 @@ uvm_map_inentry(struct proc *p, struct p_inentry *ie, vaddr_t addr,
 	boolean_t ok = TRUE;
 
 	if (uvm_map_inentry_recheck(serial, addr, ie)) {
-		KERNEL_LOCK();
 		ok = uvm_map_inentry_fix(p, ie, addr, fn, serial);
 		if (!ok) {
+			KERNEL_LOCK();
 			printf(fmt, p->p_p->ps_comm, p->p_p->ps_pid, p->p_tid,
 			    addr, ie->ie_start, ie->ie_end);
 			p->p_p->ps_acflag |= AMAP;
 			sv.sival_ptr = (void *)PROC_PC(p);
 			trapsignal(p, SIGSEGV, 0, SEGV_ACCERR, sv);
+			KERNEL_UNLOCK();
 		}
-		KERNEL_UNLOCK();
 	}
 	return (ok);
 }
@@ -4812,8 +4812,8 @@ uvm_map_clip_start(struct vm_map *map, struct vm_map_entry *entry, vaddr_t addr)
 /*
  * Boundary fixer.
  */
-static __inline vaddr_t uvm_map_boundfix(vaddr_t, vaddr_t, vaddr_t);
-static __inline vaddr_t
+static inline vaddr_t uvm_map_boundfix(vaddr_t, vaddr_t, vaddr_t);
+static inline vaddr_t
 uvm_map_boundfix(vaddr_t min, vaddr_t max, vaddr_t bound)
 {
 	return (min < bound && max > bound) ? bound : max;

@@ -14,7 +14,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: dighost.c,v 1.29 2020/09/14 08:40:43 florian Exp $ */
+/* $Id: dighost.c,v 1.34 2020/09/15 11:47:42 florian Exp $ */
 
 /*! \file
  *  \note
@@ -37,7 +37,6 @@
 #include <time.h>
 #include <stdint.h>
 
-#include <dns/byaddr.h>
 #include <dns/fixedname.h>
 #include <dns/log.h>
 #include <dns/message.h>
@@ -56,7 +55,6 @@
 #include <isc/base64.h>
 #include <isc/hex.h>
 #include <isc/log.h>
-#include <isc/netaddr.h>
 #include <isc/result.h>
 #include <isc/serial.h>
 #include <isc/sockaddr.h>
@@ -98,8 +96,8 @@ isc_taskmgr_t *taskmgr = NULL;
 isc_task_t *global_task = NULL;
 isc_timermgr_t *timermgr = NULL;
 isc_socketmgr_t *socketmgr = NULL;
-isc_sockaddr_t bind_address;
-isc_sockaddr_t bind_any;
+struct sockaddr_storage bind_address;
+struct sockaddr_storage bind_any;
 int sendcount = 0;
 int recvcount = 0;
 int sockcount = 0;
@@ -110,7 +108,7 @@ int lookup_counter = 0;
 static char sitvalue[256];
 
 isc_socket_t *keep = NULL;
-isc_sockaddr_t keepaddr;
+struct sockaddr_storage keepaddr;
 
 static const struct {
 	const char *ns;
@@ -180,7 +178,7 @@ isc_result_t
 	int headers);
 
 void
-(*dighost_received)(unsigned int bytes, isc_sockaddr_t *from, dig_query_t *query);
+(*dighost_received)(unsigned int bytes, struct sockaddr_storage *from, dig_query_t *query);
 
 void
 (*dighost_trying)(char *frm, dig_lookup_t *lookup);
@@ -309,25 +307,35 @@ get_reverse(char *reverse, size_t len, char *value, int ip6_int,
 	    int strict)
 {
 	int r;
+	struct in_addr in;
+	struct in6_addr in6;
 	isc_result_t result;
-	isc_netaddr_t addr;
 
-	addr.family = AF_INET6;
-	r = inet_pton(AF_INET6, value, &addr.type.in6);
+	r = inet_pton(AF_INET6, value, &in6);
 	if (r > 0) {
 		/* This is a valid IPv6 address. */
-		dns_fixedname_t fname;
-		dns_name_t *name;
-		unsigned int options = 0;
+		static char hex_digits[] = {
+			'0', '1', '2', '3', '4', '5', '6', '7',
+			'8', '9', 'a', 'b', 'c', 'd', 'e', 'f'
+		};
+		int i;
+		unsigned char *bytes = (unsigned char *)&in6;
+		char* cp;
 
-		if (ip6_int)
-			options |= DNS_BYADDROPT_IPV6INT;
-		dns_fixedname_init(&fname);
-		name = dns_fixedname_name(&fname);
-		result = dns_byaddr_createptrname2(&addr, options, name);
-		if (result != ISC_R_SUCCESS)
-			return (result);
-		dns_name_format(name, reverse, (unsigned int)len);
+		if (len <= 15 * 4 + sizeof("ip6.int"))
+			return (ISC_R_NOMEMORY);
+
+		cp = reverse;
+		for (i = 15; i >= 0; i--) {
+			*cp++ = hex_digits[bytes[i] & 0x0f];
+			*cp++ = '.';
+			*cp++ = hex_digits[(bytes[i] >> 4) & 0x0f];
+			*cp++ = '.';
+		}
+		*cp = '\0';
+		if (strlcat(reverse, ip6_int ? "ip6.int" : "ip6.arpa", len)
+		    >= len)
+			return (ISC_R_NOSPACE);
 		return (ISC_R_SUCCESS);
 	} else {
 		/*
@@ -340,16 +348,14 @@ get_reverse(char *reverse, size_t len, char *value, int ip6_int,
 		 */
 		char *p = reverse;
 		char *end = reverse + len;
-		if (strict && inet_pton(AF_INET, value, &addr.type.in) != 1)
+		if (strict && inet_pton(AF_INET, value, &in) != 1)
 			return (DNS_R_BADDOTTEDQUAD);
 		result = reverse_octets(value, &p, end);
 		if (result != ISC_R_SUCCESS)
 			return (result);
 		/* Append .in-addr.arpa. and a terminating NUL. */
 		result = append(".in-addr.arpa.", 15, &p, end);
-		if (result != ISC_R_SUCCESS)
-			return (result);
-		return (ISC_R_SUCCESS);
+		return (result);
 	}
 }
 
@@ -488,7 +494,7 @@ flush_server_list(void) {
 /* this used to be bind9_getaddresses from lib/bind9 */
 static isc_result_t
 get_addresses(const char *hostname, in_port_t dstport,
-		   isc_sockaddr_t *addrs, int addrsize, int *addrcount)
+		   struct sockaddr_storage *addrs, int addrsize, int *addrcount)
 {
 	struct addrinfo *ai = NULL, *tmpai, hints;
 	int result, i;
@@ -550,11 +556,10 @@ get_addresses(const char *hostname, in_port_t dstport,
 isc_result_t
 set_nameserver(char *opt) {
 	isc_result_t result;
-	isc_sockaddr_t sockaddrs[DIG_MAX_ADDRESSES];
-	isc_netaddr_t netaddr;
+	struct sockaddr_storage sockaddrs[DIG_MAX_ADDRESSES];
 	int count, i;
 	dig_server_t *srv;
-	char tmp[ISC_NETADDR_FORMATSIZE];
+	char tmp[NI_MAXHOST];
 
 	if (opt == NULL)
 		return ISC_R_NOTFOUND;
@@ -567,8 +572,12 @@ set_nameserver(char *opt) {
 	flush_server_list();
 
 	for (i = 0; i < count; i++) {
-		isc_netaddr_fromsockaddr(&netaddr, &sockaddrs[i]);
-		isc_netaddr_format(&netaddr, tmp, sizeof(tmp));
+		int error;
+		error = getnameinfo((struct sockaddr *)&sockaddrs[i],
+		    sockaddrs[i].ss_len, tmp, sizeof(tmp), NULL, 0,
+		    NI_NUMERICHOST | NI_NUMERICSERV);
+		if (error)
+			fatal("%s", gai_strerror(error));
 		srv = make_server(tmp, opt);
 		if (srv == NULL)
 			fatal("memory allocation failure");
@@ -816,7 +825,7 @@ clone_lookup(dig_lookup_t *lookold, int servers) {
 	looknew->eoferr = lookold->eoferr;
 
 	if (lookold->ecs_addr != NULL) {
-		size_t len = sizeof(isc_sockaddr_t);
+		size_t len = sizeof(struct sockaddr_storage);
 		looknew->ecs_addr = malloc(len);
 		if (looknew->ecs_addr == NULL)
 			fatal("out of memory");
@@ -924,8 +933,8 @@ parse_bits(char *arg, uint32_t max) {
 }
 
 isc_result_t
-parse_netprefix(isc_sockaddr_t **sap, const char *value) {
-	isc_sockaddr_t *sa = NULL;
+parse_netprefix(struct sockaddr_storage **sap, int *plen, const char *value) {
+	struct sockaddr_storage *sa = NULL;
 	struct in_addr in4;
 	struct in6_addr in6;
 	uint32_t prefix_length = 0xffffffff;
@@ -946,7 +955,7 @@ parse_netprefix(isc_sockaddr_t **sap, const char *value) {
 	memset(sa, 0, sizeof(*sa));
 
 	if (strcmp(buf, "0") == 0) {
-		sa->type.sa.sa_family = AF_UNSPEC;
+		sa->ss_family = AF_UNSPEC;
 		prefix_length = 0;
 		goto done;
 	}
@@ -954,7 +963,7 @@ parse_netprefix(isc_sockaddr_t **sap, const char *value) {
 	slash = strchr(buf, '/');
 	if (slash != NULL) {
 		*slash = '\0';
-		prefix_length = strtonum(slash + 1, 0, 10, &errstr);
+		prefix_length = strtonum(slash + 1, 0, 128, &errstr);
 		if (errstr != NULL) {
 			fatal("prefix length is %s: '%s'", errstr, value);
 		}
@@ -991,7 +1000,7 @@ parse_netprefix(isc_sockaddr_t **sap, const char *value) {
 		fatal("invalid address '%s'", value);
 
 done:
-	sa->length = prefix_length;
+	*plen = prefix_length;
 	*sap = sa;
 
 	return (ISC_R_SUCCESS);
@@ -2180,8 +2189,8 @@ setup_lookup(dig_lookup_t *lookup) {
 			struct sockaddr_in6 *sin6;
 			size_t addrl;
 
-			sa = &lookup->ecs_addr->type.sa;
-			plen = lookup->ecs_addr->length;
+			sa = (struct sockaddr *)lookup->ecs_addr;
+			plen = lookup->ecs_plen;
 
 			/* Round up prefix len to a multiple of 8 */
 			addrl = (plen + 7) / 8;
@@ -3313,7 +3322,7 @@ recv_done(isc_task_t *task, isc_event_t *event) {
 				  ISC_SOCKADDR_CMPSCOPEZERO)) {
 		char buf1[ISC_SOCKADDR_FORMATSIZE];
 		char buf2[ISC_SOCKADDR_FORMATSIZE];
-		isc_sockaddr_t any;
+		struct sockaddr_storage any;
 
 		if (isc_sockaddr_pf(&query->sockaddr) == AF_INET)
 			isc_sockaddr_any(&any);
@@ -3709,7 +3718,7 @@ recv_done(isc_task_t *task, isc_event_t *event) {
  * routines, since they may be using a non-DNS system for these lookups.
  */
 isc_result_t
-get_address(char *host, in_port_t myport, isc_sockaddr_t *sockaddr) {
+get_address(char *host, in_port_t myport, struct sockaddr_storage *sockaddr) {
 	int count;
 	isc_result_t result;
 
@@ -3725,11 +3734,10 @@ get_address(char *host, in_port_t myport, isc_sockaddr_t *sockaddr) {
 int
 getaddresses(dig_lookup_t *lookup, const char *host, isc_result_t *resultp) {
 	isc_result_t result;
-	isc_sockaddr_t sockaddrs[DIG_MAX_ADDRESSES];
-	isc_netaddr_t netaddr;
+	struct sockaddr_storage sockaddrs[DIG_MAX_ADDRESSES];
 	int count, i;
 	dig_server_t *srv;
-	char tmp[ISC_NETADDR_FORMATSIZE];
+	char tmp[NI_MAXHOST];
 
 	result = get_addresses(host, 0, sockaddrs,
 				    DIG_MAX_ADDRESSES, &count);
@@ -3743,8 +3751,13 @@ getaddresses(dig_lookup_t *lookup, const char *host, isc_result_t *resultp) {
 	}
 
 	for (i = 0; i < count; i++) {
-		isc_netaddr_fromsockaddr(&netaddr, &sockaddrs[i]);
-		isc_netaddr_format(&netaddr, tmp, sizeof(tmp));
+		int error;
+		error = getnameinfo((struct sockaddr *)&sockaddrs[i],
+		    sockaddrs[i].ss_len, tmp, sizeof(tmp), NULL, 0,
+		    NI_NUMERICHOST | NI_NUMERICSERV);
+		if (error)
+			fatal("%s", gai_strerror(error));
+
 		srv = make_server(tmp, host);
 		ISC_LIST_APPEND(lookup->my_server_list, srv, link);
 	}

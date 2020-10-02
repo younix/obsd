@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_verify.c,v 1.6 2020/09/14 12:33:51 beck Exp $ */
+/* $OpenBSD: x509_verify.c,v 1.13 2020/09/26 15:44:06 jsing Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -169,6 +169,29 @@ x509_verify_ctx_cert_is_root(struct x509_verify_ctx *ctx, X509 *cert)
 	return 0;
 }
 
+static int
+x509_verify_ctx_set_xsc_chain(struct x509_verify_ctx *ctx,
+    struct x509_verify_chain *chain)
+{
+	size_t depth;
+	X509 *last = x509_verify_chain_last(chain);
+
+	if (ctx->xsc == NULL)
+		return 1;
+
+	depth = sk_X509_num(chain->certs);
+	if (depth > 0)
+		depth--;
+
+	ctx->xsc->last_untrusted = depth ? depth - 1 : 0;
+	sk_X509_pop_free(ctx->xsc->chain, X509_free);
+	ctx->xsc->chain = X509_chain_up_ref(chain->certs);
+	if (ctx->xsc->chain == NULL)
+		return x509_verify_cert_error(ctx, last, depth,
+		    X509_V_ERR_OUT_OF_MEM, 0);
+	return 1;
+}
+
 /* Add a validated chain to our list of valid chains */
 static int
 x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
@@ -194,12 +217,8 @@ x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
 	 * knobs that are there for the fiddling.
 	 */
 	if (ctx->xsc != NULL) {
-		ctx->xsc->last_untrusted = depth ? depth - 1 : 0;
-		sk_X509_pop_free(ctx->xsc->chain, X509_free);
-		ctx->xsc->chain = X509_chain_up_ref(chain->certs);
-		if (ctx->xsc->chain == NULL)
-			return x509_verify_cert_error(ctx, last, depth,
-			    X509_V_ERR_OUT_OF_MEM, 0);
+		if (!x509_verify_ctx_set_xsc_chain(ctx, chain))
+			return 0;
 
 		/*
 		 * XXX currently this duplicates some work done
@@ -343,12 +362,20 @@ x509_verify_consider_candidate(struct x509_verify_ctx *ctx, X509 *cert,
 	 * so we save it.  Otherwise, recurse until we find a root or
 	 * give up.
 	 */
-	if (is_root_cert &&
-	    x509_verify_cert_error(ctx, candidate, depth, X509_V_OK, 1))
-		(void) x509_verify_ctx_add_chain(ctx, new_chain);
-	else
-		x509_verify_build_chains(ctx, candidate, new_chain);
+	if (is_root_cert) {
+		if (!x509_verify_ctx_set_xsc_chain(ctx, new_chain)) {
+			x509_verify_chain_free(new_chain);
+			return 0;
+		}
+		if (x509_verify_cert_error(ctx, candidate, depth, X509_V_OK, 1)) {
+			(void) x509_verify_ctx_add_chain(ctx, new_chain);
+			goto done;
+		}
+	}
 
+	x509_verify_build_chains(ctx, candidate, new_chain);
+
+ done:
 	x509_verify_chain_free(new_chain);
 	return 1;
 }
@@ -484,7 +511,7 @@ x509_verify_set_check_time(struct x509_verify_ctx *ctx) {
 	return 1;
 }
 
-static int
+int
 x509_verify_asn1_time_to_tm(const ASN1_TIME *atime, struct tm *tm, int notafter)
 {
 	int type;
@@ -688,31 +715,24 @@ struct x509_verify_ctx *
 x509_verify_ctx_new_from_xsc(X509_STORE_CTX *xsc, STACK_OF(X509) *roots)
 {
 	struct x509_verify_ctx *ctx;
+	size_t max_depth;
 
 	if (xsc == NULL)
 		return NULL;
 
-	if ((ctx = calloc(1, sizeof(struct x509_verify_ctx))) == NULL)
+	if ((ctx = x509_verify_ctx_new(roots)) == NULL)
 		return NULL;
 
 	ctx->xsc = xsc;
-
-	if ((ctx->roots = X509_chain_up_ref(roots)) == NULL)
-		goto err;
 
 	if (xsc->untrusted &&
 	    (ctx->intermediates = X509_chain_up_ref(xsc->untrusted)) == NULL)
 		goto err;
 
-	ctx->max_depth = xsc->param->depth;
-	if (ctx->max_depth == 0 || ctx->max_depth > X509_VERIFY_MAX_CHAIN_CERTS)
-		ctx->max_depth = X509_VERIFY_MAX_CHAIN_CERTS;
-
-	ctx->max_chains = X509_VERIFY_MAX_CHAINS;
-	ctx->max_sigs = X509_VERIFY_MAX_SIGCHECKS;
-
-	if ((ctx->chains = calloc(X509_VERIFY_MAX_CHAINS, sizeof(*ctx->chains))) ==
-	    NULL)
+	max_depth = X509_VERIFY_MAX_CHAIN_CERTS;
+	if (xsc->param->depth > 0 && xsc->param->depth < X509_VERIFY_MAX_CHAIN_CERTS)
+		max_depth = xsc->param->depth;
+	if (!x509_verify_ctx_set_max_depth(ctx, max_depth))
 		goto err;
 
 	return ctx;
@@ -782,9 +802,7 @@ x509_verify_ctx_set_max_chains(struct x509_verify_ctx *ctx, size_t max)
 int
 x509_verify_ctx_set_max_signatures(struct x509_verify_ctx *ctx, size_t max)
 {
-	if (max < 1)
-		return 0;
-	if (max > 100000)
+	if (max < 1 || max > 100000)
 		return 0;
 	ctx->max_sigs = max;
 	return 1;
@@ -833,7 +851,7 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 {
 	struct x509_verify_chain *current_chain;
 
-	if (ctx == NULL || ctx->roots == NULL || ctx->max_depth == 0) {
+	if (ctx->roots == NULL || ctx->max_depth == 0) {
 		ctx->error = X509_V_ERR_INVALID_CALL;
 		return 0;
 	}
@@ -844,15 +862,7 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 			return 0;
 		}
 		leaf = ctx->xsc->cert;
-	}
 
-	if (!x509_verify_cert_valid(ctx, leaf, NULL))
-		return 0;
-
-	if (!x509_verify_cert_hostname(ctx, leaf, name))
-		return 0;
-
-	if (ctx->xsc != NULL) {
 		/*
 		 * XXX
 		 * The legacy code expects the top level cert to be
@@ -873,7 +883,15 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 			ctx->error = X509_V_ERR_OUT_OF_MEM;
 			return 0;
 		}
+		ctx->xsc->error_depth = 0;
+		ctx->xsc->current_cert = leaf;
 	}
+
+	if (!x509_verify_cert_valid(ctx, leaf, NULL))
+		return 0;
+
+	if (!x509_verify_cert_hostname(ctx, leaf, name))
+		return 0;
 
 	if ((current_chain = x509_verify_chain_new()) == NULL) {
 		ctx->error = X509_V_ERR_OUT_OF_MEM;

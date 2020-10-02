@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.98 2020/09/14 18:25:23 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.100 2020/09/19 09:56:35 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -192,6 +192,18 @@ void *
 SSL_SESSION_get_ex_data(const SSL_SESSION *s, int idx)
 {
 	return (CRYPTO_get_ex_data(&s->internal->ex_data, idx));
+}
+
+uint32_t
+SSL_SESSION_get_max_early_data(const SSL_SESSION *s)
+{
+	return 0;
+}
+
+int
+SSL_SESSION_set_max_early_data(SSL_SESSION *s, uint32_t max_early_data)
+{
+	return 1;
 }
 
 SSL_SESSION *
@@ -785,9 +797,7 @@ SSL_set_session(SSL *s, SSL_SESSION *session)
 		return SSL_set_ssl_method(s, s->ctx->method);
 	}
 
-	if ((method = tls1_get_client_method(session->ssl_version)) == NULL)
-		method = dtls1_get_client_method(session->ssl_version);
-	if (method == NULL) {
+	if ((method = ssl_get_client_method(session->ssl_version)) == NULL) {
 		SSLerror(s, SSL_R_UNABLE_TO_FIND_SSL_METHOD);
 		return (0);
 	}

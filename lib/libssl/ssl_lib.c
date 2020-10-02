@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.227 2020/09/14 18:34:12 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.234 2020/09/24 18:12:00 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -196,8 +196,7 @@ SSL_clear(SSL *s)
 	tls13_ctx_free(s->internal->tls13);
 	s->internal->tls13 = NULL;
 
-	BUF_MEM_free(s->internal->init_buf);
-	s->internal->init_buf = NULL;
+	ssl3_release_init_buffer(s);
 
 	ssl_clear_cipher_state(s);
 
@@ -470,6 +469,12 @@ SSL_set1_host(SSL *s, const char *hostname)
 		return X509_VERIFY_PARAM_set1_host(s->param, hostname, 0);
 }
 
+const char *
+SSL_get0_peername(SSL *s)
+{
+	return X509_VERIFY_PARAM_get0_peername(s->param);
+}
+
 X509_VERIFY_PARAM *
 SSL_CTX_get0_param(SSL_CTX *ctx)
 {
@@ -525,7 +530,7 @@ SSL_free(SSL *s)
 
 	tls13_ctx_free(s->internal->tls13);
 
-	BUF_MEM_free(s->internal->init_buf);
+	ssl3_release_init_buffer(s);
 
 	sk_SSL_CIPHER_free(s->cipher_list);
 	sk_SSL_CIPHER_free(s->internal->cipher_list_tls13);
@@ -1000,6 +1005,57 @@ SSL_write(SSL *s, const void *buf, int num)
 	return ssl3_write(s, buf, num);
 }
 
+uint32_t
+SSL_CTX_get_max_early_data(const SSL_CTX *ctx)
+{
+	return 0;
+}
+
+int
+SSL_CTX_set_max_early_data(SSL_CTX *ctx, uint32_t max_early_data)
+{
+	return 1;
+}
+
+uint32_t
+SSL_get_max_early_data(const SSL *s)
+{
+	return 0;
+}
+
+int
+SSL_set_max_early_data(SSL *s, uint32_t max_early_data)
+{
+	return 1;
+}
+
+int
+SSL_get_early_data_status(const SSL *s)
+{
+	return SSL_EARLY_DATA_REJECTED;
+}
+
+int
+SSL_read_early_data(SSL *s, void *buf, size_t num, size_t *readbytes)
+{
+	*readbytes = 0;
+
+	if (!s->server) {
+		SSLerror(s, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+		return SSL_READ_EARLY_DATA_ERROR;
+	}
+
+	return SSL_READ_EARLY_DATA_FINISH;
+}
+
+int
+SSL_write_early_data(SSL *s, const void *buf, size_t num, size_t *written)
+{
+	*written = 0;
+	SSLerror(s, ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
+	return 0;
+}
+
 int
 SSL_shutdown(SSL *s)
 {
@@ -1336,6 +1392,8 @@ SSL_get_cipher_list(const SSL *s, int n)
 STACK_OF(SSL_CIPHER) *
 SSL_CTX_get_ciphers(const SSL_CTX *ctx)
 {
+	if (ctx == NULL)
+		return NULL;
 	return ctx->cipher_list;
 }
 
@@ -2200,28 +2258,28 @@ SSL_get_ssl_method(SSL *s)
 }
 
 int
-SSL_set_ssl_method(SSL *s, const SSL_METHOD *meth)
+SSL_set_ssl_method(SSL *s, const SSL_METHOD *method)
 {
-	int	conn = -1;
-	int	ret = 1;
+	int (*handshake_func)(SSL *) = NULL;
+	int ret = 1;
 
-	if (s->method != meth) {
-		if (s->internal->handshake_func != NULL)
-			conn = (s->internal->handshake_func == s->method->internal->ssl_connect);
+	if (s->method == method)
+		return (ret);
 
-		if (s->method->internal->version == meth->internal->version)
-			s->method = meth;
-		else {
-			s->method->internal->ssl_free(s);
-			s->method = meth;
-			ret = s->method->internal->ssl_new(s);
-		}
+	if (s->internal->handshake_func == s->method->internal->ssl_connect)
+		handshake_func = method->internal->ssl_connect;
+	else if (s->internal->handshake_func == s->method->internal->ssl_accept)
+		handshake_func = method->internal->ssl_accept;
 
-		if (conn == 1)
-			s->internal->handshake_func = meth->internal->ssl_connect;
-		else if (conn == 0)
-			s->internal->handshake_func = meth->internal->ssl_accept;
+	if (s->method->internal->version == method->internal->version) {
+		s->method = method;
+	} else {
+		s->method->internal->ssl_free(s);
+		s->method = method;
+		ret = s->method->internal->ssl_new(s);
 	}
+	s->internal->handshake_func = handshake_func;
+
 	return (ret);
 }
 
@@ -2724,17 +2782,22 @@ SSL_get_SSL_CTX(const SSL *ssl)
 SSL_CTX *
 SSL_set_SSL_CTX(SSL *ssl, SSL_CTX* ctx)
 {
-	if (ssl->ctx == ctx)
-		return (ssl->ctx);
+	CERT *new_cert;
+
 	if (ctx == NULL)
 		ctx = ssl->initial_ctx;
+	if (ssl->ctx == ctx)
+		return (ssl->ctx);
 
+	if ((new_cert = ssl_cert_dup(ctx->internal->cert)) == NULL)
+		return NULL;
 	ssl_cert_free(ssl->cert);
-	ssl->cert = ssl_cert_dup(ctx->internal->cert);
+	ssl->cert = new_cert;
 
-	CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX);
+	SSL_CTX_up_ref(ctx);
 	SSL_CTX_free(ssl->ctx); /* decrement reference count */
 	ssl->ctx = ctx;
+
 	return (ssl->ctx);
 }
 

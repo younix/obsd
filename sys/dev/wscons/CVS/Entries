@@ -2,7 +2,6 @@
 /files.wscons/1.17/Mon Feb 27 15:59:56 2017//
 /unicode.h/1.1/Tue May 16 23:49:10 2000//
 /wscons_callbacks.h/1.9/Fri Oct 18 22:06:40 2013//
-/wsconsio.h/1.94/Sun Mar 22 07:59:59 2020//
 /wsdisplay_usl_io.h/1.4/Sun Apr 24 17:30:31 2016//
 /wsemul_dumb.c/1.14/Mon May 25 09:55:49 2020//
 /wsemul_subr.c/1.1/Fri Oct 18 22:06:41 2013//
@@ -24,13 +23,14 @@
 /wsmouseinput.h/1.14/Mon Aug 19 21:19:38 2019//
 /wsmousevar.h/1.15/Sun Jun 18 13:21:48 2017//
 /wsmuxvar.h/1.11/Mon Feb 18 17:39:14 2019//
-/wscons_features.h/1.4/Mon Sep 14 20:09:33 2020//
-/wsdisplay.c/1.142/Mon Sep 14 20:07:59 2020//
-/wsdisplay_compat_usl.c/1.33/Fri Sep 11 08:34:33 2020//
-/wsdisplayvar.h/1.38/Mon Sep 14 20:09:33 2020//
-/wsemulvar.h/1.18/Mon Sep 14 20:09:33 2020//
-/wskbd.c/1.106/Fri Sep 11 08:34:33 2020//
-/wsmouse.c/1.66/Fri Sep 11 08:34:33 2020//
-/wsmux.c/1.51/Fri Sep 11 08:34:33 2020//
-/wstpad.c/1.26/Mon Sep 14 20:09:33 2020//
+/wscons_features.h/1.4/Sat Sep 26 23:17:55 2020//
+/wsconsio.h/1.95/Fri Oct  2 17:07:05 2020//
+/wsdisplay.c/1.142/Sat Sep 26 23:17:55 2020//
+/wsdisplay_compat_usl.c/1.33/Sat Sep 26 23:17:55 2020//
+/wsdisplayvar.h/1.38/Sat Sep 26 23:17:55 2020//
+/wsemulvar.h/1.18/Sat Sep 26 23:17:55 2020//
+/wskbd.c/1.106/Sat Sep 26 23:17:55 2020//
+/wsmouse.c/1.66/Sat Sep 26 23:17:55 2020//
+/wsmux.c/1.51/Sat Sep 26 23:17:55 2020//
+/wstpad.c/1.26/Sat Sep 26 23:17:55 2020//
 D

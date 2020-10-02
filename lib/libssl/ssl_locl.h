@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.291 2020/09/13 16:49:05 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.295 2020/09/24 18:12:00 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -382,8 +382,6 @@ typedef struct ssl_method_internal_st {
 	int (*ssl_read_bytes)(SSL *s, int type, unsigned char *buf, int len,
 	    int peek);
 	int (*ssl_write_bytes)(SSL *s, int type, const void *buf_, int len);
-
-	const struct ssl_method_st *(*get_ssl_method)(int version);
 
 	struct ssl3_enc_method *ssl3_enc; /* Extra SSLv3/TLS stuff */
 } SSL_METHOD_INTERNAL;
@@ -1133,10 +1131,8 @@ const SSL_METHOD *tls_legacy_method(void);
 const SSL_METHOD *tls_legacy_client_method(void);
 const SSL_METHOD *tls_legacy_server_method(void);
 
-const SSL_METHOD *dtls1_get_client_method(int ver);
-const SSL_METHOD *dtls1_get_server_method(int ver);
-const SSL_METHOD *tls1_get_client_method(int ver);
-const SSL_METHOD *tls1_get_server_method(int ver);
+const SSL_METHOD *ssl_get_client_method(uint16_t version);
+const SSL_METHOD *ssl_get_server_method(uint16_t version);
 
 extern SSL3_ENC_METHOD DTLSv1_enc_data;
 extern SSL3_ENC_METHOD TLSv1_enc_data;
@@ -1225,10 +1221,12 @@ SSL_CIPHER *ssl3_choose_cipher(SSL *ssl, STACK_OF(SSL_CIPHER) *clnt,
     STACK_OF(SSL_CIPHER) *srvr);
 int	ssl3_setup_buffers(SSL *s);
 int	ssl3_setup_init_buffer(SSL *s);
+void ssl3_release_init_buffer(SSL *s);
 int	ssl3_setup_read_buffer(SSL *s);
 int	ssl3_setup_write_buffer(SSL *s);
-int	ssl3_release_read_buffer(SSL *s);
-int	ssl3_release_write_buffer(SSL *s);
+void ssl3_release_buffer(SSL3_BUFFER_INTERNAL *b);
+void ssl3_release_read_buffer(SSL *s);
+void ssl3_release_write_buffer(SSL *s);
 int	ssl3_new(SSL *s);
 void	ssl3_free(SSL *s);
 int	ssl3_accept(SSL *s);

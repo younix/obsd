@@ -51,6 +51,6 @@
 /intr.h/1.16/Mon Jul 20 09:32:29 2020//
 /pci_machdep.h/1.7/Mon Jul 20 09:32:29 2020//
 /timetc.h/1.2/Mon Jul 20 09:32:29 2020//
-/armreg.h/1.12/Fri Sep 11 08:34:32 2020//
-/softintr.h/1.2/Fri Sep 11 08:34:32 2020//
+/armreg.h/1.12/Sat Sep 26 23:17:55 2020//
+/softintr.h/1.2/Sat Sep 26 23:17:55 2020//
 D

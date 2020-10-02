@@ -152,6 +152,10 @@ unsigned char *invaliduri[] = {
 	"https://.www.openbsd.org/",
 	"https://www.ope|nbsd.org%",
 	"https://www.openbsd.org.#",
+	"///",
+	"//",
+	"/",
+	"",
 	NULL,
 };
 
@@ -240,6 +244,7 @@ static int
 test_invalid_hostnames(void)
 {
 	int i, failure = 0;
+	char *nulhost = "www.openbsd.org\0";
 
 	for (i = 0; invalid_hostnames[i] != NULL; i++) {
 		if (x509_constraints_valid_host(invalid_hostnames[i],
@@ -257,7 +262,6 @@ test_invalid_hostnames(void)
 			goto done;
 		}
 	}
-	char *nulhost = "www.openbsd.org\0";
 	if (x509_constraints_valid_host(nulhost,
 	    strlen(nulhost) + 1)) {
 		FAIL("hostname with NUL byte accepted\n");
@@ -340,15 +344,15 @@ test_invalid_uri(void) {
 			FAIL("invalid URI '%s' accepted\n",
 			    invaliduri[j]);
 			failure = 1;
+			goto done;
 		}
-		goto done;
 	}
  done:
 	return failure;
 }
 
 static int
-test_constraints1()
+test_constraints1(void)
 {
 	char *c; size_t cl;
 	char *d; size_t dl;
@@ -386,6 +390,10 @@ test_constraints1()
 		"https://www.openbsd.net?",
 		"https://org#",
 		"herp://beck@org:",
+		"///",
+		"//",
+		"/",
+		"",
 		NULL,
 	};
 	for (i = 0; constraints[i] != NULL; i++) {

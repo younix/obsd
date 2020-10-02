@@ -15,7 +15,7 @@
 /sensors.c/1.54/Mon Nov 11 06:32:52 2019//
 /server.c/1.44/Sat Sep  3 11:52:06 2016//
 /util.c/1.25/Thu Jan 30 15:55:41 2020//
-/client.c/1.114/Mon Sep 14 20:09:39 2020//
-/ntp.c/1.167/Mon Sep 14 20:09:39 2020//
-/ntpd.h/1.150/Fri Sep 11 08:34:33 2020//
+/client.c/1.114/Sat Sep 26 23:17:55 2020//
+/ntp.c/1.167/Sat Sep 26 23:17:55 2020//
+/ntpd.h/1.150/Sat Sep 26 23:17:55 2020//
 D

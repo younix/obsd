@@ -70,8 +70,6 @@
 /nwld.c/1.1.1.1/Thu Oct 15 17:11:30 2009//
 /nwld.h/1.1.1.1/Thu Oct 15 17:11:30 2009//
 /openbsd.h/1.1.1.1/Thu Oct 15 17:11:30 2009//
-/openbsd64.h/1.7/Fri Sep 14 13:44:18 2018//
-/openbsdelf.h/1.6/Fri Sep 14 13:44:18 2018//
 /pentium.md/1.1.1.1/Thu Oct 15 17:11:29 2009//
 /pmm_malloc.h/1.2/Wed May 30 11:58:33 2012//
 /pmmintrin.h/1.1.1.1/Thu Oct 15 17:11:29 2009//
@@ -137,4 +135,6 @@
 /xm-djgpp.h/1.1.1.1/Thu Oct 15 17:11:29 2009//
 /xm-mingw32.h/1.1.1.1/Thu Oct 15 17:11:30 2009//
 /xmmintrin.h/1.1.1.1/Thu Oct 15 17:11:29 2009//
+/openbsd64.h/1.8/Fri Oct  2 17:05:40 2020//
+/openbsdelf.h/1.7/Fri Oct  2 17:05:40 2020//
 D

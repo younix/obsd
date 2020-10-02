@@ -48,7 +48,6 @@
 /pctr.h/1.17/Sat Mar 29 18:09:29 2014//
 /pic.h/1.2/Tue Dec 16 21:40:05 2014//
 /pio.h/1.12/Sat Apr 25 21:31:24 2015//
-/pmap.h/1.87/Thu Dec 19 17:46:32 2019//
 /proc.h/1.10/Sat Mar 31 13:45:03 2018//
 /profile.h/1.12/Sat Mar 29 18:09:29 2014//
 /psl.h/1.21/Mon Jul  9 19:20:30 2018//
@@ -57,7 +56,6 @@
 /rbus_machdep.h/1.9/Wed Mar 23 16:54:35 2011//
 /reg.h/1.7/Wed Mar 23 16:54:35 2011//
 /reloc.h/1.3/Wed Mar 23 16:54:35 2011//
-/segments.h/1.26/Mon Jul  9 19:20:30 2018//
 /setjmp.h/1.2/Sat Aug  5 22:07:32 2000//
 /signal.h/1.11/Tue May 10 18:39:45 2016//
 /smbiosvar.h/1.12/Thu Feb 20 06:12:14 2020//
@@ -69,9 +67,11 @@
 /vga_post.h/1.2/Wed Mar 23 16:54:35 2011//
 /vmmvar.h/1.19/Fri Jan 18 01:34:50 2019//
 /vmparam.h/1.56/Tue Apr 17 15:50:05 2018//
-/cpu.h/1.170/Mon Jun  1 06:23:24 2020//
 /timetc.h/1.1/Mon Jul 20 09:32:29 2020//
-/cpufunc.h/1.33/Mon Sep 14 20:09:28 2020//
-/intrdefs.h/1.18/Mon Sep 14 20:09:28 2020//
-/specialreg.h/1.76/Mon Sep 14 20:09:28 2020//
+/cpu.h/1.172/Fri Oct  2 17:06:59 2020//
+/cpufunc.h/1.33/Sat Sep 26 23:17:55 2020//
+/intrdefs.h/1.18/Sat Sep 26 23:17:55 2020//
+/pmap.h/1.88/Fri Oct  2 17:06:59 2020//
+/segments.h/1.28/Fri Oct  2 17:06:59 2020//
+/specialreg.h/1.76/Sat Sep 26 23:17:55 2020//
 D

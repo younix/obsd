@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.83 2020/09/12 17:27:11 tb Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.85 2020/09/24 18:12:00 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -691,10 +691,8 @@ ssl3_accept(SSL *s)
 				goto end;
 			}
 
-			if (!SSL_IS_DTLS(s)) {
-				BUF_MEM_free(s->internal->init_buf);
-				s->internal->init_buf = NULL;
-			}
+			if (!SSL_IS_DTLS(s))
+				ssl3_release_init_buffer(s);
 
 			/* remove buffering on output */
 			ssl_free_wbio_buffer(s);
@@ -870,9 +868,7 @@ ssl3_get_client_hello(SSL *s)
 	s->client_version = client_version;
 	s->version = shared_version;
 
-	if ((method = tls1_get_server_method(shared_version)) == NULL)
-		method = dtls1_get_server_method(shared_version);
-	if (method == NULL) {
+	if ((method = ssl_get_server_method(shared_version)) == NULL) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		goto err;
 	}
