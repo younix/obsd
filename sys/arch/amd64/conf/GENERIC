@@ -14,10 +14,6 @@ include		"../../../conf/GENERIC"
 maxusers	80			# estimated number of users
 
 option		USER_PCICONF	# user-space PCI configuration
-option		RP_DEBUG
-option		RP_DEBUG1
-option		RP_DEBUG2
-option		RP_DEBUG3
 
 option		APERTURE	# in-kernel aperture driver for XFree86
 option		MTRR		# CPU memory range attributes control
