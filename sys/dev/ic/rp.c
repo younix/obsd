@@ -36,10 +36,6 @@
 
 #include <sys/cdefs.h>
 
-/* 
- * rp.c - for RocketPort FreeBSD
- */
-
 #include <sys/types.h>
 #include <sys/atomic.h>
 #include <sys/param.h>
@@ -106,8 +102,6 @@ uint8_t sIRQMap[16] =
 
 uint8_t rp_sBitMapClrTbl[8] = {0xfe, 0xfd, 0xfb, 0xf7, 0xef, 0xdf, 0xbf, 0x7f};
 uint8_t rp_sBitMapSetTbl[8] = {0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80};
-
-//void rpfree(void *);
 
 struct cfdriver rp_cd = {
 	NULL, "rp", DV_TTY
@@ -407,7 +401,8 @@ rp_write_tx_prio_byte(struct rp_chan *ch, uint8_t data)
 		/* get priority buffer status */
 		rp_writech2(ch, _INDX_ADDR, ch->TxPrioCnt);
 
-		if (rp_readch1(ch, _INDX_DATA) & PRI_PEND)	/* priority buffer busy */
+		/* priority buffer busy */
+		if (rp_readch1(ch, _INDX_DATA) & PRI_PEND)
 			return (0);		/* nothing sent */
 
 		htolem16(DWBuf, ch->TxPrioBuf);/* data byte address */
@@ -420,7 +415,7 @@ rp_write_tx_prio_byte(struct rp_chan *ch, uint8_t data)
 
 		DWBuf[2] = PRI_PEND + 1;	/* indicate 1 byte pending */
 		DWBuf[3] = 0;			/* priority buffer pointer */
-		rp_writech4(ch, _INDX_ADDR, lemtoh32(DWBuf));	/* write it out */
+		rp_writech4(ch, _INDX_ADDR, lemtoh32(DWBuf)); /* write it out */
 	} else {
 		/* write it to Tx FIFO */
 		rp_write_tx_byte(ch, rp_txrx_data_io(ch), data);
@@ -528,7 +523,7 @@ rp_disable_interrupts(struct rp_chan *ch, uint16_t flags)
  */
 int	rpclose(dev_t dev, int, int, struct proc *);
 void	rphardclose(struct tty *, struct rp_port *);
-//int	rpmodem(struct tty *, int, int);
+/* TODO: int	rpmodem(struct tty *, int, int); */
 int	rpparam(struct tty *, struct termios *);
 void	rpstart(struct tty *);
 struct tty *rptty(dev_t);
@@ -583,7 +578,6 @@ rp_do_receive(struct rp_port *rp, struct tty *tp, struct rp_chan *cp,
 				    DEVNAME(rp->rp_sc), RP_PORT(tp->t_dev));
 			}
 
-			//ttydisc_rint(tp, ch, err);
 			(*linesw[tp->t_line].l_rint)(ch, tp);
 			ToRecv--;
 		}
@@ -661,17 +655,6 @@ rp_poll(struct rp_port *rp)
 	if (count > 0)
 		rpstart(tp);
 }
-
-#if 0
-void
-rpfree(void *softc)
-{
-	struct rp_port *rp = softc;
-	struct rp_softc *sc = rp->rp_sc;
-
-	atomic_dec_int(&sc->free);
-}
-#endif
 
 int
 rp_attach(struct rp_softc *sc, int num_aiops, int num_ports)
@@ -1187,8 +1170,6 @@ rpparam(struct tty *tp, struct termios *t)
 	struct rp_chan	*cp = &rp->rp_channel;
 	int		 cflag = t->c_cflag;
 	int		 iflag = t->c_iflag;
-//	int		 oflag = t->c_oflag;
-//	int		 lflag = t->c_lflag;
 	int		 ospeed = rp_convert_baud(t->c_ispeed);
 
 #ifdef RP_DEBUG1
