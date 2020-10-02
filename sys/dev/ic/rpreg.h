@@ -359,7 +359,6 @@ struct rp_softc {
 
         struct mutex	hwmtx;		/* Spinlock protecting hardware. */
 	int		hwmtx_init;
-//	int		free;
 	int		num_ports;
 
 	void			*sc_ih;
@@ -759,11 +758,6 @@ rp_unlock(struct rp_softc *sc)
 	if (sc->hwmtx_init != 0)
 		mtx_leave(&sc->hwmtx);
 }
-
-/* XXX: useless block */
-//extern uint8_t R[RDATASIZE];
-//XXX: extern struct rp_softc sController[CTL_SIZE];
-//extern uint8_t sIRQMap[16];
 
 extern uint8_t rp_sBitMapClrTbl[8];
 extern uint8_t rp_sBitMapSetTbl[8];
