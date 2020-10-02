@@ -519,8 +519,6 @@ rp_disable_interrupts(struct rp_chan *ch, uint16_t flags)
  * Begin OS-specific driver code
  */
 
-#define RP_POLL_INTERVAL	(hz / 100)
-
 #define RP_ISMULTIPORT(dev)	((dev)->id_flags & 0x1)
 #define RP_MPMASTER(dev)	(((dev)->id_flags >> 8) & 0xff)
 #define RP_NOTAST4(dev) 	((dev)->id_flags & 0x04)
@@ -601,7 +599,6 @@ rp_do_receive(struct rp_port *rp, struct tty *tp, struct rp_chan *cp,
 			ToRecv--;
 		}
 	}
-	//XXX: do we need this?! -> ttydisc_rint_done(tp);
 	splx(s);
 }
 
@@ -626,39 +623,33 @@ rp_handle_port(struct rp_port *rp)
 		rp_do_receive(rp, tp, cp, ChanStatus);
 
 	if (IntMask & DELTA_CD) {
-		if (ChanStatus & CD_ACT)
+		if (ChanStatus & CD_ACT) {
 			(void)(*linesw[tp->t_line].l_modem)(tp, 1);
-		else
+		} else {
 			(void)(*linesw[tp->t_line].l_modem)(tp, 0);
+		}
 	}
-/*	oldcts = rp->rp_cts;
-	rp->rp_cts = ((ChanStatus & CTS_ACT) != 0);
-	if (oldcts != rp->rp_cts) {
-		printf("CTS change (now %s)... on port %d\n", rp->rp_cts ? "on" : "off", rp->rp_port);
-	}
-*/
 
 	oldcts = rp->rp_cts;
 	rp->rp_cts = ((ChanStatus & CTS_ACT) != 0);
-	//if (oldcts != rp->rp_cts && ISSET(tp->t_cflag, CRTSCTS)) {
 	CLR(tp->t_state, TS_BUSY);	// XXX: not sure with this
 	if (oldcts != rp->rp_cts) {
 		CLR(tp->t_state, TS_BUSY | TS_FLUSH);
+#ifdef RP_DEBUG
 		printf("CTS change (now %s)... on port %d\n", rp->rp_cts ? "on" : "off", rp->rp_port);
+#endif
 		(*linesw[tp->t_line].l_start)(tp);
 	}
 }
 
 void
-rp_poll(void *arg)
+rp_poll(struct rp_port *rp)
 {
-	struct rp_port	*rp = arg;
 	struct rp_softc	*sc = rp->rp_sc;
 	struct tty	*tp = rp->rp_tty;
 	int		 count;
 	unsigned char	 AiopMask;
 
-//	tty_lock_assert(tp, MA_OWNED);	//XXX: do we need this?
 	if (sc->ctlmask(sc) & (1 << rp->rp_aiop)) {
 		AiopMask = rp_aiop_intr_status(sc, rp->rp_aiop);
 		if (AiopMask & (1 << rp->rp_chan)) {
@@ -666,14 +657,9 @@ rp_poll(void *arg)
 		}
 	}
 
-/* XXX: thats maybe useless?!
-	count = rp_get_tx_cnt(&rp->rp_channel);
-	if (count >= 0 && count <= rp->rp_restart) { */
 	count = rp_get_tx_cnt(&rp->rp_channel);
 	if (count > 0)
 		rpstart(tp);
-
-	timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 }
 
 #if 0
@@ -720,7 +706,6 @@ rp_attach(struct rp_softc *sc, int num_aiops, int num_ports)
 			tp->t_oproc = rpstart;
 			tp->t_param = rpparam;
 
-//XXX: do we need this:	callout_init_mtx(&rp->rp_timer, tty_getlock(tp), 0);
 			rp->rp_port = port;
 			rp->rp_sc = sc;
 			rp->rp_unit = unit;
@@ -733,15 +718,13 @@ rp_attach(struct rp_softc *sc, int num_aiops, int num_ports)
 			ChanStatus = rp_chan_status(&rp->rp_channel);
 #endif /* notdef */
 			if (rp_init_chan(sc, &rp->rp_channel, aiop, chan) == 0){
-				//XXX: fix this message
-				printf(" init channel (%d, %d, %d) failed.\n",
-				    unit, aiop, chan);
+				printf("%s port %d init channel (%d, %d, %d) failed.\n",
+				    DEVNAME(sc), port, unit, aiop, chan);
 				retval = ENXIO;
 				goto nogo;
 			}
 			ChanStatus = rp_chan_status(&rp->rp_channel);
 			rp->rp_cts = (ChanStatus & CTS_ACT) != 0;
-//XXX: do we need this:	tty_makedev(tp, NULL, "R%r%r", unit, port);
 		}
 	}
 
@@ -761,26 +744,32 @@ rp_releaseresource(struct rp_softc *sc)
 
 		for (i = 0; i < sc->num_ports; i++) {
 			struct rp_port *rp = sc->sc_rp + i;
-
-			//atomic_inc_int(&sc->free);
-//XXX: do we need this:	s = spltty();	//tty_lock(rp->rp_tty);
-//			tty_rel_gone(rp->rp_tty);
 			ttyfree(rp->rp_tty);
 		}
-printf("free(%p, %d, %zu * %d);\n",
-    sc->sc_rp, M_DEVBUF, sizeof(*(sc->sc_rp)), sc->num_ports);
 		free(sc->sc_rp, M_DEVBUF, sizeof(*(sc->sc_rp)) * sc->num_ports);
 		sc->sc_rp = NULL;
 	}
+}
 
-//XXX: do we need this:
-//	while (sc->free != 0) {
-//		pause("rpwt", hz / 10);
-//	}
+int
+rp_intr(void *arg)
+{
+	struct rp_softc *sc = arg;
+	int i;
 
-//XXX: do we need this:
-//	if (sc->hwmtx_init)
-//		mtx_destroy(&sc->hwmtx);
+	if (sc->sc_rp == NULL)
+		return 0;
+
+	for (i = 0; i < sc->num_ports; i++)
+		rp_poll(sc->sc_rp + i);
+
+#define _PCI_INT_FUNC	0x3A
+#define PCI_STROB	0x2000
+#define INTR_EN_PCI	0x0010
+
+	rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB | INTR_EN_PCI);
+
+	return 1;
 }
 
 int
@@ -863,10 +852,6 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 
 //		rp_set_DTR(&rp->rp_channel);
 //		rp_set_RTS(&rp->rp_channel);
-
-//XXX:		callout_reset(&rp->rp_timer, POLL_INTERVAL, rp_poll, rp);
-		timeout_set(&rp->rp_timer, rp_poll, rp);
-		timeout_add(&rp->rp_timer, RP_POLL_INTERVAL);
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
 		return (EBUSY);
 	} else {
@@ -889,7 +874,9 @@ rpopen(dev_t dev, int flag, int mode, struct proc *p)
 				return (EBUSY);
 			}
 		} else {
-			while (rp->rp_cua) {
+			while (rp->rp_cua || (!ISSET(tp->t_cflag, CLOCAL) &&
+			    !ISSET(tp->t_state, TS_CARR_ON))) {
+
 				SET(tp->t_state, TS_WOPEN);
 				error = ttysleep(tp, &tp->t_rawq,
 				    TTIPRI | PCATCH, ttopen);
@@ -935,10 +922,8 @@ rpclose(dev_t dev, int flag, int mode, struct proc *p)
 
 	s = spltty();
 
-	if (!ISSET(tp->t_state, TS_WOPEN)) {
-		timeout_del(&rp->rp_timer);
+	if (!ISSET(tp->t_state, TS_WOPEN))
 		rphardclose(tp, rp);
-	}
 
 	CLR(tp->t_state, TS_BUSY | TS_FLUSH);
 	rp->rp_cua = 0;

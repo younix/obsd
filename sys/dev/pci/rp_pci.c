@@ -127,6 +127,9 @@ rp_pci_attach(struct device *parent, struct device *self, void *aux)
 	int num_ports, num_aiops;
 	int aiop;
 	pcireg_t maptype;
+	pci_intr_handle_t ih;
+	const char *intrstr;
+	//bus_size_t size;
 
 	sc->aiop2rid = rp_pci_aiop2rid;
 	sc->aiop2off = rp_pci_aiop2off;
@@ -150,6 +153,27 @@ rp_pci_attach(struct device *parent, struct device *self, void *aux)
 		num_ports += sc->AiopNumChan[aiop];
 	}
 
+	/* map pci interrupt */
+	if (pci_intr_map(pa, &ih)) {
+		printf(": can't map interrupt\n");
+		//bus_space_unmap(sc->iot, sc->ioh, size);
+		return;
+	}
+	intrstr = pci_intr_string(pa->pa_pc, ih);
+	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih, IPL_TTY,
+	    rp_intr, sc, sc->sc_dev.dv_xname);
+	if (!sc->sc_ih) {
+		printf(": can't establish interrupt");
+		if (intrstr)
+			printf(" at %s", intrstr);
+		printf("\n");
+		//bus_space_unmap(sc->iot, sc->ioh, size);
+		return;
+	}
+
+	printf(": %s\n", intrstr);
+	/* enable pci interrupt */
+
 	rp_attach(sc, num_aiops, num_ports);
 }
 
@@ -160,7 +184,8 @@ rp_pci_init_controller(struct rp_softc *sc, int AiopNum, int IRQNum,
 	int i;
 
 	/* Strobe the MUDBAC's End Of Interrupt bit */
-	rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB);
+	//rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB);
+	rp_writeio2(sc, 0, _PCI_INT_FUNC, PCI_STROB | INTR_EN_PCI);
 
 	/* Init AIOPs */
 	sc->NumAiop = 0;
