@@ -68,7 +68,7 @@ MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	rge.4 ricohrtc.4 rkanxdp.4 rkclock.4 rkdrm.4 rkdwhdmi.4 rkdwusb.4 \
 	rkemmcphy.4 rkgpio.4 rkgrf.4 rkiic.4 rkiis.4 rkpcie.4 rkpinctrl.4 \
 	rkpmic.4 rkpwm.4 rkrng.4 rktemp.4 rkvop.4 \
-	rl.4 rlphy.4 route.4 rsu.4 rtsx.4 rum.4 run.4 rtw.4 rtwn.4 \
+	rl.4 rlphy.4 route.4 rp.4 rsu.4 rtsx.4 rum.4 run.4 rtw.4 rtwn.4 \
 	safe.4 safte.4 sbus.4 schsio.4 scsi.4 sd.4 \
 	sdmmc.4 sdhc.4 se.4 ses.4 sf.4 sili.4 \
 	simpleamp.4 simpleaudio.4 simplefb.4 simplepanel.4 siop.4 sis.4 sk.4 \
