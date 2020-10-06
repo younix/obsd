@@ -38,6 +38,7 @@ _DEV(ch, 17)
 _DEV(st, 14)
 _TITLE(term)
 _DEV(com, 8)
+_DEV(ttyRP, 34)
 _DEV(ttyc, 38)
 _DEV(ttyVI, 94)
 _TITLE(pty)
@@ -108,6 +109,11 @@ ramdisk)
 
 _std(1, 2, 50, 7)
 	M xf86		c 2 4 600
+	;;
+
+ttyRP*)
+	M ttyRP$U c 34 $U 660 dialer root
+	M cuaRP$U c 34 Add($U, 128) 660 dialer root
 	;;
 
 ttyc*)
