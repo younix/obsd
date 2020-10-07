@@ -24,7 +24,6 @@
 /wsmousevar.h/1.15/Sun Jun 18 13:21:48 2017//
 /wsmuxvar.h/1.11/Mon Feb 18 17:39:14 2019//
 /wscons_features.h/1.4/Sat Sep 26 23:17:55 2020//
-/wsconsio.h/1.95/Fri Oct  2 17:07:05 2020//
 /wsdisplay.c/1.142/Sat Sep 26 23:17:55 2020//
 /wsdisplay_compat_usl.c/1.33/Sat Sep 26 23:17:55 2020//
 /wsdisplayvar.h/1.38/Sat Sep 26 23:17:55 2020//
@@ -33,4 +32,5 @@
 /wsmouse.c/1.66/Sat Sep 26 23:17:55 2020//
 /wsmux.c/1.51/Sat Sep 26 23:17:55 2020//
 /wstpad.c/1.26/Sat Sep 26 23:17:55 2020//
+/wsconsio.h/1.95/Fri Oct  2 17:08:34 2020//
 D

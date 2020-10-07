@@ -17,7 +17,6 @@
 /process.S/1.26/Fri May 17 22:35:19 2013//
 /process_machdep.c/1.4/Mon Jul 28 17:50:11 2008//
 /sig_machdep.c/1.29/Tue Jul 10 04:19:59 2018//
-/softintr.c/1.7/Fri Mar  6 05:49:20 2015//
 /subr.S/1.27/Mon May 29 06:06:52 2017//
 /vectors_88100.S/1.7/Mon Jun  9 15:00:57 2014//
 /vectors_88110.S/1.9/Mon Jun  9 15:00:57 2014//
@@ -25,5 +24,6 @@
 /pmap.c/1.86/Mon Jul 20 09:32:29 2020//
 /m88100_fp.c/1.5/Sat Sep 26 23:17:55 2020//
 /m88110_fp.c/1.12/Sat Sep 26 23:17:55 2020//
-/trap.c/1.116/Fri Oct  2 17:07:00 2020//
+/softintr.c/1.8/Wed Oct  7 14:19:54 2020//
+/trap.c/1.116/Fri Oct  2 17:08:34 2020//
 D

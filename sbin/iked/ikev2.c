@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.261 2020/09/24 13:16:52 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.265 2020/10/06 19:06:06 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -101,6 +101,8 @@ int	 ikev2_send_error(struct iked *, struct iked_sa *,
 int	 ikev2_send_init_error(struct iked *, struct iked_message *);
 
 int	 ikev2_handle_certreq(struct iked*, struct iked_message *);
+ssize_t	 ikev2_handle_delete(struct iked *, struct iked_message *,
+	    struct ibuf *, struct ikev2_payload **, uint8_t *);
 
 int	 ikev2_send_create_child_sa(struct iked *, struct iked_sa *,
 	    struct iked_spi *, uint8_t);
@@ -875,6 +877,19 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 			return (-1);
 	}
 
+	/* AUTH payload is required for non-EAP */
+	if (!msg->msg_auth.id_type &&
+	    !sa->sa_policy->pol_auth.auth_eap) {
+		/* get dstid */
+		if (msg->msg_id.id_type) {
+			memcpy(id, &msg->msg_id, sizeof(*id));
+			bzero(&msg->msg_id, sizeof(msg->msg_id));
+		}
+		log_debug("%s: missing auth payload", SPI_SA(sa, __func__));
+		ikev2_send_auth_failed(env, sa);
+		return (-1);
+	}
+
 	if (msg->msg_id.id_type) {
 		memcpy(id, &msg->msg_id, sizeof(*id));
 		bzero(&msg->msg_id, sizeof(msg->msg_id));
@@ -1044,6 +1059,19 @@ ikev2_init_recv(struct iked *env, struct iked_message *msg,
 		(void)ikev2_init_auth(env, msg);
 		break;
 	case IKEV2_EXCHANGE_IKE_AUTH:
+		if (msg->msg_flags & IKED_MSG_FLAGS_AUTHENTICATION_FAILED) {
+			log_debug("%s: AUTHENTICATION_FAILED, closing SA",
+			    __func__);
+			ikev2_log_cert_info(SPI_SA(sa, __func__),
+			    sa->sa_hdr.sh_initiator ? &sa->sa_rcert
+			    : &sa->sa_icert);
+			ikev2_ike_sa_setreason(sa,
+			    "authentication failed notification from peer");
+			sa_state(env, sa, IKEV2_STATE_CLOSED);
+			msg->msg_sa = NULL;
+			return;
+		}
+
 		(void)ikev2_ike_auth_recv(env, sa, msg);
 		break;
 	case IKEV2_EXCHANGE_CREATE_CHILD_SA:
@@ -2438,6 +2466,11 @@ ikev2_resp_informational(struct iked *env, struct iked_sa *sa,
 
 	if ((buf = ibuf_static()) == NULL)
 		goto done;
+
+	if ((len = ikev2_handle_delete(env, msg, buf, &pld,
+	    &firstpayload)) == -1)
+		goto done;
+
 	/*
 	 * Include NAT_DETECTION notification on UPDATE_SA_ADDRESSES or if
 	 * the peer did include them, too (RFC 455, 3.8).
@@ -2495,6 +2528,15 @@ ikev2_resp_informational(struct iked *env, struct iked_sa *sa,
 	    IKEV2_EXCHANGE_INFORMATIONAL, firstpayload, 1);
 	if (ret != -1)
 		msg->msg_responded = 1;
+	if (msg->msg_flags & IKED_MSG_FLAGS_AUTHENTICATION_FAILED) {
+		log_debug("%s: AUTHENTICATION_FAILED, closing SA",
+		    __func__);
+		ikev2_log_cert_info(SPI_SA(sa, __func__),
+		    sa->sa_hdr.sh_initiator ? &sa->sa_rcert : &sa->sa_icert);
+		ikev2_ike_sa_setreason(sa,
+		    "authentication failed notification from peer");
+		sa_state(env, sa, IKEV2_STATE_CLOSED);
+	}
  done:
 	ibuf_release(buf);
 	return (ret);
@@ -2632,6 +2674,157 @@ ikev2_resp_recv(struct iked *env, struct iked_message *msg,
 	}
 }
 
+ssize_t
+ikev2_handle_delete(struct iked *env, struct iked_message *msg,
+    struct ibuf *resp, struct ikev2_payload **pld, uint8_t *firstpayload)
+{
+	struct iked_childsa	**peersas = NULL;
+	struct iked_sa		*sa = msg->msg_sa;
+	struct ikev2_delete	*localdel;
+	struct ibuf		*spibuf = NULL;
+	uint64_t		*localspi = NULL;
+	uint64_t		 spi64, spi = 0;
+	uint32_t		 spi32;
+	uint8_t			*buf;
+	size_t			 found = 0, failed = 0;
+	int			 ret = -1;
+	size_t			 i, sz, cnt, len;
+
+	if (!msg->msg_del_protoid)
+		return (0);
+
+	sz = msg->msg_del_spisize;
+
+	switch (sz) {
+	case 4:
+	case 8:
+		break;
+	case 0:
+		if (msg->msg_del_protoid != IKEV2_SAPROTO_IKE) {
+			log_debug("%s: invalid SPI size", __func__);
+			goto done;
+		}
+		ikev2_ikesa_recv_delete(env, sa);
+		return (0);
+	default:
+		log_info("%s: error: invalid SPI size", __func__);
+		goto done;
+	}
+
+	cnt = msg->msg_del_cnt;
+	len = ibuf_length(msg->msg_del_buf);
+
+	if ((len / sz) != cnt) {
+		log_debug("%s: invalid payload length %zu/%zu != %zu",
+		    __func__, len, sz, cnt);
+		return (-1);
+	}
+
+	if (((peersas = calloc(cnt, sizeof(struct iked_childsa *))) == NULL ||
+	     (localspi = calloc(cnt, sizeof(uint64_t))) == NULL)) {
+		log_warn("%s", __func__);
+		goto done;
+	}
+
+	buf = ibuf_data(msg->msg_del_buf);
+	for (i = 0; i < cnt; i++) {
+		switch (sz) {
+		case 4:
+			memcpy(&spi32, buf + (i * sz), sizeof(spi32));
+			spi = betoh32(spi32);
+			break;
+		case 8:
+			memcpy(&spi64, buf + (i * sz), sizeof(spi64));
+			spi = betoh64(spi64);
+			break;
+		}
+
+		log_debug("%s: spi %s", __func__, print_spi(spi, sz));
+
+		if (peersas == NULL || sa == NULL)
+			continue;
+
+		if ((peersas[i] = childsa_lookup(sa, spi,
+		    msg->msg_del_protoid)) == NULL) {
+			log_warnx("%s: CHILD SA doesn't exist for spi %s",
+			    SPI_SA(sa, __func__),
+			    print_spi(spi, sz));
+			continue;
+		}
+
+		if (ikev2_childsa_delete(env, sa, msg->msg_del_protoid, spi,
+		    &localspi[i], 0) == -1)
+			failed++;
+		else {
+			found++;
+
+			/* append SPI to log buffer */
+			if (ibuf_strlen(spibuf))
+				ibuf_strcat(&spibuf, ", ");
+			ibuf_strcat(&spibuf, print_spi(spi, sz));
+		}
+
+		/*
+		 * Flows are left in the require mode so that it would be
+		 * possible to quickly negotiate a new Child SA
+		 */
+	}
+
+	if (resp == NULL) {
+		ret = 0;
+		goto done;
+	}
+
+	/* Response to the INFORMATIONAL with Delete payload */
+	if (found) {
+		if ((*pld = ikev2_add_payload(resp)) == NULL)
+			goto done;
+		*firstpayload = IKEV2_PAYLOAD_DELETE;
+
+		if ((localdel = ibuf_advance(resp, sizeof(*localdel))) == NULL)
+			goto done;
+
+		localdel->del_protoid = msg->msg_del_protoid;
+		localdel->del_spisize = sz;
+		localdel->del_nspi = htobe16(found);
+		ret = sizeof(*localdel);
+
+		for (i = 0; i < cnt; i++) {
+			if (localspi[i] == 0)	/* happens if found < cnt */
+				continue;
+			switch (sz) {
+			case 4:
+				spi32 = htobe32(localspi[i]);
+				if (ibuf_add(resp, &spi32, sizeof(spi32)) != 0)
+					goto done;
+				ret += sizeof(spi32);
+				break;
+			case 8:
+				spi64 = htobe64(localspi[i]);
+				if (ibuf_add(resp, &spi64, sizeof(spi64)) != 0)
+					goto done;
+				ret += sizeof(spi64);
+				break;
+			}
+		}
+		log_info("%sdeleted %zu SPI%s: %.*s",
+		    SPI_SA(sa, NULL), found,
+		    found == 1 ? "" : "s",
+		    spibuf ? ibuf_strlen(spibuf) : 0,
+		    spibuf ? (char *)ibuf_data(spibuf) : "");
+	} else {
+		/* XXX should we send an INVALID_SPI notification? */
+		ret = 0;
+	}
+
+ done:
+	free(localspi);
+	free(peersas);
+	ibuf_release(spibuf);
+
+	return (ret);
+}
+
 int
 ikev2_handle_notifies(struct iked *env, struct iked_message *msg)
 {
@@ -2662,17 +2855,6 @@ ikev2_handle_notifies(struct iked *env, struct iked_message *msg)
 		/* This makes sense for Child SAs only atm */
 		ikev2_disable_rekeying(env, sa);
 		sa->sa_stateflags &= ~IKED_REQ_CHILDSA;
-	}
-
-	if (msg->msg_flags & IKED_MSG_FLAGS_AUTHENTICATION_FAILED) {
-		log_debug("%s: AUTHENTICATION_FAILED, closing SA", __func__);
-		ikev2_log_cert_info(SPI_SA(sa, __func__),
-		    sa->sa_hdr.sh_initiator ? &sa->sa_rcert : &sa->sa_icert);
-		ikev2_ike_sa_setreason(sa,
-		    "authentication failed notification from peer");
-		sa_state(env, sa, IKEV2_STATE_CLOSED);
-		msg->msg_sa = NULL;
-		return (-1);
 	}
 
 	if (msg->msg_flags & IKED_MSG_FLAGS_INVALID_KE) {
@@ -5130,7 +5312,7 @@ ikev2_sa_keys(struct iked *env, struct iked_sa *sa, struct ibuf *key)
 		goto done;
 	}
 
-	if ((skeyseed = ibuf_new(NULL, hash_length(prf))) == NULL) {
+	if ((skeyseed = ibuf_new(NULL, hash_keylength(prf))) == NULL) {
 		log_info("%s: failed to get SKEYSEED buffer",
 		    SPI_SA(sa, __func__));
 		goto done;
@@ -5292,7 +5474,7 @@ ikev2_prfplus(struct iked_hash *prf, struct ibuf *key, struct ibuf *seed,
 			ibuf_release(t1);
 		} else
 			t2 = ibuf_new(NULL, 0);
-		t1 = ibuf_new(NULL, hash_length(prf));
+		t1 = ibuf_new(NULL, hash_keylength(prf));
 
 		ibuf_add(t2, seed->buf, ibuf_length(seed));
 		pad = i + 1;

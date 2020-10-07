@@ -1,4 +1,4 @@
-/* $OpenBSD: readconf.c,v 1.335 2020/08/27 02:11:09 djm Exp $ */
+/* $OpenBSD: readconf.c,v 1.338 2020/10/07 02:18:45 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -495,7 +495,7 @@ execute_in_shell(const char *cmd)
 {
 	char *shell;
 	pid_t pid;
-	int devnull, status;
+	int status;
 
 	if ((shell = getenv("SHELL")) == NULL)
 		shell = _PATH_BSHELL;
@@ -505,23 +505,14 @@ execute_in_shell(const char *cmd)
 		    shell, strerror(errno));
 	}
 
-	/* Need this to redirect subprocess stdin/out */
-	if ((devnull = open(_PATH_DEVNULL, O_RDWR)) == -1)
-		fatal("open(/dev/null): %s", strerror(errno));
-
 	debug("Executing command: '%.500s'", cmd);
 
 	/* Fork and execute the command. */
 	if ((pid = fork()) == 0) {
 		char *argv[4];
 
-		/* Redirect child stdin and stdout. Leave stderr */
-		if (dup2(devnull, STDIN_FILENO) == -1)
-			fatal("dup2: %s", strerror(errno));
-		if (dup2(devnull, STDOUT_FILENO) == -1)
-			fatal("dup2: %s", strerror(errno));
-		if (devnull > STDERR_FILENO)
-			close(devnull);
+		if (stdfd_devnull(1, 1, 0) == -1)
+			fatal("%s: stdfd_devnull failed", __func__);
 		closefrom(STDERR_FILENO + 1);
 
 		argv[0] = shell;
@@ -539,8 +530,6 @@ execute_in_shell(const char *cmd)
 	/* Parent. */
 	if (pid == -1)
 		fatal("%s: fork: %.100s", __func__, strerror(errno));
-
-	close(devnull);
 
 	while (waitpid(pid, &status, 0) == -1) {
 		if (errno != EINTR && errno != EAGAIN)
@@ -2162,8 +2151,15 @@ fill_default_options(Options * options)
 		options->system_hostfiles[options->num_system_hostfiles++] =
 		    xstrdup(_PATH_SSH_SYSTEM_HOSTFILE2);
 	}
-	if (options->update_hostkeys == -1)
+	if (options->update_hostkeys == -1) {
+		if (options->verify_host_key_dns <= 0 &&
+		    (options->num_user_hostfiles == 0 ||
+		    (options->num_user_hostfiles == 1 && strcmp(options->
+		    user_hostfiles[0], _PATH_SSH_USER_HOSTFILE) == 0)))
+			options->update_hostkeys = SSH_UPDATE_HOSTKEYS_YES;
+		else
 			options->update_hostkeys = SSH_UPDATE_HOSTKEYS_NO;
+	}
 	if (options->num_user_hostfiles == 0) {
 		options->user_hostfiles[options->num_user_hostfiles++] =
 		    xstrdup(_PATH_SSH_USER_HOSTFILE);

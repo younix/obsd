@@ -68,10 +68,10 @@
 /vmmvar.h/1.19/Fri Jan 18 01:34:50 2019//
 /vmparam.h/1.56/Tue Apr 17 15:50:05 2018//
 /timetc.h/1.1/Mon Jul 20 09:32:29 2020//
-/cpu.h/1.172/Fri Oct  2 17:06:59 2020//
 /cpufunc.h/1.33/Sat Sep 26 23:17:55 2020//
 /intrdefs.h/1.18/Sat Sep 26 23:17:55 2020//
-/pmap.h/1.88/Fri Oct  2 17:06:59 2020//
-/segments.h/1.28/Fri Oct  2 17:06:59 2020//
 /specialreg.h/1.76/Sat Sep 26 23:17:55 2020//
+/cpu.h/1.172/Fri Oct  2 17:08:34 2020//
+/pmap.h/1.88/Fri Oct  2 17:08:34 2020//
+/segments.h/1.28/Fri Oct  2 17:08:34 2020//
 D

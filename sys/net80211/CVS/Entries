@@ -7,7 +7,6 @@
 /ieee80211_crypto_ccmp.c/1.22/Fri May 15 14:21:09 2020//
 /ieee80211_crypto_wep.c/1.17/Fri Nov  9 14:14:31 2018//
 /ieee80211_ioctl.c/1.79/Wed Jan 15 09:34:27 2020//
-/ieee80211_ioctl.h/1.40/Wed Apr 29 13:13:30 2020//
 /ieee80211_mira.c/1.30/Fri May  1 14:04:17 2020//
 /ieee80211_mira.h/1.8/Tue Mar  3 21:09:35 2020//
 /ieee80211_output.c/1.131/Tue May 19 18:57:57 2020//
@@ -27,4 +26,5 @@
 /ieee80211_var.h/1.102/Mon Jul 20 09:32:33 2020//
 /ieee80211_node.h/1.87/Fri Jul 24 10:26:29 2020//
 /ieee80211_input.c/1.221/Sat Sep 26 23:17:55 2020//
+/ieee80211_ioctl.h/1.41/Wed Oct  7 14:19:59 2020//
 D

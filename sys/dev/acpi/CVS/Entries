@@ -43,18 +43,18 @@
 /acpitimer.c/1.13/Mon Jul 20 09:32:29 2020//
 /acpiutil.c/1.9/Mon Jul 20 09:32:29 2020//
 /amdgpio.c/1.4/Mon Jul 20 09:32:29 2020//
-/abl.c/1.2/Wed Sep 16 09:35:14 2020//
 /acpi.c/1.391/Sat Sep 26 23:17:55 2020//
 /acpials.c/1.4/Sat Sep 26 23:17:55 2020//
-/acpicpu.c/1.89/Fri Oct  2 17:07:01 2020//
 /acpidebug.c/1.32/Sat Sep 26 23:17:55 2020//
 /acpiec.c/1.62/Sat Sep 26 23:17:55 2020//
-/acpireg.h/1.46/Fri Oct  2 17:07:01 2020//
 /acpivar.h/1.111/Sat Sep 26 23:17:55 2020//
-/acpivout.c/1.24/Fri Oct  2 17:07:01 2020//
 /asmc.c/1.2/Sat Sep 26 23:17:55 2020//
-/dsdt.c/1.256/Fri Oct  2 17:07:01 2020//
-/dsdt.h/1.78/Fri Oct  2 17:07:01 2020//
 /dwiic_acpi.c/1.16/Sat Sep 26 23:17:55 2020//
-/files.acpi/1.57/Fri Oct  2 17:07:01 2020//
+/abl.c/1.2/Fri Oct  2 17:08:34 2020//
+/acpicpu.c/1.89/Fri Oct  2 17:08:34 2020//
+/acpireg.h/1.46/Fri Oct  2 17:08:34 2020//
+/acpivout.c/1.24/Fri Oct  2 17:08:34 2020//
+/dsdt.c/1.256/Fri Oct  2 17:08:34 2020//
+/dsdt.h/1.78/Fri Oct  2 17:08:34 2020//
+/files.acpi/1.57/Fri Oct  2 17:08:34 2020//
 D

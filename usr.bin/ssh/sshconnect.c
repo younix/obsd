@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.c,v 1.332 2020/09/09 21:57:27 djm Exp $ */
+/* $OpenBSD: sshconnect.c,v 1.339 2020/10/07 02:26:28 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -93,24 +93,6 @@ expand_proxy_command(const char *proxy_command, const char *user,
 	return ret;
 }
 
-static void
-stderr_null(void)
-{
-	int devnull;
-
-	if ((devnull = open(_PATH_DEVNULL, O_WRONLY)) == -1) {
-		error("Can't open %s for stderr redirection: %s",
-		    _PATH_DEVNULL, strerror(errno));
-		return;
-	}
-	if (devnull == STDERR_FILENO)
-		return;
-	if (dup2(devnull, STDERR_FILENO) == -1)
-		error("Cannot redirect stderr to %s", _PATH_DEVNULL);
-	if (devnull > STDERR_FILENO)
-		close(devnull);
-}
-
 /*
  * Connect to the given ssh server using a proxy command that passes a
  * a connected fd back to us.
@@ -157,8 +139,8 @@ ssh_proxy_fdpass_connect(struct ssh *ssh, const char *host,
 		 * error messages may be printed on the user's terminal.
 		 */
 		if (!debug_flag && options.control_path != NULL &&
-		    options.control_persist)
-			stderr_null();
+		    options.control_persist && stdfd_devnull(0, 0, 1) == -1)
+			error("%s: stdfd_devnull failed", __func__);
 
 		argv[0] = shell;
 		argv[1] = "-c";
@@ -240,8 +222,8 @@ ssh_proxy_connect(struct ssh *ssh, const char *host, const char *host_arg,
 		 * error messages may be printed on the user's terminal.
 		 */
 		if (!debug_flag && options.control_path != NULL &&
-		    options.control_persist)
-			stderr_null();
+		    options.control_persist && stdfd_devnull(0, 0, 1) == -1)
+			error("%s: stdfd_devnull failed", __func__);
 
 		argv[0] = shell;
 		argv[1] = "-c";
@@ -605,7 +587,12 @@ check_host_cert(const char *host, const struct sshkey *key)
 		    "(null)" : key->cert->signature_type, ssh_err(r));
 		return 0;
 	}
-
+	/* Do not attempt hostkey update if a certificate was successful */
+	if (options.update_hostkeys != 0) {
+		options.update_hostkeys = 0;
+		debug3("%s: certificate host key in use; disabling "
+		    "UpdateHostkeys", __func__);
+	}
 	return 1;
 }
 
@@ -666,6 +653,19 @@ get_hostfile_hostname_ipaddr(char *hostname, struct sockaddr *hostaddr,
 	}
 }
 
+/* returns non-zero if path appears in hostfiles, or 0 if not. */
+static int
+path_in_hostfiles(const char *path, char **hostfiles, u_int num_hostfiles)
+{
+	u_int i;
+
+	for (i = 0; i < num_hostfiles; i++) {
+		if (strcmp(path, hostfiles[i]) == 0)
+			return 1;
+	}
+	return 0;
+}
+
 /*
  * check whether the supplied host key is valid, return -1 if the key
  * is not valid. user_hostfile[0] will not be updated if 'readonly' is true.
@@ -679,14 +679,13 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
     char **user_hostfiles, u_int num_user_hostfiles,
     char **system_hostfiles, u_int num_system_hostfiles)
 {
-	HostStatus host_status;
-	HostStatus ip_status;
+	HostStatus host_status = -1, ip_status = -1;
 	struct sshkey *raw_key = NULL;
 	char *ip = NULL, *host = NULL;
 	char hostline[1000], *hostp, *fp, *ra;
 	char msg[1024];
 	const char *type;
-	const struct hostkey_entry *host_found, *ip_found;
+	const struct hostkey_entry *host_found = NULL, *ip_found = NULL;
 	int len, cancelled_forwarding = 0, confirmed;
 	int local = sockaddr_is_local(hostaddr);
 	int r, want_cert = sshkey_is_cert(host_key), host_ip_differ = 0;
@@ -706,6 +705,7 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 	    options.host_key_alias == NULL) {
 		debug("Forcing accepting of host key for "
 		    "loopback/localhost.");
+		options.update_hostkeys = 0;
 		return 0;
 	}
 
@@ -777,6 +777,17 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 		    !check_host_cert(options.host_key_alias == NULL ?
 		    hostname : options.host_key_alias, host_key))
 			goto fail;
+		/* Turn off UpdateHostkeys if key was in system known_hosts */
+		if (options.update_hostkeys != 0 &&
+		    (path_in_hostfiles(host_found->file,
+		    system_hostfiles, num_system_hostfiles) ||
+		    (ip_status == HOST_OK && ip_found != NULL &&
+		    path_in_hostfiles(ip_found->file,
+		    system_hostfiles, num_system_hostfiles)))) {
+			options.update_hostkeys = 0;
+			debug3("%s: host key found in GlobalKnownHostsFile; "
+			    "disabling UpdateHostkeys", __func__);
+		}
 		if (options.check_host_ip && ip_status == HOST_NEW) {
 			if (readonly || want_cert)
 				logit("%s host key for IP address "
@@ -1029,6 +1040,11 @@ check_host_key(char *hostname, struct sockaddr *hostaddr, u_short port,
 			    "man-in-the-middle attacks.");
 			options.tun_open = SSH_TUNMODE_NO;
 			cancelled_forwarding = 1;
+		}
+		if (options.update_hostkeys != 0) {
+			error("UpdateHostkeys is disabled because the host "
+			    "key is not trusted.");
+			options.update_hostkeys = 0;
 		}
 		if (options.exit_on_forward_failure && cancelled_forwarding)
 			fatal("Error: forwarding disabled due to host key "
@@ -1285,7 +1301,8 @@ show_other_keys(struct hostkeys *hostkeys, struct sshkey *key)
 	for (i = 0; type[i] != -1; i++) {
 		if (type[i] == key->type)
 			continue;
-		if (!lookup_key_in_hostkeys_by_type(hostkeys, type[i], &found))
+		if (!lookup_key_in_hostkeys_by_type(hostkeys, type[i],
+		    -1, &found))
 			continue;
 		fp = sshkey_fingerprint(found->key,
 		    options.fingerprint_hash, SSH_FP_DEFAULT);

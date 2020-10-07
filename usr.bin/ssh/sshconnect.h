@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect.h,v 1.40 2020/01/25 07:17:18 djm Exp $ */
+/* $OpenBSD: sshconnect.h,v 1.42 2020/10/07 02:22:23 djm Exp $ */
 
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
