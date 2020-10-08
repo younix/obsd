@@ -963,7 +963,7 @@ bwfm_pci_fill_rx_ioctl_ring(struct bwfm_pci_softc *sc, struct if_rxring *rxring,
 		req = bwfm_pci_ring_write_reserve(sc, &sc->sc_ctrl_submit);
 		if (req == NULL)
 			break;
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, MSGBUF_MAX_PKT_SIZE);
+		m = MCLGETL(NULL, M_DONTWAIT, MSGBUF_MAX_PKT_SIZE);
 		if (m == NULL) {
 			bwfm_pci_ring_write_cancel(sc, &sc->sc_ctrl_submit, 1);
 			break;
@@ -1003,7 +1003,7 @@ bwfm_pci_fill_rx_buf_ring(struct bwfm_pci_softc *sc)
 		req = bwfm_pci_ring_write_reserve(sc, &sc->sc_rxpost_submit);
 		if (req == NULL)
 			break;
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, MSGBUF_MAX_PKT_SIZE);
+		m = MCLGETL(NULL, M_DONTWAIT, MSGBUF_MAX_PKT_SIZE);
 		if (m == NULL) {
 			bwfm_pci_ring_write_cancel(sc, &sc->sc_rxpost_submit, 1);
 			break;
@@ -1959,7 +1959,7 @@ bwfm_pci_msgbuf_query_dcmd(struct bwfm_softc *bwfm, int ifidx,
 	int s;
 
 	buflen = min(*len, BWFM_DMA_H2D_IOCTL_BUF_LEN);
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, buflen);
+	m = MCLGETL(NULL, M_DONTWAIT, buflen);
 	if (m == NULL)
 		return 1;
 	m->m_len = m->m_pkthdr.len = buflen;

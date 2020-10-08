@@ -474,7 +474,7 @@ msk_newbuf(struct sk_if_softc *sc_if)
 	uint32_t		hiaddr;
 	unsigned int		pktlen = sc_if->sk_pktlen + ETHER_ALIGN;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, pktlen);
+	m = MCLGETL(NULL, M_DONTWAIT, pktlen);
 	if (m == NULL)
 		return (0);
 	m->m_len = m->m_pkthdr.len = pktlen;

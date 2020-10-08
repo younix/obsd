@@ -1081,7 +1081,7 @@ xl_newbuf(struct xl_softc *sc, struct xl_chain_onefrag *c)
 	struct mbuf	*m_new = NULL;
 	bus_dmamap_t	map;
 
-	m_new = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
+	m_new = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
 	if (!m_new)
 		return (ENOBUFS);
 

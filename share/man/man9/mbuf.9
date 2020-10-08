@@ -58,7 +58,7 @@
 .Nm m_devget ,
 .Nm m_apply ,
 .Nm MCLGET ,
-.Nm MCLGETI ,
+.Nm MCLGETL ,
 .Nm MEXTADD ,
 .Nm m_align ,
 .Nm M_READONLY ,
@@ -126,7 +126,7 @@
 "int (*func)(caddr_t, caddr_t, unsigned int)" "caddr_t fstate"
 .Fn MCLGET "struct mbuf *m" "int how"
 .Ft struct mbuf *
-.Fn MCLGETI "struct mbuf *m" "int how" "struct ifnet *ifp" "int len"
+.Fn MCLGETL "struct mbuf *m" "int how" "int len"
 .Fn MEXTADD "struct mbuf *m" "caddr_t buf" "u_int size" "int flags" \
 "void (*free)(caddr_t, u_int, void *)" "void *arg"
 .Ft void
@@ -721,7 +721,7 @@ See
 .Fn m_get
 for a description of
 .Fa how .
-.It Fn MCLGETI "struct mbuf *m" "int how" "struct ifnet *ifp" "int len"
+.It Fn MCLGETL "struct mbuf *m" "int how" "int len"
 If
 .Fa m
 is NULL, allocate it.

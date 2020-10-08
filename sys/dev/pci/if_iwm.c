@@ -3790,7 +3790,7 @@ iwm_rx_addbuf(struct iwm_softc *sc, int size, int idx)
 	if (size <= MCLBYTES) {
 		MCLGET(m, M_DONTWAIT);
 	} else {
-		MCLGETI(m, M_DONTWAIT, NULL, IWM_RBUF_SIZE);
+		MCLGETL(m, M_DONTWAIT, IWM_RBUF_SIZE);
 	}
 	if ((m->m_flags & M_EXT) == 0) {
 		m_freem(m);
@@ -4560,7 +4560,7 @@ iwm_send_cmd(struct iwm_softc *sc, struct iwm_host_cmd *hcmd)
 			err = EINVAL;
 			goto out;
 		}
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, totlen);
+		m = MCLGETL(NULL, M_DONTWAIT, totlen);
 		if (m == NULL) {
 			printf("%s: could not get fw cmd mbuf (%zd bytes)\n",
 			    DEVNAME(sc), totlen);

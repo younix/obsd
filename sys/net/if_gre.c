@@ -3198,7 +3198,7 @@ gre_keepalive_send(void *arg)
 		return;
 
 	if (len > MHLEN) {
-		MCLGETI(m, M_DONTWAIT, NULL, len);
+		MCLGETL(m, M_DONTWAIT, len);
 		if (!ISSET(m->m_flags, M_EXT)) {
 			m_freem(m);
 			return;
@@ -4099,7 +4099,7 @@ eoip_keepalive_send(void *arg)
 		return;
 
 	if (linkhdr > MHLEN) {
-		MCLGETI(m, M_DONTWAIT, NULL, linkhdr);
+		MCLGETL(m, M_DONTWAIT, linkhdr);
 		if (!ISSET(m->m_flags, M_EXT)) {
 			m_freem(m);
 			return;

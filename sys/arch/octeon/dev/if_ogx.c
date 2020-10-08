@@ -1147,7 +1147,7 @@ ogx_load_mbufs(struct ogx_softc *sc, unsigned int n)
 	paddr_t pktbuf;
 
 	for ( ; n > 0; n--) {
-		m = MCLGETI(NULL, M_NOWAIT, NULL, MCLBYTES);
+		m = MCLGETL(NULL, M_NOWAIT, MCLBYTES);
 		if (m == NULL)
 			break;
 

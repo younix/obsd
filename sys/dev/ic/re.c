@@ -1125,7 +1125,7 @@ re_newbuf(struct rl_softc *sc)
 	u_int32_t	cmdstat;
 	int		error, idx;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, RL_FRAMELEN(sc->rl_max_mtu));
+	m = MCLGETL(NULL, M_DONTWAIT, RL_FRAMELEN(sc->rl_max_mtu));
 	if (!m)
 		return (ENOBUFS);
 

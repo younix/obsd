@@ -312,7 +312,7 @@ struct mbuf {
 } while (/* CONSTCOND */ 0)
 
 #define MCLGET(m, how) (void) m_clget((m), (how), MCLBYTES)
-#define MCLGETI(m, how, ifp, l) m_clget((m), (how), (l))
+#define MCLGETL(m, how, l) m_clget((m), (how), (l))
 
 u_int mextfree_register(void (*)(caddr_t, u_int, void *));
 #define	MEXTFREE_POOL 0

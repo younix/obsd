@@ -1284,7 +1284,7 @@ hme_newbuf(struct hme_softc *sc, struct hme_sxd *d)
 	 * until we're sure everything is a success.
 	 */
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
+	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
 	if (!m)
 		return (ENOBUFS);
 

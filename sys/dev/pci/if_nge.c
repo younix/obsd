@@ -962,7 +962,7 @@ nge_newbuf(struct nge_softc *sc, struct nge_desc *c, struct mbuf *m)
 	struct mbuf		*m_new = NULL;
 
 	if (m == NULL) {
-		m_new = MCLGETI(NULL, M_DONTWAIT, NULL, NGE_MCLBYTES);
+		m_new = MCLGETL(NULL, M_DONTWAIT, NGE_MCLBYTES);
 		if (m_new == NULL)
 			return (ENOBUFS);
 	} else {

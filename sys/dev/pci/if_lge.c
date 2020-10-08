@@ -626,7 +626,7 @@ lge_newbuf(struct lge_softc *sc, struct lge_rx_desc *c, struct mbuf *m)
 	struct mbuf		*m_new = NULL;
 
 	if (m == NULL) {
-		m_new = MCLGETI(NULL, M_DONTWAIT, NULL, LGE_JLEN);
+		m_new = MCLGETL(NULL, M_DONTWAIT, LGE_JLEN);
 		if (m_new == NULL)
 			return (ENOBUFS);
 	} else {

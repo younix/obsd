@@ -1054,7 +1054,7 @@ rge_newbuf(struct rge_softc *sc)
 	bus_dmamap_t rxmap;
 	int idx;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, sc->rge_rxbufsz);
+	m = MCLGETL(NULL, M_DONTWAIT, sc->rge_rxbufsz);
 	if (m == NULL)
 		return (ENOBUFS);
 

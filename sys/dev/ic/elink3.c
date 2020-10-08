@@ -1343,7 +1343,7 @@ epget(struct ep_softc *sc, int totlen)
 	m = sc->mb[sc->next_mb];
 	sc->mb[sc->next_mb] = NULL;
 	if (m == NULL) {
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
+		m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
 		/* If the queue is no longer full, refill. */
 		if (!timeout_pending(&sc->sc_epmbuffill_tmo))
 			timeout_add(&sc->sc_epmbuffill_tmo, 1);
@@ -1609,7 +1609,7 @@ epmbuffill(void *v)
 	s = splnet();
 	for (i = 0; i < MAX_MBS; i++) {
 		if (sc->mb[i] == NULL) {
-			sc->mb[i] = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
+			sc->mb[i] = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
 			if (sc->mb[i] == NULL)
 				break;
 		}

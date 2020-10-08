@@ -1627,7 +1627,7 @@ pfsync_sendout(void)
 	}
 
 	if (max_linkhdr + sc->sc_len > MHLEN) {
-		MCLGETI(m, M_DONTWAIT, NULL, max_linkhdr + sc->sc_len);
+		MCLGETL(m, M_DONTWAIT, max_linkhdr + sc->sc_len);
 		if (!ISSET(m->m_flags, M_EXT)) {
 			m_free(m);
 			sc->sc_if.if_oerrors++;

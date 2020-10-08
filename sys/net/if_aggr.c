@@ -2664,7 +2664,7 @@ aggr_ntt_transmit(struct aggr_port *p)
 		return;
 
 	if (len > MHLEN) {
-		MCLGETI(m, M_DONTWAIT, NULL, len);
+		MCLGETL(m, M_DONTWAIT, len);
 		if (!ISSET(m->m_flags, M_EXT)) {
 			m_freem(m);
 			return;

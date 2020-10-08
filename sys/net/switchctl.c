@@ -224,7 +224,7 @@ switchwrite(dev_t dev, struct uio *uio, int ioflag)
 		if (m == NULL)
 			return (ENOBUFS);
 		if (len >= MHLEN) {
-			MCLGETI(m, M_DONTWAIT, NULL, MIN(MAXMCLBYTES, len));
+			MCLGETL(m, M_DONTWAIT, MIN(MAXMCLBYTES, len));
 			if ((m->m_flags & M_EXT) == 0) {
 				m_free(m);
 				return (ENOBUFS);
@@ -262,7 +262,7 @@ switchwrite(dev_t dev, struct uio *uio, int ioflag)
 			goto save_return;
 		}
 		if (len >= MLEN) {
-			MCLGETI(n, M_DONTWAIT, NULL, MIN(MAXMCLBYTES, len));
+			MCLGETL(n, M_DONTWAIT, MIN(MAXMCLBYTES, len));
 			if ((n->m_flags & M_EXT) == 0) {
 				m_free(n);
 				error = ENOBUFS;

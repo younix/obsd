@@ -1113,7 +1113,7 @@ bge_newbuf(struct bge_softc *sc, int i)
 	struct mbuf		*m;
 	int			error;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, sc->bge_rx_std_len);
+	m = MCLGETL(NULL, M_DONTWAIT, sc->bge_rx_std_len);
 	if (!m)
 		return (ENOBUFS);
 	m->m_len = m->m_pkthdr.len = sc->bge_rx_std_len;
@@ -1162,7 +1162,7 @@ bge_newbuf_jumbo(struct bge_softc *sc, int i)
 	struct mbuf		*m;
 	int			error;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, BGE_JLEN);
+	m = MCLGETL(NULL, M_DONTWAIT, BGE_JLEN);
 	if (!m)
 		return (ENOBUFS);
 	m->m_len = m->m_pkthdr.len = BGE_JUMBO_FRAMELEN;

@@ -847,11 +847,11 @@ se_newbuf(struct se_softc *sc, uint i)
 	struct mbuf *m;
 	int rc;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, MCLBYTES);
+	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
 	if (m == NULL) {
 #ifdef SE_DEBUG
 		if (ifp->if_flags & IFF_DEBUG)
-			printf("%s: MCLGETI failed\n", ifp->if_xname);
+			printf("%s: MCLGETL failed\n", ifp->if_xname);
 #endif
 		return ENOBUFS;
 	}

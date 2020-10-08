@@ -2515,7 +2515,7 @@ em_get_buf(struct em_queue *que, int i)
 
 	KASSERT(pkt->pkt_m == NULL);
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, EM_MCLBYTES);
+	m = MCLGETL(NULL, M_DONTWAIT, EM_MCLBYTES);
 	if (m == NULL) {
 		sc->mbuf_cluster_failed++;
 		return (ENOBUFS);

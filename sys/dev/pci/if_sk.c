@@ -622,7 +622,7 @@ sk_newbuf(struct sk_if_softc *sc_if)
 	int			error;
 	uint64_t		dva;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, SK_JLEN);
+	m = MCLGETL(NULL, M_DONTWAIT, SK_JLEN);
 	if (m == NULL)
 		return (ENOBUFS);
 

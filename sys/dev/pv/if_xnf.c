@@ -855,7 +855,7 @@ xnf_rx_ring_fill(struct xnf_softc *sc)
 		id = rxd->rxd_rsp.rxp_id;
 		if (sc->sc_rx_buf[id])
 			break;
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, XNF_MCLEN);
+		m = MCLGETL(NULL, M_DONTWAIT, XNF_MCLEN);
 		if (m == NULL)
 			break;
 		m->m_len = m->m_pkthdr.len = XNF_MCLEN;

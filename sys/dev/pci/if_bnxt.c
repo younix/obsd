@@ -1879,7 +1879,7 @@ bnxt_rx_fill_slots(struct bnxt_softc *sc, struct bnxt_ring *ring, void *ring_mem
 	p = *prod;
 	for (fills = 0; fills < nslots; fills++) {
 		bs = &slots[p];
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, bufsize);
+		m = MCLGETL(NULL, M_DONTWAIT, bufsize);
 		if (m == NULL)
 			break;
 

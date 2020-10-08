@@ -184,7 +184,7 @@ m_pulldown(struct mbuf *m, int off, int len, int *offp)
 	}
 	MGET(o, M_DONTWAIT, m->m_type);
 	if (o && len > MLEN) {
-		MCLGETI(o, M_DONTWAIT, NULL, len);
+		MCLGETL(o, M_DONTWAIT, len);
 		if ((o->m_flags & M_EXT) == 0) {
 			m_free(o);
 			o = NULL;
@@ -235,7 +235,7 @@ m_dup1(struct mbuf *m, int off, int len, int wait)
 		l = MLEN;
 	}
 	if (n && len > l) {
-		MCLGETI(n, wait, NULL, len);
+		MCLGETL(n, wait, len);
 		if ((n->m_flags & M_EXT) == 0) {
 			m_free(n);
 			n = NULL;

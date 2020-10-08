@@ -1967,7 +1967,7 @@ myx_mcl_small(void)
 {
 	struct mbuf *m;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, MYX_RXSMALL_SIZE);
+	m = MCLGETL(NULL, M_DONTWAIT, MYX_RXSMALL_SIZE);
 	if (m == NULL)
 		return (NULL);
 

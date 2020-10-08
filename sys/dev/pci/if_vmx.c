@@ -652,7 +652,7 @@ vmxnet3_rxfill(struct vmxnet3_rxring *ring)
 	for (slots = if_rxr_get(&ring->rxr, NRXDESC); slots > 0; slots--) {
 		KASSERT(ring->m[prod] == NULL);
 
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, JUMBO_LEN);
+		m = MCLGETL(NULL, M_DONTWAIT, JUMBO_LEN);
 		if (m == NULL)
 			break;
 

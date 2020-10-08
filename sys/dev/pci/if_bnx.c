@@ -3671,7 +3671,7 @@ bnx_get_buf(struct bnx_softc *sc, u_int16_t *prod,
 	    *prod_bseq);
 
 	/* This is a new mbuf allocation. */
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, BNX_MAX_JUMBO_MRU);
+	m = MCLGETL(NULL, M_DONTWAIT, BNX_MAX_JUMBO_MRU);
 	if (!m)
 		return (0);
 	m->m_len = m->m_pkthdr.len = BNX_MAX_JUMBO_MRU;

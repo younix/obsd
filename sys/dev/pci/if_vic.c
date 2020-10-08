@@ -1311,7 +1311,7 @@ vic_alloc_mbuf(struct vic_softc *sc, bus_dmamap_t map, u_int pktlen)
 {
 	struct mbuf *m = NULL;
 
-	m = MCLGETI(NULL, M_DONTWAIT, NULL, pktlen);
+	m = MCLGETL(NULL, M_DONTWAIT, pktlen);
 	if (!m)
 		return (NULL);
 	m->m_data += ETHER_ALIGN;

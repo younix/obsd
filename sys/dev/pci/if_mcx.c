@@ -6403,7 +6403,7 @@ mcx_rx_fill_slots(struct mcx_softc *sc, struct mcx_rx *rx,
 	rqe = ring;
 	for (fills = 0; fills < nslots; fills++) {
 		ms = &slots[slot];
-		m = MCLGETI(NULL, M_DONTWAIT, NULL, sc->sc_rxbufsz);
+		m = MCLGETL(NULL, M_DONTWAIT, sc->sc_rxbufsz);
 		if (m == NULL)
 			break;
 
