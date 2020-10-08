@@ -19,7 +19,7 @@
 .Os
 .Sh NAME
 .Nm rp
-.Nd Comtrol RocketPort Intelligent Serial Port Cards device driver
+.Nd Comtrol RocketPort intelligent serial port cards device
 .Sh SYNOPSIS
 .Cd "rp* at pci?"
 .Sh DESCRIPTION
@@ -32,7 +32,7 @@ The device minor numbers for this driver are encoded as follows:
     bits    meaning
     ----    -------
     uuuuu   physical serial line (i.e., unit) to use
-		0-7 on a 8Y, 0-15 on a 16Y
+            0-7 on a 8Y, 0-15 on a 16Y
 
     cc      card number
 
@@ -48,7 +48,9 @@ The device minor numbers for this driver are encoded as follows:
 .Sh AUTHORS
 This driver was written under contract for Comtrol Corporation by
 .An Theodore Ts'o Aq Mt tytso@mit.edu .
-It was ported to OpenBSD by
+It was ported to
+.Ox
+by
 .An Jan Klemkow Aq Mt j.klemkow@wemelug.de .
 .Sh BUGS
 Modem control does not work properly.
