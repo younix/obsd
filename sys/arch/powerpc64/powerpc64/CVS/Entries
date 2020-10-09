@@ -21,9 +21,9 @@
 /cpu.c/1.20/Fri Oct  2 17:08:34 2020//
 /db_trace.c/1.7/Fri Oct  2 17:08:34 2020//
 /intr.c/1.9/Fri Oct  2 17:08:34 2020//
-/locore.S/1.38/Wed Oct  7 14:19:55 2020//
 /machdep.c/1.61/Fri Oct  2 17:08:34 2020//
-/softintr.c/1.2/Wed Oct  7 14:19:55 2020//
-/trap.c/1.40/Fri Oct  2 17:08:34 2020//
 /trap_subr.S/1.18/Fri Oct  2 17:08:34 2020//
+/locore.S/1.38/Thu Oct  8 22:36:13 2020//
+/softintr.c/1.2/Thu Oct  8 22:36:13 2020//
+/trap.c/1.41/Thu Oct  8 23:07:17 2020//
 D
