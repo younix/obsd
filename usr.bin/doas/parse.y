@@ -88,6 +88,7 @@ rule:		action ident target cmd {
 				errx(1, "can't allocate rule");
 			r->action = $1.action;
 			r->options = $1.options;
+			r->timeout = $1.timeout;
 			r->envlist = $1.envlist;
 			r->ident = $2.str;
 			r->target = $3.str;
@@ -138,6 +139,10 @@ option:		TNOPASS {
 			$$.envlist = NULL;
 		} | TPERSIST {
 			$$.options = PERSIST;
+			$$.envlist = NULL;
+		} | TTIMEOUT time {
+			$$.options = TIMEOUT;
+			$$.timeout = $2;
 			$$.envlist = NULL;
 		} | TKEEPENV {
 			$$.options = KEEPENV;
@@ -210,6 +215,7 @@ static struct keyword {
 	{ "args", TARGS },
 	{ "nopass", TNOPASS },
 	{ "persist", TPERSIST },
+	{ "timeout", TTIMEOUT },
 	{ "keepenv", TKEEPENV },
 	{ "setenv", TSETENV },
 };

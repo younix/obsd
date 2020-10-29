@@ -18,6 +18,7 @@
 struct rule {
 	int action;
 	int options;
+	int timeout;
 	const char *ident;
 	const char *target;
 	const char *cmd;
@@ -42,3 +43,4 @@ char **prepenv(const struct rule *, const struct passwd *,
 #define NOPASS		0x1
 #define KEEPENV		0x2
 #define PERSIST		0x4
+#define TIMEOUT		0x8

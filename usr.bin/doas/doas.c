@@ -198,7 +198,7 @@ checkconfig(const char *confpath, int argc, char **argv,
 }
 
 static void
-authuser(char *myname, char *login_style, int persist)
+authuser(char *myname, char *login_style, int persist, int secs)
 {
 	char *challenge = NULL, *response, rbuf[1024], cbuf[128];
 	auth_session_t *as;
@@ -238,7 +238,6 @@ authuser(char *myname, char *login_style, int persist)
 	explicit_bzero(rbuf, sizeof(rbuf));
 good:
 	if (fd != -1) {
-		int secs = 5 * 60;
 		ioctl(fd, TIOCSETVERAUTH, &secs);
 		close(fd);
 	}
@@ -404,7 +403,8 @@ main(int argc, char **argv)
 		if (nflag)
 			errx(1, "Authorization required");
 
-		authuser(mypw->pw_name, login_style, rule->options & PERSIST);
+		authuser(mypw->pw_name, login_style,
+		    rule->options & (PERSIST|TIMEOUT), 5 * 60);
 	}
 
 	if ((p = getenv("PATH")) != NULL)
