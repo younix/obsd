@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.1939 2020/10/07 11:14:59 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.1942 2020/10/28 18:49:03 kettenis Exp 
  */
 
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
@@ -1326,6 +1326,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_3X_CCP,
 	    "17h/3xh Crypto",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_3X_HDA,
+	    "17h/3xh HD Audio",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_14_HB,
@@ -9388,6 +9392,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "PRIMEPOWER250/450 LAN",
 	},
 	{
+	    PCI_VENDOR_FUJITSU, PCI_PRODUCT_FUJITSU_SPARC64X,
+	    "SPARC64 X PCIe",
+	},
+	{
 	    PCI_VENDOR_FUSIONIO, PCI_PRODUCT_FUSIONIO_IODRIVE_1_2,
 	    "ioDrive v1.2",
 	},
@@ -16764,6 +16772,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "495 Series UART",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_495SERIES_LP_HDA,
+	    "495 Series HD Audio",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_495SERIES_LP_AHCI,
 	    "495 Series AHCI",
 	},
@@ -19524,7 +19536,11 @@ static const struct pci_known_product pci_known_products[] = {
 	    "C610 PCIE",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C610_HDA,
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C610_HDA_1,
+	    "C610 HD Audio",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C610_HDA_2,
 	    "C610 HD Audio",
 	},
 	{
@@ -20748,8 +20764,8 @@ static const struct pci_known_product pci_known_products[] = {
 	    "100 Series HD Audio",
 	},
 	{
-	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_CM238_HDA,
-	    "CM238 HD Audio Controller",
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_100SERIES_H_HDA,
+	    "100 Series HD Audio",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C620_AHCI_1,
@@ -20806,6 +20822,14 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C620_MROM0,
 	    "C620 MROM",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C620_HDA_1,
+	    "C620 HD Audio",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_C620_HDA_2,
+	    "C620 HD Audio",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_200SERIES_AHCI_1,
@@ -25962,6 +25986,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_PLX, PCI_PRODUCT_PLX_PEX_8724,
 	    "PEX 8724",
+	},
+	{
+	    PCI_VENDOR_PLX, PCI_PRODUCT_PLX_PEX_8732,
+	    "PEX 8732",
 	},
 	{
 	    PCI_VENDOR_PLX, PCI_PRODUCT_PLX_PEX_8733,

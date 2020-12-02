@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2_pld.c,v 1.101 2020/10/03 20:23:08 tobhe Exp $	*/
+/*	$OpenBSD: ikev2_pld.c,v 1.107 2020/10/24 20:27:59 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -20,7 +20,6 @@
 
 #include <sys/queue.h>
 #include <sys/socket.h>
-#include <sys/wait.h>
 #include <sys/uio.h>
 
 #include <netinet/in.h>
@@ -33,7 +32,6 @@
 #include <signal.h>
 #include <errno.h>
 #include <err.h>
-#include <pwd.h>
 #include <event.h>
 
 #include <openssl/sha.h>
@@ -1180,6 +1178,9 @@ ikev2_pld_notify(struct iked *env, struct ikev2_payload *pld,
 		}
 		msg->msg_parent->msg_flags |= IKED_MSG_FLAGS_CHILD_SA_NOT_FOUND;
 		break;
+	case IKEV2_N_NO_PROPOSAL_CHOSEN:
+		msg->msg_parent->msg_flags |= IKED_MSG_FLAGS_NO_PROPOSAL_CHOSEN;
+		break;
 	case IKEV2_N_MOBIKE_SUPPORTED:
 		if (!msg->msg_e) {
 			log_debug("%s: N_MOBIKE_SUPPORTED not encrypted",
@@ -1806,7 +1807,6 @@ ikev2_pld_cp(struct iked *env, struct ikev2_payload *pld,
 	struct ikev2_cfg	*cfg;
 	uint8_t			*ptr;
 	size_t			 len;
-	struct iked_sa		*sa = msg->msg_sa;
 
 	if (ikev2_validate_cp(msg, offset, left, &cp))
 		return (-1);
@@ -1848,8 +1848,7 @@ ikev2_pld_cp(struct iked *env, struct ikev2_payload *pld,
 	if (!ikev2_msg_frompeer(msg))
 		return (0);
 
-	if (sa)
-		sa->sa_cp = cp.cp_type;
+	msg->msg_parent->msg_cp = cp.cp_type;
 
 	return (0);
 }

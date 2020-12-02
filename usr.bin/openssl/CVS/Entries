@@ -48,12 +48,12 @@
 /ts.c/1.15/Wed Feb  7 05:47:55 2018//
 /version.c/1.9/Sun Jul 14 03:30:46 2019//
 /x509.c/1.18/Sun May 10 17:13:31 2020//
-/openssl.1/1.125/Mon Jul 20 09:32:33 2020//
-/s_client.c/1.51/Mon Jul 20 09:32:33 2020//
-/verify.c/1.8/Mon Jul 20 09:32:33 2020//
-/apps.c/1.55/Sat Sep 26 23:17:55 2020//
 /apps.h/1.24/Sat Sep 26 23:17:55 2020//
-/ocsp.c/1.19/Sat Sep 26 23:17:55 2020//
 /req.c/1.19/Sat Sep 26 23:17:55 2020//
 /s_server.c/1.44/Fri Oct  2 17:08:34 2020//
+/apps.c/1.57/Thu Oct 29 07:57:09 2020//
+/ocsp.c/1.21/Thu Oct 29 07:57:09 2020//
+/openssl.1/1.126/Thu Oct 29 07:57:09 2020//
+/s_client.c/1.52/Thu Oct 29 07:57:09 2020//
+/verify.c/1.9/Thu Oct 29 07:57:09 2020//
 D

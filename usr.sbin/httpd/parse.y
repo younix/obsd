@@ -1,6 +1,7 @@
-/*	$OpenBSD: parse.y,v 1.117 2020/08/26 06:50:20 florian Exp $	*/
+/*	$OpenBSD: parse.y,v 1.119 2020/10/26 19:31:22 denis Exp $	*/
 
 /*
+ * Copyright (c) 2020 Matthias Pressfreund <mpfr@fn.de>
  * Copyright (c) 2007 - 2015 Reyk Floeter <reyk@openbsd.org>
  * Copyright (c) 2008 Gilles Chehade <gilles@openbsd.org>
  * Copyright (c) 2006 Pierre-Yves Ritschard <pyr@openbsd.org>
@@ -355,10 +356,17 @@ server		: SERVER optmatch STRING	{
 				YYERROR;
 			}
 
-			if (server_tls_load_keypair(srv) == -1)
+			if (server_tls_load_keypair(srv) == -1) {
+				/* Soft fail as there may be no certificate. */
 				log_warnx("%s:%d: server \"%s\": failed to "
 				    "load public/private keys", file->name,
 				    yylval.lineno, srv->srv_conf.name);
+				serverconfig_free(srv_conf);
+				srv_conf = NULL;
+				free(srv);
+				srv = NULL;
+				break;
+			}
 
 			if (server_tls_load_ca(srv) == -1) {
 				yyerror("server \"%s\": failed to load "
@@ -580,8 +588,10 @@ serveroptsl	: LISTEN ON STRING opttls port	{
 			struct server	*s = NULL;
 
 			TAILQ_FOREACH(s, conf->sc_servers, srv_entry) {
+				/* Compare locations of same parent server */
 				if ((s->srv_conf.flags & SRVFLAG_LOCATION) &&
-				    s->srv_conf.id == srv_conf->id &&
+				    s->srv_conf.parent_id ==
+				    srv_conf->parent_id &&
 				    strcmp(s->srv_conf.location,
 				    srv_conf->location) == 0)
 					break;

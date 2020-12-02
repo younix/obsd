@@ -1,4 +1,4 @@
-/*	$OpenBSD: config.c,v 1.68 2020/09/30 16:52:08 tobhe Exp $	*/
+/*	$OpenBSD: config.c,v 1.71 2020/10/21 17:47:36 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -18,7 +18,6 @@
  */
 
 #include <sys/queue.h>
-#include <sys/wait.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
 
@@ -29,7 +28,6 @@
 #include <signal.h>
 #include <errno.h>
 #include <err.h>
-#include <pwd.h>
 #include <event.h>
 
 #include <openssl/evp.h>
@@ -530,6 +528,8 @@ config_getreset(struct iked *env, struct imsg *imsg)
 			if (mode == RESET_ALL ||
 			    ikev2_ike_sa_delete(env, sa) != 0) {
 				RB_REMOVE(iked_sas, &env->sc_sas, sa);
+				if (sa->sa_dstid_entry_valid)
+					sa_dstid_remove(env, sa);
 				config_free_sa(env, sa);
 			}
 		}

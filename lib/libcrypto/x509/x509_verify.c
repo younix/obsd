@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_verify.c,v 1.13 2020/09/26 15:44:06 jsing Exp $ */
+/* $OpenBSD: x509_verify.c,v 1.16 2020/10/26 12:01:01 tb Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -458,8 +458,13 @@ x509_verify_cert_hostname(struct x509_verify_ctx *ctx, X509 *cert, char *name)
 	size_t len;
 
 	if (name == NULL) {
-		if (ctx->xsc != NULL)
-			return x509_vfy_check_id(ctx->xsc);
+		if (ctx->xsc != NULL) {
+			int ret;
+
+			if ((ret = x509_vfy_check_id(ctx->xsc)) == 0)
+				ctx->error = ctx->xsc->error;
+			return ret;
+		}
 		return 1;
 	}
 	if ((candidate = strdup(name)) == NULL) {
@@ -853,13 +858,13 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 
 	if (ctx->roots == NULL || ctx->max_depth == 0) {
 		ctx->error = X509_V_ERR_INVALID_CALL;
-		return 0;
+		goto err;
 	}
 
 	if (ctx->xsc != NULL) {
 		if (leaf != NULL || name != NULL) {
 			ctx->error = X509_V_ERR_INVALID_CALL;
-			return 0;
+			goto err;
 		}
 		leaf = ctx->xsc->cert;
 
@@ -872,34 +877,34 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 		 */
 		if ((ctx->xsc->chain = sk_X509_new_null()) == NULL) {
 			ctx->error = X509_V_ERR_OUT_OF_MEM;
-			return 0;
+			goto err;
 		}
 		if (!X509_up_ref(leaf)) {
 			ctx->error = X509_V_ERR_OUT_OF_MEM;
-			return 0;
+			goto err;
 		}
 		if (!sk_X509_push(ctx->xsc->chain, leaf)) {
 			X509_free(leaf);
 			ctx->error = X509_V_ERR_OUT_OF_MEM;
-			return 0;
+			goto err;
 		}
 		ctx->xsc->error_depth = 0;
 		ctx->xsc->current_cert = leaf;
 	}
 
 	if (!x509_verify_cert_valid(ctx, leaf, NULL))
-		return 0;
+		goto err;
 
 	if (!x509_verify_cert_hostname(ctx, leaf, name))
-		return 0;
+		goto err;
 
 	if ((current_chain = x509_verify_chain_new()) == NULL) {
 		ctx->error = X509_V_ERR_OUT_OF_MEM;
-		return 0;
+		goto err;
 	}
 	if (!x509_verify_chain_append(current_chain, leaf, &ctx->error)) {
 		x509_verify_chain_free(current_chain);
-		return 0;
+		goto err;
 	}
 	if (x509_verify_ctx_cert_is_root(ctx, leaf))
 		x509_verify_ctx_add_chain(ctx, current_chain);
@@ -925,4 +930,11 @@ x509_verify(struct x509_verify_ctx *ctx, X509 *leaf, char *name)
 		return ctx->xsc->verify_cb(ctx->chains_count, ctx->xsc);
 	}
 	return (ctx->chains_count);
+
+ err:
+	if (ctx->error == X509_V_OK)
+		ctx->error = X509_V_ERR_UNSPECIFIED;
+	if (ctx->xsc != NULL)
+		ctx->xsc->error = ctx->error;
+	return 0;
 }

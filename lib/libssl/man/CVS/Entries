@@ -104,7 +104,6 @@
 /SSL_want.3/1.5/Tue Mar 27 17:35:50 2018//
 /d2i_SSL_SESSION.3/1.7/Sat Jun  8 15:25:43 2019//
 /SSL_read.3/1.7/Mon Jun  1 06:23:15 2020//
-/SSL_CTX_new.3/1.12/Sat Jun  6 11:21:49 2020//
 /Makefile/1.69/Fri Oct  2 17:08:34 2020//
 /SSL_CTX_set_verify.3/1.8/Fri Oct  2 17:08:34 2020//
 /SSL_get_ciphers.3/1.11/Fri Oct  2 17:08:34 2020//
@@ -114,7 +113,8 @@
 /SSL_set1_host.3/1.2/Fri Oct  2 17:08:34 2020//
 /SSL_set_SSL_CTX.3/1.3/Fri Oct  2 17:08:34 2020//
 /ssl.3/1.20/Fri Oct  2 17:08:34 2020//
-/SSL_CTX_set_mode.3/1.7/Thu Oct  8 23:06:58 2020//
-/SSL_set_bio.3/1.6/Thu Oct  8 23:06:58 2020//
-/SSL_write.3/1.6/Thu Oct  8 23:06:58 2020//
+/SSL_CTX_new.3/1.15/Thu Oct 29 07:56:48 2020//
+/SSL_CTX_set_mode.3/1.7/Fri Oct  9 12:00:10 2020//
+/SSL_set_bio.3/1.6/Fri Oct  9 12:00:10 2020//
+/SSL_write.3/1.6/Fri Oct  9 12:00:10 2020//
 D

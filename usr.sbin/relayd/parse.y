@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.246 2020/09/14 11:30:25 martijn Exp $	*/
+/*	$OpenBSD: parse.y,v 1.248 2020/10/26 16:52:06 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007 - 2014 Reyk Floeter <reyk@openbsd.org>
@@ -39,6 +39,7 @@
 #include <net/pfvar.h>
 #include <net/route.h>
 
+#include <agentx.h>
 #include <stdint.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -56,7 +57,6 @@
 
 #include "relayd.h"
 #include "http.h"
-#include "subagentx.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
 static struct file {
@@ -454,7 +454,7 @@ main		: INTERVAL NUMBER	{
 				free($3);
 			} else
 				(void)strlcpy(conf->sc_conf.agentx_path,
-				    SUBAGENTX_AGENTX_MASTER,
+				    AGENTX_MASTER_PATH,
 				    sizeof(conf->sc_conf.agentx_path));
 		}
 		| SNMP trap optstring	{
@@ -1971,7 +1971,7 @@ relayoptsl	: LISTEN ON STRING port opttls {
 				yyerror("more than one protocol specified");
 				YYERROR;
 			}
-				
+
 			TAILQ_FOREACH(p, conf->sc_protos, entry)
 				if (!strcmp(p->name, $2))
 					break;

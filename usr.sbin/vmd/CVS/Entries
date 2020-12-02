@@ -10,7 +10,6 @@
 /i8259.c/1.19/Thu Jul 12 10:15:44 2018//
 /i8259.h/1.4/Fri Apr 27 12:15:10 2018//
 /loadfile.h/1.12/Thu May 16 21:16:04 2019//
-/loadfile_elf.c/1.35/Thu May 16 21:16:04 2019//
 /log.c/1.8/Tue Mar 21 12:06:56 2017//
 /mc146818.h/1.5/Sun Jul  9 00:51:40 2017//
 /ns8250.h/1.9/Wed Dec 11 06:45:16 2019//
@@ -22,7 +21,6 @@
 /task.c/1.2/Tue Jun 19 17:12:34 2018//
 /task.h/1.1/Fri Sep 15 02:39:33 2017//
 /ufs.c/1.6/Sat Oct  7 19:48:30 2017//
-/vioqcow2.c/1.13/Thu Jan 10 19:21:02 2019//
 /vioraw.c/1.5/Mon Nov 26 10:39:30 2018//
 /virtio.c/1.82/Wed Dec 11 06:45:16 2019//
 /virtio.h/1.35/Wed Dec 11 06:45:16 2019//
@@ -44,4 +42,6 @@
 /vm.conf.5/1.55/Fri Oct  2 17:08:35 2020//
 /vmd.c/1.119/Fri Oct  2 17:08:35 2020//
 /vmd.h/1.101/Fri Oct  2 17:08:35 2020//
+/loadfile_elf.c/1.36/Thu Oct 29 07:57:14 2020//
+/vioqcow2.c/1.14/Thu Oct 29 07:57:14 2020//
 D

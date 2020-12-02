@@ -30,10 +30,10 @@
 /intr.c/1.61/Mon Jul 20 09:32:29 2020//
 /machdep.c/1.198/Mon Jul 20 09:32:29 2020//
 /autoconf.c/1.138/Sat Sep 26 23:17:55 2020//
-/clock.c/1.66/Sat Sep 26 23:17:55 2020//
 /cpu.c/1.71/Sat Sep 26 23:17:55 2020//
 /db_disasm.c/1.9/Sat Sep 26 23:17:55 2020//
 /emul.c/1.26/Sat Sep 26 23:17:55 2020//
 /locore.s/1.190/Sat Sep 26 23:17:55 2020//
-/trap.c/1.105/Fri Oct  2 17:08:34 2020//
+/clock.c/1.67/Thu Oct 29 07:57:04 2020//
+/trap.c/1.107/Thu Oct 29 07:57:04 2020//
 D

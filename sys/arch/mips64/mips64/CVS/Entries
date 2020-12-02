@@ -15,7 +15,6 @@
 /exception_tfp.S/1.7/Wed May  9 15:03:04 2018//
 /genassym.cf/1.15/Thu Apr 20 15:42:26 2017//
 /interrupt.c/1.73/Thu Sep  5 05:31:38 2019//
-/lcore_access.S/1.28/Tue Apr 23 15:37:58 2019//
 /lcore_ddb.S/1.14/Sun Apr 30 16:45:45 2017//
 /lcore_float.S/1.23/Mon Jan 14 15:02:57 2019//
 /mem.c/1.24/Fri Dec 20 13:34:41 2019//
@@ -34,6 +33,7 @@
 /cpu.c/1.77/Fri Jul 24 10:26:29 2020//
 /fp_emulate.c/1.23/Sat Sep 26 23:17:55 2020//
 /ipifuncs.c/1.22/Sat Sep 26 23:17:55 2020//
-/softintr.c/1.22/Thu Oct  8 22:36:13 2020//
-/trap.c/1.149/Thu Oct  8 23:07:16 2020//
+/lcore_access.S/1.30/Thu Oct 29 07:57:03 2020//
+/softintr.c/1.22/Fri Oct  9 12:00:10 2020//
+/trap.c/1.152/Thu Oct 29 07:57:03 2020//
 D

@@ -13,7 +13,6 @@
 /chmod.2/1.28/Thu Sep 10 17:55:21 2015//
 /chown.2/1.26/Thu Sep 10 17:55:21 2015//
 /chroot.2/1.22/Thu Jan 22 20:44:05 2015//
-/clock_gettime.2/1.30/Fri Jan 18 05:27:25 2019//
 /close.2/1.18/Wed Dec 10 19:19:00 2014//
 /closefrom.2/1.10/Fri May 31 18:36:58 2019//
 /connect.2/1.34/Thu Jun 20 14:19:25 2019//
@@ -196,4 +195,5 @@
 /select.2/1.43/Sat Sep 26 23:17:55 2020//
 /sysctl.2/1.41/Sat Sep 26 23:17:55 2020//
 /utimes.2/1.28/Fri Oct  2 17:08:34 2020//
+/clock_gettime.2/1.31/Thu Oct 29 07:56:46 2020//
 D

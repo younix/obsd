@@ -20,11 +20,11 @@
 /ch.c/1.67/Fri Oct  2 17:08:34 2020//
 /mpath.c/1.54/Fri Oct  2 17:08:34 2020//
 /safte.c/1.66/Fri Oct  2 17:08:34 2020//
-/scsi_base.c/1.276/Fri Oct  2 17:08:34 2020//
 /scsi_ioctl.c/1.67/Fri Oct  2 17:08:34 2020//
-/scsiconf.h/1.199/Fri Oct  2 17:08:34 2020//
 /sd.c/1.329/Fri Oct  2 17:08:34 2020//
 /sdvar.h/1.52/Fri Oct  2 17:08:34 2020//
 /ses.c/1.63/Fri Oct  2 17:08:34 2020//
 /st.c/1.185/Fri Oct  2 17:08:34 2020//
+/scsi_base.c/1.277/Thu Oct 29 07:57:08 2020//
+/scsiconf.h/1.200/Thu Oct 29 07:57:08 2020//
 D

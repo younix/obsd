@@ -54,7 +54,6 @@
 /ieee80211_node.9/1.9/Mon Nov 23 17:53:57 2015//
 /ieee80211_output.9/1.6/Mon Nov 23 17:53:57 2015//
 /ieee80211_proto.9/1.5/Wed Jul 17 20:21:53 2013//
-/ieee80211_radiotap.9/1.14/Sun Dec 11 21:45:06 2016//
 /if_addrhook_add.9/1.2/Fri Nov  8 08:14:11 2019//
 /if_get.9/1.2/Tue Dec  8 18:35:51 2015//
 /if_rxr_init.9/1.9/Tue May 12 20:47:58 2020//
@@ -177,6 +176,7 @@
 /vgone.9/1.10/Sat Sep 26 23:17:55 2020//
 /vrecycle.9/1.11/Sat Sep 26 23:17:55 2020//
 /pool.9/1.59/Fri Oct  2 17:08:34 2020//
-/kcov_remote_register.9/1.3/Thu Oct  8 22:36:13 2020//
 /mbuf.9/1.119/Thu Oct  8 21:39:16 2020//
+/ieee80211_radiotap.9/1.15/Thu Oct 29 07:57:01 2020//
+/kcov_remote_register.9/1.3/Fri Oct  9 12:00:10 2020//
 D

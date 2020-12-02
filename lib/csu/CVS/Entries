@@ -1,5 +1,4 @@
 /boot.h/1.30/Fri May 10 13:29:21 2019//
-/crt0.c/1.14/Fri May 10 13:29:21 2019//
 /crtbegin.c/1.26/Wed Jan  9 16:42:38 2019//
 /crtbeginS.c/1.20/Wed Jan  9 16:42:38 2019//
 /crtend.c/1.12/Sat Jan 21 00:45:13 2017//
@@ -19,3 +18,4 @@ D/sh////
 D/sparc64////
 D/powerpc64////
 /Makefile/1.35/Mon Jul 20 09:32:24 2020//
+/crt0.c/1.15/Thu Oct 29 07:56:44 2020//

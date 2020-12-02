@@ -1,3 +1,4 @@
+/*	$OpenBSD: ax.c,v 1.4 2020/10/27 17:19:44 martijn Exp $ */
 /*
  * Copyright (c) 2019 Martijn van Duren <martijn@openbsd.org>
  *
@@ -28,37 +29,37 @@
 #include <strings.h>
 #include <unistd.h>
 
-#include "agentx.h"
+#include "ax.h"
 
-#define AGENTX_PDU_HEADER 20
+#define AX_PDU_HEADER 20
 
-static int agentx_pdu_need(struct agentx *, size_t);
-static int agentx_pdu_header(struct agentx *,
-    enum agentx_pdu_type, uint8_t, uint32_t, uint32_t, uint32_t, 
-    struct agentx_ostring *);
-static uint32_t agentx_packetid(struct agentx *);
-static uint32_t agentx_pdu_queue(struct agentx *);
-static int agentx_pdu_add_uint16(struct agentx *, uint16_t);
-static int agentx_pdu_add_uint32(struct agentx *, uint32_t);
-static int agentx_pdu_add_uint64(struct agentx *, uint64_t);
-static int agentx_pdu_add_oid(struct agentx *, struct agentx_oid *, int);
-static int agentx_pdu_add_str(struct agentx *, struct agentx_ostring *);
-static int agentx_pdu_add_varbindlist( struct agentx *, struct agentx_varbind *,
+static int ax_pdu_need(struct ax *, size_t);
+static int ax_pdu_header(struct ax *,
+    enum ax_pdu_type, uint8_t, uint32_t, uint32_t, uint32_t,
+    struct ax_ostring *);
+static uint32_t ax_packetid(struct ax *);
+static uint32_t ax_pdu_queue(struct ax *);
+static int ax_pdu_add_uint16(struct ax *, uint16_t);
+static int ax_pdu_add_uint32(struct ax *, uint32_t);
+static int ax_pdu_add_uint64(struct ax *, uint64_t);
+static int ax_pdu_add_oid(struct ax *, struct ax_oid *, int);
+static int ax_pdu_add_str(struct ax *, struct ax_ostring *);
+static int ax_pdu_add_varbindlist( struct ax *, struct ax_varbind *,
     size_t);
-static uint16_t agentx_pdutoh16(struct agentx_pdu_header *, uint8_t *);
-static uint32_t agentx_pdutoh32(struct agentx_pdu_header *, uint8_t *);
-static uint64_t agentx_pdutoh64(struct agentx_pdu_header *, uint8_t *);
-static ssize_t agentx_pdutooid(struct agentx_pdu_header *, struct agentx_oid *,
+static uint16_t ax_pdutoh16(struct ax_pdu_header *, uint8_t *);
+static uint32_t ax_pdutoh32(struct ax_pdu_header *, uint8_t *);
+static uint64_t ax_pdutoh64(struct ax_pdu_header *, uint8_t *);
+static ssize_t ax_pdutooid(struct ax_pdu_header *, struct ax_oid *,
     uint8_t *, size_t);
-static ssize_t agentx_pdutoostring(struct agentx_pdu_header *,
-    struct agentx_ostring *, uint8_t *, size_t);
-static ssize_t agentx_pdutovarbind(struct agentx_pdu_header *,
-    struct agentx_varbind *, uint8_t *, size_t);
+static ssize_t ax_pdutoostring(struct ax_pdu_header *,
+    struct ax_ostring *, uint8_t *, size_t);
+static ssize_t ax_pdutovarbind(struct ax_pdu_header *,
+    struct ax_varbind *, uint8_t *, size_t);
 
-struct agentx *
-agentx_new(int fd)
+struct ax *
+ax_new(int fd)
 {
-	struct agentx *ax;
+	struct ax *ax;
 
 	if (fd == -1) {
 		errno = EINVAL;
@@ -68,10 +69,10 @@ agentx_new(int fd)
 	if ((ax = calloc(1, sizeof(*ax))) == NULL)
 		return NULL;
 	ax->ax_fd = fd;
-	if ((ax->ax_rbuf = malloc(512)) == NULL)
-		goto fail;
 	ax->ax_rbsize = 512;
-	ax->ax_byteorder = AGENTX_BYTE_ORDER_NATIVE;
+	if ((ax->ax_rbuf = malloc(ax->ax_rbsize)) == NULL)
+		goto fail;
+	ax->ax_byteorder = AX_BYTE_ORDER_NATIVE;
 
 	return ax;
 
@@ -81,7 +82,7 @@ fail:
 }
 
 void
-agentx_free(struct agentx *ax)
+ax_free(struct ax *ax)
 {
 	if (ax == NULL)
 		return;
@@ -92,16 +93,16 @@ agentx_free(struct agentx *ax)
 	free(ax);
 }
 
-struct agentx_pdu *
-agentx_recv(struct agentx *ax)
+struct ax_pdu *
+ax_recv(struct ax *ax)
 {
-	struct agentx_pdu *pdu;
-	struct agentx_pdu_header header;
-	struct agentx_pdu_response *response;
-	struct agentx_varbind *varbind;
-	struct agentx_pdu_searchrangelist *srl;
-	struct agentx_pdu_varbindlist *vbl;
-	struct agentx_searchrange *sr;
+	struct ax_pdu *pdu;
+	struct ax_pdu_header header;
+	struct ax_pdu_response *response;
+	struct ax_varbind *varbind;
+	struct ax_pdu_searchrangelist *srl = NULL;
+	struct ax_pdu_varbindlist *vbl;
+	struct ax_searchrange *sr;
 	size_t rbsize, packetidx = 0, i, rawlen;
 	ssize_t nread;
 	uint8_t *u8;
@@ -109,16 +110,16 @@ agentx_recv(struct agentx *ax)
 	int found;
 
 	/* Only read a single packet at a time to make sure libevent triggers */
-	if (ax->ax_rblen < AGENTX_PDU_HEADER) {
+	if (ax->ax_rblen < AX_PDU_HEADER) {
 		if ((nread = read(ax->ax_fd, ax->ax_rbuf + ax->ax_rblen,
-		    AGENTX_PDU_HEADER - ax->ax_rblen)) == 0) {
+		    AX_PDU_HEADER - ax->ax_rblen)) == 0) {
 			errno = ECONNRESET;
 			return NULL;
 		}
 		if (nread == -1)
 			return NULL;
 		ax->ax_rblen += nread;
-		if (ax->ax_rblen < AGENTX_PDU_HEADER) {
+		if (ax->ax_rblen < AX_PDU_HEADER) {
 			errno = EAGAIN;
 			return NULL;
 		}
@@ -128,21 +129,21 @@ agentx_recv(struct agentx *ax)
 	header.aph_type = *u8++;
 	header.aph_flags = *u8++;
 	u8++;
-	header.aph_sessionid = agentx_pdutoh32(&header, u8);
+	header.aph_sessionid = ax_pdutoh32(&header, u8);
 	u8 += 4;
-	header.aph_transactionid = agentx_pdutoh32(&header, u8);
+	header.aph_transactionid = ax_pdutoh32(&header, u8);
 	u8 += 4;
-	header.aph_packetid = agentx_pdutoh32(&header, u8);
+	header.aph_packetid = ax_pdutoh32(&header, u8);
 	u8 += 4;
-	header.aph_plength = agentx_pdutoh32(&header, u8);
+	header.aph_plength = ax_pdutoh32(&header, u8);
 
 	if (header.aph_version != 1) {
 		errno = EPROTO;
 		return NULL;
 	}
-	if (ax->ax_rblen < AGENTX_PDU_HEADER + header.aph_plength) {
-		if (AGENTX_PDU_HEADER + header.aph_plength > ax->ax_rbsize) {
-			rbsize = (((AGENTX_PDU_HEADER + header.aph_plength)
+	if (ax->ax_rblen < AX_PDU_HEADER + header.aph_plength) {
+		if (AX_PDU_HEADER + header.aph_plength > ax->ax_rbsize) {
+			rbsize = (((AX_PDU_HEADER + header.aph_plength)
 			    / 512) + 1) * 512;
 			if ((rbuf = recallocarray(ax->ax_rbuf, ax->ax_rbsize,
 			    rbsize, sizeof(*rbuf))) == NULL)
@@ -151,13 +152,13 @@ agentx_recv(struct agentx *ax)
 			ax->ax_rbuf = rbuf;
 		}
 		nread = read(ax->ax_fd, ax->ax_rbuf + ax->ax_rblen,
-		    header.aph_plength - (ax->ax_rblen - AGENTX_PDU_HEADER));
+		    header.aph_plength - (ax->ax_rblen - AX_PDU_HEADER));
 		if (nread == 0)
 			errno = ECONNRESET;
 		if (nread <= 0)
 			return NULL;
 		ax->ax_rblen += nread;
-		if (ax->ax_rblen < AGENTX_PDU_HEADER + header.aph_plength) {
+		if (ax->ax_rblen < AX_PDU_HEADER + header.aph_plength) {
 			errno = EAGAIN;
 			return NULL;
 		}
@@ -168,13 +169,13 @@ agentx_recv(struct agentx *ax)
 
 	memcpy(&(pdu->ap_header), &header, sizeof(header));
 
-#if defined(AGENTX_DEBUG) && defined(AGENTX_DEBUG_VERBOSE)
+#if defined(AX_DEBUG) && defined(AX_DEBUG_VERBOSE)
 	{
 		char chars[4];
 		int print = 1;
 
 		fprintf(stderr, "received packet:\n");
-		for (i = 0; i < pdu->ap_header.aph_plength + AGENTX_PDU_HEADER;
+		for (i = 0; i < pdu->ap_header.aph_plength + AX_PDU_HEADER;
 		    i++) {
 			fprintf(stderr, "%02hhx ", ax->ax_rbuf[i]);
 			chars[i % 4] = ax->ax_rbuf[i];
@@ -190,10 +191,10 @@ agentx_recv(struct agentx *ax)
 	}
 #endif
 
-	u8 = (ax->ax_rbuf) + AGENTX_PDU_HEADER;
+	u8 = (ax->ax_rbuf) + AX_PDU_HEADER;
 	rawlen = pdu->ap_header.aph_plength;
-	if (pdu->ap_header.aph_flags & AGENTX_PDU_FLAG_NON_DEFAULT_CONTEXT) {
-		nread = agentx_pdutoostring(&header, &(pdu->ap_context), u8,
+	if (pdu->ap_header.aph_flags & AX_PDU_FLAG_NON_DEFAULT_CONTEXT) {
+		nread = ax_pdutoostring(&header, &(pdu->ap_context), u8,
 		    rawlen);
 		if (nread == -1)
 			goto fail;
@@ -202,23 +203,23 @@ agentx_recv(struct agentx *ax)
 	}
 
 	switch (pdu->ap_header.aph_type) {
-	case AGENTX_PDU_TYPE_GETBULK:
+	case AX_PDU_TYPE_GETBULK:
 		if (rawlen < 4) {
 			errno = EPROTO;
 			goto fail;
 		}
 		pdu->ap_payload.ap_getbulk.ap_nonrep =
-		    agentx_pdutoh16(&header, u8);
+		    ax_pdutoh16(&header, u8);
 		u8 += 2;
 		pdu->ap_payload.ap_getbulk.ap_maxrep =
-		    agentx_pdutoh16(&header, u8);
+		    ax_pdutoh16(&header, u8);
 		u8 += 2;
 		srl = &(pdu->ap_payload.ap_getbulk.ap_srl);
 		rawlen -= 4;
 		/* FALLTHROUGH */
-	case AGENTX_PDU_TYPE_GET:
-	case AGENTX_PDU_TYPE_GETNEXT:
-		if (pdu->ap_header.aph_type != AGENTX_PDU_TYPE_GETBULK)
+	case AX_PDU_TYPE_GET:
+	case AX_PDU_TYPE_GETNEXT:
+		if (pdu->ap_header.aph_type != AX_PDU_TYPE_GETBULK)
 			srl = &(pdu->ap_payload.ap_srl);
 		while (rawlen > 0 ) {
 			srl->ap_nsr++;
@@ -227,19 +228,19 @@ agentx_recv(struct agentx *ax)
 				goto fail;
 			srl->ap_sr = sr;
 			sr += (srl->ap_nsr - 1);
-			if ((nread = agentx_pdutooid(&header, &(sr->asr_start),
+			if ((nread = ax_pdutooid(&header, &(sr->asr_start),
 			    u8, rawlen)) == -1)
 				goto fail;
 			rawlen -= nread;
 			u8 += nread;
-			if ((nread = agentx_pdutooid(&header, &(sr->asr_stop),
+			if ((nread = ax_pdutooid(&header, &(sr->asr_stop),
 			    u8, rawlen)) == -1)
 				goto fail;
 			rawlen -= nread;
 			u8 += nread;
 		}
 		break;
-	case AGENTX_PDU_TYPE_TESTSET:
+	case AX_PDU_TYPE_TESTSET:
 		vbl = &(pdu->ap_payload.ap_vbl);
 		while (rawlen > 0) {
 			varbind = recallocarray(vbl->ap_varbind,
@@ -248,7 +249,7 @@ agentx_recv(struct agentx *ax)
 			if (varbind == NULL)
 				goto fail;
 			vbl->ap_varbind = varbind;
-			nread = agentx_pdutovarbind(&header,
+			nread = ax_pdutovarbind(&header,
 			    &(vbl->ap_varbind[vbl->ap_nvarbind]), u8, rawlen);
 			if (nread == -1)
 				goto fail;
@@ -257,15 +258,15 @@ agentx_recv(struct agentx *ax)
 			rawlen -= nread;
 		}
 		break;
-	case AGENTX_PDU_TYPE_COMMITSET:
-	case AGENTX_PDU_TYPE_UNDOSET:
-	case AGENTX_PDU_TYPE_CLEANUPSET:
+	case AX_PDU_TYPE_COMMITSET:
+	case AX_PDU_TYPE_UNDOSET:
+	case AX_PDU_TYPE_CLEANUPSET:
 		if (rawlen != 0) {
 			errno = EPROTO;
 			goto fail;
 		}
 		break;
-	case AGENTX_PDU_TYPE_RESPONSE:
+	case AX_PDU_TYPE_RESPONSE:
 		if (ax->ax_packetids != NULL) {
 			found = 0;
 			for (i = 0; ax->ax_packetids[i] != 0; i++) {
@@ -289,11 +290,11 @@ agentx_recv(struct agentx *ax)
 			goto fail;
 		}
 		response = &(pdu->ap_payload.ap_response);
-		response->ap_uptime = agentx_pdutoh32(&header, u8);
+		response->ap_uptime = ax_pdutoh32(&header, u8);
 		u8 += 4;
-		response->ap_error = agentx_pdutoh16(&header, u8);
+		response->ap_error = ax_pdutoh16(&header, u8);
 		u8 += 2;
-		response->ap_index = agentx_pdutoh16(&header, u8);
+		response->ap_index = ax_pdutoh16(&header, u8);
 		u8 += 2;
 		rawlen -= 8;
 		while (rawlen > 0) {
@@ -303,7 +304,7 @@ agentx_recv(struct agentx *ax)
 			if (varbind == NULL)
 				goto fail;
 			response->ap_varbindlist = varbind;
-			nread = agentx_pdutovarbind(&header,
+			nread = ax_pdutovarbind(&header,
 			    &(response->ap_varbindlist[response->ap_nvarbind]),
 			    u8, rawlen);
 			if (nread == -1)
@@ -315,9 +316,9 @@ agentx_recv(struct agentx *ax)
 		break;
 	default:
 		pdu->ap_payload.ap_raw = malloc(pdu->ap_header.aph_plength);
-		if (pdu == NULL)
+		if (pdu->ap_payload.ap_raw == NULL)
 			goto fail;
-		memcpy(pdu->ap_payload.ap_raw, ax->ax_rbuf + AGENTX_PDU_HEADER,
+		memcpy(pdu->ap_payload.ap_raw, ax->ax_rbuf + AX_PDU_HEADER,
 		    pdu->ap_header.aph_plength);
 		break;
 	}
@@ -326,12 +327,12 @@ agentx_recv(struct agentx *ax)
 
 	return pdu;
 fail:
-	agentx_pdu_free(pdu);
+	ax_pdu_free(pdu);
 	return NULL;
 }
 
 static int
-agentx_pdu_need(struct agentx *ax, size_t need)
+ax_pdu_need(struct ax *ax, size_t need)
 {
 	uint8_t *wbuf;
 	size_t wbsize;
@@ -351,7 +352,7 @@ agentx_pdu_need(struct agentx *ax, size_t need)
 }
 
 ssize_t
-agentx_send(struct agentx *ax)
+ax_send(struct ax *ax)
 {
 	ssize_t nwrite;
 
@@ -363,7 +364,7 @@ agentx_send(struct agentx *ax)
 	if (ax->ax_wblen == 0)
 		return 0;
 
-#if defined(AGENTX_DEBUG) && defined(AGENTX_DEBUG_VERBOSE)
+#if defined(AX_DEBUG) && defined(AX_DEBUG_VERBOSE)
 	{
 		size_t i;
 		char chars[4];
@@ -397,199 +398,199 @@ agentx_send(struct agentx *ax)
 }
 
 uint32_t
-agentx_open(struct agentx *ax, uint8_t timeout, struct agentx_oid *oid,
-    struct agentx_ostring *descr)
+ax_open(struct ax *ax, uint8_t timeout, struct ax_oid *oid,
+    struct ax_ostring *descr)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_OPEN, 0, 0, 0, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_OPEN, 0, 0, 0, 0,
 	    NULL) == -1)
 		return 0;
-	agentx_pdu_need(ax, 4);
+	ax_pdu_need(ax, 4);
 	ax->ax_wbuf[ax->ax_wbtlen++] = timeout;
 	memset(&(ax->ax_wbuf[ax->ax_wbtlen]), 0, 3);
 	ax->ax_wbtlen += 3;
-	if (agentx_pdu_add_oid(ax, oid, 0) == -1)
+	if (ax_pdu_add_oid(ax, oid, 0) == -1)
 		return 0;
-	if (agentx_pdu_add_str(ax, descr) == -1)
+	if (ax_pdu_add_str(ax, descr) == -1)
 		return 0;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_close(struct agentx *ax, uint32_t sessionid,
-    enum agentx_close_reason reason)
+ax_close(struct ax *ax, uint32_t sessionid,
+    enum ax_close_reason reason)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_CLOSE, 0, sessionid, 0, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_CLOSE, 0, sessionid, 0, 0,
 	    NULL) == -1)
 		return 0;
 
-	if (agentx_pdu_need(ax, 4) == -1)
+	if (ax_pdu_need(ax, 4) == -1)
 		return 0;
 	ax->ax_wbuf[ax->ax_wbtlen++] = (uint8_t)reason;
 	memset(&(ax->ax_wbuf[ax->ax_wbtlen]), 0, 3);
 	ax->ax_wbtlen += 3;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_indexallocate(struct agentx *ax, uint8_t flags, uint32_t sessionid,
-    struct agentx_ostring *context, struct agentx_varbind *vblist, size_t nvb)
+ax_indexallocate(struct ax *ax, uint8_t flags, uint32_t sessionid,
+    struct ax_ostring *context, struct ax_varbind *vblist, size_t nvb)
 {
-	if (flags & ~(AGENTX_PDU_FLAG_NEW_INDEX | AGENTX_PDU_FLAG_ANY_INDEX)) {
+	if (flags & ~(AX_PDU_FLAG_NEW_INDEX | AX_PDU_FLAG_ANY_INDEX)) {
 		errno = EINVAL;
 		return 0;
 	}
 
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_INDEXALLOCATE, flags,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_INDEXALLOCATE, flags,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
 
-	if (agentx_pdu_add_varbindlist(ax, vblist, nvb) == -1)
+	if (ax_pdu_add_varbindlist(ax, vblist, nvb) == -1)
 		return 0;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_indexdeallocate(struct agentx *ax, uint32_t sessionid,
-    struct agentx_ostring *context, struct agentx_varbind *vblist, size_t nvb)
+ax_indexdeallocate(struct ax *ax, uint32_t sessionid,
+    struct ax_ostring *context, struct ax_varbind *vblist, size_t nvb)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_INDEXDEALLOCATE, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_INDEXDEALLOCATE, 0,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
 
-	if (agentx_pdu_add_varbindlist(ax, vblist, nvb) == -1)
+	if (ax_pdu_add_varbindlist(ax, vblist, nvb) == -1)
 		return 0;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_addagentcaps(struct agentx *ax, uint32_t sessionid,
-    struct agentx_ostring *context, struct agentx_oid *id,
-    struct agentx_ostring *descr)
+ax_addagentcaps(struct ax *ax, uint32_t sessionid,
+    struct ax_ostring *context, struct ax_oid *id,
+    struct ax_ostring *descr)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_ADDAGENTCAPS, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_ADDAGENTCAPS, 0,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
-	if (agentx_pdu_add_oid(ax, id, 0) == -1)
+	if (ax_pdu_add_oid(ax, id, 0) == -1)
 		return 0;
-	if (agentx_pdu_add_str(ax, descr) == -1)
+	if (ax_pdu_add_str(ax, descr) == -1)
 		return 0;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_removeagentcaps(struct agentx *ax, uint32_t sessionid,
-    struct agentx_ostring *context, struct agentx_oid *id)
+ax_removeagentcaps(struct ax *ax, uint32_t sessionid,
+    struct ax_ostring *context, struct ax_oid *id)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_REMOVEAGENTCAPS, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_REMOVEAGENTCAPS, 0,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
-	if (agentx_pdu_add_oid(ax, id, 0) == -1)
+	if (ax_pdu_add_oid(ax, id, 0) == -1)
 		return 0;
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 
 }
 
 uint32_t
-agentx_register(struct agentx *ax, uint8_t flags, uint32_t sessionid,
-    struct agentx_ostring *context, uint8_t timeout, uint8_t priority,
-    uint8_t range_subid, struct agentx_oid *subtree, uint32_t upperbound)
+ax_register(struct ax *ax, uint8_t flags, uint32_t sessionid,
+    struct ax_ostring *context, uint8_t timeout, uint8_t priority,
+    uint8_t range_subid, struct ax_oid *subtree, uint32_t upperbound)
 {
-	if (flags & ~(AGENTX_PDU_FLAG_INSTANCE_REGISTRATION)) {
+	if (flags & ~(AX_PDU_FLAG_INSTANCE_REGISTRATION)) {
 		errno = EINVAL;
 		return 0;
 	}
 
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_REGISTER, flags,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_REGISTER, flags,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
 
-	if (agentx_pdu_need(ax, 4) == -1)
+	if (ax_pdu_need(ax, 4) == -1)
 		return 0;
 	ax->ax_wbuf[ax->ax_wbtlen++] = timeout;
 	ax->ax_wbuf[ax->ax_wbtlen++] = priority;
 	ax->ax_wbuf[ax->ax_wbtlen++] = range_subid;
 	ax->ax_wbuf[ax->ax_wbtlen++] = 0;
-	if (agentx_pdu_add_oid(ax, subtree, 0) == -1)
+	if (ax_pdu_add_oid(ax, subtree, 0) == -1)
 		return 0;
 	if (range_subid != 0) {
-		if (agentx_pdu_add_uint32(ax, upperbound) == -1)
+		if (ax_pdu_add_uint32(ax, upperbound) == -1)
 			return 0;
 	}
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 uint32_t
-agentx_unregister(struct agentx *ax, uint32_t sessionid,
-    struct agentx_ostring *context, uint8_t priority, uint8_t range_subid,
-    struct agentx_oid *subtree, uint32_t upperbound)
+ax_unregister(struct ax *ax, uint32_t sessionid,
+    struct ax_ostring *context, uint8_t priority, uint8_t range_subid,
+    struct ax_oid *subtree, uint32_t upperbound)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_UNREGISTER, 0,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_UNREGISTER, 0,
 	    sessionid, 0, 0, context) == -1)
 		return 0;
 
-	if (agentx_pdu_need(ax, 4) == -1)
+	if (ax_pdu_need(ax, 4) == -1)
 		return 0;
 	ax->ax_wbuf[ax->ax_wbtlen++] = 0;
 	ax->ax_wbuf[ax->ax_wbtlen++] = priority;
 	ax->ax_wbuf[ax->ax_wbtlen++] = range_subid;
 	ax->ax_wbuf[ax->ax_wbtlen++] = 0;
-	if (agentx_pdu_add_oid(ax, subtree, 0) == -1)
+	if (ax_pdu_add_oid(ax, subtree, 0) == -1)
 		return 0;
 	if (range_subid != 0) {
-		if (agentx_pdu_add_uint32(ax, upperbound) == -1)
+		if (ax_pdu_add_uint32(ax, upperbound) == -1)
 			return 0;
 	}
 
-	return agentx_pdu_queue(ax);
+	return ax_pdu_queue(ax);
 }
 
 int
-agentx_response(struct agentx *ax, uint32_t sessionid, uint32_t transactionid,
-    uint32_t packetid, struct agentx_ostring *context, uint32_t sysuptime,
-    uint16_t error, uint16_t index, struct agentx_varbind *vblist, size_t nvb)
+ax_response(struct ax *ax, uint32_t sessionid, uint32_t transactionid,
+    uint32_t packetid, struct ax_ostring *context, uint32_t sysuptime,
+    uint16_t error, uint16_t index, struct ax_varbind *vblist, size_t nvb)
 {
-	if (agentx_pdu_header(ax, AGENTX_PDU_TYPE_RESPONSE, 0, sessionid,
+	if (ax_pdu_header(ax, AX_PDU_TYPE_RESPONSE, 0, sessionid,
 	    transactionid, packetid, context) == -1)
 		return -1;
 
-	if (agentx_pdu_add_uint32(ax, sysuptime) == -1 ||
-	    agentx_pdu_add_uint16(ax, error) == -1 ||
-	    agentx_pdu_add_uint16(ax, index) == -1)
+	if (ax_pdu_add_uint32(ax, sysuptime) == -1 ||
+	    ax_pdu_add_uint16(ax, error) == -1 ||
+	    ax_pdu_add_uint16(ax, index) == -1)
 		return -1;
 
-	if (agentx_pdu_add_varbindlist(ax, vblist, nvb) == -1)
+	if (ax_pdu_add_varbindlist(ax, vblist, nvb) == -1)
 		return -1;
-	if (agentx_pdu_queue(ax) == 0)
+	if (ax_pdu_queue(ax) == 0)
 		return -1;
 	return 0;
 }
 
 void
-agentx_pdu_free(struct agentx_pdu *pdu)
+ax_pdu_free(struct ax_pdu *pdu)
 {
 	size_t i;
-	struct agentx_pdu_response *response;
+	struct ax_pdu_response *response;
 
-	if (pdu->ap_header.aph_flags & AGENTX_PDU_FLAG_NON_DEFAULT_CONTEXT)
+	if (pdu->ap_header.aph_flags & AX_PDU_FLAG_NON_DEFAULT_CONTEXT)
 		free(pdu->ap_context.aos_string);
 
 	switch (pdu->ap_header.aph_type) {
-	case AGENTX_PDU_TYPE_GET:
-	case AGENTX_PDU_TYPE_GETNEXT:
-	case AGENTX_PDU_TYPE_GETBULK:
+	case AX_PDU_TYPE_GET:
+	case AX_PDU_TYPE_GETNEXT:
+	case AX_PDU_TYPE_GETBULK:
 		free(pdu->ap_payload.ap_srl.ap_sr);
 		break;
-	case AGENTX_PDU_TYPE_RESPONSE:
+	case AX_PDU_TYPE_RESPONSE:
 		response = &(pdu->ap_payload.ap_response);
 		for (i = 0; i < response->ap_nvarbind; i++)
-			agentx_varbind_free(&(response->ap_varbindlist[i]));
+			ax_varbind_free(&(response->ap_varbindlist[i]));
 		free(response->ap_varbindlist);
 		break;
 	default:
@@ -600,12 +601,12 @@ agentx_pdu_free(struct agentx_pdu *pdu)
 }
 
 void
-agentx_varbind_free(struct agentx_varbind *varbind)
+ax_varbind_free(struct ax_varbind *varbind)
 {
 	switch (varbind->avb_type) {
-	case AGENTX_DATA_TYPE_OCTETSTRING:
-	case AGENTX_DATA_TYPE_IPADDRESS:
-	case AGENTX_DATA_TYPE_OPAQUE:
+	case AX_DATA_TYPE_OCTETSTRING:
+	case AX_DATA_TYPE_IPADDRESS:
+	case AX_DATA_TYPE_OPAQUE:
 		free(varbind->avb_data.avb_ostring.aos_string);
 		break;
 	default:
@@ -614,63 +615,63 @@ agentx_varbind_free(struct agentx_varbind *varbind)
 }
 
 const char *
-agentx_error2string(enum agentx_pdu_error error)
+ax_error2string(enum ax_pdu_error error)
 {
 	static char buffer[64];
 	switch (error) {
-	case AGENTX_PDU_ERROR_NOERROR:
+	case AX_PDU_ERROR_NOERROR:
 		return "No error";
-	case AGENTX_PDU_ERROR_GENERR:
+	case AX_PDU_ERROR_GENERR:
 		return "Generic error";
-	case AGENTX_PDU_ERROR_NOACCESS:
+	case AX_PDU_ERROR_NOACCESS:
 		return "No access";
-	case AGENTX_PDU_ERROR_WRONGTYPE:
+	case AX_PDU_ERROR_WRONGTYPE:
 		return "Wrong type";
-	case AGENTX_PDU_ERROR_WRONGLENGTH:
+	case AX_PDU_ERROR_WRONGLENGTH:
 		return "Wrong length";
-	case AGENTX_PDU_ERROR_WRONGENCODING:
+	case AX_PDU_ERROR_WRONGENCODING:
 		return "Wrong encoding";
-	case AGENTX_PDU_ERROR_WRONGVALUE:
+	case AX_PDU_ERROR_WRONGVALUE:
 		return "Wrong value";
-	case AGENTX_PDU_ERROR_NOCREATION:
+	case AX_PDU_ERROR_NOCREATION:
 		return "No creation";
-	case AGENTX_PDU_ERROR_INCONSISTENTVALUE:
+	case AX_PDU_ERROR_INCONSISTENTVALUE:
 		return "Inconsistent value";
-	case AGENTX_PDU_ERROR_RESOURCEUNAVAILABLE:
+	case AX_PDU_ERROR_RESOURCEUNAVAILABLE:
 		return "Resource unavailable";
-	case AGENTX_PDU_ERROR_COMMITFAILED:
+	case AX_PDU_ERROR_COMMITFAILED:
 		return "Commit failed";
-	case AGENTX_PDU_ERROR_UNDOFAILED:
+	case AX_PDU_ERROR_UNDOFAILED:
 		return "Undo failed";
-	case AGENTX_PDU_ERROR_NOTWRITABLE:
+	case AX_PDU_ERROR_NOTWRITABLE:
 		return "Not writable";
-	case AGENTX_PDU_ERROR_INCONSISTENTNAME:
+	case AX_PDU_ERROR_INCONSISTENTNAME:
 		return "Inconsistent name";
-	case AGENTX_PDU_ERROR_OPENFAILED:
+	case AX_PDU_ERROR_OPENFAILED:
 		return "Open Failed";
-	case AGENTX_PDU_ERROR_NOTOPEN:
+	case AX_PDU_ERROR_NOTOPEN:
 		return "Not open";
-	case AGENTX_PDU_ERROR_INDEXWRONGTYPE:
+	case AX_PDU_ERROR_INDEXWRONGTYPE:
 		return "Index wrong type";
-	case AGENTX_PDU_ERROR_INDEXALREADYALLOCATED:
+	case AX_PDU_ERROR_INDEXALREADYALLOCATED:
 		return "Index already allocated";
-	case AGENTX_PDU_ERROR_INDEXNONEAVAILABLE:
+	case AX_PDU_ERROR_INDEXNONEAVAILABLE:
 		return "Index none available";
-	case AGENTX_PDU_ERROR_INDEXNOTALLOCATED:
+	case AX_PDU_ERROR_INDEXNOTALLOCATED:
 		return "Index not allocated";
-	case AGENTX_PDU_ERROR_UNSUPPORTEDCONETXT:
+	case AX_PDU_ERROR_UNSUPPORTEDCONETXT:
 		return "Unsupported context";
-	case AGENTX_PDU_ERROR_DUPLICATEREGISTRATION:
+	case AX_PDU_ERROR_DUPLICATEREGISTRATION:
 		return "Duplicate registration";
-	case AGENTX_PDU_ERROR_UNKNOWNREGISTRATION:
+	case AX_PDU_ERROR_UNKNOWNREGISTRATION:
 		return "Unkown registration";
-	case AGENTX_PDU_ERROR_UNKNOWNAGENTCAPS:
+	case AX_PDU_ERROR_UNKNOWNAGENTCAPS:
 		return "Unknown agent capabilities";
-	case AGENTX_PDU_ERROR_PARSEERROR:
+	case AX_PDU_ERROR_PARSEERROR:
 		return "Parse error";
-	case AGENTX_PDU_ERROR_REQUESTDENIED:
+	case AX_PDU_ERROR_REQUESTDENIED:
 		return "Request denied";
-	case AGENTX_PDU_ERROR_PROCESSINGERROR:
+	case AX_PDU_ERROR_PROCESSINGERROR:
 		return "Processing error";
 	}
 	snprintf(buffer, sizeof(buffer), "Unknown error: %d", error);
@@ -678,45 +679,45 @@ agentx_error2string(enum agentx_pdu_error error)
 }
 
 const char *
-agentx_pdutype2string(enum agentx_pdu_type type)
+ax_pdutype2string(enum ax_pdu_type type)
 {
 	static char buffer[64];
 	switch(type) {
-	case AGENTX_PDU_TYPE_OPEN:
+	case AX_PDU_TYPE_OPEN:
 		return "agentx-Open-PDU";
-	case AGENTX_PDU_TYPE_CLOSE:
+	case AX_PDU_TYPE_CLOSE:
 		return "agentx-Close-PDU";
-	case AGENTX_PDU_TYPE_REGISTER:
+	case AX_PDU_TYPE_REGISTER:
 		return "agentx-Register-PDU";
-	case AGENTX_PDU_TYPE_UNREGISTER:
+	case AX_PDU_TYPE_UNREGISTER:
 		return "agentx-Unregister-PDU";
-	case AGENTX_PDU_TYPE_GET:
+	case AX_PDU_TYPE_GET:
 		return "agentx-Get-PDU";
-	case AGENTX_PDU_TYPE_GETNEXT:
+	case AX_PDU_TYPE_GETNEXT:
 		return "agentx-GetNext-PDU";
-	case AGENTX_PDU_TYPE_GETBULK:
+	case AX_PDU_TYPE_GETBULK:
 		return "agentx-GetBulk-PDU";
-	case AGENTX_PDU_TYPE_TESTSET:
+	case AX_PDU_TYPE_TESTSET:
 		return "agentx-TestSet-PDU";
-	case AGENTX_PDU_TYPE_COMMITSET:
+	case AX_PDU_TYPE_COMMITSET:
 		return "agentx-CommitSet-PDU";
-	case AGENTX_PDU_TYPE_UNDOSET:
+	case AX_PDU_TYPE_UNDOSET:
 		return "agentx-UndoSet-PDU";
-	case AGENTX_PDU_TYPE_CLEANUPSET:
+	case AX_PDU_TYPE_CLEANUPSET:
 		return "agentx-CleanupSet-PDU";
-	case AGENTX_PDU_TYPE_NOTIFY:
+	case AX_PDU_TYPE_NOTIFY:
 		return "agentx-Notify-PDU";
-	case AGENTX_PDU_TYPE_PING:
+	case AX_PDU_TYPE_PING:
 		return "agentx-Ping-PDU";
-	case AGENTX_PDU_TYPE_INDEXALLOCATE:
+	case AX_PDU_TYPE_INDEXALLOCATE:
 		return "agentx-IndexAllocate-PDU";
-	case AGENTX_PDU_TYPE_INDEXDEALLOCATE:
+	case AX_PDU_TYPE_INDEXDEALLOCATE:
 		return "agentx-IndexDeallocate-PDU";
-	case AGENTX_PDU_TYPE_ADDAGENTCAPS:
+	case AX_PDU_TYPE_ADDAGENTCAPS:
 		return "agentx-AddAgentCaps-PDU";
-	case AGENTX_PDU_TYPE_REMOVEAGENTCAPS:
+	case AX_PDU_TYPE_REMOVEAGENTCAPS:
 		return "agentx-RemoveAgentCaps-PDU";
-	case AGENTX_PDU_TYPE_RESPONSE:
+	case AX_PDU_TYPE_RESPONSE:
 		return "agentx-Response-PDU";
 	}
 	snprintf(buffer, sizeof(buffer), "Unknown type: %d", type);
@@ -724,22 +725,22 @@ agentx_pdutype2string(enum agentx_pdu_type type)
 }
 
 const char *
-agentx_closereason2string(enum agentx_close_reason reason)
+ax_closereason2string(enum ax_close_reason reason)
 {
 	static char buffer[64];
 
 	switch (reason) {
-	case AGENTX_CLOSE_OTHER:
+	case AX_CLOSE_OTHER:
 		return "Undefined reason";
-	case AGENTX_CLOSEN_PARSEERROR:
+	case AX_CLOSEN_PARSEERROR:
 		return "Too many AgentX parse errors from peer";
-	case AGENTX_CLOSE_PROTOCOLERROR:
+	case AX_CLOSE_PROTOCOLERROR:
 		return "Too many AgentX protocol errors from peer";
-	case AGENTX_CLOSE_TIMEOUTS:
+	case AX_CLOSE_TIMEOUTS:
 		return "Too many timeouts waiting for peer";
-	case AGENTX_CLOSE_SHUTDOWN:
+	case AX_CLOSE_SHUTDOWN:
 		return "shutting down";
-	case AGENTX_CLOSE_BYMANAGER:
+	case AX_CLOSE_BYMANAGER:
 		return "Manager shuts down";
 	}
 	snprintf(buffer, sizeof(buffer), "Unknown reason: %d", reason);
@@ -747,13 +748,13 @@ agentx_closereason2string(enum agentx_close_reason reason)
 }
 
 const char *
-agentx_oid2string(struct agentx_oid *oid)
+ax_oid2string(struct ax_oid *oid)
 {
-	return agentx_oidrange2string(oid, 0, 0);
+	return ax_oidrange2string(oid, 0, 0);
 }
 
 const char *
-agentx_oidrange2string(struct agentx_oid *oid, uint8_t range_subid,
+ax_oidrange2string(struct ax_oid *oid, uint8_t range_subid,
     uint32_t upperbound)
 {
 	static char buf[1024];
@@ -780,7 +781,7 @@ agentx_oidrange2string(struct agentx_oid *oid, uint8_t range_subid,
 }
 
 const char *
-agentx_varbind2string(struct agentx_varbind *vb)
+ax_varbind2string(struct ax_varbind *vb)
 {
 	static char buf[1024];
 	char tmpbuf[1024];
@@ -790,18 +791,18 @@ agentx_varbind2string(struct agentx_varbind *vb)
 	int ret;
 
 	switch (vb->avb_type) {
-	case AGENTX_DATA_TYPE_INTEGER:
-		(void) snprintf(buf, sizeof(buf), "%s: (int)%u",
-		    agentx_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
+	case AX_DATA_TYPE_INTEGER:
+		snprintf(buf, sizeof(buf), "%s: (int)%d",
+		    ax_oid2string(&(vb->avb_oid)), vb->avb_data.avb_int32);
 		break;
-	case AGENTX_DATA_TYPE_OCTETSTRING:
+	case AX_DATA_TYPE_OCTETSTRING:
 		for (i = 0;
 		    i < vb->avb_data.avb_ostring.aos_slen && !ishex; i++) {
 			if (!isprint(vb->avb_data.avb_ostring.aos_string[i]))
 				ishex = 1;
 		}
 		if (ishex) {
-			p = tmpbuf; 
+			p = tmpbuf;
 			bufleft = sizeof(tmpbuf);
 			for (i = 0;
 			    i < vb->avb_data.avb_ostring.aos_slen; i++) {
@@ -816,14 +817,14 @@ agentx_varbind2string(struct agentx_varbind *vb)
 				bufleft -= 3;
 			}
 			ret = snprintf(buf, sizeof(buf), "%s: (hex-string)%s",
-			    agentx_oid2string(&(vb->avb_oid)), tmpbuf);
+			    ax_oid2string(&(vb->avb_oid)), tmpbuf);
 			if (ret >= (int) sizeof(buf)) {
 				p  = strrchr(buf, ' ');
 				strlcpy(p, "...", 4);
 			}
 		} else {
 			ret = snprintf(buf, sizeof(buf), "%s: (string)",
-			    agentx_oid2string(&(vb->avb_oid)));
+			    ax_oid2string(&(vb->avb_oid)));
 			if (ret >= (int) sizeof(buf)) {
 				snprintf(buf, sizeof(buf), "<too large OID>: "
 				    "(string)<too large string>");
@@ -836,51 +837,51 @@ agentx_varbind2string(struct agentx_varbind *vb)
 			    vb->avb_data.avb_ostring.aos_string) >=
 			    (int) bufleft) {
 				p = buf + sizeof(buf) - 4;
-				(void) strlcpy(p, "...", 4);
+				strlcpy(p, "...", 4);
 			}
 		}
 		break;
-	case AGENTX_DATA_TYPE_NULL:
-		(void) snprintf(buf, sizeof(buf), "%s: <null>",
-		    agentx_oid2string(&(vb->avb_oid)));
+	case AX_DATA_TYPE_NULL:
+		snprintf(buf, sizeof(buf), "%s: <null>",
+		    ax_oid2string(&(vb->avb_oid)));
 		break;
-	case AGENTX_DATA_TYPE_OID:
-		(void) strlcpy(tmpbuf, 
-		    agentx_oid2string(&(vb->avb_data.avb_oid)), sizeof(tmpbuf));
+	case AX_DATA_TYPE_OID:
+		strlcpy(tmpbuf,
+		    ax_oid2string(&(vb->avb_data.avb_oid)), sizeof(tmpbuf));
 		snprintf(buf, sizeof(buf), "%s: (oid)%s",
-		    agentx_oid2string(&(vb->avb_oid)), tmpbuf);
+		    ax_oid2string(&(vb->avb_oid)), tmpbuf);
 		break;
-	case AGENTX_DATA_TYPE_IPADDRESS:
+	case AX_DATA_TYPE_IPADDRESS:
 		if (vb->avb_data.avb_ostring.aos_slen != 4) {
 			snprintf(buf, sizeof(buf), "%s: (ipaddress)<invalid>",
-			    agentx_oid2string(&(vb->avb_oid)));
+			    ax_oid2string(&(vb->avb_oid)));
 			break;
 		}
-		if (inet_ntop(PF_INET, vb->avb_data.avb_ostring.aos_string, 
+		if (inet_ntop(PF_INET, vb->avb_data.avb_ostring.aos_string,
 		    tmpbuf, sizeof(tmpbuf)) == NULL) {
 			snprintf(buf, sizeof(buf), "%s: (ipaddress)"
 			    "<unparseable>: %s",
-			    agentx_oid2string(&(vb->avb_oid)),
+			    ax_oid2string(&(vb->avb_oid)),
 			    strerror(errno));
 			break;
 		}
 		snprintf(buf, sizeof(buf), "%s: (ipaddress)%s",
-		    agentx_oid2string(&(vb->avb_oid)), tmpbuf);
+		    ax_oid2string(&(vb->avb_oid)), tmpbuf);
 		break;
-	case AGENTX_DATA_TYPE_COUNTER32:
-		(void) snprintf(buf, sizeof(buf), "%s: (counter32)%u",
-		    agentx_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
+	case AX_DATA_TYPE_COUNTER32:
+		snprintf(buf, sizeof(buf), "%s: (counter32)%u",
+		    ax_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
 		break;
-	case AGENTX_DATA_TYPE_GAUGE32:
-		(void) snprintf(buf, sizeof(buf), "%s: (gauge32)%u",
-		    agentx_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
+	case AX_DATA_TYPE_GAUGE32:
+		snprintf(buf, sizeof(buf), "%s: (gauge32)%u",
+		    ax_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
 		break;
-	case AGENTX_DATA_TYPE_TIMETICKS:
-		(void) snprintf(buf, sizeof(buf), "%s: (timeticks)%u",
-		    agentx_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
+	case AX_DATA_TYPE_TIMETICKS:
+		snprintf(buf, sizeof(buf), "%s: (timeticks)%u",
+		    ax_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint32);
 		break;
-	case AGENTX_DATA_TYPE_OPAQUE:
-		p = tmpbuf; 
+	case AX_DATA_TYPE_OPAQUE:
+		p = tmpbuf;
 		bufleft = sizeof(tmpbuf);
 		for (i = 0;
 		    i < vb->avb_data.avb_ostring.aos_slen; i++) {
@@ -895,34 +896,34 @@ agentx_varbind2string(struct agentx_varbind *vb)
 			bufleft -= 3;
 		}
 		ret = snprintf(buf, sizeof(buf), "%s: (opaque)%s",
-		    agentx_oid2string(&(vb->avb_oid)), tmpbuf);
+		    ax_oid2string(&(vb->avb_oid)), tmpbuf);
 		if (ret >= (int) sizeof(buf)) {
 			p  = strrchr(buf, ' ');
 			strlcpy(p, "...", 4);
 		}
 		break;
-	case AGENTX_DATA_TYPE_COUNTER64:
-		(void) snprintf(buf, sizeof(buf), "%s: (counter64)%"PRIu64,
-		    agentx_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint64);
+	case AX_DATA_TYPE_COUNTER64:
+		snprintf(buf, sizeof(buf), "%s: (counter64)%"PRIu64,
+		    ax_oid2string(&(vb->avb_oid)), vb->avb_data.avb_uint64);
 		break;
-	case AGENTX_DATA_TYPE_NOSUCHOBJECT:
-		(void) snprintf(buf, sizeof(buf), "%s: <noSuchObject>",
-		    agentx_oid2string(&(vb->avb_oid)));
+	case AX_DATA_TYPE_NOSUCHOBJECT:
+		snprintf(buf, sizeof(buf), "%s: <noSuchObject>",
+		    ax_oid2string(&(vb->avb_oid)));
 		break;
-	case AGENTX_DATA_TYPE_NOSUCHINSTANCE:
-		(void) snprintf(buf, sizeof(buf), "%s: <noSuchInstance>",
-		    agentx_oid2string(&(vb->avb_oid)));
+	case AX_DATA_TYPE_NOSUCHINSTANCE:
+		snprintf(buf, sizeof(buf), "%s: <noSuchInstance>",
+		    ax_oid2string(&(vb->avb_oid)));
 		break;
-	case AGENTX_DATA_TYPE_ENDOFMIBVIEW:
-		(void) snprintf(buf, sizeof(buf), "%s: <endOfMibView>",
-		    agentx_oid2string(&(vb->avb_oid)));
+	case AX_DATA_TYPE_ENDOFMIBVIEW:
+		snprintf(buf, sizeof(buf), "%s: <endOfMibView>",
+		    ax_oid2string(&(vb->avb_oid)));
 		break;
 	}
 	return buf;
 }
 
 int
-agentx_oid_cmp(struct agentx_oid *o1, struct agentx_oid *o2)
+ax_oid_cmp(struct ax_oid *o1, struct ax_oid *o2)
 {
 	size_t i, min;
 
@@ -943,27 +944,27 @@ agentx_oid_cmp(struct agentx_oid *o1, struct agentx_oid *o2)
 }
 
 int
-agentx_oid_add(struct agentx_oid *oid, uint32_t value)
+ax_oid_add(struct ax_oid *oid, uint32_t value)
 {
-	if (oid->aoi_idlen == AGENTX_OID_MAX_LEN)
+	if (oid->aoi_idlen == AX_OID_MAX_LEN)
 		return -1;
 	oid->aoi_id[oid->aoi_idlen++] = value;
 	return 0;
 }
 
 static uint32_t
-agentx_pdu_queue(struct agentx *ax)
+ax_pdu_queue(struct ax *ax)
 {
-	struct agentx_pdu_header header;
+	struct ax_pdu_header header;
 	uint32_t packetid, plength;
 	size_t wbtlen = ax->ax_wbtlen;
 
-	header.aph_flags = ax->ax_byteorder == AGENTX_BYTE_ORDER_BE ?
-	    AGENTX_PDU_FLAG_NETWORK_BYTE_ORDER : 0;
-	packetid = agentx_pdutoh32(&header, &(ax->ax_wbuf[ax->ax_wblen + 12]));
-	plength = (ax->ax_wbtlen - ax->ax_wblen) - AGENTX_PDU_HEADER;
+	header.aph_flags = ax->ax_byteorder == AX_BYTE_ORDER_BE ?
+	    AX_PDU_FLAG_NETWORK_BYTE_ORDER : 0;
+	packetid = ax_pdutoh32(&header, &(ax->ax_wbuf[ax->ax_wblen + 12]));
+	plength = (ax->ax_wbtlen - ax->ax_wblen) - AX_PDU_HEADER;
 	ax->ax_wbtlen = ax->ax_wblen + 16;
-	(void)agentx_pdu_add_uint32(ax, plength);
+	(void)ax_pdu_add_uint32(ax, plength);
 
 	ax->ax_wblen = ax->ax_wbtlen = wbtlen;
 
@@ -971,9 +972,9 @@ agentx_pdu_queue(struct agentx *ax)
 }
 
 static int
-agentx_pdu_header(struct agentx *ax, enum agentx_pdu_type type, uint8_t flags,
+ax_pdu_header(struct ax *ax, enum ax_pdu_type type, uint8_t flags,
     uint32_t sessionid, uint32_t transactionid, uint32_t packetid,
-    struct agentx_ostring *context)
+    struct ax_ostring *context)
 {
 	if (ax->ax_wblen != ax->ax_wbtlen) {
 		errno = EALREADY;
@@ -981,26 +982,26 @@ agentx_pdu_header(struct agentx *ax, enum agentx_pdu_type type, uint8_t flags,
 	}
 
 	ax->ax_wbtlen = ax->ax_wblen;
-	if (agentx_pdu_need(ax, 4) == -1)
+	if (ax_pdu_need(ax, 4) == -1)
 		return -1;
 	ax->ax_wbuf[ax->ax_wbtlen++] = 1;
 	ax->ax_wbuf[ax->ax_wbtlen++] = (uint8_t) type;
 	if (context != NULL)
-		flags |= AGENTX_PDU_FLAG_NON_DEFAULT_CONTEXT;
-	if (ax->ax_byteorder == AGENTX_BYTE_ORDER_BE)
-		flags |= AGENTX_PDU_FLAG_NETWORK_BYTE_ORDER;
+		flags |= AX_PDU_FLAG_NON_DEFAULT_CONTEXT;
+	if (ax->ax_byteorder == AX_BYTE_ORDER_BE)
+		flags |= AX_PDU_FLAG_NETWORK_BYTE_ORDER;
 	ax->ax_wbuf[ax->ax_wbtlen++] = flags;
 	ax->ax_wbuf[ax->ax_wbtlen++] = 0;
 	if (packetid == 0)
-		packetid = agentx_packetid(ax);
-	if (agentx_pdu_add_uint32(ax, sessionid) == -1 ||
-	    agentx_pdu_add_uint32(ax, transactionid) == -1 ||
-	    agentx_pdu_add_uint32(ax, packetid) == -1 ||
-	    agentx_pdu_need(ax, 4) == -1)
+		packetid = ax_packetid(ax);
+	if (ax_pdu_add_uint32(ax, sessionid) == -1 ||
+	    ax_pdu_add_uint32(ax, transactionid) == -1 ||
+	    ax_pdu_add_uint32(ax, packetid) == -1 ||
+	    ax_pdu_need(ax, 4) == -1)
 		return -1;
 	ax->ax_wbtlen += 4;
 	if (context != NULL) {
-		if (agentx_pdu_add_str(ax, context) == -1)
+		if (ax_pdu_add_str(ax, context) == -1)
 			return -1;
 	}
 
@@ -1008,7 +1009,7 @@ agentx_pdu_header(struct agentx *ax, enum agentx_pdu_type type, uint8_t flags,
 }
 
 static uint32_t
-agentx_packetid(struct agentx *ax)
+ax_packetid(struct ax *ax)
 {
 	uint32_t packetid, *packetids;
 	size_t npackets = 0, i;
@@ -1042,12 +1043,12 @@ agentx_packetid(struct agentx *ax)
 }
 
 static int
-agentx_pdu_add_uint16(struct agentx *ax, uint16_t value)
+ax_pdu_add_uint16(struct ax *ax, uint16_t value)
 {
-	if (agentx_pdu_need(ax, sizeof(value)) == -1)
+	if (ax_pdu_need(ax, sizeof(value)) == -1)
 		return -1;
 
-	if (ax->ax_byteorder == AGENTX_BYTE_ORDER_BE)
+	if (ax->ax_byteorder == AX_BYTE_ORDER_BE)
 		value = htobe16(value);
 	else
 		value = htole16(value);
@@ -1057,12 +1058,12 @@ agentx_pdu_add_uint16(struct agentx *ax, uint16_t value)
 }
 
 static int
-agentx_pdu_add_uint32(struct agentx *ax, uint32_t value)
+ax_pdu_add_uint32(struct ax *ax, uint32_t value)
 {
-	if (agentx_pdu_need(ax, sizeof(value)) == -1)
+	if (ax_pdu_need(ax, sizeof(value)) == -1)
 		return -1;
 
-	if (ax->ax_byteorder == AGENTX_BYTE_ORDER_BE)
+	if (ax->ax_byteorder == AX_BYTE_ORDER_BE)
 		value = htobe32(value);
 	else
 		value = htole32(value);
@@ -1072,12 +1073,12 @@ agentx_pdu_add_uint32(struct agentx *ax, uint32_t value)
 }
 
 static int
-agentx_pdu_add_uint64(struct agentx *ax, uint64_t value)
+ax_pdu_add_uint64(struct ax *ax, uint64_t value)
 {
-	if (agentx_pdu_need(ax, sizeof(value)) == -1)
+	if (ax_pdu_need(ax, sizeof(value)) == -1)
 		return -1;
 
-	if (ax->ax_byteorder == AGENTX_BYTE_ORDER_BE)
+	if (ax->ax_byteorder == AX_BYTE_ORDER_BE)
 		value = htobe64(value);
 	else
 		value = htole64(value);
@@ -1088,9 +1089,9 @@ agentx_pdu_add_uint64(struct agentx *ax, uint64_t value)
 
 
 static int
-agentx_pdu_add_oid(struct agentx *ax, struct agentx_oid *oid, int include)
+ax_pdu_add_oid(struct ax *ax, struct ax_oid *oid, int include)
 {
-	static struct agentx_oid nulloid = {0};
+	static struct ax_oid nulloid = {0};
 	uint8_t prefix = 0, n_subid, i = 0;
 
 	n_subid = oid->aoi_idlen;
@@ -1106,7 +1107,7 @@ agentx_pdu_add_oid(struct agentx *ax, struct agentx_oid *oid, int include)
 		i = 5;
 	}
 
-	if (agentx_pdu_need(ax, 4) == -1)
+	if (ax_pdu_need(ax, 4) == -1)
 		return -1;
 	ax->ax_wbuf[ax->ax_wbtlen++] = n_subid - i;
 	ax->ax_wbuf[ax->ax_wbtlen++] = prefix;
@@ -1114,7 +1115,7 @@ agentx_pdu_add_oid(struct agentx *ax, struct agentx_oid *oid, int include)
 	ax->ax_wbuf[ax->ax_wbtlen++] = 0;
 
 	for (; i < n_subid; i++) {
-		if (agentx_pdu_add_uint32(ax, oid->aoi_id[i]) == -1)
+		if (ax_pdu_add_uint32(ax, oid->aoi_id[i]) == -1)
 			return -1;
 	}
 
@@ -1122,17 +1123,17 @@ agentx_pdu_add_oid(struct agentx *ax, struct agentx_oid *oid, int include)
 }
 
 static int
-agentx_pdu_add_str(struct agentx *ax, struct agentx_ostring *str)
+ax_pdu_add_str(struct ax *ax, struct ax_ostring *str)
 {
 	size_t length, zeroes;
 
-	if (agentx_pdu_add_uint32(ax, str->aos_slen) == -1)
+	if (ax_pdu_add_uint32(ax, str->aos_slen) == -1)
 		return -1;
 
 	if ((zeroes = (4 - (str->aos_slen % 4))) == 4)
 		zeroes = 0;
 	length = str->aos_slen + zeroes;
-	if (agentx_pdu_need(ax, length) == -1)
+	if (ax_pdu_need(ax, length) == -1)
 		return -1;
 
 	memcpy(&(ax->ax_wbuf[ax->ax_wbtlen]), str->aos_string, str->aos_slen);
@@ -1143,51 +1144,55 @@ agentx_pdu_add_str(struct agentx *ax, struct agentx_ostring *str)
 }
 
 static int
-agentx_pdu_add_varbindlist(struct agentx *ax,
-    struct agentx_varbind *vblist, size_t nvb)
+ax_pdu_add_varbindlist(struct ax *ax,
+    struct ax_varbind *vblist, size_t nvb)
 {
 	size_t i;
 	uint16_t temp;
 
 	for (i = 0; i < nvb; i++) {
 		temp = (uint16_t) vblist[i].avb_type;
-		if (agentx_pdu_add_uint16(ax, temp) == -1 ||
-		    agentx_pdu_need(ax, 2))
+		if (ax_pdu_add_uint16(ax, temp) == -1 ||
+		    ax_pdu_need(ax, 2))
 			return -1;
 		memset(&(ax->ax_wbuf[ax->ax_wbtlen]), 0, 2);
 		ax->ax_wbtlen += 2;
-		if (agentx_pdu_add_oid(ax, &(vblist[i].avb_oid), 0) == -1)
+		if (ax_pdu_add_oid(ax, &(vblist[i].avb_oid), 0) == -1)
 			return -1;
 		switch (vblist[i].avb_type) {
-		case AGENTX_DATA_TYPE_INTEGER:
-		case AGENTX_DATA_TYPE_COUNTER32:
-		case AGENTX_DATA_TYPE_GAUGE32:
-		case AGENTX_DATA_TYPE_TIMETICKS:
-			if (agentx_pdu_add_uint32(ax,
+		case AX_DATA_TYPE_INTEGER:
+			if (ax_pdu_add_uint32(ax,
+			    vblist[i].avb_data.avb_int32) == -1)
+				return -1;
+			break;
+		case AX_DATA_TYPE_COUNTER32:
+		case AX_DATA_TYPE_GAUGE32:
+		case AX_DATA_TYPE_TIMETICKS:
+			if (ax_pdu_add_uint32(ax,
 			    vblist[i].avb_data.avb_uint32) == -1)
 				return -1;
 			break;
-		case AGENTX_DATA_TYPE_COUNTER64:
-			if (agentx_pdu_add_uint64(ax,
+		case AX_DATA_TYPE_COUNTER64:
+			if (ax_pdu_add_uint64(ax,
 			    vblist[i].avb_data.avb_uint64) == -1)
 				return -1;
 			break;
-		case AGENTX_DATA_TYPE_OCTETSTRING:
-		case AGENTX_DATA_TYPE_IPADDRESS:
-		case AGENTX_DATA_TYPE_OPAQUE:
-			if (agentx_pdu_add_str(ax,
+		case AX_DATA_TYPE_OCTETSTRING:
+		case AX_DATA_TYPE_IPADDRESS:
+		case AX_DATA_TYPE_OPAQUE:
+			if (ax_pdu_add_str(ax,
 			    &(vblist[i].avb_data.avb_ostring)) == -1)
 				return -1;
 			break;
-		case AGENTX_DATA_TYPE_OID:
-			if (agentx_pdu_add_oid(ax,
+		case AX_DATA_TYPE_OID:
+			if (ax_pdu_add_oid(ax,
 			    &(vblist[i].avb_data.avb_oid), 1) == -1)
 				return -1;
 			break;
-		case AGENTX_DATA_TYPE_NULL:
-		case AGENTX_DATA_TYPE_NOSUCHOBJECT:
-		case AGENTX_DATA_TYPE_NOSUCHINSTANCE:
-		case AGENTX_DATA_TYPE_ENDOFMIBVIEW:
+		case AX_DATA_TYPE_NULL:
+		case AX_DATA_TYPE_NOSUCHOBJECT:
+		case AX_DATA_TYPE_NOSUCHINSTANCE:
+		case AX_DATA_TYPE_ENDOFMIBVIEW:
 			break;
 		default:
 			errno = EINVAL;
@@ -1198,40 +1203,40 @@ agentx_pdu_add_varbindlist(struct agentx *ax,
 }
 
 static uint16_t
-agentx_pdutoh16(struct agentx_pdu_header *header, uint8_t *buf)
+ax_pdutoh16(struct ax_pdu_header *header, uint8_t *buf)
 {
 	uint16_t value;
 
 	memcpy(&value, buf, sizeof(value));
-	if (header->aph_flags & AGENTX_PDU_FLAG_NETWORK_BYTE_ORDER)
+	if (header->aph_flags & AX_PDU_FLAG_NETWORK_BYTE_ORDER)
 		return be16toh(value);
 	return le16toh(value);
 }
 
 static uint32_t
-agentx_pdutoh32(struct agentx_pdu_header *header, uint8_t *buf)
+ax_pdutoh32(struct ax_pdu_header *header, uint8_t *buf)
 {
 	uint32_t value;
 
 	memcpy(&value, buf, sizeof(value));
-	if (header->aph_flags & AGENTX_PDU_FLAG_NETWORK_BYTE_ORDER)
+	if (header->aph_flags & AX_PDU_FLAG_NETWORK_BYTE_ORDER)
 		return be32toh(value);
 	return le32toh(value);
 }
 
 static uint64_t
-agentx_pdutoh64(struct agentx_pdu_header *header, uint8_t *buf)
+ax_pdutoh64(struct ax_pdu_header *header, uint8_t *buf)
 {
 	uint64_t value;
 
 	memcpy(&value, buf, sizeof(value));
-	if (header->aph_flags & AGENTX_PDU_FLAG_NETWORK_BYTE_ORDER)
+	if (header->aph_flags & AX_PDU_FLAG_NETWORK_BYTE_ORDER)
 		return be64toh(value);
 	return le64toh(value);
 }
 
 static ssize_t
-agentx_pdutooid(struct agentx_pdu_header *header, struct agentx_oid *oid,
+ax_pdutooid(struct ax_pdu_header *header, struct ax_oid *oid,
     uint8_t *buf, size_t rawlen)
 {
 	size_t i = 0;
@@ -1257,25 +1262,25 @@ agentx_pdutooid(struct agentx_pdu_header *header, struct agentx_oid *oid,
 	buf++;
 	oid->aoi_include = *buf;
 	for (buf += 2; i < oid->aoi_idlen; i++, buf += 4)
-		oid->aoi_id[i] = agentx_pdutoh32(header, buf);
+		oid->aoi_id[i] = ax_pdutoh32(header, buf);
 
 	return nread;
-		
+
 fail:
 	errno = EPROTO;
 	return -1;
 }
 
 static ssize_t
-agentx_pdutoostring(struct agentx_pdu_header *header,
-    struct agentx_ostring *ostring, uint8_t *buf, size_t rawlen)
+ax_pdutoostring(struct ax_pdu_header *header,
+    struct ax_ostring *ostring, uint8_t *buf, size_t rawlen)
 {
 	ssize_t nread;
 
 	if (rawlen < 4)
 		goto fail;
-	
-	ostring->aos_slen = agentx_pdutoh32(header, buf);
+
+	ostring->aos_slen = ax_pdutoh32(header, buf);
 	rawlen -= 4;
 	buf += 4;
 	if (ostring->aos_slen > rawlen)
@@ -1288,7 +1293,7 @@ agentx_pdutoostring(struct agentx_pdu_header *header,
 	nread = 4 + ostring->aos_slen;
 	if (ostring->aos_slen % 4 != 0)
 		nread += 4 - (ostring->aos_slen % 4);
-		
+
 	return nread;
 
 fail:
@@ -1297,8 +1302,8 @@ fail:
 }
 
 static ssize_t
-agentx_pdutovarbind(struct agentx_pdu_header *header,
-    struct agentx_varbind *varbind, uint8_t *buf, size_t rawlen)
+ax_pdutovarbind(struct ax_pdu_header *header,
+    struct ax_varbind *varbind, uint8_t *buf, size_t rawlen)
 {
 	ssize_t nread, rread = 4;
 
@@ -1307,11 +1312,11 @@ agentx_pdutovarbind(struct agentx_pdu_header *header,
 
 	if (rawlen < 8)
 		goto fail;
-	varbind->avb_type = agentx_pdutoh16(header, buf);
-	
+	varbind->avb_type = ax_pdutoh16(header, buf);
+
 	buf += 4;
 	rawlen -= 4;
-	nread = agentx_pdutooid(header, &(varbind->avb_oid), buf, rawlen);
+	nread = ax_pdutooid(header, &(varbind->avb_oid), buf, rawlen);
 	if (nread == -1)
 		return -1;
 	rread += nread;
@@ -1319,37 +1324,41 @@ agentx_pdutovarbind(struct agentx_pdu_header *header,
 	rawlen -= nread;
 
 	switch(varbind->avb_type) {
-	case AGENTX_DATA_TYPE_INTEGER:
-	case AGENTX_DATA_TYPE_COUNTER32:
-	case AGENTX_DATA_TYPE_GAUGE32:
-	case AGENTX_DATA_TYPE_TIMETICKS:
+	case AX_DATA_TYPE_INTEGER:
 		if (rawlen < 4)
 			goto fail;
-		varbind->avb_data.avb_uint32 = agentx_pdutoh32(header, buf);
+		varbind->avb_data.avb_int32 = ax_pdutoh32(header, buf);
 		return rread + 4;
-	case AGENTX_DATA_TYPE_COUNTER64:
+	case AX_DATA_TYPE_COUNTER32:
+	case AX_DATA_TYPE_GAUGE32:
+	case AX_DATA_TYPE_TIMETICKS:
+		if (rawlen < 4)
+			goto fail;
+		varbind->avb_data.avb_uint32 = ax_pdutoh32(header, buf);
+		return rread + 4;
+	case AX_DATA_TYPE_COUNTER64:
 		if (rawlen < 8)
 			goto fail;
-		varbind->avb_data.avb_uint64 = agentx_pdutoh64(header, buf);
+		varbind->avb_data.avb_uint64 = ax_pdutoh64(header, buf);
 		return rread + 8;
-	case AGENTX_DATA_TYPE_OCTETSTRING:
-	case AGENTX_DATA_TYPE_IPADDRESS:
-	case AGENTX_DATA_TYPE_OPAQUE:
-		nread = agentx_pdutoostring(header,
+	case AX_DATA_TYPE_OCTETSTRING:
+	case AX_DATA_TYPE_IPADDRESS:
+	case AX_DATA_TYPE_OPAQUE:
+		nread = ax_pdutoostring(header,
 		    &(varbind->avb_data.avb_ostring), buf, rawlen);
-		if (rread == -1)
+		if (nread == -1)
 			return -1;
 		return nread + rread;
-	case AGENTX_DATA_TYPE_OID:
-		nread = agentx_pdutooid(header, &(varbind->avb_data.avb_oid),
+	case AX_DATA_TYPE_OID:
+		nread = ax_pdutooid(header, &(varbind->avb_data.avb_oid),
 		    buf, rawlen);
-		if (rread == -1)
+		if (nread == -1)
 			return -1;
 		return nread + rread;
-	case AGENTX_DATA_TYPE_NULL:
-	case AGENTX_DATA_TYPE_NOSUCHOBJECT:
-	case AGENTX_DATA_TYPE_NOSUCHINSTANCE:
-	case AGENTX_DATA_TYPE_ENDOFMIBVIEW:
+	case AX_DATA_TYPE_NULL:
+	case AX_DATA_TYPE_NOSUCHOBJECT:
+	case AX_DATA_TYPE_NOSUCHINSTANCE:
+	case AX_DATA_TYPE_ENDOFMIBVIEW:
 		return rread;
 	}
 

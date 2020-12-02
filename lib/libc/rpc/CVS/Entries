@@ -12,7 +12,6 @@
 /clnt_simple.c/1.18/Thu Aug 20 21:49:29 2015//
 /get_myaddress.c/1.15/Sun Sep 13 15:36:56 2015//
 /getrpcent.3/1.13/Wed Jun  5 03:39:23 2013//
-/getrpcent.c/1.21/Sun Sep 13 15:36:56 2015//
 /getrpcport.3/1.10/Wed Jun  5 03:39:23 2013//
 /getrpcport.c/1.8/Wed Sep  1 14:43:34 2010//
 /pmap_clnt.c/1.19/Sun Sep 13 15:36:56 2015//
@@ -44,4 +43,5 @@
 /clnt_udp.c/1.37/Mon Jul 20 09:32:24 2020//
 /svc_tcp.c/1.41/Mon Jul 20 09:32:24 2020//
 /rpc_prot.c/1.16/Sat Sep 26 23:17:55 2020//
+/getrpcent.c/1.22/Thu Oct 29 07:56:45 2020//
 D

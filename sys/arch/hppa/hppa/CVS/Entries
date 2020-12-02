@@ -20,6 +20,6 @@
 /wscons_machdep.c/1.7/Tue Oct  5 19:27:55 2004//
 /pmap.c/1.174/Mon Jun  1 06:23:24 2020//
 /conf.c/1.70/Mon Jul 20 09:32:29 2020//
-/machdep.c/1.260/Mon Jul 20 09:32:29 2020//
-/trap.c/1.150/Thu Oct  8 23:07:15 2020//
+/machdep.c/1.261/Thu Oct 29 07:57:02 2020//
+/trap.c/1.152/Thu Oct 29 07:57:02 2020//
 D

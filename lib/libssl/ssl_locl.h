@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.299 2020/10/07 08:43:34 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.306 2020/10/14 16:57:33 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -313,21 +313,21 @@ __BEGIN_HIDDEN_DECLS
  */
 #define SSL_C_PKEYLENGTH(c)	1024
 
-/* Check if an SSL structure is using DTLS. */
-#define SSL_IS_DTLS(s) \
-	(s->method->internal->version == DTLS1_VERSION)
-
 /* See if we use signature algorithms extension. */
 #define SSL_USE_SIGALGS(s) \
-	(s->method->internal->ssl3_enc->enc_flags & SSL_ENC_FLAG_SIGALGS)
+	(s->method->internal->enc_flags & SSL_ENC_FLAG_SIGALGS)
+
+/* See if we use SHA256 default PRF. */
+#define SSL_USE_SHA256_PRF(s) \
+	(s->method->internal->enc_flags & SSL_ENC_FLAG_SHA256_PRF)
 
 /* Allow TLS 1.2 ciphersuites: applies to DTLS 1.2 as well as TLS 1.2. */
 #define SSL_USE_TLS1_2_CIPHERS(s) \
-	(s->method->internal->ssl3_enc->enc_flags & SSL_ENC_FLAG_TLS1_2_CIPHERS)
+	(s->method->internal->enc_flags & SSL_ENC_FLAG_TLS1_2_CIPHERS)
 
 /* Allow TLS 1.3 ciphersuites only. */
 #define SSL_USE_TLS1_3_CIPHERS(s) \
-	(s->method->internal->ssl3_enc->enc_flags & SSL_ENC_FLAG_TLS1_3_CIPHERS)
+	(s->method->internal->enc_flags & SSL_ENC_FLAG_TLS1_3_CIPHERS)
 
 #define SSL_PKEY_RSA		0
 #define SSL_PKEY_ECC		1
@@ -358,6 +358,7 @@ __BEGIN_HIDDEN_DECLS
 #define NAMED_CURVE_TYPE           3
 
 typedef struct ssl_method_internal_st {
+	int dtls;
 	int version;
 
 	uint16_t min_version;
@@ -379,7 +380,7 @@ typedef struct ssl_method_internal_st {
 	    int peek);
 	int (*ssl_write_bytes)(SSL *s, int type, const void *buf_, int len);
 
-	struct ssl3_enc_method *ssl3_enc; /* Extra SSLv3/TLS stuff */
+	unsigned int enc_flags;		/* SSL_ENC_FLAG_* */
 } SSL_METHOD_INTERNAL;
 
 typedef struct ssl_session_internal_st {
@@ -797,7 +798,7 @@ typedef struct ssl_internal_st {
 	TLS_SESSION_TICKET_EXT *tlsext_session_ticket;
 
 	STACK_OF(SRTP_PROTECTION_PROFILE) *srtp_profiles;	/* What we'll do */
-	SRTP_PROTECTION_PROFILE *srtp_profile;			/* What's been chosen */
+	const SRTP_PROTECTION_PROFILE *srtp_profile;		/* What's been chosen */
 
 	int renegotiate;/* 1 if we are renegotiating.
 		 	 * 2 if we are a server and are inside a handshake
@@ -1063,10 +1064,6 @@ typedef struct sess_cert_st {
 /*#define SSL_DEBUG	*/
 /*#define RSA_DEBUG	*/
 
-typedef struct ssl3_enc_method {
-	unsigned int enc_flags;
-} SSL3_ENC_METHOD;
-
 /*
  * Flag values for enc_flags.
  */
@@ -1082,6 +1079,14 @@ typedef struct ssl3_enc_method {
 
 /* Allow TLS 1.3 ciphersuites only. */
 #define SSL_ENC_FLAG_TLS1_3_CIPHERS     (1 << 5)
+
+#define TLSV1_ENC_FLAGS		0
+#define TLSV1_1_ENC_FLAGS	0
+#define TLSV1_2_ENC_FLAGS	(SSL_ENC_FLAG_SIGALGS		| \
+				 SSL_ENC_FLAG_SHA256_PRF	| \
+				 SSL_ENC_FLAG_TLS1_2_CIPHERS)
+#define TLSV1_3_ENC_FLAGS	(SSL_ENC_FLAG_SIGALGS		| \
+				 SSL_ENC_FLAG_TLS1_3_CIPHERS)
 
 /*
  * ssl_aead_ctx_st contains information about an AEAD that is being used to
@@ -1105,7 +1110,7 @@ struct ssl_aead_ctx_st {
 	char variable_nonce_in_record;
 };
 
-extern SSL_CIPHER ssl3_ciphers[];
+extern const SSL_CIPHER ssl3_ciphers[];
 
 const char *ssl_version_string(int ver);
 int ssl_enabled_version_range(SSL *s, uint16_t *min_ver, uint16_t *max_ver);
@@ -1121,16 +1126,7 @@ int ssl_cipher_allowed_in_version_range(const SSL_CIPHER *cipher,
     uint16_t min_ver, uint16_t max_ver);
 
 const SSL_METHOD *tls_legacy_method(void);
-const SSL_METHOD *tls_legacy_client_method(void);
-const SSL_METHOD *tls_legacy_server_method(void);
-
-const SSL_METHOD *ssl_get_client_method(uint16_t version);
-const SSL_METHOD *ssl_get_server_method(uint16_t version);
-
-extern SSL3_ENC_METHOD TLSv1_enc_data;
-extern SSL3_ENC_METHOD TLSv1_1_enc_data;
-extern SSL3_ENC_METHOD TLSv1_2_enc_data;
-extern SSL3_ENC_METHOD TLSv1_3_enc_data;
+const SSL_METHOD *ssl_get_method(uint16_t version);
 
 void ssl_clear_cipher_state(SSL *s);
 void ssl_clear_cipher_read_state(SSL *s);
@@ -1417,10 +1413,10 @@ void SSL_error_internal(const SSL *s, int r, char *f, int l);
 
 #ifndef OPENSSL_NO_SRTP
 
-int srtp_find_profile_by_name(char *profile_name,
-    SRTP_PROTECTION_PROFILE **pptr, unsigned int len);
+int srtp_find_profile_by_name(const char *profile_name,
+    const SRTP_PROTECTION_PROFILE **pptr, unsigned int len);
 int srtp_find_profile_by_num(unsigned int profile_num,
-    SRTP_PROTECTION_PROFILE **pptr);
+    const SRTP_PROTECTION_PROFILE **pptr);
 
 #endif /* OPENSSL_NO_SRTP */
 

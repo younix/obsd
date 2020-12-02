@@ -29,7 +29,6 @@
 /process_machdep.c/1.6/Fri Mar 16 21:46:04 2018//
 /setstack.S/1.5/Mon Aug  6 18:39:13 2018//
 /sig_machdep.c/1.18/Tue Jul 10 04:19:59 2018//
-/sigcode.S/1.9/Fri Mar 13 08:46:50 2020//
 /stubs.c/1.11/Sat Jun 30 15:23:35 2018//
 /sys_machdep.c/1.5/Sat Jun 30 15:23:35 2018//
 /syscall.c/1.21/Fri Mar 13 08:46:50 2020//
@@ -42,5 +41,6 @@
 /db_trace.c/1.15/Sat Sep 26 23:17:55 2020//
 /softintr.c/1.10/Sat Sep 26 23:17:55 2020//
 /undefined.c/1.14/Sat Sep 26 23:17:55 2020//
-/fault.c/1.42/Fri Oct  2 17:08:34 2020//
+/fault.c/1.44/Thu Oct 29 07:57:02 2020//
+/sigcode.S/1.10/Thu Oct 29 07:57:02 2020//
 D
