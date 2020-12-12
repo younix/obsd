@@ -19,9 +19,6 @@
 /viornd.c/1.4/Mon Jun  1 06:23:27 2020//
 /hvs.c/1.33/Fri Dec 11 17:58:24 2020//
 /hyperv.c/1.47/Sat Dec 12 11:04:13 2020//
-/if_hvn.c/1.44/Sat Dec 12 11:04:13 2020//
-/if_vio.c/1.18/Fri Dec 11 17:58:24 2020//
-/if_xnf.c/1.64/Fri Dec 11 17:58:24 2020//
 /pvbus.c/1.22/Fri Dec 11 17:58:24 2020//
 /pvclock.c/1.6/Fri Dec 11 17:58:24 2020//
 /vioblk.c/1.32/Fri Dec 11 17:58:24 2020//
@@ -31,4 +28,7 @@
 /vmt.c/1.19/Fri Dec 11 17:58:24 2020//
 /xbf.c/1.51/Fri Dec 11 17:58:24 2020//
 /xen.c/1.97/Fri Dec 11 17:58:24 2020//
+/if_hvn.c/1.45/Sat Dec 12 12:50:19 2020//
+/if_vio.c/1.19/Sat Dec 12 12:50:19 2020//
+/if_xnf.c/1.65/Sat Dec 12 12:50:19 2020//
 D

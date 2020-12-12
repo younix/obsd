@@ -160,7 +160,6 @@
 /kcov_remote_register.9/1.3/Fri Dec 11 17:58:22 2020//
 /kstat_create.9/1.2/Fri Dec 11 17:58:22 2020//
 /kstat_kv_init.9/1.2/Fri Dec 11 17:58:22 2020//
-/mbuf.9/1.119/Fri Dec 11 17:58:22 2020//
 /mbuf_tags.9/1.41/Fri Dec 11 17:58:22 2020//
 /microtime.9/1.22/Fri Dec 11 17:58:22 2020//
 /mq_init.9/1.13/Fri Dec 11 17:58:22 2020//
@@ -179,4 +178,5 @@
 /vgone.9/1.10/Fri Dec 11 17:58:22 2020//
 /vinvalbuf.9/1.13/Sat Dec 12 11:06:49 2020//
 /vrecycle.9/1.11/Fri Dec 11 17:58:22 2020//
+/mbuf.9/1.120/Sat Dec 12 12:50:14 2020//
 D
