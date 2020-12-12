@@ -1761,7 +1761,7 @@ oce_get_buf(struct oce_rq *rq)
 	if ((pkt = oce_pkt_get(&rq->pkt_free)) == NULL)
 		return (0);
 
-	pkt->mbuf = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	pkt->mbuf = MCLGET(NULL, M_DONTWAIT);
 	if (pkt->mbuf == NULL) {
 		oce_pkt_put(&rq->pkt_free, pkt);
 		return (0);

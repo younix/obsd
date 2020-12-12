@@ -1323,7 +1323,7 @@ sis_newbuf(struct sis_softc *sc, struct sis_desc *c)
 	if (c == NULL)
 		return (EINVAL);
 
-	m_new = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m_new = MCLGET(NULL, M_DONTWAIT);
 	if (!m_new)
 		return (ENOBUFS);
 

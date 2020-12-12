@@ -300,7 +300,7 @@ genet_alloc_mbufcl(struct genet_softc *sc)
 {
 	struct mbuf *m;
 
-	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m = MCLGET(NULL, M_DONTWAIT);
 	if (m != NULL)
 		m->m_pkthdr.len = m->m_len = m->m_ext.ext_size;
 

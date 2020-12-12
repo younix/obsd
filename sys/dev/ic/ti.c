@@ -576,7 +576,7 @@ ti_newbuf_std(struct ti_softc *sc, int i, struct mbuf *m,
 	sc->ti_cdata.ti_rx_std_map[i] = dmamap;
 
 	if (m == NULL) {
-		m_new = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		m_new = MCLGET(NULL, M_DONTWAIT);
 		if (m_new == NULL)
 			return (ENOBUFS);
 

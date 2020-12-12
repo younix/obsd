@@ -1699,7 +1699,7 @@ vr_alloc_mbuf(struct vr_softc *sc, struct vr_chain_onefrag *r)
 	if (r == NULL)
 		return (EINVAL);
 
-	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m = MCLGET(NULL, M_DONTWAIT);
 	if (!m)
 		return (ENOBUFS);
 

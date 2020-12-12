@@ -685,7 +685,7 @@ rt2860_alloc_rx_ring(struct rt2860_softc *sc, struct rt2860_rx_ring *ring)
 			goto fail;
 		}
 
-		data->m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		data->m = MCLGET(NULL, M_DONTWAIT);
 		if (data->m == NULL) {
 			printf("%s: could not allocate Rx mbuf\n",
 			    sc->sc_dev.dv_xname);
@@ -1304,7 +1304,7 @@ rt2860_rx_intr(struct rt2860_softc *sc)
 			goto skip;
 		}
 
-		m1 = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		m1 = MCLGET(NULL, M_DONTWAIT);
 		if (__predict_false(m1 == NULL)) {
 			ifp->if_ierrors++;
 			goto skip;

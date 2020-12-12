@@ -904,7 +904,7 @@ vio_add_rx_mbuf(struct vio_softc *sc, int i)
 	struct mbuf *m;
 	int r;
 
-	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m = MCLGET(NULL, M_DONTWAIT);
 	if (m == NULL)
 		return ENOBUFS;
 	sc->sc_rx_mbufs[i] = m;

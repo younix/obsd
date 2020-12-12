@@ -847,7 +847,7 @@ se_newbuf(struct se_softc *sc, uint i)
 	struct mbuf *m;
 	int rc;
 
-	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m = MCLGET(NULL, M_DONTWAIT);
 	if (m == NULL) {
 #ifdef SE_DEBUG
 		if (ifp->if_flags & IFF_DEBUG)

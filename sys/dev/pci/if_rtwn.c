@@ -545,7 +545,7 @@ rtwn_alloc_rx_list(struct rtwn_pci_softc *sc)
 			goto fail;
 		}
 
-		rx_data->m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		rx_data->m = MCLGET(NULL, M_DONTWAIT);
 		if (rx_data->m == NULL) {
 			printf("%s: could not allocate rx mbuf\n",
 			    sc->sc_dev.dv_xname);
@@ -887,7 +887,7 @@ rtwn_rx_frame(struct rtwn_pci_softc *sc, struct r92c_rx_desc_pci *rx_desc,
 	DPRINTFN(5, ("Rx frame len=%d rate=%d infosz=%d shift=%d rssi=%d\n",
 	    pktlen, rate, infosz, shift, rssi));
 
-	m1 = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m1 = MCLGET(NULL, M_DONTWAIT);
 	if (m1 == NULL) {
 		ifp->if_ierrors++;
 		return;

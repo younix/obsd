@@ -311,7 +311,7 @@ struct mbuf {
 	MCLINITREFERENCE(m);						\
 } while (/* CONSTCOND */ 0)
 
-#define MCLGET(m, how) (void) m_clget((m), (how), MCLBYTES)
+#define MCLGET(m, how) m_clget((m), (how), MCLBYTES)
 #define MCLGETL(m, how, l) m_clget((m), (how), (l))
 
 u_int mextfree_register(void (*)(caddr_t, u_int, void *));

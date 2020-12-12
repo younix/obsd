@@ -3124,7 +3124,7 @@ mvpp2_alloc_mbuf(struct mvpp2_softc *sc, bus_dmamap_t map)
 {
 	struct mbuf *m = NULL;
 
-	m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+	m = MCLGET(NULL, M_DONTWAIT);
 	if (!m)
 		return (NULL);
 	m->m_len = m->m_pkthdr.len = MCLBYTES;

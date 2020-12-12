@@ -697,7 +697,7 @@ nfe_rxeof(struct nfe_softc *sc)
 		 * old mbuf. In the unlikely case that the old mbuf can't be
 		 * reloaded either, explicitly panic.
 		 */
-		mnew = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		mnew = MCLGET(NULL, M_DONTWAIT);
 		if (mnew == NULL) {
 			ifp->if_ierrors++;
 			goto skip;
@@ -1210,7 +1210,7 @@ nfe_alloc_rx_ring(struct nfe_softc *sc, struct nfe_rx_ring *ring)
 	for (i = 0; i < NFE_RX_RING_COUNT; i++) {
 		data = &sc->rxq.data[i];
 
-		data->m = MCLGETL(NULL, M_DONTWAIT, MCLBYTES);
+		data->m = MCLGET(NULL, M_DONTWAIT);
 		if (data->m == NULL) {
 			printf("%s: could not allocate rx mbuf\n",
 			    sc->sc_dev.dv_xname);
