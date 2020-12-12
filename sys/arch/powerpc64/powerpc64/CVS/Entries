@@ -1,10 +1,8 @@
 /disksubr.c/1.1/Sat May 16 17:11:14 2020//
 /sys_machdep.c/1.1/Sat May 16 17:11:14 2020//
-/autoconf.c/1.7/Sat Dec 12 11:04:08 2020//
 /bus_dma.c/1.2/Fri Dec 11 17:58:22 2020//
 /bus_space.c/1.2/Fri Dec 11 17:58:22 2020//
 /clock.c/1.2/Fri Dec 11 17:58:22 2020//
-/conf.c/1.10/Fri Dec 11 17:58:22 2020//
 /cpu.c/1.20/Fri Dec 11 17:58:22 2020//
 /db_disasm.c/1.3/Fri Dec 11 17:58:22 2020//
 /db_interface.c/1.3/Fri Dec 11 17:58:22 2020//
@@ -13,17 +11,19 @@
 /fpu.c/1.2/Fri Dec 11 17:58:22 2020//
 /genassym.cf/1.13/Fri Dec 11 17:58:22 2020//
 /intr.c/1.9/Fri Dec 11 17:58:22 2020//
-/locore.S/1.41/Fri Dec 11 17:58:22 2020//
 /locore0.S/1.4/Fri Dec 11 17:58:22 2020//
-/machdep.c/1.65/Sat Dec 12 11:04:08 2020//
 /mem.c/1.1/Fri Dec 11 17:58:22 2020//
 /openprom.c/1.2/Fri Dec 11 17:58:22 2020//
-/pmap.c/1.54/Fri Dec 11 17:58:22 2020//
 /process_machdep.c/1.4/Fri Dec 11 17:58:22 2020//
 /softintr.c/1.2/Fri Dec 11 17:58:22 2020//
 /syncicache.c/1.3/Fri Dec 11 17:58:22 2020//
-/syscall.c/1.7/Fri Dec 11 17:58:22 2020//
-/trap.c/1.46/Fri Dec 11 17:58:22 2020//
 /trap_subr.S/1.18/Fri Dec 11 17:58:22 2020//
 /vm_machdep.c/1.5/Fri Dec 11 17:58:22 2020//
+/autoconf.c/1.7/Sat Dec 12 22:29:33 2020//
+/conf.c/1.10/Sat Dec 12 22:29:33 2020//
+/locore.S/1.41/Sat Dec 12 22:29:33 2020//
+/machdep.c/1.65/Sat Dec 12 22:29:33 2020//
+/pmap.c/1.54/Sat Dec 12 22:29:33 2020//
+/syscall.c/1.7/Sat Dec 12 22:29:33 2020//
+/trap.c/1.46/Sat Dec 12 22:29:33 2020//
 D

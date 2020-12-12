@@ -28,9 +28,9 @@ D/man8.octeon////
 D/man8.sgi////
 D/man8.sparc64////
 D/man8.powerpc64////
-/Makefile/1.100/Fri Dec 11 17:58:22 2020//
-/afterboot.8/1.167/Fri Dec 11 17:58:22 2020//
-/daily.8/1.29/Fri Dec 11 17:58:22 2020//
-/diskless.8/1.70/Sat Dec 12 11:06:48 2020//
-/netstart.8/1.25/Sat Dec 12 11:06:48 2020//
 /release.8/1.96/Fri Dec 11 17:58:22 2020//
+/Makefile/1.100/Sat Dec 12 22:29:33 2020//
+/afterboot.8/1.167/Sat Dec 12 22:29:33 2020//
+/daily.8/1.29/Sat Dec 12 22:29:33 2020//
+/diskless.8/1.70/Sat Dec 12 22:29:33 2020//
+/netstart.8/1.25/Sat Dec 12 22:29:33 2020//

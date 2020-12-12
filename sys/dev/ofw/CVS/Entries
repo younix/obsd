@@ -12,9 +12,9 @@
 /ofw_thermal.h/1.2/Thu Jan 23 23:10:04 2020//
 /fdt.c/1.25/Fri Dec 11 17:58:22 2020//
 /fdt.h/1.6/Fri Dec 11 17:58:22 2020//
-/ofw_misc.c/1.27/Sat Dec 12 11:04:10 2020//
-/ofw_misc.h/1.17/Sat Dec 12 11:04:10 2020//
 /ofw_pinctrl.c/1.3/Fri Dec 11 17:58:22 2020//
 /ofw_regulator.c/1.14/Fri Dec 11 17:58:22 2020//
 /openfirm.h/1.16/Fri Dec 11 17:58:22 2020//
+/ofw_misc.c/1.27/Sat Dec 12 22:29:33 2020//
+/ofw_misc.h/1.17/Sat Dec 12 22:29:33 2020//
 D

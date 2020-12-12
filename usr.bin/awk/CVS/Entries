@@ -1,16 +1,16 @@
 D/USD.doc////
-/FIXES/1.39/Sat Dec 12 11:06:56 2020//
 /Makefile/1.18/Fri Dec 11 17:58:24 2020//
-/README.md/1.4/Sat Dec 12 11:06:56 2020//
-/awk.1/1.59/Sat Dec 12 11:06:56 2020//
 /awk.h/1.27/Fri Dec 11 17:58:24 2020//
 /awkgram.y/1.14/Fri Dec 11 17:58:24 2020//
-/b.c/1.35/Sat Dec 12 11:06:56 2020//
-/lex.c/1.27/Sat Dec 12 11:06:56 2020//
-/lib.c/1.42/Sat Dec 12 11:06:56 2020//
-/main.c/1.46/Sat Dec 12 11:06:56 2020//
 /maketab.c/1.20/Fri Dec 11 17:58:24 2020//
-/parse.c/1.13/Sat Dec 12 11:06:56 2020//
-/proto.h/1.20/Sat Dec 12 11:06:56 2020//
-/run.c/1.69/Sat Dec 12 11:06:56 2020//
-/tran.c/1.32/Sat Dec 12 11:06:56 2020//
+/FIXES/1.39/Sat Dec 12 22:29:33 2020//
+/README.md/1.4/Sat Dec 12 22:29:33 2020//
+/awk.1/1.59/Sat Dec 12 22:29:33 2020//
+/b.c/1.35/Sat Dec 12 22:29:33 2020//
+/lex.c/1.27/Sat Dec 12 22:29:33 2020//
+/lib.c/1.42/Sat Dec 12 22:29:33 2020//
+/main.c/1.46/Sat Dec 12 22:29:33 2020//
+/parse.c/1.13/Sat Dec 12 22:29:33 2020//
+/proto.h/1.20/Sat Dec 12 22:29:33 2020//
+/run.c/1.69/Sat Dec 12 22:29:33 2020//
+/tran.c/1.32/Sat Dec 12 22:29:33 2020//

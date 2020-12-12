@@ -29,8 +29,8 @@
 /wsdisplay_compat_usl.c/1.33/Fri Dec 11 17:58:24 2020//
 /wsdisplayvar.h/1.38/Fri Dec 11 17:58:24 2020//
 /wsemulvar.h/1.18/Fri Dec 11 17:58:24 2020//
-/wskbd.c/1.107/Sat Dec 12 11:04:13 2020//
 /wsmouse.c/1.66/Fri Dec 11 17:58:24 2020//
-/wsmux.c/1.52/Sat Dec 12 11:04:13 2020//
 /wstpad.c/1.26/Fri Dec 11 17:58:24 2020//
+/wskbd.c/1.107/Sat Dec 12 22:29:33 2020//
+/wsmux.c/1.52/Sat Dec 12 22:29:33 2020//
 D

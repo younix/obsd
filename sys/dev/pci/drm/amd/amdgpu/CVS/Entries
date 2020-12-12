@@ -63,7 +63,6 @@
 /vega10_ih.h/1.1/Tue May 21 22:40:07 2019//
 /vega10_sdma_pkt_open.h/1.1/Tue May 21 22:40:07 2019//
 /vid.h/1.1/Tue May 21 22:40:07 2019//
-/amdgpu.h/1.3/Fri Dec 11 17:58:22 2020//
 /amdgpu_acp.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_acpi.c/1.3/Fri Dec 11 17:58:22 2020//
 /amdgpu_afmt.c/1.2/Fri Dec 11 17:58:22 2020//
@@ -96,11 +95,9 @@
 /amdgpu_cs.c/1.4/Fri Dec 11 17:58:22 2020//
 /amdgpu_csa.c/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_csa.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_ctx.c/1.3/Fri Dec 11 17:58:22 2020//
 /amdgpu_ctx.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_debugfs.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_debugfs.h/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu_device.c/1.16/Sat Dec 12 11:04:10 2020//
 /amdgpu_devlist.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_df.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_discovery.c/1.1/Fri Dec 11 17:58:22 2020//
@@ -109,13 +106,11 @@
 /amdgpu_display.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dma_buf.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dma_buf.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_doorbell.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dpm.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dpm.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_drv.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_encoders.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_fb.c/1.3/Fri Dec 11 17:58:22 2020//
-/amdgpu_fence.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_gart.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_gart.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_gds.h/1.2/Fri Dec 11 17:58:22 2020//
@@ -139,7 +134,6 @@
 /amdgpu_job.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_jpeg.c/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_jpeg.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_kms.c/1.17/Fri Dec 11 17:58:22 2020//
 /amdgpu_kv_dpm.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_kv_smc.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_mes.h/1.1/Fri Dec 11 17:58:22 2020//
@@ -177,12 +171,10 @@
 /amdgpu_si_dpm.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_si_smc.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_socbb.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_sync.c/1.3/Fri Dec 11 17:58:22 2020//
 /amdgpu_sync.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_test.c/1.3/Fri Dec 11 17:58:22 2020//
 /amdgpu_trace.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_trace_points.c/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu_ttm.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_ttm.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_ucode.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_ucode.h/1.3/Fri Dec 11 17:58:22 2020//
@@ -224,12 +216,10 @@
 /df_v1_7.c/1.2/Fri Dec 11 17:58:22 2020//
 /df_v3_6.c/1.3/Fri Dec 11 17:58:22 2020//
 /df_v3_6.h/1.2/Fri Dec 11 17:58:22 2020//
-/gfx_v10_0.c/1.3/Fri Dec 11 17:58:22 2020//
 /gfx_v10_0.h/1.1/Fri Dec 11 17:58:22 2020//
 /gfx_v6_0.c/1.2/Fri Dec 11 17:58:22 2020//
 /gfx_v7_0.c/1.2/Fri Dec 11 17:58:22 2020//
 /gfx_v8_0.c/1.3/Fri Dec 11 17:58:22 2020//
-/gfx_v9_0.c/1.9/Fri Dec 11 17:58:22 2020//
 /gfx_v9_4.c/1.1/Fri Dec 11 17:58:22 2020//
 /gfx_v9_4.h/1.1/Fri Dec 11 17:58:22 2020//
 /gfxhub_v1_0.c/1.2/Fri Dec 11 17:58:22 2020//
@@ -288,9 +278,7 @@
 /psp_v10_0.c/1.5/Fri Dec 11 17:58:22 2020//
 /psp_v11_0.c/1.1/Fri Dec 11 17:58:22 2020//
 /psp_v11_0.h/1.1/Fri Dec 11 17:58:22 2020//
-/psp_v12_0.c/1.2/Fri Dec 11 17:58:22 2020//
 /psp_v12_0.h/1.1/Fri Dec 11 17:58:22 2020//
-/psp_v3_1.c/1.3/Fri Dec 11 17:58:22 2020//
 /sdma_v2_4.c/1.2/Fri Dec 11 17:58:22 2020//
 /sdma_v3_0.c/1.2/Fri Dec 11 17:58:22 2020//
 /sdma_v4_0.c/1.4/Fri Dec 11 17:58:22 2020//
@@ -327,4 +315,16 @@
 /vega20_reg_init.c/1.2/Fri Dec 11 17:58:22 2020//
 /vi.c/1.2/Fri Dec 11 17:58:22 2020//
 /vi.h/1.2/Fri Dec 11 17:58:22 2020//
+/amdgpu.h/1.3/Sat Dec 12 22:29:33 2020//
+/amdgpu_ctx.c/1.3/Sat Dec 12 22:29:33 2020//
+/amdgpu_device.c/1.16/Sat Dec 12 22:29:33 2020//
+/amdgpu_doorbell.h/1.2/Sat Dec 12 22:29:33 2020//
+/amdgpu_fence.c/1.5/Sat Dec 12 22:29:33 2020//
+/amdgpu_kms.c/1.17/Sat Dec 12 22:29:33 2020//
+/amdgpu_sync.c/1.3/Sat Dec 12 22:29:33 2020//
+/amdgpu_ttm.c/1.5/Sat Dec 12 22:29:33 2020//
+/gfx_v10_0.c/1.3/Sat Dec 12 22:29:33 2020//
+/gfx_v9_0.c/1.9/Sat Dec 12 22:29:33 2020//
+/psp_v12_0.c/1.2/Sat Dec 12 22:29:33 2020//
+/psp_v3_1.c/1.3/Sat Dec 12 22:29:33 2020//
 D

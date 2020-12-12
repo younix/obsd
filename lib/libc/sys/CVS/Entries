@@ -186,14 +186,14 @@
 /Makefile.inc/1.159/Fri Dec 11 17:58:18 2020//
 /acct.2/1.19/Fri Dec 11 17:58:18 2020//
 /adjfreq.2/1.8/Fri Dec 11 17:58:18 2020//
-/clock_gettime.2/1.31/Fri Dec 11 17:58:18 2020//
-/kqueue.2/1.43/Sat Dec 12 11:06:22 2020//
 /microtime.c/1.1/Fri Dec 11 17:58:18 2020//
 /pledge.2/1.60/Fri Dec 11 17:58:18 2020//
 /select.2/1.43/Fri Dec 11 17:58:18 2020//
-/sendsyslog.2/1.12/Sat Dec 12 11:06:22 2020//
 /sysctl.2/1.41/Fri Dec 11 17:58:18 2020//
 /utimes.2/1.28/Fri Dec 11 17:58:18 2020//
 /w_clock_gettime.c/1.1/Fri Dec 11 17:58:18 2020//
 /w_gettimeofday.c/1.1/Fri Dec 11 17:58:18 2020//
+/clock_gettime.2/1.31/Sat Dec 12 22:29:33 2020//
+/kqueue.2/1.43/Sat Dec 12 22:29:33 2020//
+/sendsyslog.2/1.12/Sat Dec 12 22:29:33 2020//
 D
