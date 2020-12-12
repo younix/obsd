@@ -10,12 +10,12 @@
 /sdmmc_scsi.h/1.3/Tue Jul 18 04:10:35 2006//
 /sdmmcdevs/1.8/Fri May 11 17:16:16 2007//
 /sdmmcdevs.h/1.8/Fri May 11 17:16:35 2007//
-/if_bwfm_sdio.c/1.38/Mon Jul 20 09:32:33 2020//
-/sdhc.c/1.69/Sat Sep 26 23:17:55 2020//
-/sdmmc.c/1.58/Sat Sep 26 23:17:55 2020//
-/sdmmc_mem.c/1.35/Sat Sep 26 23:17:55 2020//
-/sdmmcchip.h/1.14/Sat Sep 26 23:17:55 2020//
-/sdmmcreg.h/1.13/Sat Sep 26 23:17:55 2020//
-/sdmmcvar.h/1.34/Sat Sep 26 23:17:55 2020//
-/sdmmc_scsi.c/1.59/Thu Oct 29 07:57:07 2020//
+/if_bwfm_sdio.c/1.38/Fri Dec 11 17:58:24 2020//
+/sdhc.c/1.69/Fri Dec 11 17:58:24 2020//
+/sdmmc.c/1.58/Fri Dec 11 17:58:24 2020//
+/sdmmc_mem.c/1.35/Fri Dec 11 17:58:24 2020//
+/sdmmc_scsi.c/1.59/Fri Dec 11 17:58:24 2020//
+/sdmmcchip.h/1.14/Fri Dec 11 17:58:24 2020//
+/sdmmcreg.h/1.13/Fri Dec 11 17:58:24 2020//
+/sdmmcvar.h/1.34/Fri Dec 11 17:58:24 2020//
 D

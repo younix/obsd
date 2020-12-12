@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.62 2020/10/19 18:54:58 kettenis Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.65 2020/11/08 20:37:24 mpi Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -41,6 +41,7 @@
 #include <uvm/uvm_extern.h>
 
 #include <dev/ofw/fdt.h>
+#include <dev/ofw/openfirm.h>
 #include <dev/cons.h>
 
 #ifdef DDB
@@ -94,11 +95,89 @@ struct fdt_reg initrd_reg;
 void memreg_add(const struct fdt_reg *);
 void memreg_remove(const struct fdt_reg *);
 
+uint8_t *bootmac = NULL;
+
 void parse_bootargs(const char *);
 const char *parse_bootduid(const char *);
+const char *parse_bootmac(const char *);
 
 paddr_t fdt_pa;
 size_t fdt_size;
+
+int stdout_node;
+int stdout_speed;
+
+static int
+atoi(const char *s)
+{
+	int n, neg;
+
+	n = 0;
+	neg = 0;
+
+	while (*s == '-') {
+		s++;
+		neg = !neg;
+	}
+
+	while (*s != '\0') {
+		if (*s < '0' || *s > '9')
+			break;
+
+		n = (10 * n) + (*s - '0');
+		s++;
+	}
+
+	return (neg ? -n : n);
+}
+
+void *
+fdt_find_cons(void)
+{
+	char *alias = "serial0";
+	char buf[128];
+	char *stdout = NULL;
+	char *p;
+	void *node;
+
+	/* First check if "stdout-path" is set. */
+	node = fdt_find_node("/chosen");
+	if (node) {
+		if (fdt_node_property(node, "stdout-path", &stdout) > 0) {
+			if (strchr(stdout, ':') != NULL) {
+				strlcpy(buf, stdout, sizeof(buf));
+				if ((p = strchr(buf, ':')) != NULL) {
+					*p++ = '\0';
+					stdout_speed = atoi(p);
+				}
+				stdout = buf;
+			}
+			if (stdout[0] != '/') {
+				/* It's an alias. */
+				alias = stdout;
+				stdout = NULL;
+			}
+		}
+	}
+
+	/* Perform alias lookup if necessary. */
+	if (stdout == NULL) {
+		node = fdt_find_node("/aliases");
+		if (node)
+			fdt_node_property(node, alias, &stdout);
+	}
+
+	/* Lookup the physical address of the interface. */
+	if (stdout) {
+		node = fdt_find_node(stdout);
+		if (node) {
+			stdout_node = OF_finddevice(stdout);
+			return (node);
+		}
+	}
+
+	return (NULL);
+}
 
 void
 init_powernv(void *fdt, void *tocbase)
@@ -151,6 +230,8 @@ init_powernv(void *fdt, void *tocbase)
 	/* Stash these such that we can remap the FDT later. */
 	fdt_pa = (paddr_t)fdt;
 	fdt_size = fdt_get_size(fdt);
+
+	fdt_find_cons();
 
 	/*
 	 * Initialize all traps with the stub that calls the generic
@@ -688,6 +769,9 @@ parse_bootargs(const char *bootargs)
 	if (strncmp(cp, "bootduid=", strlen("bootduid=")) == 0)
 		cp = parse_bootduid(cp + strlen("bootduid="));
 
+	if (strncmp(cp, "bootmac=", strlen("bootmac=")) == 0)
+		cp = parse_bootmac(cp + strlen("bootmac="));
+
 	while (*cp != '-')
 		if (*cp++ == '\0')
 			return;
@@ -743,6 +827,38 @@ parse_bootduid(const char *bootarg)
 	return bootarg;
 }
 
+const char *
+parse_bootmac(const char *bootarg)
+{
+	static uint8_t lladdr[6];
+	const char *cp = bootarg;
+	int digit, count = 0;
+
+	memset(lladdr, 0, sizeof(lladdr));
+
+	while (count < 12) {
+		if (*cp >= '0' && *cp <= '9')
+			digit = *cp - '0';
+		else if (*cp >= 'a' && *cp <= 'f')
+			digit = *cp - 'a' + 10;
+		else if (*cp == ':') {
+			cp++;
+			continue;
+		} else
+			break;
+		lladdr[count / 2] |= digit << (4 * !(count % 2));
+		count++;
+		cp++;
+	}
+
+	if (count > 0) {
+		bootmac = lladdr;
+		return cp;
+	}
+
+	return bootarg;
+}
+
 #define PSL_USER \
     (PSL_SF | PSL_HV | PSL_EE | PSL_PR | PSL_ME | PSL_IR | PSL_DR | PSL_RI)
 
@@ -771,7 +887,7 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 	pcb->pcb_flags = 0;
 }
 
-void
+int
 sendsig(sig_t catcher, int sig, sigset_t mask, const siginfo_t *ksip)
 {
 	struct proc *p = curproc;
@@ -832,7 +948,7 @@ sendsig(sig_t catcher, int sig, sigset_t mask, const siginfo_t *ksip)
 
 	frame.sf_sc.sc_cookie = (long)&fp->sf_sc ^ p->p_p->ps_sigcookie;
 	if (copyout(&frame, fp, sizeof(frame)))
-		sigexit(p, SIGILL);
+		return 1;
 
 	/*
 	 * Build context to run handler in.
@@ -844,6 +960,8 @@ sendsig(sig_t catcher, int sig, sigset_t mask, const siginfo_t *ksip)
 	tf->fixreg[12] = (register_t)catcher;
 
 	tf->srr0 = p->p_p->ps_sigcode;
+
+	return 0;
 }
 
 int

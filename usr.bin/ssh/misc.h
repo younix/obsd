@@ -1,4 +1,4 @@
-/* $OpenBSD: misc.h,v 1.88 2020/10/03 09:22:26 djm Exp $ */
+/* $OpenBSD: misc.h,v 1.90 2020/11/27 00:49:58 djm Exp $ */
 
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
@@ -53,6 +53,8 @@ void	 set_nodelay(int);
 int	 set_reuseaddr(int);
 char	*get_rdomain(int);
 int	 set_rdomain(int, const char *);
+int	 get_sock_af(int);
+void	 set_sock_tos(int, int);
 int	 waitrfd(int, int *);
 int	 timeout_connect(int, const struct sockaddr *, socklen_t, int *);
 int	 a2port(const char *);
@@ -189,7 +191,8 @@ char	*read_passphrase(const char *, int);
 int	 ask_permission(const char *, ...) __attribute__((format(printf, 1, 2)));
 struct notifier_ctx *notify_start(int, const char *, ...)
 	__attribute__((format(printf, 2, 3)));
-void	notify_complete(struct notifier_ctx *);
+void	notify_complete(struct notifier_ctx *, const char *, ...)
+	__attribute__((format(printf, 2, 3)));
 
 #define MINIMUM(a, b)	(((a) < (b)) ? (a) : (b))
 #define MAXIMUM(a, b)	(((a) > (b)) ? (a) : (b))

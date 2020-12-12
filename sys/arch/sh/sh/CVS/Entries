@@ -15,13 +15,13 @@
 /mmu_sh4.c/1.3/Sat Mar  5 17:16:33 2016//
 /pmap.c/1.28/Wed Oct 19 08:28:20 2016//
 /process_machdep.c/1.4/Sat Jun 26 23:24:44 2010//
-/sh_machdep.c/1.51/Sat May 16 14:44:45 2020//
 /sys_machdep.c/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /vectors.S/1.8/Tue Dec 14 20:24:25 2010//
 /vm_machdep.c/1.15/Thu Aug 17 20:50:51 2017//
-/cpu.c/1.5/Fri Oct  2 17:08:34 2020//
-/locore_c.c/1.13/Fri Oct  2 17:08:34 2020//
-/clock.c/1.11/Thu Oct 29 07:57:04 2020//
-/interrupt.c/1.17/Fri Oct  9 12:00:10 2020//
-/trap.c/1.47/Thu Oct 29 07:57:04 2020//
+/clock.c/1.11/Fri Dec 11 17:58:22 2020//
+/cpu.c/1.5/Fri Dec 11 17:58:22 2020//
+/interrupt.c/1.17/Fri Dec 11 17:58:22 2020//
+/locore_c.c/1.13/Fri Dec 11 17:58:22 2020//
+/sh_machdep.c/1.52/Sat Dec 12 11:04:08 2020//
+/trap.c/1.47/Fri Dec 11 17:58:22 2020//
 D

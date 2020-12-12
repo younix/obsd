@@ -10,17 +10,17 @@ D/dcn10////
 D/diagnostics////
 D/dcn20////
 D/dcn21////
-/ddc_regs.h/1.2/Mon Jul 20 09:32:31 2020//
-/generic_regs.h/1.1/Mon Jul 20 09:32:31 2020//
-/gpio_base.c/1.2/Mon Jul 20 09:32:31 2020//
-/gpio_service.c/1.2/Mon Jul 20 09:32:31 2020//
-/gpio_service.h/1.2/Mon Jul 20 09:32:31 2020//
-/hw_ddc.c/1.2/Mon Jul 20 09:32:31 2020//
-/hw_ddc.h/1.2/Mon Jul 20 09:32:31 2020//
-/hw_factory.c/1.2/Mon Jul 20 09:32:31 2020//
-/hw_factory.h/1.2/Mon Jul 20 09:32:31 2020//
-/hw_generic.c/1.1/Mon Jul 20 09:32:31 2020//
-/hw_generic.h/1.1/Mon Jul 20 09:32:31 2020//
-/hw_hpd.c/1.2/Mon Jul 20 09:32:31 2020//
-/hw_hpd.h/1.2/Mon Jul 20 09:32:31 2020//
-/hw_translate.c/1.2/Mon Jul 20 09:32:31 2020//
+/ddc_regs.h/1.2/Fri Dec 11 17:58:23 2020//
+/generic_regs.h/1.1/Fri Dec 11 17:58:23 2020//
+/gpio_base.c/1.2/Fri Dec 11 17:58:23 2020//
+/gpio_service.c/1.2/Fri Dec 11 17:58:23 2020//
+/gpio_service.h/1.2/Fri Dec 11 17:58:23 2020//
+/hw_ddc.c/1.2/Fri Dec 11 17:58:23 2020//
+/hw_ddc.h/1.2/Fri Dec 11 17:58:23 2020//
+/hw_factory.c/1.2/Fri Dec 11 17:58:23 2020//
+/hw_factory.h/1.2/Fri Dec 11 17:58:23 2020//
+/hw_generic.c/1.1/Fri Dec 11 17:58:23 2020//
+/hw_generic.h/1.1/Fri Dec 11 17:58:23 2020//
+/hw_hpd.c/1.2/Fri Dec 11 17:58:23 2020//
+/hw_hpd.h/1.2/Fri Dec 11 17:58:23 2020//
+/hw_translate.c/1.2/Fri Dec 11 17:58:23 2020//

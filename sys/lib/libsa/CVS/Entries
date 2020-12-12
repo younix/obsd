@@ -75,7 +75,6 @@
 /snprintf.c/1.7/Sat May 11 16:56:47 2019//
 /softraid.c/1.4/Fri Aug 10 16:41:35 2018//
 /softraid.h/1.2/Fri Aug 10 16:41:35 2018//
-/stand.h/1.69/Thu Nov 28 00:17:13 2019//
 /stat.c/1.6/Mon Aug 11 06:23:09 2003//
 /strchr.c/1.5/Fri Jul 13 16:09:49 2012//
 /strcmp.c/1.5/Mon Aug 11 06:23:09 2003//
@@ -92,6 +91,7 @@
 /ufs2.c/1.8/Sat Aug  3 15:22:17 2019//
 /ufs2.h/1.2/Sat Feb 29 07:31:34 2020//
 /write.c/1.6/Mon Aug 11 06:23:09 2003//
-/bcrypt_pbkdf.c/1.2/Mon Jul 20 09:32:33 2020//
-/loadfile_elf.c/1.17/Thu Oct 29 07:57:07 2020//
+/bcrypt_pbkdf.c/1.2/Fri Dec 11 17:58:24 2020//
+/loadfile_elf.c/1.17/Fri Dec 11 17:58:24 2020//
+/stand.h/1.70/Sat Dec 12 11:04:14 2020//
 D

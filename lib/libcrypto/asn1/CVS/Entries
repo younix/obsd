@@ -18,10 +18,7 @@
 /a_utf8.c/1.8/Fri Jul 11 08:44:47 2014//
 /a_verify.c/1.24/Tue May  2 03:59:44 2017//
 /ameth_lib.c/1.21/Sat Nov  2 16:06:25 2019//
-/asn1.h/1.53/Fri Nov 30 04:51:19 2018//
-/asn1_err.c/1.21/Thu Mar 29 02:29:24 2018//
 /asn1_gen.c/1.17/Wed Apr 25 11:48:21 2018//
-/asn1_lib.c/1.44/Sat Nov 17 09:34:11 2018//
 /asn1_locl.h/1.12/Thu Oct 24 16:36:10 2019//
 /asn1_par.c/1.28/Thu Jan  9 11:27:21 2020//
 /asn1t.h/1.15/Tue Aug 20 13:10:09 2019//
@@ -52,8 +49,6 @@
 /t_spki.c/1.11/Fri Jul 11 08:44:47 2014//
 /t_x509.c/1.32/Fri Apr 10 07:05:24 2020//
 /t_x509a.c/1.8/Fri Jul 11 08:44:47 2014//
-/tasn_dec.c/1.37/Mon Apr  1 15:48:04 2019//
-/tasn_enc.c/1.22/Mon Apr  1 15:48:04 2019//
 /tasn_fre.c/1.17/Mon Apr  1 15:48:04 2019//
 /tasn_new.c/1.18/Mon Apr  1 15:48:04 2019//
 /tasn_prn.c/1.21/Tue Mar 24 10:46:38 2020//
@@ -75,6 +70,11 @@
 /x_x509.c/1.26/Sat Feb 17 15:50:42 2018//
 /x_x509a.c/1.15/Tue May  1 19:01:27 2018//
 /x_attrib.c/1.14/Sat Jun  6 11:21:48 2020//
-/a_bitstr.c/1.30/Sat Sep 26 23:17:55 2020//
-/x_info.c/1.18/Sat Sep 26 23:17:55 2020//
+/a_bitstr.c/1.30/Fri Dec 11 17:58:18 2020//
+/asn1.h/1.54/Sat Dec 12 11:06:23 2020//
+/asn1_err.c/1.22/Sat Dec 12 11:06:23 2020//
+/asn1_lib.c/1.45/Sat Dec 12 11:06:23 2020//
+/tasn_dec.c/1.38/Sat Dec 12 11:06:23 2020//
+/tasn_enc.c/1.23/Sat Dec 12 11:06:23 2020//
+/x_info.c/1.18/Fri Dec 11 17:58:18 2020//
 D

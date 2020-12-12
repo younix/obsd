@@ -46,11 +46,11 @@
 /vfp.h/1.4/Mon Jul  2 07:23:37 2018//
 /vmparam.h/1.7/Sat Jun  1 18:38:27 2019//
 /cpu.h/1.18/Sat Jun  6 11:21:49 2020//
-/fdt.h/1.7/Mon Jul 20 09:32:29 2020//
-/intr.h/1.16/Mon Jul 20 09:32:29 2020//
-/pci_machdep.h/1.7/Mon Jul 20 09:32:29 2020//
-/timetc.h/1.2/Mon Jul 20 09:32:29 2020//
-/softintr.h/1.2/Sat Sep 26 23:17:55 2020//
-/armreg.h/1.13/Thu Oct 29 07:57:02 2020//
-/pmap.h/1.14/Thu Oct 29 07:57:02 2020//
+/armreg.h/1.13/Fri Dec 11 17:58:22 2020//
+/fdt.h/1.7/Fri Dec 11 17:58:22 2020//
+/intr.h/1.16/Fri Dec 11 17:58:22 2020//
+/pci_machdep.h/1.7/Fri Dec 11 17:58:22 2020//
+/pmap.h/1.14/Fri Dec 11 17:58:22 2020//
+/softintr.h/1.2/Fri Dec 11 17:58:22 2020//
+/timetc.h/1.2/Fri Dec 11 17:58:22 2020//
 D

@@ -11,7 +11,7 @@
 /getentropy_linux.c/1.47/Sun May 17 14:44:20 2020//
 /getentropy_osx.c/1.13/Sun May 17 14:44:20 2020//
 /getentropy_solaris.c/1.14/Sun May 17 14:44:20 2020//
-/getentropy_win.c/1.5/Sun Aug  7 03:27:21 2016//
-/getentropy_freebsd.c/1.4/Thu Oct 29 07:56:46 2020//
-/getentropy_netbsd.c/1.4/Thu Oct 29 07:56:46 2020//
+/getentropy_freebsd.c/1.4/Fri Dec 11 17:58:18 2020//
+/getentropy_netbsd.c/1.4/Fri Dec 11 17:58:18 2020//
+/getentropy_win.c/1.6/Sat Dec 12 11:06:23 2020//
 D

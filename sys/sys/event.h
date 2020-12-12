@@ -1,4 +1,4 @@
-/*	$OpenBSD: event.h,v 1.46 2020/10/11 07:11:59 mpi Exp $	*/
+/*	$OpenBSD: event.h,v 1.49 2020/12/09 18:58:19 mpi Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
@@ -204,6 +204,9 @@ struct kqueue_scan_state {
 	struct kqueue	*kqs_kq;		/* kqueue of this scan */
 	struct knote	 kqs_start;		/* start marker */
 	struct knote	 kqs_end;		/* end marker */
+	int		 kqs_nevent;		/* number of events collected */
+	int		 kqs_queued;		/* if set, end marker is
+						 * in queue */
 };
 
 struct proc;
@@ -212,6 +215,8 @@ struct timespec;
 extern const struct filterops sig_filtops;
 extern const struct filterops dead_filtops;
 
+extern void	kqpoll_init(void);
+extern void	kqpoll_exit(void);
 extern void	knote(struct klist *list, long hint);
 extern void	knote_activate(struct knote *);
 extern void	knote_remove(struct proc *p, struct knlist *list);
@@ -220,9 +225,10 @@ extern void	knote_processexit(struct proc *);
 extern int	kqueue_register(struct kqueue *kq,
 		    struct kevent *kev, struct proc *p);
 extern int	kqueue_scan(struct kqueue_scan_state *, int, struct kevent *,
-		    struct timespec *, struct kevent *, struct proc *, int *);
+		    struct timespec *, struct proc *, int *);
 extern void	kqueue_scan_setup(struct kqueue_scan_state *, struct kqueue *);
 extern void	kqueue_scan_finish(struct kqueue_scan_state *);
+extern void	kqueue_purge(struct proc *, struct kqueue *);
 extern int	filt_seltrue(struct knote *kn, long hint);
 extern int	seltrue_kqfilter(dev_t, struct knote *);
 extern void	klist_insert(struct klist *, struct knote *);

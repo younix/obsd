@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.332 2020/10/29 02:52:43 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.336 2020/11/13 07:30:44 djm Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -32,6 +32,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <limits.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <string.h>
@@ -222,9 +223,9 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port)
 
 	/* Expand or fill in HostkeyAlgorithms */
 	all_key = sshkey_alg_list(0, 0, 1, ',');
-	if (kex_assemble_names(&options.hostkeyalgorithms,
-	    kex_default_pk_alg(), all_key) != 0)
-		fatal_f("kex_assemble_namelist");
+	if ((r = kex_assemble_names(&options.hostkeyalgorithms,
+	    kex_default_pk_alg(), all_key)) != 0)
+		fatal_fr(r, "kex_assemble_namelist");
 	free(all_key);
 
 	if ((s = kex_names_cat(options.kex_algorithms, "ext-info-c")) == NULL)
@@ -1272,7 +1273,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 	free(prompt);
 	if (pin != NULL)
 		freezero(pin, strlen(pin));
-	notify_complete(notifier);
+	notify_complete(notifier, "User presence confirmed");
 	sshkey_free(prv);
 	return r;
 }
@@ -1879,15 +1880,15 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 {
 	Authctxt *authctxt = ssh->authctxt;
 	char *name = NULL, *inst = NULL, *lang = NULL, *prompt = NULL;
-	char *response = NULL;
+	char *display_prompt = NULL, *response = NULL;
 	u_char echo = 0;
 	u_int num_prompts, i;
 	int r;
 
-	debug2("input_userauth_info_req");
+	debug2_f("entering");
 
 	if (authctxt == NULL)
-		fatal("input_userauth_info_req: no authentication context");
+		fatal_f("no authentication context");
 
 	authctxt->info_req_seen = 1;
 
@@ -1912,17 +1913,22 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 	    (r = sshpkt_put_u32(ssh, num_prompts)) != 0)
 		goto out;
 
-	debug2("input_userauth_info_req: num_prompts %d", num_prompts);
+	debug2_f("num_prompts %d", num_prompts);
 	for (i = 0; i < num_prompts; i++) {
 		if ((r = sshpkt_get_cstring(ssh, &prompt, NULL)) != 0 ||
 		    (r = sshpkt_get_u8(ssh, &echo)) != 0)
 			goto out;
-		response = read_passphrase(prompt, echo ? RP_ECHO : 0);
+		if (asmprintf(&display_prompt, INT_MAX, NULL, "(%s@%s) %s",
+		    authctxt->server_user, options.host_key_alias ?
+		    options.host_key_alias : authctxt->host, prompt) == -1)
+			fatal_f("asmprintf failed");
+		response = read_passphrase(display_prompt, echo ? RP_ECHO : 0);
 		if ((r = sshpkt_put_cstring(ssh, response)) != 0)
 			goto out;
 		freezero(response, strlen(response));
 		free(prompt);
-		response = prompt = NULL;
+		free(display_prompt);
+		display_prompt = response = prompt = NULL;
 	}
 	/* done with parsing incoming message. */
 	if ((r = sshpkt_get_end(ssh)) != 0 ||
@@ -1933,6 +1939,7 @@ input_userauth_info_req(int type, u_int32_t seq, struct ssh *ssh)
 	if (response)
 		freezero(response, strlen(response));
 	free(prompt);
+	free(display_prompt);
 	free(name);
 	free(inst);
 	free(lang);

@@ -1,4 +1,4 @@
-/* $OpenBSD: format.c,v 1.264 2020/10/06 07:36:42 nicm Exp $ */
+/* $OpenBSD: format.c,v 1.267 2020/12/01 08:12:58 nicm Exp $ */
 
 /*
  * Copyright (c) 2011 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -98,6 +98,8 @@ format_job_cmp(struct format_job *fj1, struct format_job *fj2)
 #define FORMAT_PANES 0x200
 #define FORMAT_PRETTY 0x400
 #define FORMAT_LENGTH 0x800
+#define FORMAT_WIDTH 0x1000
+#define FORMAT_ESCAPE 0x2000
 
 /* Limit on recursion. */
 #define FORMAT_LOOP_LIMIT 10
@@ -1393,6 +1395,23 @@ format_quote(const char *s)
 	return (out);
 }
 
+/* Escape #s in string. */
+static char *
+format_escape(const char *s)
+{
+	const char	*cp;
+	char		*out, *at;
+
+	at = out = xmalloc(strlen(s) * 2 + 1);
+	for (cp = s; *cp != '\0'; cp++) {
+		if (*cp == '#')
+			*at++ = '#';
+		*at++ = *cp;
+	}
+	*at = '\0';
+	return (out);
+}
+
 /* Make a prettier time. */
 static char *
 format_pretty_time(time_t t)
@@ -1538,6 +1557,11 @@ found:
 		found = xstrdup(format_quote(saved));
 		free(saved);
 	}
+	if (modifiers & FORMAT_ESCAPE) {
+		saved = found;
+		found = xstrdup(format_escape(saved));
+		free(saved);
+	}
 	return (found);
 }
 
@@ -1671,7 +1695,7 @@ format_build_modifiers(struct format_expand_state *es, const char **s,
 
 	/*
 	 * Modifiers are a ; separated list of the forms:
-	 *      l,m,C,b,d,n,t,q,E,T,S,W,P,<,>
+	 *      l,m,C,b,d,n,t,w,q,E,T,S,W,P,<,>
 	 *	=a
 	 *	=/a
 	 *      =/a/
@@ -1688,7 +1712,7 @@ format_build_modifiers(struct format_expand_state *es, const char **s,
 			cp++;
 
 		/* Check single character modifiers with no arguments. */
-		if (strchr("lbdnqETSWP<>", cp[0]) != NULL &&
+		if (strchr("lbdnwETSWP<>", cp[0]) != NULL &&
 		    format_is_end(cp[1])) {
 			format_add_modifier(&list, count, cp, 1, NULL, 0);
 			cp++;
@@ -1709,7 +1733,7 @@ format_build_modifiers(struct format_expand_state *es, const char **s,
 		}
 
 		/* Now try single character with arguments. */
-		if (strchr("mCst=pe", cp[0]) == NULL)
+		if (strchr("mCst=peq", cp[0]) == NULL)
 			break;
 		c = cp[0];
 
@@ -1984,7 +2008,17 @@ format_replace_expression(struct format_modifier *mexp,
 	int			 use_fp = 0;
 	u_int			 prec = 0;
 	double			 mleft, mright, result;
-	enum { ADD, SUBTRACT, MULTIPLY, DIVIDE, MODULUS } operator;
+	enum { ADD,
+	       SUBTRACT,
+	       MULTIPLY,
+	       DIVIDE,
+	       MODULUS,
+	       EQUAL,
+	       NOT_EQUAL,
+	       GREATER_THAN,
+	       GREATER_THAN_EQUAL,
+	       LESS_THAN,
+	       LESS_THAN_EQUAL } operator;
 
 	if (strcmp(mexp->argv[0], "+") == 0)
 		operator = ADD;
@@ -1997,6 +2031,18 @@ format_replace_expression(struct format_modifier *mexp,
 	else if (strcmp(mexp->argv[0], "%") == 0 ||
 	    strcmp(mexp->argv[0], "m") == 0)
 		operator = MODULUS;
+	else if (strcmp(mexp->argv[0], "==") == 0)
+		operator = EQUAL;
+	else if (strcmp(mexp->argv[0], "!=") == 0)
+		operator = NOT_EQUAL;
+	else if (strcmp(mexp->argv[0], ">") == 0)
+		operator = GREATER_THAN;
+	else if (strcmp(mexp->argv[0], "<") == 0)
+		operator = LESS_THAN;
+	else if (strcmp(mexp->argv[0], ">=") == 0)
+		operator = GREATER_THAN_EQUAL;
+	else if (strcmp(mexp->argv[0], "<=") == 0)
+		operator = LESS_THAN_EQUAL;
 	else {
 		format_log(es, "expression has no valid operator: '%s'",
 		    mexp->argv[0]);
@@ -2058,6 +2104,24 @@ format_replace_expression(struct format_modifier *mexp,
 		break;
 	case MODULUS:
 		result = fmod(mleft, mright);
+		break;
+	case EQUAL:
+		result = fabs(mleft - mright) < 1e-9;
+		break;
+	case NOT_EQUAL:
+		result = fabs(mleft - mright) > 1e-9;
+		break;
+	case GREATER_THAN:
+		result = (mleft > mright);
+		break;
+	case GREATER_THAN_EQUAL:
+		result = (mleft >= mright);
+		break;
+	case LESS_THAN:
+		result = (mleft < mright);
+		break;
+	case LESS_THAN_EQUAL:
+		result = (mleft > mright);
 		break;
 	}
 	if (use_fp)
@@ -2144,6 +2208,9 @@ format_replace(struct format_expand_state *es, const char *key, size_t keylen,
 				if (errptr != NULL)
 					width = 0;
 				break;
+			case 'w':
+				modifiers |= FORMAT_WIDTH;
+				break;
 			case 'e':
 				if (fm->argc < 1 || fm->argc > 3)
 					break;
@@ -2172,7 +2239,10 @@ format_replace(struct format_expand_state *es, const char *key, size_t keylen,
 					time_format = format_strip(fm->argv[1]);
 				break;
 			case 'q':
-				modifiers |= FORMAT_QUOTE;
+				if (fm->argc < 1)
+					modifiers |= FORMAT_QUOTE;
+				else if (strchr(fm->argv[0], 'e') != NULL)
+					modifiers |= FORMAT_ESCAPE;
 				break;
 			case 'E':
 				modifiers |= FORMAT_EXPAND;
@@ -2416,12 +2486,18 @@ done:
 		format_log(es, "applied padding width %d: %s", width, value);
 	}
 
-	/* Replace with the length if needed. */
+	/* Replace with the length or width if needed. */
 	if (modifiers & FORMAT_LENGTH) {
 		xasprintf(&new, "%zu", strlen(value));
 		free(value);
 		value = new;
 		format_log(es, "replacing with length: %s", new);
+	}
+	if (modifiers & FORMAT_WIDTH) {
+		xasprintf(&new, "%u", format_width(value));
+		free(value);
+		value = new;
+		format_log(es, "replacing with width: %s", new);
 	}
 
 	/* Expand the buffer and copy in the value. */
@@ -2549,8 +2625,30 @@ format_expand1(struct format_expand_state *es, const char *fmt)
 				break;
 			fmt += n + 1;
 			continue;
-		case '}':
 		case '#':
+			/*
+			 * If ##[ (with two or more #s), then it is a style and
+			 * can be left for format_draw to handle.
+			 */
+			ptr = fmt;
+			n = 2;
+			while (*ptr == '#') {
+				ptr++;
+				n++;
+			}
+			if (*ptr == '[') {
+				format_log(es, "found #*%zu[", n);
+				while (len - off < n + 2) {
+					buf = xreallocarray(buf, 2, len);
+					len *= 2;
+				}
+				memcpy(buf + off, fmt - 2, n + 1);
+				off += n + 1;
+				fmt = ptr + 1;
+				continue;
+			}
+			/* FALLTHROUGH */
+		case '}':
 		case ',':
 			format_log(es, "found #%c", ch);
 			while (len - off < 2) {

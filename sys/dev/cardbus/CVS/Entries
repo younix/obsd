@@ -25,6 +25,6 @@
 /rbus.c/1.16/Wed Sep 22 02:28:37 2010//
 /rbus.h/1.10/Wed Sep 22 02:28:37 2010//
 /uhci_cardbus.c/1.15/Sat Mar 14 03:38:47 2015//
-/if_re_cardbus.c/1.29/Mon Jul 20 09:32:29 2020//
-/if_rl_cardbus.c/1.31/Mon Jul 20 09:32:29 2020//
+/if_re_cardbus.c/1.29/Fri Dec 11 17:58:22 2020//
+/if_rl_cardbus.c/1.31/Fri Dec 11 17:58:22 2020//
 D

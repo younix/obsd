@@ -1,9 +1,9 @@
 /disklabel.5/1.22/Thu Sep 10 17:55:21 2015//
 /disklabel.8/1.140/Thu Apr 23 21:28:08 2020//
-/disklabel.c/1.235/Fri Jun 28 13:32:43 2019//
 /dkcksum.c/1.8/Tue Oct 27 23:59:32 2009//
 /editor.c/1.363/Tue Nov 19 06:20:37 2019//
 /extern.h/1.32/Sun Mar 31 02:27:28 2019//
 /pathnames.h/1.7/Mon Jun  2 20:06:14 2003//
-/Makefile/1.68/Fri Jul 24 10:26:28 2020//
+/Makefile/1.68/Fri Dec 11 17:58:22 2020//
+/disklabel.c/1.236/Sat Dec 12 11:06:46 2020//
 D

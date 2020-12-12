@@ -1,4 +1,4 @@
-/*	$OpenBSD: drm_linux.c,v 1.65 2020/10/17 15:10:54 semarie Exp $	*/
+/*	$OpenBSD: drm_linux.c,v 1.71 2020/12/10 12:24:06 jsg Exp $	*/
 /*
  * Copyright (c) 2013 Jonathan Gray <jsg@openbsd.org>
  * Copyright (c) 2015, 2016 Mark Kettenis <kettenis@openbsd.org>
@@ -68,6 +68,11 @@ tasklet_run(void *arg)
 	}
 }
 
+/* 32 bit powerpc lacks 64 bit atomics */
+#if defined(__powerpc__) && !defined(__powerpc64__)
+struct mutex atomic64_mtx = MUTEX_INITIALIZER(IPL_HIGH);
+#endif
+
 struct mutex sch_mtx = MUTEX_INITIALIZER(IPL_SCHED);
 volatile struct proc *sch_proc;
 volatile void *sch_ident;
@@ -104,7 +109,7 @@ long
 schedule_timeout(long timeout)
 {
 	struct sleep_state sls;
-	long deadline;
+	unsigned long deadline;
 	int wait, spl;
 
 	MUTEX_ASSERT_LOCKED(&sch_mtx);
@@ -123,10 +128,10 @@ schedule_timeout(long timeout)
 	sleep_setup_signal(&sls);
 
 	if (timeout != MAX_SCHEDULE_TIMEOUT)
-		deadline = ticks + timeout;
+		deadline = jiffies + timeout;
 	sleep_finish_all(&sls, wait);
 	if (timeout != MAX_SCHEDULE_TIMEOUT)
-		timeout = deadline - ticks;
+		timeout = deadline - jiffies;
 
 	mtx_enter(&sch_mtx);
 	MUTEX_OLDIPL(&sch_mtx) = spl;
@@ -559,7 +564,7 @@ memchr_inv(const void *s, int c, size_t n)
 		do {
 			if (*p++ != (unsigned char)c)
 				return ((void *)(p - 1));
-		}while (--n != 0);
+		} while (--n != 0);
 	}
 	return (NULL);
 }
@@ -592,13 +597,6 @@ struct idr_entry *idr_entry_cache;
 void
 idr_init(struct idr *idr)
 {
-	static int initialized;
-
-	if (!initialized) {
-		pool_init(&idr_pool, sizeof(struct idr_entry), 0, IPL_TTY, 0,
-		    "idrpl", NULL);
-		initialized = 1;
-	}
 	SPLAY_INIT(&idr->tree);
 }
 
@@ -625,8 +623,7 @@ idr_preload(unsigned int gfp_mask)
 }
 
 int
-idr_alloc(struct idr *idr, void *ptr, int start, int end,
-    unsigned int gfp_mask)
+idr_alloc(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask)
 {
 	int flags = (gfp_mask & GFP_NOWAIT) ? PR_NOWAIT : PR_WAITOK;
 	struct idr_entry *id;
@@ -652,8 +649,10 @@ idr_alloc(struct idr *idr, void *ptr, int start, int end,
 	id->id = begin = start;
 #endif
 	while (SPLAY_INSERT(idr_tree, &idr->tree, id)) {
-		if (++id->id == end)
+		if (id->id == end)
 			id->id = start;
+		else
+			id->id++;
 		if (id->id == begin) {
 			pool_put(&idr_pool, id);
 			return -ENOSPC;
@@ -664,7 +663,7 @@ idr_alloc(struct idr *idr, void *ptr, int start, int end,
 }
 
 void *
-idr_replace(struct idr *idr, void *ptr, int id)
+idr_replace(struct idr *idr, void *ptr, unsigned long id)
 {
 	struct idr_entry find, *res;
 	void *old;
@@ -679,7 +678,7 @@ idr_replace(struct idr *idr, void *ptr, int id)
 }
 
 void *
-idr_remove(struct idr *idr, int id)
+idr_remove(struct idr *idr, unsigned long id)
 {
 	struct idr_entry find, *res;
 	void *ptr = NULL;
@@ -695,7 +694,7 @@ idr_remove(struct idr *idr, int id)
 }
 
 void *
-idr_find(struct idr *idr, int id)
+idr_find(struct idr *idr, unsigned long id)
 {
 	struct idr_entry find, *res;
 
@@ -747,38 +746,26 @@ SPLAY_GENERATE(idr_tree, idr_entry, entry, idr_cmp);
 void
 ida_init(struct ida *ida)
 {
-	ida->counter = 0;
+	idr_init(&ida->idr);
 }
 
 void
 ida_destroy(struct ida *ida)
 {
-}
-
-void
-ida_remove(struct ida *ida, int id)
-{
+	idr_destroy(&ida->idr);
 }
 
 int
 ida_simple_get(struct ida *ida, unsigned int start, unsigned int end,
-    int flags)
+    gfp_t gfp_mask)
 {
-	if (end <= 0)
-		end = INT_MAX;
-
-	if (start > ida->counter)
-		ida->counter = start;
-
-	if (ida->counter >= end)
-		return -ENOSPC;
-
-	return ida->counter++;
+	return idr_alloc(&ida->idr, NULL, start, end, gfp_mask);
 }
 
 void
-ida_simple_remove(struct ida *ida, int id)
+ida_simple_remove(struct ida *ida, unsigned int id)
 {
+	idr_remove(&ida->idr, id);
 }
 
 int
@@ -833,8 +820,10 @@ xa_alloc(struct xarray *xa, u32 *id, void *entry, int limit, gfp_t gfp)
 	xid->id = begin = start;
 
 	while (SPLAY_INSERT(xarray_tree, &xa->xa_tree, xid)) {
-		if (++xid->id == limit)
+		if (xid->id == limit)
 			xid->id = start;
+		else
+			xid->id++;
 		if (xid->id == begin) {
 			pool_put(&xa_pool, xid);
 			return -EBUSY;
@@ -1939,28 +1928,35 @@ struct taskq *taskletq;
 void
 drm_linux_init(void)
 {
-	if (system_wq == NULL) {
-		system_wq = (struct workqueue_struct *)
-		    taskq_create("drmwq", 4, IPL_HIGH, 0);
-	}
-	if (system_highpri_wq == NULL) {
-		system_highpri_wq = (struct workqueue_struct *)
-		    taskq_create("drmhpwq", 4, IPL_HIGH, 0);
-	}
-	if (system_unbound_wq == NULL) {
-		system_unbound_wq = (struct workqueue_struct *)
-		    taskq_create("drmubwq", 4, IPL_HIGH, 0);
-	}
-	if (system_long_wq == NULL) {
-		system_long_wq = (struct workqueue_struct *)
-		    taskq_create("drmlwq", 4, IPL_HIGH, 0);
-	}
+	system_wq = (struct workqueue_struct *)
+	    taskq_create("drmwq", 4, IPL_HIGH, 0);
+	system_highpri_wq = (struct workqueue_struct *)
+	    taskq_create("drmhpwq", 4, IPL_HIGH, 0);
+	system_unbound_wq = (struct workqueue_struct *)
+	    taskq_create("drmubwq", 4, IPL_HIGH, 0);
+	system_long_wq = (struct workqueue_struct *)
+	    taskq_create("drmlwq", 4, IPL_HIGH, 0);
 
-	if (taskletq == NULL)
-		taskletq = taskq_create("drmtskl", 1, IPL_HIGH, 0);
+	taskletq = taskq_create("drmtskl", 1, IPL_HIGH, 0);
 
 	init_waitqueue_head(&bit_waitq);
 	init_waitqueue_head(&var_waitq);
+
+	pool_init(&idr_pool, sizeof(struct idr_entry), 0, IPL_TTY, 0,
+	    "idrpl", NULL);
+}
+
+void
+drm_linux_exit(void)
+{
+	pool_destroy(&idr_pool);
+
+	taskq_destroy(taskletq);
+
+	taskq_destroy((struct taskq *)system_long_wq);
+	taskq_destroy((struct taskq *)system_unbound_wq);
+	taskq_destroy((struct taskq *)system_highpri_wq);
+	taskq_destroy((struct taskq *)system_wq);
 }
 
 #define PCIE_ECAP_RESIZE_BAR	0x15
