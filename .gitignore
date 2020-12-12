@@ -2,4 +2,5 @@ obj
 *.swp
 tags
 *.orig
+*.rej
 .#*
