@@ -422,7 +422,7 @@ mpi*	at pci?				# LSI Logic Message Passing Interface
 mpii*	at pci?				# LSI Message Passing Interface II
 gdt*	at pci?				# ICP Vortex GDT RAID controllers
 twe*	at pci?				# 3ware Escalade RAID controllers
-#aac*	at pci?				# Adaptec FSA RAID controllers
+aac*	at pci?				# Adaptec FSA RAID controllers
 ami*	at pci?				# AMI MegaRAID controllers
 mfi*	at pci?				# LSI MegaRAID SAS controllers
 mfii*	at pci?				# LSI MegaRAID SAS Fusion controllers
