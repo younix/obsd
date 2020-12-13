@@ -916,8 +916,8 @@
 	{ MIBDECL(ifHCOutBroadcastPkts) },		\
 	{ MIBDECL(ifLinkUpDownTrapEnable) },		\
 	{ MIBDECL(ifHighSpeed) },			\
-	{ MIBDECL(ifPromiscuousMode) },			\
-	{ MIBDECL(ifConnectorPresent) },		\
+	{ MIBDECL(ifPromiscuousMode), "TruthValue" },	\
+	{ MIBDECL(ifConnectorPresent), "TruthValue" },	\
 	{ MIBDECL(ifAlias) },				\
 	{ MIBDECL(ifCounterDiscontinuityTime) },	\
 	{ MIBDECL(ifStackTable) },			\
