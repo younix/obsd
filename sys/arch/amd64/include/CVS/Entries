@@ -71,8 +71,8 @@
 /specialreg.h/1.88/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.2/Fri Dec 11 17:58:22 2020//
 /bus.h/1.35/Sat Dec 12 22:29:33 2020//
-/frameasm.h/1.25/Sat Dec 12 22:29:33 2020//
 /pci_machdep.h/1.30/Sat Dec 12 22:29:33 2020//
 /setjmp.h/1.2/Sat Dec 12 22:29:33 2020//
-/trap.h/1.4/Sat Dec 12 22:29:33 2020//
+/frameasm.h/1.25/Sat Dec 12 23:14:52 2020//
+/trap.h/1.4/Sat Dec 12 23:14:52 2020//
 D

@@ -56,7 +56,6 @@
 /curs_util.3/1.6/Tue Jan 12 23:21:59 2010//
 /curs_window.3/1.10/Tue Jan 12 23:21:59 2010//
 /curses.3/1.5/Wed Feb 13 07:18:57 2019//
-/curses.h/1.61/Mon Sep  6 17:26:17 2010//
 /curses.priv.h/1.34/Mon Sep  6 17:26:17 2010//
 /default_colors.3/1.2/Tue Jan 12 23:21:59 2010//
 /define_key.3/1.5/Tue Jan 12 23:21:59 2010//
@@ -76,10 +75,8 @@
 /shlib_version/1.22/Wed Nov 14 20:43:48 2018//
 /term.5/1.1/Wed Feb 13 07:18:57 2019//
 /term.7/1.9/Thu Dec  3 11:29:55 2015//
-/term.h/1.15/Sat Nov 14 23:56:49 2015//
 /term_entry.h/1.12/Tue Jan 12 23:21:59 2010//
 /termcap.3/1.9/Tue Dec 10 20:33:51 2013//
-/termcap.h/1.10/Tue Dec 10 20:33:51 2013//
 /terminfo.3/1.10/Tue Jan 12 23:21:59 2010//
 /terminfo.5/1.1/Wed Feb 13 07:18:57 2019//
 /tic.h/1.14/Tue Jan 12 23:21:59 2010//
@@ -91,3 +88,6 @@ D/trace////
 D/tty////
 D/widechar////
 /nc_tparm.h/1.2/Sat Jun  6 11:21:49 2020//
+/curses.h/1.62/Tue Dec 15 20:07:07 2020//
+/term.h/1.16/Tue Dec 15 20:07:07 2020//
+/termcap.h/1.11/Tue Dec 15 20:07:07 2020//

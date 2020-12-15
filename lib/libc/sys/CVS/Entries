@@ -194,6 +194,6 @@
 /w_clock_gettime.c/1.1/Fri Dec 11 17:58:18 2020//
 /w_gettimeofday.c/1.1/Fri Dec 11 17:58:18 2020//
 /clock_gettime.2/1.31/Sat Dec 12 22:29:33 2020//
-/kqueue.2/1.43/Sat Dec 12 22:29:33 2020//
-/sendsyslog.2/1.12/Sat Dec 12 22:29:33 2020//
+/kqueue.2/1.43/Sat Dec 12 23:14:52 2020//
+/sendsyslog.2/1.12/Sat Dec 12 23:14:52 2020//
 D
