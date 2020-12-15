@@ -2,6 +2,7 @@
 
 daemon="/usr/bin/tcpbench"
 daemon_flags="-s"
+daemon_user=_tcpbench
 
 . /etc/rc.d/rc.subr
 

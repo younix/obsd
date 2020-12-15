@@ -79,6 +79,7 @@ _ftp_proxy: /dev/null
 _sndiop: /dev/null
 _syspatch: /dev/null
 _slaacd: /dev/null
+_tcpbench: /dev/null
 sshd:   /dev/null
 
 # Well-known aliases -- these should be filled in!
