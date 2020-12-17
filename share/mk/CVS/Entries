@@ -6,7 +6,6 @@
 /bsd.port.arch.mk/1.1/Sat Sep 24 07:26:01 2011//
 /bsd.port.mk/1.95/Sat Sep 24 07:26:01 2011//
 /bsd.port.subdir.mk/1.9/Sat Sep 24 07:26:01 2011//
-/bsd.regress.mk/1.21/Mon Jun 17 17:20:24 2019//
 /bsd.subdir.mk/1.22/Sat Oct  8 09:43:46 2016//
 /bsd.sys.mk/1.13/Sun Jul  9 14:04:50 2017//
 /bsd.xconf.mk/1.1/Tue Mar 25 23:35:56 2008//
@@ -15,4 +14,5 @@
 /bsd.own.mk/1.204/Fri Dec 11 17:58:22 2020//
 /bsd.prog.mk/1.82/Fri Dec 11 17:58:22 2020//
 /sys.mk/1.88/Fri Dec 11 17:58:22 2020//
+/bsd.regress.mk/1.23/Thu Dec 17 19:15:47 2020//
 D

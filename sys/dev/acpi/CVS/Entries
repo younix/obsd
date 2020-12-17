@@ -7,18 +7,14 @@
 /acpidock.c/1.44/Sat Mar 14 03:38:46 2015//
 /acpimadt.c/1.37/Fri Jun 29 17:39:18 2018//
 /acpimcfg.c/1.4/Sun Aug 19 08:23:47 2018//
-/acpiprt.c/1.49/Sat Apr 11 11:01:18 2020//
-/acpipwrres.c/1.8/Mon Apr  6 00:01:08 2020//
 /acpisony.c/1.8/Mon Apr  6 00:01:08 2020//
 /acpisurface.c/1.1/Sat Jun 30 18:15:12 2018//
 /acpithinkpad.c/1.68/Tue Dec 31 01:38:33 2019//
 /acpitoshiba.c/1.13/Mon Mar 16 08:51:48 2020//
-/acpitz.c/1.54/Fri Jun 29 17:39:18 2018//
 /acpivideo.c/1.13/Mon Apr  6 00:01:08 2020//
 /ahci_acpi.c/1.3/Fri May  8 11:18:01 2020//
 /amltypes.h/1.48/Thu Jan 10 18:50:32 2019//
 /aplgpio.c/1.2/Fri May 22 10:16:37 2020//
-/atk0110.c/1.15/Fri Jun 29 17:39:18 2018//
 /bytgpio.c/1.14/Fri May 22 10:16:37 2020//
 /ccp_acpi.c/1.2/Fri May  8 11:18:01 2020//
 /ccpmic.c/1.2/Mon May 21 15:00:25 2018//
@@ -49,13 +45,11 @@
 /acpiutil.c/1.9/Fri Dec 11 17:58:22 2020//
 /acpivout.c/1.24/Fri Dec 11 17:58:22 2020//
 /amdgpio.c/1.4/Fri Dec 11 17:58:22 2020//
-/dsdt.c/1.256/Fri Dec 11 17:58:22 2020//
 /dsdt.h/1.78/Fri Dec 11 17:58:22 2020//
 /dwiic_acpi.c/1.16/Fri Dec 11 17:58:22 2020//
 /abl.c/1.3/Sat Dec 12 22:29:33 2020//
 /acpidmar.h/1.1/Sat Dec 12 22:29:33 2020//
 /amd_iommu.h/1.1/Sat Dec 12 22:29:33 2020//
-/acpi.c/1.392/Sat Dec 12 23:14:52 2020//
 /acpidmar.c/1.2/Sat Dec 12 23:14:52 2020//
 /acpige.c/1.1/Sat Dec 12 23:14:52 2020//
 /acpivar.h/1.113/Sat Dec 12 23:14:52 2020//
@@ -64,4 +58,10 @@
 /files.acpi/1.62/Sat Dec 12 23:14:52 2020//
 /imxiic_acpi.c/1.1/Sat Dec 12 23:14:52 2020//
 /pchgpio.c/1.1/Sat Dec 12 23:14:52 2020//
+/acpi.c/1.393/Thu Dec 17 19:15:51 2020//
+/acpiprt.c/1.50/Thu Dec 17 19:15:51 2020//
+/acpipwrres.c/1.9/Thu Dec 17 19:15:51 2020//
+/acpitz.c/1.55/Thu Dec 17 19:15:51 2020//
+/atk0110.c/1.16/Thu Dec 17 19:15:51 2020//
+/dsdt.c/1.257/Thu Dec 17 19:15:51 2020//
 D

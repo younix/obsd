@@ -22,7 +22,6 @@
 /rndis.h/1.2/Tue Sep 20 10:34:41 2016//
 /softraid_concat.c/1.27/Sat Apr 25 14:37:43 2020//
 /softraid_raid0.c/1.53/Wed Mar 25 21:29:04 2020//
-/softraid_raid5.c/1.30/Thu Mar 26 11:28:23 2020//
 /softraid_raid6.c/1.71/Tue Apr 12 16:26:54 2016//
 /spdmem.c/1.7/Sat Dec 21 12:33:03 2019//
 /spdmemvar.h/1.1/Mon Mar 22 21:20:56 2010//
@@ -74,6 +73,7 @@ D/x86emu////
 /softraidvar.h/1.171/Fri Dec 11 17:58:24 2020//
 /vscsi.c/1.57/Fri Dec 11 17:58:24 2020//
 /kcov.c/1.36/Sat Dec 12 22:29:33 2020//
-/softraid.c/1.416/Sat Dec 12 22:29:33 2020//
 /ipmi.c/1.114/Sat Dec 12 23:14:53 2020//
 /softraid_raid1.c/1.66/Sat Dec 12 23:14:53 2020//
+/softraid.c/1.417/Thu Dec 17 19:15:51 2020//
+/softraid_raid5.c/1.31/Thu Dec 17 19:15:51 2020//
