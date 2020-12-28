@@ -96,8 +96,8 @@
  */
 #define CY_PORT(x) (minor(x) & 0xf)
 #define CY_CARD(x) ((minor(x) >> 5) & 3)
-#define CY_DIALOUT(x) ((minor(x) & 0x80) != 0)
-#define CY_DIALIN(x) (!CY_DIALOUT(x))
+//#define CY_DIALOUT(x) ((minor(x) & 0x80) != 0)
+//#define CY_DIALIN(x) (!CY_DIALOUT(x))
 
 /*
  * read/write cd1400 registers (when cy_port-structure is available)

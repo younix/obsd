@@ -299,6 +299,7 @@ cyopen(dev, flag, mode, p)
 		tp->t_iflag = TTYDEF_IFLAG;
 		tp->t_oflag = TTYDEF_OFLAG;
 		tp->t_cflag = TTYDEF_CFLAG;
+		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 		if (ISSET(cy->cy_openflags, TIOCFLAG_CLOCAL))
 			SET(tp->t_cflag, CLOCAL);
 		if (ISSET(cy->cy_openflags, TIOCFLAG_CRTSCTS))
@@ -306,9 +307,12 @@ cyopen(dev, flag, mode, p)
 		if (ISSET(cy->cy_openflags, TIOCFLAG_MDMBUF))
 			SET(tp->t_cflag, MDMBUF);
 		tp->t_lflag = TTYDEF_LFLAG;
-		tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 
 		s = spltty();
+
+		/* this sets parameters and raises DTR */
+		cyparam(tp, &tp->t_termios);
+		ttsetwater(tp);
 
 		/*
 		 * Allocate input ring buffer if we don't already have one
@@ -348,20 +352,30 @@ cyopen(dev, flag, mode, p)
 		/* raise RTS too */
 		cy_modem_control(cy, TIOCM_RTS, DMBIS);
 
+printf("%s %s:%d %x\n", sc->sc_dev.dv_xname, __func__, __LINE__, cy->cy_carrier_stat);
 		cy->cy_carrier_stat = cd_read_reg(cy, CD1400_MSVR2);
 
+printf("%s %s:%d %d, %d, %d, %d\n", sc->sc_dev.dv_xname, __func__, __LINE__,
+    DEVCUA(dev),
+    ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR),
+    ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD),
+    ISSET(tp->t_cflag, MDMBUF));
 		/* enable receiver and modem change interrupts */
 		cd_write_reg(cy, CD1400_SRER,
 		    CD1400_SRER_MDMCH | CD1400_SRER_RXDATA);
 
-		if (CY_DIALOUT(dev) ||
+		if (DEVCUA(dev) ||
 		    ISSET(cy->cy_openflags, TIOCFLAG_SOFTCAR) ||
 		    ISSET(tp->t_cflag, MDMBUF) ||
-		    ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD))
+		    ISSET(cy->cy_carrier_stat, CD1400_MSVR2_CD)) {
+printf("%s %s:%d set carrier on\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			SET(tp->t_state, TS_CARR_ON);
-		else
+		} else {
+printf("%s %s:%d clear carrier\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			CLR(tp->t_state, TS_CARR_ON);
+		}
 	} else if (ISSET(tp->t_state, TS_XCLUDE) && suser(p) != 0) {
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 		return (EBUSY);
 	} else {
 		s = spltty();
@@ -371,6 +385,7 @@ cyopen(dev, flag, mode, p)
 		if (ISSET(tp->t_state, TS_ISOPEN)) {
 			/* Ah, but someone already is dialed in... */
 			splx(s);
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 			return EBUSY;
 		}
 		cy->cy_cua = 1;
@@ -381,6 +396,7 @@ cyopen(dev, flag, mode, p)
 			if (cy->cy_cua) {
 				/* Opening TTY non-blocking... but the CUA is busy. */
 				splx(s);
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
@@ -388,11 +404,15 @@ cyopen(dev, flag, mode, p)
 			    (!ISSET(tp->t_cflag, CLOCAL) &&
 			    !ISSET(tp->t_state, TS_CARR_ON))) {
 				SET(tp->t_state, TS_WOPEN);
-				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
-				    "cydcd");
+
+printf("%s %s:%d enter ttysleep\n", sc->sc_dev.dv_xname, __func__, __LINE__);
+//				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
+//				    "cydcd");
+printf("%s %s:%d exit ttysleep\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				if (error != 0 && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
 					splx(s);
+printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 					return (error);
 				}
 			}
@@ -400,6 +420,7 @@ cyopen(dev, flag, mode, p)
 	}
 	splx(s);
 
+printf("%s %s:%d return l_open()\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 	return (*linesw[tp->t_line].l_open)(dev, tp, p);
 }
 
@@ -578,7 +599,7 @@ cyioctl(dev, cmd, data, flag, p)
 
 	case TIOCGFLAGS:
 		*((int *)data) = cy->cy_openflags |
-		    (CY_DIALOUT(dev) ? TIOCFLAG_SOFTCAR : 0);
+		    (DEVCUA(dev) ? TIOCFLAG_SOFTCAR : 0);
 		break;
 
 	case TIOCSFLAGS:
@@ -1036,7 +1057,7 @@ cy_poll(void *arg)
 			    "(port %d, carrier %d)\n",
 			    sc->sc_dev.dv_xname, port, carrier);
 #endif
-			if (CY_DIALIN(tp->t_dev) &&
+			if (DEVCUA(tp->t_dev) &&
 			    !(*linesw[tp->t_line].l_modem)(tp, carrier))
 				cy_modem_control(cy, TIOCM_DTR, DMBIC);
 
