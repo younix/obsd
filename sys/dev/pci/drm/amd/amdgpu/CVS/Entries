@@ -76,7 +76,6 @@
 /amdgpu_amdkfd_gfx_v9.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_amdkfd_gfx_v9.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_amdkfd_gpuvm.c/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu_atom.c/1.4/Fri Dec 11 17:58:22 2020//
 /amdgpu_atombios.c/1.4/Fri Dec 11 17:58:22 2020//
 /amdgpu_atombios_crtc.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_atombios_dp.c/1.2/Fri Dec 11 17:58:22 2020//
@@ -96,7 +95,6 @@
 /amdgpu_csa.c/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_csa.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_ctx.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_debugfs.c/1.5/Fri Dec 11 17:58:22 2020//
 /amdgpu_debugfs.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_devlist.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_df.h/1.1/Fri Dec 11 17:58:22 2020//
@@ -104,7 +102,6 @@
 /amdgpu_discovery.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_display.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_display.h/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu_dma_buf.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dma_buf.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_dpm.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_dpm.h/1.2/Fri Dec 11 17:58:22 2020//
@@ -151,7 +148,6 @@
 /amdgpu_pm.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_pmu.c/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_pmu.h/1.1/Fri Dec 11 17:58:22 2020//
-/amdgpu_psp.c/1.8/Fri Dec 11 17:58:22 2020//
 /amdgpu_psp.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_ras.c/1.4/Fri Dec 11 17:58:22 2020//
 /amdgpu_ras.h/1.2/Fri Dec 11 17:58:22 2020//
@@ -240,7 +236,6 @@
 /jpeg_v1_0.h/1.1/Fri Dec 11 17:58:22 2020//
 /jpeg_v2_0.c/1.1/Fri Dec 11 17:58:22 2020//
 /jpeg_v2_0.h/1.1/Fri Dec 11 17:58:22 2020//
-/jpeg_v2_5.c/1.2/Fri Dec 11 17:58:22 2020//
 /jpeg_v2_5.h/1.1/Fri Dec 11 17:58:22 2020//
 /mes_v10_1.c/1.1/Fri Dec 11 17:58:22 2020//
 /mes_v10_1.h/1.1/Fri Dec 11 17:58:22 2020//
@@ -315,16 +310,21 @@
 /vega20_reg_init.c/1.2/Fri Dec 11 17:58:22 2020//
 /vi.c/1.2/Fri Dec 11 17:58:22 2020//
 /vi.h/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu.h/1.3/Sat Dec 12 22:29:33 2020//
-/amdgpu_ctx.c/1.3/Sat Dec 12 22:29:33 2020//
-/amdgpu_doorbell.h/1.2/Sat Dec 12 22:29:33 2020//
-/amdgpu_fence.c/1.5/Sat Dec 12 22:29:33 2020//
-/amdgpu_kms.c/1.17/Sat Dec 12 22:29:33 2020//
-/amdgpu_sync.c/1.3/Sat Dec 12 22:29:33 2020//
-/amdgpu_ttm.c/1.5/Sat Dec 12 22:29:33 2020//
-/gfx_v10_0.c/1.3/Sat Dec 12 22:29:33 2020//
-/gfx_v9_0.c/1.9/Sat Dec 12 22:29:33 2020//
-/psp_v12_0.c/1.2/Sat Dec 12 22:29:33 2020//
-/psp_v3_1.c/1.3/Sat Dec 12 22:29:33 2020//
-/amdgpu_device.c/1.16/Sat Dec 12 23:14:53 2020//
+/amdgpu.h/1.3/Fri Dec 18 08:57:37 2020//
+/amdgpu_atom.c/1.4/Thu Dec 17 19:39:59 2020//
+/amdgpu_ctx.c/1.3/Fri Dec 18 08:57:37 2020//
+/amdgpu_debugfs.c/1.5/Thu Dec 17 19:39:59 2020//
+/amdgpu_device.c/1.16/Fri Dec 18 08:57:37 2020//
+/amdgpu_dma_buf.c/1.2/Thu Dec 17 19:39:59 2020//
+/amdgpu_doorbell.h/1.2/Fri Dec 18 08:57:37 2020//
+/amdgpu_fence.c/1.5/Fri Dec 18 08:57:37 2020//
+/amdgpu_kms.c/1.17/Fri Dec 18 08:57:37 2020//
+/amdgpu_psp.c/1.8/Thu Dec 17 19:39:59 2020//
+/amdgpu_sync.c/1.3/Fri Dec 18 08:57:37 2020//
+/amdgpu_ttm.c/1.5/Fri Dec 18 08:57:37 2020//
+/gfx_v10_0.c/1.3/Fri Dec 18 08:57:37 2020//
+/gfx_v9_0.c/1.9/Fri Dec 18 08:57:37 2020//
+/jpeg_v2_5.c/1.2/Thu Dec 17 19:39:59 2020//
+/psp_v12_0.c/1.2/Fri Dec 18 08:57:37 2020//
+/psp_v3_1.c/1.3/Fri Dec 18 08:57:37 2020//
 D

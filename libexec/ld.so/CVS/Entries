@@ -13,7 +13,6 @@
 /library_mquery.c/1.64/Mon Dec  9 23:15:03 2019//
 /library_subr.c/1.50/Fri Oct  4 17:42:16 2019//
 /loader.c/1.190/Tue Dec 17 03:16:07 2019//
-/malloc.c/1.30/Mon Sep 30 03:35:09 2019//
 /path.c/1.8/Tue Dec 17 17:16:32 2019//
 /path.h/1.2/Mon Jan 23 11:04:19 2017//
 /reallocarray.c/1.2/Tue Jan 24 07:48:37 2017//
@@ -39,5 +38,6 @@ D/powerpc////
 D/sh////
 D/sparc64////
 D/powerpc64////
-/dl_uname.c/1.3/Sat Dec 12 22:29:33 2020//
-/util.c/1.48/Sat Dec 12 22:29:33 2020//
+/dl_uname.c/1.3/Fri Dec 18 08:57:36 2020//
+/malloc.c/1.31/Mon Dec 28 14:38:41 2020//
+/util.c/1.48/Fri Dec 18 08:57:36 2020//

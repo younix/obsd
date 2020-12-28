@@ -10,9 +10,9 @@
 /bsd.sys.mk/1.13/Sun Jul  9 14:04:50 2017//
 /bsd.xconf.mk/1.1/Tue Mar 25 23:35:56 2008//
 /bsd.xorg.mk/1.2/Sun Dec 31 10:38:18 2006//
-/bsd.README/1.85/Fri Dec 11 17:58:22 2020//
-/bsd.own.mk/1.204/Fri Dec 11 17:58:22 2020//
-/bsd.prog.mk/1.82/Fri Dec 11 17:58:22 2020//
-/sys.mk/1.88/Fri Dec 11 17:58:22 2020//
-/bsd.regress.mk/1.23/Thu Dec 17 19:15:47 2020//
+/bsd.README/1.85/Fri Dec 18 08:57:36 2020//
+/bsd.own.mk/1.205/Mon Dec 28 14:38:55 2020//
+/bsd.prog.mk/1.82/Fri Dec 18 08:57:36 2020//
+/bsd.regress.mk/1.23/Fri Dec 18 08:57:36 2020//
+/sys.mk/1.88/Thu Dec 17 19:39:58 2020//
 D

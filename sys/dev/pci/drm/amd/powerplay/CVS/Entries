@@ -3,14 +3,14 @@ D/inc////
 D/smumgr////
 /amd_powerplay.c/1.2/Fri Dec 11 17:58:23 2020//
 /amdgpu_smu.c/1.1/Fri Dec 11 17:58:23 2020//
-/arcturus_ppt.c/1.2/Fri Dec 11 17:58:23 2020//
 /arcturus_ppt.h/1.1/Fri Dec 11 17:58:23 2020//
 /navi10_ppt.c/1.1/Fri Dec 11 17:58:23 2020//
 /navi10_ppt.h/1.1/Fri Dec 11 17:58:23 2020//
 /renoir_ppt.c/1.2/Fri Dec 11 17:58:23 2020//
 /renoir_ppt.h/1.1/Fri Dec 11 17:58:23 2020//
 /smu_internal.h/1.1/Fri Dec 11 17:58:23 2020//
-/smu_v11_0.c/1.2/Fri Dec 11 17:58:23 2020//
 /smu_v12_0.c/1.1/Fri Dec 11 17:58:23 2020//
 /vega20_ppt.c/1.1/Fri Dec 11 17:58:23 2020//
 /vega20_ppt.h/1.1/Fri Dec 11 17:58:23 2020//
+/arcturus_ppt.c/1.2/Thu Dec 17 19:39:59 2020//
+/smu_v11_0.c/1.2/Thu Dec 17 19:39:59 2020//

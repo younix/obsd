@@ -19,7 +19,6 @@
 /lcore_float.S/1.23/Mon Jan 14 15:02:57 2019//
 /mem.c/1.24/Fri Dec 20 13:34:41 2019//
 /mips64r2.S/1.4/Sun Jun 11 03:35:30 2017//
-/pmap.c/1.114/Fri Dec 20 13:27:41 2019//
 /process_machdep.c/1.18/Fri Sep  1 13:16:47 2017//
 /r4000_errata.c/1.7/Thu Dec 22 15:33:36 2016//
 /sys_machdep.c/1.11/Fri Dec 20 13:34:41 2019//
@@ -29,11 +28,12 @@
 /cp0access.S/1.21/Sat Jun  6 11:21:49 2020//
 /clock.c/1.42/Fri Dec 11 17:58:22 2020//
 /cpu.c/1.77/Fri Dec 11 17:58:22 2020//
-/fp_emulate.c/1.23/Fri Dec 11 17:58:22 2020//
-/ipifuncs.c/1.22/Fri Dec 11 17:58:22 2020//
 /mips64_machdep.c/1.33/Fri Dec 11 17:58:22 2020//
-/softintr.c/1.22/Fri Dec 11 17:58:22 2020//
-/lcore_access.S/1.30/Sat Dec 12 22:29:33 2020//
-/trap.c/1.152/Sat Dec 12 22:29:33 2020//
-/sendsig.c/1.34/Sat Dec 12 23:14:52 2020//
+/fp_emulate.c/1.23/Thu Dec 17 19:39:58 2020//
+/ipifuncs.c/1.22/Thu Dec 17 19:39:58 2020//
+/lcore_access.S/1.30/Fri Dec 18 08:57:37 2020//
+/pmap.c/1.115/Mon Dec 28 14:38:57 2020//
+/sendsig.c/1.34/Fri Dec 18 08:57:37 2020//
+/softintr.c/1.22/Fri Dec 18 08:57:37 2020//
+/trap.c/1.152/Fri Dec 18 08:57:37 2020//
 D

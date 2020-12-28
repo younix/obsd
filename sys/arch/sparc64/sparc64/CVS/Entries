@@ -26,14 +26,14 @@
 /sys_machdep.c/1.4/Sat Dec 30 20:46:59 2017//
 /timerreg.h/1.5/Tue May 29 09:54:23 2007//
 /vm_machdep.c/1.39/Thu Aug 17 20:50:51 2017//
-/autoconf.c/1.138/Fri Dec 11 17:58:22 2020//
 /conf.c/1.84/Fri Dec 11 17:58:22 2020//
-/cpu.c/1.71/Fri Dec 11 17:58:22 2020//
-/db_disasm.c/1.9/Fri Dec 11 17:58:22 2020//
-/emul.c/1.26/Fri Dec 11 17:58:22 2020//
 /intr.c/1.61/Fri Dec 11 17:58:22 2020//
-/locore.s/1.190/Fri Dec 11 17:58:22 2020//
-/clock.c/1.67/Sat Dec 12 22:29:33 2020//
-/trap.c/1.107/Sat Dec 12 22:29:33 2020//
-/machdep.c/1.199/Sat Dec 12 23:14:52 2020//
+/autoconf.c/1.138/Thu Dec 17 19:39:58 2020//
+/clock.c/1.67/Fri Dec 18 08:57:37 2020//
+/cpu.c/1.71/Thu Dec 17 19:39:58 2020//
+/db_disasm.c/1.9/Thu Dec 17 19:39:58 2020//
+/emul.c/1.26/Thu Dec 17 19:39:58 2020//
+/locore.s/1.190/Thu Dec 17 19:39:58 2020//
+/machdep.c/1.199/Fri Dec 18 08:57:37 2020//
+/trap.c/1.107/Fri Dec 18 08:57:37 2020//
 D

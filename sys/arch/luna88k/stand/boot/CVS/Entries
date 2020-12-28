@@ -28,9 +28,9 @@
 /sioreg.h/1.1/Mon Oct 28 22:13:13 2013//
 /status.h/1.1/Mon Oct 28 22:13:13 2013//
 /ufs_disksubr.c/1.4/Tue Nov  5 00:51:58 2013//
-/conf.c/1.4/Sat Dec 12 23:14:52 2020//
-/dev_net.c/1.4/Sat Dec 12 23:14:52 2020//
-/dev_net.h/1.2/Sat Dec 12 23:14:52 2020//
-/samachdep.h/1.4/Sat Dec 12 23:14:52 2020//
-/sd.c/1.6/Sat Dec 12 23:14:52 2020//
+/conf.c/1.4/Fri Dec 18 08:57:37 2020//
+/dev_net.c/1.4/Fri Dec 18 08:57:37 2020//
+/dev_net.h/1.2/Fri Dec 18 08:57:37 2020//
+/samachdep.h/1.4/Fri Dec 18 08:57:37 2020//
+/sd.c/1.6/Fri Dec 18 08:57:37 2020//
 D

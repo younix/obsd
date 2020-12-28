@@ -1,7 +1,6 @@
 /Makefile/1.1/Sun Mar 18 04:32:44 2001//
 /files.rasops/1.7/Thu Dec 15 19:18:41 2016//
 /rasops.h/1.25/Mon May 25 09:55:49 2020//
-/rasops1.c/1.10/Mon May 25 09:55:49 2020//
 /rasops15.c/1.9/Mon May 25 09:55:49 2020//
 /rasops24.c/1.12/Mon May 25 09:55:49 2020//
 /rasops4.c/1.12/Mon May 25 09:55:49 2020//
@@ -11,4 +10,5 @@
 /rasops.c/1.66/Fri Dec 11 17:58:24 2020//
 /rasops32.c/1.12/Fri Dec 11 17:58:24 2020//
 /rasops_bitops.h/1.9/Fri Dec 11 17:58:24 2020//
+/rasops1.c/1.11/Mon Dec 28 14:39:02 2020//
 D

@@ -66,12 +66,12 @@
 /vga_post.h/1.2/Wed Mar 23 16:54:35 2011//
 /vmmvar.h/1.19/Fri Jan 18 01:34:50 2019//
 /vmparam.h/1.56/Tue Apr 17 15:50:05 2018//
-/cpu.h/1.172/Fri Dec 11 17:58:22 2020//
-/cpufunc.h/1.33/Fri Dec 11 17:58:22 2020//
-/intrdefs.h/1.18/Fri Dec 11 17:58:22 2020//
-/pmap.h/1.88/Fri Dec 11 17:58:22 2020//
-/segments.h/1.28/Fri Dec 11 17:58:22 2020//
-/specialreg.h/1.76/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.1/Fri Dec 11 17:58:22 2020//
-/setjmp.h/1.4/Thu Dec 17 19:14:07 2020//
+/cpu.h/1.172/Fri Dec 18 08:57:37 2020//
+/cpufunc.h/1.33/Thu Dec 17 19:39:58 2020//
+/intrdefs.h/1.18/Thu Dec 17 19:39:58 2020//
+/pmap.h/1.88/Fri Dec 18 08:57:37 2020//
+/segments.h/1.28/Fri Dec 18 08:57:37 2020//
+/setjmp.h/1.4/Fri Dec 18 08:57:37 2020//
+/specialreg.h/1.76/Thu Dec 17 19:39:58 2020//
 D

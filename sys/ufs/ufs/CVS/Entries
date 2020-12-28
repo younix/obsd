@@ -12,6 +12,6 @@
 /dinode.h/1.19/Mon Jun  1 06:23:28 2020//
 /inode.h/1.53/Fri Dec 11 17:58:24 2020//
 /ufs_quota.c/1.47/Fri Dec 11 17:58:24 2020//
-/ufs_vnops.c/1.152/Fri Dec 11 17:58:24 2020//
-/ufs_lookup.c/1.58/Sat Dec 12 22:29:33 2020//
+/ufs_lookup.c/1.58/Fri Dec 18 08:57:37 2020//
+/ufs_vnops.c/1.153/Mon Dec 28 14:39:04 2020//
 D

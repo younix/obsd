@@ -2,8 +2,8 @@
 /kdump.c/1.143/Sun Apr  5 08:32:14 2020//
 /kdump.h/1.6/Thu Mar 24 05:05:42 2016//
 /kdump_subr.h/1.22/Mon Nov  5 17:05:50 2018//
-/ktrstruct.c/1.28/Sat Nov 17 20:46:12 2018//
 /mksubr/1.36/Mon Nov  5 17:05:50 2018//
 /Makefile/1.37/Fri Dec 11 17:58:24 2020//
 /mkioctls/1.42/Fri Dec 11 17:58:24 2020//
+/ktrstruct.c/1.29/Mon Dec 28 14:39:05 2020//
 D
