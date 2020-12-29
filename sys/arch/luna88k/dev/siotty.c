@@ -503,9 +503,6 @@ sioopen(dev_t dev, int flag, int mode, struct proc *p)
 		splx(s);
 	}
 
-	error = ttyopen(dev, tp, p);
-	if (error > 0)
-		return error;
 	return (*linesw[tp->t_line].l_open)(dev, tp, p);
 }
  

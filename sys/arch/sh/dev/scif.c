@@ -756,10 +756,6 @@ scifopen(dev_t dev, int flag, int mode, struct proc *p)
 
 	splx(s);
 
-	error = ttyopen(dev, tp, p);
-	if (error)
-		goto bad;
-
 	error = (*linesw[tp->t_line].l_open)(dev, tp, p);
 	if (error)
 		goto bad;
