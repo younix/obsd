@@ -17,7 +17,6 @@
 /clang.arm64/1.24/Thu Dec 17 19:39:49 2020//
 /clang.armv7/1.23/Thu Dec 17 19:39:49 2020//
 /clang.i386/1.31/Thu Dec 17 19:39:49 2020//
-/clang.loongson/1.15/Mon Dec 28 14:37:35 2020//
 /clang.macppc/1.10/Thu Dec 17 19:39:49 2020//
 /clang.octeon/1.15/Thu Dec 17 19:39:49 2020//
 /clang.powerpc64/1.4/Thu Dec 17 19:39:49 2020//
@@ -35,4 +34,5 @@
 /gcc.sparc64/1.14/Thu Dec 17 19:39:49 2020//
 /md.armv7/1.29/Fri Dec 18 08:57:34 2020//
 /mi/1.1532/Fri Dec 18 08:57:34 2020//
+/clang.loongson/1.15/Fri Jan  1 10:13:38 2021//
 D

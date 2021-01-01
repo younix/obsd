@@ -67,7 +67,6 @@
 /intr.h/1.32/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.2/Fri Dec 11 17:58:22 2020//
 /bus.h/1.35/Fri Dec 18 08:57:36 2020//
-/cacheinfo.h/1.3/Mon Dec 28 14:38:55 2020//
 /cpufunc.h/1.36/Thu Dec 17 19:39:58 2020//
 /frameasm.h/1.25/Fri Dec 18 08:57:36 2020//
 /intrdefs.h/1.21/Thu Dec 17 19:39:58 2020//
@@ -75,4 +74,5 @@
 /setjmp.h/1.2/Fri Dec 18 08:57:36 2020//
 /specialreg.h/1.88/Thu Dec 17 19:39:58 2020//
 /trap.h/1.4/Fri Dec 18 08:57:36 2020//
+/cacheinfo.h/1.3/Fri Jan  1 10:13:40 2021//
 D

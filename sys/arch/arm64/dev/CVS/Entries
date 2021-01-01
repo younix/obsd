@@ -8,9 +8,9 @@
 /acpipci.c/1.22/Fri Dec 18 08:57:37 2020//
 /agintc.c/1.29/Fri Dec 18 08:57:37 2020//
 /ampintc.c/1.20/Thu Dec 17 19:39:58 2020//
-/apm.c/1.6/Mon Dec 28 14:38:56 2020//
 /mainbus.c/1.19/Thu Dec 17 19:39:58 2020//
 /pciecam.c/1.11/Fri Dec 18 08:57:37 2020//
 /simplebus.c/1.12/Fri Dec 18 08:57:37 2020//
 /smbios.c/1.6/Thu Dec 17 19:39:58 2020//
+/apm.c/1.6/Fri Jan  1 10:13:40 2021//
 D

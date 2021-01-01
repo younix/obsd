@@ -11,8 +11,8 @@
 /bsd.xconf.mk/1.1/Tue Mar 25 23:35:56 2008//
 /bsd.xorg.mk/1.2/Sun Dec 31 10:38:18 2006//
 /bsd.README/1.85/Fri Dec 18 08:57:36 2020//
-/bsd.own.mk/1.205/Mon Dec 28 14:38:55 2020//
 /bsd.prog.mk/1.82/Fri Dec 18 08:57:36 2020//
 /bsd.regress.mk/1.23/Fri Dec 18 08:57:36 2020//
 /sys.mk/1.88/Thu Dec 17 19:39:58 2020//
+/bsd.own.mk/1.205/Fri Jan  1 10:13:39 2021//
 D

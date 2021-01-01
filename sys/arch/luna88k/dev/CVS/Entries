@@ -11,7 +11,6 @@
 /omrasops1.c/1.3/Mon Mar 20 19:37:54 2017//
 /sio.c/1.6/Sun Jun  4 13:48:13 2017//
 /sioreg.h/1.1/Wed Apr 21 15:23:55 2004//
-/siotty.c/1.23/Mon Feb 25 11:29:30 2019//
 /siovar.h/1.3/Sun Jun  4 13:48:13 2017//
 /spc.c/1.11/Wed Feb  5 16:29:29 2020//
 /timekeeper.c/1.10/Fri Nov  3 06:54:06 2017//
@@ -19,4 +18,5 @@
 /xp.c/1.3/Fri Sep  8 05:36:52 2017//
 /mb89352var.h/1.7/Fri Dec 11 17:58:22 2020//
 /mb89352.c/1.30/Fri Dec 18 08:57:37 2020//
+/siotty.c/1.23/Tue Dec 29 13:10:42 2020//
 D
