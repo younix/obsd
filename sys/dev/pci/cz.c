@@ -1,4 +1,4 @@
-/*	$OpenBSD: cz.c,v 1.24 2020/05/21 09:31:59 mpi Exp $ */
+/*	$OpenBSD: cz.c,v 1.25 2021/01/01 10:21:26 jan Exp $ */
 /*	$NetBSD: cz.c,v 1.15 2001/01/20 19:10:36 thorpej Exp $	*/
 
 /*-
