@@ -2,8 +2,8 @@
 /agp_machdep.c/1.14/Sat Mar 14 03:38:46 2015//
 /pcib.c/1.6/Thu May 30 16:15:01 2013//
 /pciide_machdep.c/1.4/Sat Oct 14 04:44:43 2017//
-/vga_post.c/1.10/Fri Aug 28 00:03:53 2015//
 /pchb.c/1.45/Mon Jun  1 06:23:23 2020//
 /acpipci.c/1.5/Fri Dec 18 08:57:36 2020//
 /pci_machdep.c/1.76/Fri Dec 18 08:57:36 2020//
+/vga_post.c/1.11/Mon Jan  4 06:05:42 2021//
 D

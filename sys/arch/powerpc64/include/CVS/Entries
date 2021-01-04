@@ -42,7 +42,7 @@
 /pte.h/1.7/Thu Dec 17 19:39:58 2020//
 /softintr.h/1.2/Thu Dec 17 19:39:58 2020//
 /vmparam.h/1.7/Thu Dec 17 19:39:58 2020//
-/cpu.h/1.29/Fri Jan  1 10:15:32 2021//
-/cpufunc.h/1.10/Fri Jan  1 10:15:32 2021//
-/trap.h/1.7/Fri Jan  1 10:15:33 2021//
+/cpu.h/1.29/Fri Jan  1 10:17:16 2021//
+/cpufunc.h/1.10/Fri Jan  1 10:17:16 2021//
+/trap.h/1.7/Fri Jan  1 10:17:16 2021//
 D

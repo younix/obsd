@@ -27,7 +27,6 @@
 /subr_kubsan.c/1.12/Wed Nov  6 19:16:48 2019//
 /subr_percpu.c/1.8/Fri Sep  8 05:36:53 2017//
 /subr_poison.c/1.14/Fri Sep  8 05:36:53 2017//
-/subr_pool.c/1.230/Fri Jan 24 06:31:17 2020//
 /subr_prof.c/1.30/Sun Sep  4 09:22:29 2016//
 /subr_tree.c/1.10/Tue Oct  9 08:28:43 2018//
 /subr_userconf.c/1.46/Fri Sep  6 21:30:31 2019//
@@ -89,18 +88,19 @@
 /vfs_subr.c/1.303/Thu Dec 17 19:39:59 2020//
 /vfs_syscalls.c/1.348/Fri Dec 18 08:57:37 2020//
 /vfs_vops.c/1.29/Fri Dec 18 08:57:37 2020//
-/init_main.c/1.304/Fri Jan  1 10:15:36 2021//
 /kern_event.c/1.156/Fri Jan  1 10:13:40 2021//
-/kern_malloc.c/1.143/Fri Jan  1 10:15:36 2021//
 /kern_sig.c/1.270/Fri Jan  1 10:13:40 2021//
 /kern_smr.c/1.9/Fri Jan  1 10:13:40 2021//
 /kern_synch.c/1.173/Fri Jan  1 10:13:40 2021//
-/kern_sysctl.c/1.385/Fri Jan  1 10:15:36 2021//
 /kern_time.c/1.151/Fri Jan  1 10:13:40 2021//
 /subr_log.c/1.70/Fri Jan  1 10:13:40 2021//
 /sys_generic.c/1.134/Fri Jan  1 10:13:40 2021//
-/sys_pipe.c/1.126/Fri Jan  1 10:15:36 2021//
 /tty.c/1.166/Fri Jan  1 10:13:40 2021//
 /tty_pty.c/1.105/Fri Jan  1 10:13:40 2021//
 /uipc_socket.c/1.252/Fri Jan  1 10:13:40 2021//
+/init_main.c/1.304/Fri Jan  1 10:17:16 2021//
+/kern_malloc.c/1.143/Fri Jan  1 10:17:16 2021//
+/kern_sysctl.c/1.385/Fri Jan  1 10:17:16 2021//
+/subr_pool.c/1.231/Mon Jan  4 06:05:48 2021//
+/sys_pipe.c/1.126/Fri Jan  1 10:17:16 2021//
 D

@@ -3,3 +3,6 @@ D/lld////
 D/lldb////
 D/llvm////
 D/compiler-rt////
+D/libcxx////
+D/libcxxabi////
+D/libunwind////

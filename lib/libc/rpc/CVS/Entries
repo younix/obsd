@@ -42,6 +42,6 @@
 /svc_tcp.c/1.41/Fri Dec 11 17:58:18 2020//
 /getrpcent.c/1.22/Fri Dec 18 08:57:36 2020//
 /rpc_prot.c/1.16/Thu Dec 17 19:39:58 2020//
-/get_myaddress.c/1.16/Fri Jan  1 10:15:08 2021//
-/pmap_rmt.c/1.36/Fri Jan  1 10:15:08 2021//
+/get_myaddress.c/1.16/Fri Jan  1 10:17:16 2021//
+/pmap_rmt.c/1.36/Fri Jan  1 10:17:16 2021//
 D
