@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_enc.c,v 1.127 2020/11/11 18:14:12 jsing Exp $ */
+/* $OpenBSD: t1_enc.c,v 1.129 2021/01/19 19:07:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -434,7 +434,7 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read,
 			goto err;
 
 		if (!tls12_record_layer_set_read_mac_key(s->internal->rl,
-		    S3I(s)->read_mac_secret, mac_secret_size))
+		    mac_secret, mac_secret_size))
 			goto err;
 	} else {
 		/*
@@ -562,12 +562,21 @@ tls1_change_cipher_state(SSL *s, int which)
 
 	if (key_block - S3I(s)->hs.key_block != S3I(s)->hs.key_block_len) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
-		goto err2;
+		goto err;
 	}
 
 	if (is_read) {
-		memcpy(S3I(s)->read_mac_secret, mac_secret, mac_secret_size);
-		S3I(s)->read_mac_secret_size = mac_secret_size;
+		if (!tls12_record_layer_change_read_cipher_state(s->internal->rl,
+		    mac_secret, mac_secret_size, key, key_len, iv, iv_len))
+			goto err;
+		tls12_record_layer_set_read_seq_num(s->internal->rl,
+		    S3I(s)->read_sequence);
+	} else {
+		if (!tls12_record_layer_change_write_cipher_state(s->internal->rl,
+		    mac_secret, mac_secret_size, key, key_len, iv, iv_len))
+			goto err;
+		tls12_record_layer_set_write_seq_num(s->internal->rl,
+		    S3I(s)->write_sequence);
 	}
 
 	if (aead != NULL) {
@@ -578,7 +587,7 @@ tls1_change_cipher_state(SSL *s, int which)
 	return tls1_change_cipher_state_cipher(s, is_read,
 	    mac_secret, mac_secret_size, key, key_len, iv, iv_len);
 
-err2:
+ err:
 	return (0);
 }
 

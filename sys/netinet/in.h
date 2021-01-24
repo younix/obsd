@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.h,v 1.138 2020/08/22 17:55:30 gnezdo Exp $	*/
+/*	$OpenBSD: in.h,v 1.140 2021/01/18 12:22:40 sthen Exp $	*/
 /*	$NetBSD: in.h,v 1.20 1996/02/13 23:41:47 christos Exp $	*/
 
 /*
@@ -97,6 +97,7 @@ typedef __in_port_t	in_port_t;	/* IP port type */
 #define	IPPROTO_PIM		103		/* Protocol indep. multicast */
 #define	IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
 #define	IPPROTO_CARP		112		/* CARP */
+#define	IPPROTO_SCTP		132		/* SCTP, RFC 4960 */
 #define	IPPROTO_UDPLITE		136		/* UDP-Lite, RFC 3828 */
 #define	IPPROTO_MPLS		137		/* unicast MPLS packet */
 #define	IPPROTO_PFSYNC		240		/* PFSYNC */
@@ -358,6 +359,12 @@ struct ip_opts {
 struct ip_mreq {
 	struct	in_addr imr_multiaddr;	/* IP multicast address of group */
 	struct	in_addr imr_interface;	/* local IP address of interface */
+};
+
+struct ip_mreqn {
+	struct	in_addr imr_multiaddr;	/* IP multicast address of group */
+	struct	in_addr imr_address;	/* local IP address of interface */
+	int		imr_ifindex;	/* interface index */
 };
 
 /*

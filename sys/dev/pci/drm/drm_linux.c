@@ -1,4 +1,4 @@
-/*	$OpenBSD: drm_linux.c,v 1.74 2020/12/31 06:31:55 jsg Exp $	*/
+/*	$OpenBSD: drm_linux.c,v 1.76 2021/01/13 01:04:49 jsg Exp $	*/
 /*
  * Copyright (c) 2013 Jonathan Gray <jsg@openbsd.org>
  * Copyright (c) 2015, 2016 Mark Kettenis <kettenis@openbsd.org>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: unwind.c,v 1.52 2020/11/09 04:22:05 tb Exp $	*/
+/*	$OpenBSD: unwind.c,v 1.56 2021/01/19 16:52:40 florian Exp $	*/
 
 /*
  * Copyright (c) 2018 Florian Obser <florian@openbsd.org>
@@ -50,12 +50,18 @@
 
 #define	TRUST_ANCHOR_FILE	"/var/db/unwind.key"
 
+enum uw_process {
+	PROC_MAIN,
+	PROC_RESOLVER,
+	PROC_FRONTEND,
+};
+
 __dead void	usage(void);
 __dead void	main_shutdown(void);
 
 void		main_sig_handler(int, short, void *);
 
-static pid_t	start_child(int, char *, int, int, int);
+static pid_t	start_child(enum uw_process, char *, int, int, int);
 
 void		main_dispatch_frontend(int, short, void *);
 void		main_dispatch_resolver(int, short, void *);
@@ -69,17 +75,14 @@ void		open_ports(void);
 void		solicit_dns_proposals(void);
 void		send_blocklist_fd(void);
 
-struct uw_conf	*main_conf;
-struct imsgev	*iev_frontend;
-struct imsgev	*iev_resolver;
-char		*conffile;
-
-pid_t		 frontend_pid;
-pid_t		 resolver_pid;
-
-uint32_t	 cmd_opts;
-
-int		 routesock;
+struct uw_conf		*main_conf;
+static struct imsgev	*iev_frontend;
+static struct imsgev	*iev_resolver;
+char			*conffile;
+pid_t			 frontend_pid;
+pid_t			 resolver_pid;
+uint32_t		 cmd_opts;
+int			 routesock;
 
 void
 main_sig_handler(int sig, short event, void *arg)
@@ -218,8 +221,7 @@ main(int argc, char *argv[])
 	    pipe_main2frontend[1], debug, cmd_opts & (OPT_VERBOSE |
 	    OPT_VERBOSE2 | OPT_VERBOSE3));
 
-	uw_process = PROC_MAIN;
-	log_procinit(log_procnames[uw_process]);
+	log_procinit("main");
 
 	event_init();
 
@@ -336,7 +338,7 @@ main_shutdown(void)
 }
 
 static pid_t
-start_child(int p, char *argv0, int fd, int debug, int verbose)
+start_child(enum uw_process p, char *argv0, int fd, int debug, int verbose)
 {
 	char	*argv[7];
 	int	 argc = 0;
@@ -725,6 +727,7 @@ open_ports(void)
 {
 	struct addrinfo	 hints, *res0;
 	int		 udp4sock = -1, udp6sock = -1, error, bsize = 65535;
+	int		 tcp4sock = -1, tcp6sock = -1;
 	int		 opt = 1;
 
 	memset(&hints, 0, sizeof(hints));
@@ -773,13 +776,72 @@ open_ports(void)
 	if (res0)
 		freeaddrinfo(res0);
 
-	if (udp4sock == -1 && udp6sock == -1)
-		fatal("could not bind to 127.0.0.1 or ::1 on port 53");
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	error = getaddrinfo("127.0.0.1", "domain", &hints, &res0);
+	if (!error && res0) {
+		if ((tcp4sock = socket(res0->ai_family,
+		    res0->ai_socktype | SOCK_NONBLOCK,
+		    res0->ai_protocol)) != -1) {
+			if (setsockopt(tcp4sock, SOL_SOCKET, SO_REUSEADDR,
+			    &opt, sizeof(opt)) == -1)
+				log_warn("setting SO_REUSEADDR on socket");
+			if (setsockopt(tcp4sock, SOL_SOCKET, SO_SNDBUF, &bsize,
+			    sizeof(bsize)) == -1)
+				log_warn("setting SO_SNDBUF on socket");
+			if (bind(tcp4sock, res0->ai_addr, res0->ai_addrlen)
+			    == -1) {
+				close(tcp4sock);
+				tcp4sock = -1;
+			}
+			if (listen(tcp4sock, 5) == -1) {
+				close(tcp4sock);
+				tcp4sock = -1;
+			}
+		}
+	}
+	if (res0)
+		freeaddrinfo(res0);
+
+	hints.ai_family = AF_INET6;
+	error = getaddrinfo("::1", "domain", &hints, &res0);
+	if (!error && res0) {
+		if ((tcp6sock = socket(res0->ai_family,
+		    res0->ai_socktype | SOCK_NONBLOCK,
+		    res0->ai_protocol)) != -1) {
+			if (setsockopt(tcp6sock, SOL_SOCKET, SO_REUSEADDR,
+			    &opt, sizeof(opt)) == -1)
+				log_warn("setting SO_REUSEADDR on socket");
+			if (setsockopt(tcp6sock, SOL_SOCKET, SO_SNDBUF, &bsize,
+			    sizeof(bsize)) == -1)
+				log_warn("setting SO_SNDBUF on socket");
+			if (bind(tcp6sock, res0->ai_addr, res0->ai_addrlen)
+			    == -1) {
+				close(tcp6sock);
+				tcp6sock = -1;
+			}
+			if (listen(tcp6sock, 5) == -1) {
+				close(tcp6sock);
+				tcp6sock = -1;
+			}
+		}
+	}
+	if (res0)
+		freeaddrinfo(res0);
+
+	if ((udp4sock == -1 || tcp4sock == -1) && (udp6sock == -1 ||
+	    tcp6sock == -1))
+		fatalx("could not bind to 127.0.0.1 or ::1 on port 53");
 
 	if (udp4sock != -1)
 		main_imsg_compose_frontend_fd(IMSG_UDP4SOCK, 0, udp4sock);
 	if (udp6sock != -1)
 		main_imsg_compose_frontend_fd(IMSG_UDP6SOCK, 0, udp6sock);
+	if (tcp4sock != -1)
+		main_imsg_compose_frontend_fd(IMSG_TCP4SOCK, 0, tcp4sock);
+	if (tcp6sock != -1)
+		main_imsg_compose_frontend_fd(IMSG_TCP6SOCK, 0, tcp6sock);
 }
 
 void

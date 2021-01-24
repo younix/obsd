@@ -79,7 +79,6 @@
 /SSL_get_rbio.3/1.5/Tue Mar 27 17:35:50 2018//
 /SSL_get_server_tmp_key.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_get_session.3/1.7/Tue Mar 27 17:35:50 2018//
-/SSL_get_shared_ciphers.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_get_state.3/1.5/Wed Jun 12 09:36:30 2019//
 /SSL_get_version.3/1.7/Mon Mar 18 18:31:15 2019//
 /SSL_library_init.3/1.7/Fri Jun 14 13:41:31 2019//
@@ -117,4 +116,5 @@
 /SSL_set_bio.3/1.6/Fri Dec 18 08:57:36 2020//
 /SSL_write.3/1.6/Fri Dec 18 08:57:36 2020//
 /ssl.3/1.20/Fri Dec 18 08:57:36 2020//
+/SSL_get_shared_ciphers.3/1.5/Sun Jan 24 00:13:17 2021//
 D

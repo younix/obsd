@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.621 2020/12/15 03:43:34 dlg Exp $	*/
+/*	$OpenBSD: if.c,v 1.625 2021/01/18 09:55:43 mvs Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -68,7 +68,6 @@
 #include "pf.h"
 #include "pfsync.h"
 #include "ppp.h"
-#include "pppoe.h"
 #include "switch.h"
 #include "if_wg.h"
 
@@ -135,6 +134,7 @@
 void	if_attachsetup(struct ifnet *);
 void	if_attachdomain(struct ifnet *);
 void	if_attach_common(struct ifnet *);
+void	if_remove(struct ifnet *);
 int	if_createrdomain(int, struct ifnet *);
 int	if_setrdomain(struct ifnet *, int);
 void	if_slowtimo(void *);
@@ -387,9 +387,6 @@ if_idxmap_remove(struct ifnet *ifp)
 	srp_update_locked(&if_ifp_gc, &map[index], NULL);
 	if_idxmap.count--;
 	/* end of if_idxmap modifications */
-
-	/* sleep until the last reference is released */
-	refcnt_finalize(&ifp->if_refcnt, "ifidxrm");
 }
 
 void
@@ -741,6 +738,8 @@ if_input(struct ifnet *ifp, struct mbuf_list *ml)
 int
 if_input_local(struct ifnet *ifp, struct mbuf *m, sa_family_t af)
 {
+	int keepflags;
+
 #if NBPFILTER > 0
 	/*
 	 * Only send packets to bpf if they are destinated to local
@@ -756,8 +755,9 @@ if_input_local(struct ifnet *ifp, struct mbuf *m, sa_family_t af)
 			bpf_mtap_af(if_bpf, af, m, BPF_DIRECTION_OUT);
 	}
 #endif
+	keepflags = m->m_flags & (M_BCAST|M_MCAST);
 	m_resethdr(m);
-	m->m_flags |= M_LOOP;
+	m->m_flags |= M_LOOP | keepflags;
 	m->m_pkthdr.ph_ifidx = ifp->if_index;
 	m->m_pkthdr.ph_rtableid = ifp->if_rdomain;
 
@@ -905,13 +905,6 @@ if_netisr(void *unused)
 			KERNEL_UNLOCK();
 		}
 #endif
-#if NPPPOE > 0
-		if (n & (1 << NETISR_PPPOE)) {
-			KERNEL_LOCK();
-			pppoeintr();
-			KERNEL_UNLOCK();
-		}
-#endif
 		t |= n;
 	}
 
@@ -953,6 +946,21 @@ if_hooks_run(struct task_list *hooks)
 		TAILQ_REMOVE(hooks, &cursor, t_entry);
 	}
 	mtx_leave(&if_hooks_mtx);
+}
+
+void
+if_remove(struct ifnet *ifp)
+{
+	/* Remove the interface from the list of all interfaces. */
+	NET_LOCK();
+	TAILQ_REMOVE(&ifnet, ifp, if_list);
+	NET_UNLOCK();
+
+	/* Remove the interface from the interface index map. */
+	if_idxmap_remove(ifp);
+
+	/* Sleep until the last reference is released. */
+	refcnt_finalize(&ifp->if_refcnt, "ifrm");
 }
 
 void
@@ -1000,10 +1008,10 @@ if_detach(struct ifnet *ifp)
 	/* Undo pseudo-driver changes. */
 	if_deactivate(ifp);
 
-	ifq_clr_oactive(&ifp->if_snd);
-
 	/* Other CPUs must not have a reference before we start destroying. */
-	if_idxmap_remove(ifp);
+	if_remove(ifp);
+
+	ifq_clr_oactive(&ifp->if_snd);
 
 #if NBPFILTER > 0
 	bpfdetach(ifp);
@@ -1037,9 +1045,6 @@ if_detach(struct ifnet *ifp)
 #if NPF > 0
 	pfi_detach_ifnet(ifp);
 #endif
-
-	/* Remove the interface from the list of all interfaces.  */
-	TAILQ_REMOVE(&ifnet, ifp, if_list);
 
 	while ((ifg = TAILQ_FIRST(&ifp->if_groups)) != NULL)
 		if_delgroup(ifp, ifg->ifgl_group->ifg_group);
@@ -1146,14 +1151,14 @@ if_clone_create(const char *name, int rdomain)
 
 	rw_enter_write(&if_cloners_lock);
 
-	if (ifunit(name) != NULL) {
+	if ((ifp = if_unit(name)) != NULL) {
 		ret = EEXIST;
 		goto unlock;
 	}
 
 	ret = (*ifc->ifc_create)(ifc, unit);
 
-	if (ret != 0 || (ifp = ifunit(name)) == NULL)
+	if (ret != 0 || (ifp = if_unit(name)) == NULL)
 		goto unlock;
 
 	NET_LOCK();
@@ -1163,6 +1168,7 @@ if_clone_create(const char *name, int rdomain)
 	NET_UNLOCK();
 unlock:
 	rw_exit_write(&if_cloners_lock);
+	if_put(ifp);
 
 	return (ret);
 }
@@ -1186,7 +1192,10 @@ if_clone_destroy(const char *name)
 
 	rw_enter_write(&if_cloners_lock);
 
-	ifp = ifunit(name);
+	TAILQ_FOREACH(ifp, &ifnet, if_list) {
+		if (strcmp(ifp->if_xname, name) == 0)
+			break;
+	}
 	if (ifp == NULL) {
 		rw_exit_write(&if_cloners_lock);
 		return (ENXIO);
@@ -1645,7 +1654,7 @@ if_watchdog_task(void *xifidx)
 }
 
 /*
- * Map interface name to interface structure pointer.
+ * Map interface name to interface structure pointer (legacy).
  */
 struct ifnet *
 ifunit(const char *name)
@@ -1659,6 +1668,20 @@ ifunit(const char *name)
 			return (ifp);
 	}
 	return (NULL);
+}
+
+/*
+ * Map interface name to interface structure pointer.
+ */
+struct ifnet *
+if_unit(const char *name)
+{
+	struct ifnet *ifp;
+
+	if ((ifp = ifunit(name)) != NULL)
+		if_ref(ifp);
+
+	return (ifp);
 }
 
 /*
@@ -1732,13 +1755,16 @@ if_createrdomain(int rdomain, struct ifnet *ifp)
 	/* Create rdomain including its loopback if with unit == rdomain */
 	snprintf(loifname, sizeof(loifname), "lo%u", unit);
 	error = if_clone_create(loifname, 0);
-	if ((loifp = ifunit(loifname)) == NULL)
+	if ((loifp = if_unit(loifname)) == NULL)
 		return (ENXIO);
-	if (error && (ifp != loifp || error != EEXIST))
+	if (error && (ifp != loifp || error != EEXIST)) {
+		if_put(loifp);
 		return (error);
+	}
 
 	rtable_l2set(rdomain, rdomain, loifp->if_index);
 	loifp->if_rdomain = rdomain;
+	if_put(loifp);
 
 	return (0);
 }
@@ -1861,7 +1887,7 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 		return (ifioctl_get(cmd, data));
 	}
 
-	ifp = ifunit(ifr->ifr_name);
+	ifp = if_unit(ifr->ifr_name);
 	if (ifp == NULL)
 		return (ENXIO);
 	oif_flags = ifp->if_flags;
@@ -2219,6 +2245,8 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 	if (((oif_flags ^ ifp->if_flags) & IFF_UP) != 0)
 		getmicrotime(&ifp->if_lastchange);
 
+	if_put(ifp);
+
 	return (error);
 }
 
@@ -2259,7 +2287,7 @@ ifioctl_get(u_long cmd, caddr_t data)
 		return (error);
 	}
 
-	ifp = ifunit(ifr->ifr_name);
+	ifp = if_unit(ifr->ifr_name);
 	if (ifp == NULL)
 		return (ENXIO);
 
@@ -2332,6 +2360,8 @@ ifioctl_get(u_long cmd, caddr_t data)
 	}
 
 	NET_RUNLOCK_IN_IOCTL();
+
+	if_put(ifp);
 
 	return (error);
 }

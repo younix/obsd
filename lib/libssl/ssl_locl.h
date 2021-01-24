@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.310 2020/12/15 16:04:49 tb Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.316 2021/01/21 18:48:57 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -477,11 +477,17 @@ struct tls12_record_layer *tls12_record_layer_new(void);
 void tls12_record_layer_free(struct tls12_record_layer *rl);
 void tls12_record_layer_alert(struct tls12_record_layer *rl,
     uint8_t *alert_desc);
+int tls12_record_layer_write_overhead(struct tls12_record_layer *rl,
+    size_t *overhead);
+int tls12_record_layer_read_protected(struct tls12_record_layer *rl);
+int tls12_record_layer_write_protected(struct tls12_record_layer *rl);
 void tls12_record_layer_set_version(struct tls12_record_layer *rl,
     uint16_t version);
-void tls12_record_layer_set_read_epoch(struct tls12_record_layer *rl,
-    uint16_t epoch);
 void tls12_record_layer_set_write_epoch(struct tls12_record_layer *rl,
+    uint16_t epoch);
+int tls12_record_layer_use_write_epoch(struct tls12_record_layer *rl,
+    uint16_t epoch);
+void tls12_record_layer_write_epoch_done(struct tls12_record_layer *rl,
     uint16_t epoch);
 void tls12_record_layer_clear_read_state(struct tls12_record_layer *rl);
 void tls12_record_layer_clear_write_state(struct tls12_record_layer *rl);
@@ -499,6 +505,12 @@ int tls12_record_layer_set_write_cipher_hash(struct tls12_record_layer *rl,
     EVP_CIPHER_CTX *cipher_ctx, EVP_MD_CTX *hash_ctx, int stream_mac);
 int tls12_record_layer_set_read_mac_key(struct tls12_record_layer *rl,
     const uint8_t *mac_key, size_t mac_key_len);
+int tls12_record_layer_change_read_cipher_state(struct tls12_record_layer *rl,
+    const uint8_t *mac_key, size_t mac_key_len, const uint8_t *key,
+    size_t key_len, const uint8_t *iv, size_t iv_len);
+int tls12_record_layer_change_write_cipher_state(struct tls12_record_layer *rl,
+    const uint8_t *mac_key, size_t mac_key_len, const uint8_t *key,
+    size_t key_len, const uint8_t *iv, size_t iv_len);
 int tls12_record_layer_open_record(struct tls12_record_layer *rl,
     uint8_t *buf, size_t buf_len, uint8_t **out, size_t *out_len);
 int tls12_record_layer_seal_record(struct tls12_record_layer *rl,
@@ -833,8 +845,6 @@ typedef struct ssl3_buffer_internal_st {
 
 typedef struct ssl3_state_internal_st {
 	unsigned char read_sequence[SSL3_SEQUENCE_SIZE];
-	int read_mac_secret_size;
-	unsigned char read_mac_secret[EVP_MAX_MD_SIZE];
 	unsigned char write_sequence[SSL3_SEQUENCE_SIZE];
 
 	SSL3_BUFFER_INTERNAL rbuf;	/* read IO goes into here */
@@ -1266,8 +1276,6 @@ int dtls1_get_message_header(unsigned char *data,
     struct hm_header_st *msg_hdr);
 void dtls1_get_ccs_header(unsigned char *data, struct ccs_header_st *ccs_hdr);
 void dtls1_reset_seq_numbers(SSL *s, int rw);
-void dtls1_build_sequence_number(unsigned char *dst, unsigned char *seq,
-    unsigned short epoch);
 struct timeval* dtls1_get_timeout(SSL *s, struct timeval* timeleft);
 int dtls1_check_timeout_num(SSL *s);
 int dtls1_handle_timeout(SSL *s);

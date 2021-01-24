@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.1096 2020/12/10 06:40:22 dlg Exp $ */
+/*	$OpenBSD: pf.c,v 1.1101 2021/01/19 22:22:23 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -1122,12 +1122,6 @@ pf_find_state(struct pf_pdesc *pd, struct pf_state_key_cmp *key,
 	}
 
 	*state = s;
-	if (pd->dir == PF_OUT && s->rt_kif != NULL && s->rt_kif != pd->kif &&
-	    ((s->rule.ptr->rt == PF_ROUTETO &&
-	    s->rule.ptr->direction == PF_OUT) ||
-	    (s->rule.ptr->rt == PF_REPLYTO &&
-	    s->rule.ptr->direction == PF_IN)))
-		return (PF_PASS);
 
 	return (PF_MATCH);
 }
@@ -1186,7 +1180,7 @@ pf_state_export(struct pfsync_state *sp, struct pf_state *st)
 
 	/* copy from state */
 	strlcpy(sp->ifname, st->kif->pfik_name, sizeof(sp->ifname));
-	memcpy(&sp->rt_addr, &st->rt_addr, sizeof(sp->rt_addr));
+	sp->rt_addr = st->rt_addr;
 	sp->creation = htonl(getuptime() - st->creation);
 	expire = pf_state_expires(st);
 	if (expire <= getuptime())
@@ -3081,7 +3075,10 @@ pf_match_tag(struct mbuf *m, struct pf_rule *r, int *tag)
 int
 pf_match_rcvif(struct mbuf *m, struct pf_rule *r)
 {
-	struct ifnet *ifp, *ifp0;
+	struct ifnet *ifp;
+#if NCARP > 0
+	struct ifnet *ifp0;
+#endif
 	struct pfi_kif *kif;
 
 	ifp = if_get(m->m_pkthdr.ph_ifidx);
@@ -3437,21 +3434,8 @@ pf_set_rt_ifp(struct pf_state *s, struct pf_addr *saddr, sa_family_t af,
 	if (!r->rt)
 		return (0);
 
-	switch (af) {
-	case AF_INET:
-		rv = pf_map_addr(AF_INET, r, saddr, &s->rt_addr, NULL, sns,
-		    &r->route, PF_SN_ROUTE);
-		break;
-#ifdef INET6
-	case AF_INET6:
-		rv = pf_map_addr(AF_INET6, r, saddr, &s->rt_addr, NULL, sns,
-		    &r->route, PF_SN_ROUTE);
-		break;
-#endif /* INET6 */
-	default:
-		rv = 1;
-	}
-
+	rv = pf_map_addr(af, r, saddr, &s->rt_addr, NULL, sns, 
+	    &r->route, PF_SN_ROUTE);
 	if (rv == 0) {
 		s->rt_kif = r->route.kif;
 		s->natrule.ptr = r;
@@ -4200,11 +4184,6 @@ pf_translate(struct pf_pdesc *pd, struct pf_addr *saddr, u_int16_t sport,
     struct pf_addr *daddr, u_int16_t dport, u_int16_t virtual_type,
     int icmp_dir)
 {
-	/*
-	 * when called from bpf_mtap_pflog, there are extra constraints:
-	 * -mbuf is faked, m_data is the bpf buffer
-	 * -pd is not fully set up
-	 */
 	int	rewrite = 0;
 	int	afto = pd->af != pd->naf;
 
@@ -4219,18 +4198,17 @@ pf_translate(struct pf_pdesc *pd, struct pf_addr *saddr, u_int16_t sport,
 		break;
 
 	case IPPROTO_ICMP:
-		/* pf_translate() is also used when logging invalid packets */
 		if (pd->af != AF_INET)
 			return (0);
 
-		if (afto) {
 #ifdef INET6
+		if (afto) {
 			if (pf_translate_icmp_af(pd, AF_INET6, &pd->hdr.icmp))
 				return (0);
 			pd->proto = IPPROTO_ICMPV6;
 			rewrite = 1;
-#endif /* INET6 */
 		}
+#endif /* INET6 */
 		if (virtual_type == htons(ICMP_ECHO)) {
 			u_int16_t icmpid = (icmp_dir == PF_IN) ? sport : dport;
 			rewrite += pf_patch_16(pd,
@@ -4240,7 +4218,6 @@ pf_translate(struct pf_pdesc *pd, struct pf_addr *saddr, u_int16_t sport,
 
 #ifdef INET6
 	case IPPROTO_ICMPV6:
-		/* pf_translate() is also used when logging invalid packets */
 		if (pd->af != AF_INET6)
 			return (0);
 
@@ -6271,7 +6248,6 @@ bad:
 }
 #endif /* INET6 */
 
-
 /*
  * check TCP checksum and set mbuf flag
  *   off is the offset where the protocol header starts
@@ -6855,7 +6831,9 @@ pf_counters_inc(int action, struct pf_pdesc *pd, struct pf_state *s,
 int
 pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 {
+#if NCARP > 0
 	struct ifnet		*ifp0;
+#endif
 	struct pfi_kif		*kif;
 	u_short			 action, reason = 0;
 	struct pf_rule		*a = NULL, *r = &pf_default_rule;
@@ -7268,20 +7246,32 @@ done:
 		pd.m->m_pkthdr.pf.flags |= PF_TAG_GENERATED;
 		switch (pd.naf) {
 		case AF_INET:
-			if (pd.dir == PF_IN)
+			if (pd.dir == PF_IN) {
+				if (ipforwarding == 0) {
+					ipstat_inc(ips_cantforward);
+					action = PF_DROP;
+					break;
+				}
 				ip_forward(pd.m, ifp, NULL, 1);
-			else
+			} else
 				ip_output(pd.m, NULL, NULL, 0, NULL, NULL, 0);
 			break;
 		case AF_INET6:
-			if (pd.dir == PF_IN)
+			if (pd.dir == PF_IN) {
+				if (ip6_forwarding == 0) {
+					ip6stat_inc(ip6s_cantforward);
+					action = PF_DROP;
+					break;
+				}
 				ip6_forward(pd.m, NULL, 1);
-			else
+			} else
 				ip6_output(pd.m, NULL, NULL, 0, NULL, NULL);
 			break;
 		}
-		pd.m = NULL;
-		action = PF_PASS;
+		if (action != PF_DROP) {
+			pd.m = NULL;
+			action = PF_PASS;
+		}
 		break;
 #endif /* INET6 */
 	case PF_DROP:

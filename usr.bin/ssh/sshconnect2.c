@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.340 2020/12/29 00:59:15 djm Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.342 2021/01/22 02:44:58 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -1184,16 +1184,16 @@ key_sig_algorithm(struct ssh *ssh, const struct sshkey *key)
 	    (key->type == KEY_RSA_CERT && (datafellows & SSH_BUG_SIGTYPE))) {
 		/* Filter base key signature alg against our configuration */
 		return match_list(sshkey_ssh_name(key),
-		    options.pubkey_key_types, NULL);
+		    options.pubkey_accepted_algos, NULL);
 	}
 
 	/*
 	 * For RSA keys/certs, since these might have a different sig type:
-	 * find the first entry in PubkeyAcceptedKeyTypes of the right type
+	 * find the first entry in PubkeyAcceptedAlgorithms of the right type
 	 * that also appears in the supported signature algorithms list from
 	 * the server.
 	 */
-	oallowed = allowed = xstrdup(options.pubkey_key_types);
+	oallowed = allowed = xstrdup(options.pubkey_accepted_algos);
 	while ((cp = strsep(&allowed, ",")) != NULL) {
 		if (sshkey_type_from_name(cp) != key->type)
 			continue;
@@ -1214,7 +1214,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
     const u_char *data, size_t datalen, u_int compat, const char *alg)
 {
 	struct sshkey *sign_key = NULL, *prv = NULL;
-	int r = SSH_ERR_INTERNAL_ERROR;
+	int retried = 0, r = SSH_ERR_INTERNAL_ERROR;
 	struct notifier_ctx *notifier = NULL;
 	char *fp = NULL, *pin = NULL, *prompt = NULL;
 
@@ -1248,6 +1248,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 		if (sshkey_is_sk(sign_key)) {
 			if ((sign_key->sk_flags &
 			    SSH_SK_USER_VERIFICATION_REQD)) {
+ retry_pin:
 				xasprintf(&prompt, "Enter PIN for %s key %s: ",
 				    sshkey_type(sign_key), id->filename);
 				pin = read_passphrase(prompt, 0);
@@ -1268,8 +1269,16 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 	if ((r = sshkey_sign(sign_key, sigp, lenp, data, datalen,
 	    alg, options.sk_provider, pin, compat)) != 0) {
 		debug_fr(r, "sshkey_sign");
+		if (pin == NULL && !retried && sshkey_is_sk(sign_key) &&
+		    r == SSH_ERR_KEY_WRONG_PASSPHRASE) {
+			notify_complete(notifier, NULL);
+			notifier = NULL;
+			retried = 1;
+			goto retry_pin;
+		}
 		goto out;
 	}
+
 	/*
 	 * PKCS#11 tokens may not support all signature algorithms,
 	 * so check what we get back.
@@ -1284,7 +1293,7 @@ identity_sign(struct identity *id, u_char **sigp, size_t *lenp,
 	free(prompt);
 	if (pin != NULL)
 		freezero(pin, strlen(pin));
-	notify_complete(notifier, "User presence confirmed");
+	notify_complete(notifier, r == 0 ? "User presence confirmed" : NULL);
 	sshkey_free(prv);
 	return r;
 }
@@ -1581,25 +1590,25 @@ static int
 key_type_allowed_by_config(struct sshkey *key)
 {
 	if (match_pattern_list(sshkey_ssh_name(key),
-	    options.pubkey_key_types, 0) == 1)
+	    options.pubkey_accepted_algos, 0) == 1)
 		return 1;
 
 	/* RSA keys/certs might be allowed by alternate signature types */
 	switch (key->type) {
 	case KEY_RSA:
 		if (match_pattern_list("rsa-sha2-512",
-		    options.pubkey_key_types, 0) == 1)
+		    options.pubkey_accepted_algos, 0) == 1)
 			return 1;
 		if (match_pattern_list("rsa-sha2-256",
-		    options.pubkey_key_types, 0) == 1)
+		    options.pubkey_accepted_algos, 0) == 1)
 			return 1;
 		break;
 	case KEY_RSA_CERT:
 		if (match_pattern_list("rsa-sha2-512-cert-v01@openssh.com",
-		    options.pubkey_key_types, 0) == 1)
+		    options.pubkey_accepted_algos, 0) == 1)
 			return 1;
 		if (match_pattern_list("rsa-sha2-256-cert-v01@openssh.com",
-		    options.pubkey_key_types, 0) == 1)
+		    options.pubkey_accepted_algos, 0) == 1)
 			return 1;
 		break;
 	}
@@ -1741,11 +1750,11 @@ pubkey_prepare(Authctxt *authctxt)
 	}
 	/* append remaining keys from the config file */
 	TAILQ_CONCAT(preferred, &files, next);
-	/* finally, filter by PubkeyAcceptedKeyTypes */
+	/* finally, filter by PubkeyAcceptedAlgorithms */
 	TAILQ_FOREACH_SAFE(id, preferred, next, id2) {
 		if (id->key != NULL && !key_type_allowed_by_config(id->key)) {
 			debug("Skipping %s key %s - "
-			    "not in PubkeyAcceptedKeyTypes",
+			    "corresponding algo not in PubkeyAcceptedAlgorithms",
 			    sshkey_ssh_name(id->key), id->filename);
 			TAILQ_REMOVE(preferred, id, next);
 			sshkey_free(id->key);

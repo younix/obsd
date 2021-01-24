@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_socket.c,v 1.252 2020/12/25 12:59:52 visa Exp $	*/
+/*	$OpenBSD: uipc_socket.c,v 1.254 2021/01/17 05:23:34 visa Exp $	*/
 /*	$NetBSD: uipc_socket.c,v 1.21 1996/02/04 02:17:52 christos Exp $	*/
 
 /*
@@ -1451,8 +1451,7 @@ somove(struct socket *so, int wait)
 	if ((m->m_flags & M_PKTHDR) &&
 	    ((m->m_pkthdr.ph_loopcnt++ >= M_MAXLOOP) ||
 	    ((m->m_flags & M_LOOP) && (m->m_flags & (M_BCAST|M_MCAST))))) {
-		if (m->m_pkthdr.ph_loopcnt >= M_MAXLOOP)
-			error = ELOOP;
+		error = ELOOP;
 		goto release;
 	}
 
@@ -2041,7 +2040,6 @@ soo_kqfilter(struct file *fp, struct knote *kn)
 	}
 
 	klist_insert_locked(&sb->sb_sel.si_note, kn);
-	sb->sb_flagsintr |= SB_KNOTE;
 
 	return (0);
 }
@@ -2054,8 +2052,6 @@ filt_sordetach(struct knote *kn)
 	KERNEL_ASSERT_LOCKED();
 
 	klist_remove_locked(&so->so_rcv.sb_sel.si_note, kn);
-	if (klist_empty(&so->so_rcv.sb_sel.si_note))
-		so->so_rcv.sb_flagsintr &= ~SB_KNOTE;
 }
 
 int
@@ -2107,8 +2103,6 @@ filt_sowdetach(struct knote *kn)
 	KERNEL_ASSERT_LOCKED();
 
 	klist_remove_locked(&so->so_snd.sb_sel.si_note, kn);
-	if (klist_empty(&so->so_snd.sb_sel.si_note))
-		so->so_snd.sb_flagsintr &= ~SB_KNOTE;
 }
 
 int
@@ -2179,7 +2173,6 @@ sobuf_print(struct sockbuf *sb,
 	(*pr)("\tsb_mbtail: %p\n", sb->sb_mbtail);
 	(*pr)("\tsb_lastrecord: %p\n", sb->sb_lastrecord);
 	(*pr)("\tsb_sel: ...\n");
-	(*pr)("\tsb_flagsintr: %d\n", sb->sb_flagsintr);
 	(*pr)("\tsb_flags: %i\n", sb->sb_flags);
 	(*pr)("\tsb_timeo_nsecs: %llu\n", sb->sb_timeo_nsecs);
 }

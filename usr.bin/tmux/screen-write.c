@@ -1,4 +1,4 @@
-/* $OpenBSD: screen-write.c,v 1.189 2020/12/07 09:23:57 nicm Exp $ */
+/* $OpenBSD: screen-write.c,v 1.191 2021/01/22 11:28:33 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -258,7 +258,6 @@ screen_write_start_callback(struct screen_write_ctx *ctx, struct screen *s,
 		    screen_size_x(ctx->s), screen_size_y(ctx->s));
 	}
 }
-
 
 /* Initialize writing. */
 void

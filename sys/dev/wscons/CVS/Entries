@@ -30,7 +30,7 @@
 /wsemulvar.h/1.18/Thu Dec 17 19:39:59 2020//
 /wskbd.c/1.107/Fri Dec 18 08:57:37 2020//
 /wsmouse.c/1.66/Thu Dec 17 19:39:59 2020//
-/wsmux.c/1.52/Fri Dec 18 08:57:37 2020//
 /wstpad.c/1.26/Thu Dec 17 19:39:59 2020//
-/wsevent.c/1.25/Fri Jan  1 10:13:40 2021//
+/wsevent.c/1.25/Mon Jan  4 07:11:05 2021//
+/wsmux.c/1.54/Sun Jan 24 00:13:37 2021//
 D

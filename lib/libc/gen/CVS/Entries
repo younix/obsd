@@ -41,7 +41,6 @@
 /fstab.c/1.22/Thu Mar 17 23:48:42 2016//
 /ftok.3/1.17/Sat Nov 15 22:22:09 2014//
 /ftok.c/1.9/Fri Jun 28 13:32:41 2019//
-/fts.c/1.59/Fri Jun 28 13:32:41 2019//
 /fts_open.3/1.1/Mon Sep  2 21:18:41 2019//
 /ftw.3/1.14/Mon Sep  2 21:18:41 2019//
 /ftw.c/1.6/Fri Jan 25 00:19:25 2019//
@@ -160,7 +159,6 @@
 /sigwait.3/1.2/Sun Jan 13 16:16:43 2019//
 /sigwait.c/1.1/Sat Jan 12 00:16:03 2019//
 /sleep.3/1.16/Sat Feb  8 01:09:57 2020//
-/sleep.c/1.12/Mon Dec 14 05:10:13 2009//
 /statvfs.3/1.8/Thu Jan 29 01:46:30 2015//
 /statvfs.c/1.2/Fri Jan 16 16:48:51 2015//
 /strtofflags.3/1.7/Wed Jun  5 03:39:22 2013//
@@ -230,4 +228,6 @@
 /sethostname.c/1.10/Fri Dec 18 08:57:36 2020//
 /setproctitle.c/1.16/Fri Dec 18 08:57:36 2020//
 /sysconf.c/1.27/Fri Dec 18 08:57:36 2020//
+/fts.c/1.60/Sun Jan 24 00:13:14 2021//
+/sleep.c/1.13/Sun Jan 24 00:13:14 2021//
 D

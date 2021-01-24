@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1082 2020/12/22 09:22:14 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1086 2021/01/20 07:16:54 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1635,7 +1635,7 @@ struct client {
 #define CLIENT_DEAD 0x200
 #define CLIENT_REDRAWBORDERS 0x400
 #define CLIENT_READONLY 0x800
-/* 0x1000 unused */
+#define CLIENT_NOSTARTSERVER 0x1000
 #define CLIENT_CONTROL 0x2000
 #define CLIENT_CONTROLCONTROL 0x4000
 #define CLIENT_FOCUSED 0x8000
@@ -1693,6 +1693,7 @@ struct client {
 
 	char		*prompt_string;
 	struct utf8_data *prompt_buffer;
+	char		*prompt_last;
 	size_t		 prompt_index;
 	prompt_input_cb	 prompt_inputcb;
 	prompt_free_cb	 prompt_freecb;
@@ -1888,7 +1889,6 @@ const char	*find_cwd(void);
 const char	*find_home(void);
 const char	*getversion(void);
 void		 expand_paths(const char *, char ***, u_int *);
-
 
 /* proc.c */
 struct imsg;
@@ -2761,7 +2761,7 @@ int		 window_pane_key(struct window_pane *, struct client *,
 int		 window_pane_visible(struct window_pane *);
 u_int		 window_pane_search(struct window_pane *, const char *, int,
 		     int);
-const char	*window_printable_flags(struct winlink *);
+const char	*window_printable_flags(struct winlink *, int);
 struct window_pane *window_pane_find_up(struct window_pane *);
 struct window_pane *window_pane_find_down(struct window_pane *);
 struct window_pane *window_pane_find_left(struct window_pane *);

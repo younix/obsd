@@ -64,7 +64,6 @@
 /mmap.2/1.65/Sat Dec 21 05:23:38 2019//
 /mmap.c/1.16/Fri Sep 11 13:26:20 2015//
 /mprotect.2/1.25/Sat Dec 21 05:23:38 2019//
-/mquery.2/1.11/Wed Jul  2 22:22:35 2014//
 /mquery.c/1.8/Fri Sep 11 13:26:20 2015//
 /msgctl.2/1.18/Thu Jul 18 13:32:40 2019//
 /msgget.2/1.14/Thu Jul 18 13:32:40 2019//
@@ -185,15 +184,16 @@
 /select.2/1.43/Thu Dec 17 19:39:58 2020//
 /sendsyslog.2/1.12/Fri Dec 18 08:57:36 2020//
 /utimes.2/1.28/Fri Dec 18 08:57:36 2020//
-/acct.2/1.20/Mon Jan  4 06:05:27 2021//
-/bind.2/1.22/Mon Jan  4 06:05:27 2021//
-/chroot.2/1.23/Mon Jan  4 06:05:27 2021//
-/intro.2/1.70/Mon Jan  4 06:05:27 2021//
-/mount.2/1.50/Mon Jan  4 06:05:27 2021//
-/open.2/1.50/Mon Jan  4 06:05:27 2021//
-/revoke.2/1.15/Mon Jan  4 06:05:27 2021//
-/stat.2/1.48/Mon Jan  4 06:05:27 2021//
-/statfs.2/1.27/Mon Jan  4 06:05:27 2021//
-/symlink.2/1.22/Mon Jan  4 06:05:27 2021//
-/sysctl.2/1.42/Fri Jan  1 10:17:16 2021//
+/acct.2/1.20/Mon Jan  4 07:11:05 2021//
+/bind.2/1.22/Mon Jan  4 07:11:05 2021//
+/chroot.2/1.23/Mon Jan  4 07:11:05 2021//
+/intro.2/1.70/Mon Jan  4 07:11:05 2021//
+/mount.2/1.50/Mon Jan  4 07:11:05 2021//
+/mquery.2/1.12/Sun Jan 24 00:13:14 2021//
+/open.2/1.50/Mon Jan  4 07:11:05 2021//
+/revoke.2/1.15/Mon Jan  4 07:11:05 2021//
+/stat.2/1.48/Mon Jan  4 07:11:05 2021//
+/statfs.2/1.27/Mon Jan  4 07:11:05 2021//
+/symlink.2/1.22/Mon Jan  4 07:11:05 2021//
+/sysctl.2/1.43/Sun Jan 24 00:13:14 2021//
 D

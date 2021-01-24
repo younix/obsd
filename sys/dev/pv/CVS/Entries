@@ -19,7 +19,6 @@
 /viornd.c/1.4/Mon Jun  1 06:23:27 2020//
 /pvclock.c/1.6/Fri Dec 11 17:58:24 2020//
 /vmmci.c/1.8/Fri Dec 11 17:58:24 2020//
-/vmt.c/1.19/Fri Dec 11 17:58:24 2020//
 /xen.c/1.97/Fri Dec 11 17:58:24 2020//
 /hvs.c/1.33/Fri Dec 18 08:57:37 2020//
 /hyperv.c/1.47/Fri Dec 18 08:57:37 2020//
@@ -31,4 +30,5 @@
 /viomb.c/1.7/Thu Dec 17 19:39:59 2020//
 /vioscsi.c/1.26/Fri Dec 18 08:57:37 2020//
 /xbf.c/1.51/Fri Dec 18 08:57:37 2020//
+/vmt.c/1.22/Sun Jan 24 00:13:36 2021//
 D

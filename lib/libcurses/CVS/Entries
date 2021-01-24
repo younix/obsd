@@ -88,6 +88,6 @@ D/trace////
 D/tty////
 D/widechar////
 /nc_tparm.h/1.2/Sat Jun  6 11:21:49 2020//
-/curses.h/1.62/Fri Dec 18 08:57:36 2020//
-/term.h/1.16/Fri Dec 18 08:57:36 2020//
-/termcap.h/1.11/Fri Dec 18 08:57:36 2020//
+/curses.h/1.62/Mon Jan  4 07:11:05 2021//
+/term.h/1.16/Mon Jan  4 07:11:05 2021//
+/termcap.h/1.11/Mon Jan  4 07:11:05 2021//

@@ -3,7 +3,6 @@
 /limits.h/1.1/Sat May 16 17:11:14 2020//
 /mutex.h/1.1/Sat May 16 17:11:14 2020//
 /param.h/1.1/Sat May 16 17:11:14 2020//
-/psl.h/1.2/Fri May 22 15:07:47 2020//
 /ptrace.h/1.1/Sat May 16 17:11:14 2020//
 /spinlock.h/1.1/Sat May 16 17:11:14 2020//
 /_float.h/1.1/Mon Jun  1 00:13:37 2020//
@@ -17,7 +16,6 @@
 /endian.h/1.2/Fri Dec 11 17:58:22 2020//
 /exec.h/1.3/Fri Dec 11 17:58:22 2020//
 /fenv.h/1.1/Fri Dec 11 17:58:22 2020//
-/fpu.h/1.2/Fri Dec 11 17:58:22 2020//
 /frame.h/1.5/Fri Dec 11 17:58:22 2020//
 /kcore.h/1.1/Fri Dec 11 17:58:22 2020//
 /kexec.h/1.3/Fri Dec 11 17:58:22 2020//
@@ -35,14 +33,17 @@
 /bus.h/1.5/Fri Dec 18 08:57:37 2020//
 /fdt.h/1.2/Fri Dec 18 08:57:37 2020//
 /intr.h/1.13/Fri Dec 18 08:57:37 2020//
-/opal.h/1.18/Fri Dec 18 08:57:37 2020//
-/pcb.h/1.7/Thu Dec 17 19:39:58 2020//
 /pci_machdep.h/1.4/Fri Dec 18 08:57:37 2020//
 /pmap.h/1.15/Thu Dec 17 19:39:58 2020//
 /pte.h/1.7/Thu Dec 17 19:39:58 2020//
 /softintr.h/1.2/Thu Dec 17 19:39:58 2020//
 /vmparam.h/1.7/Thu Dec 17 19:39:58 2020//
-/cpu.h/1.29/Fri Jan  1 10:17:16 2021//
-/cpufunc.h/1.10/Fri Jan  1 10:17:16 2021//
-/trap.h/1.7/Fri Jan  1 10:17:16 2021//
+/cpu.h/1.29/Mon Jan  4 07:11:05 2021//
+/cpufunc.h/1.10/Mon Jan  4 07:11:05 2021//
+/fpu.h/1.3/Sun Jan 24 00:13:33 2021//
+/opal.h/1.19/Sun Jan 24 00:13:33 2021//
+/pcb.h/1.8/Sun Jan 24 00:13:33 2021//
+/psl.h/1.3/Sun Jan 24 00:13:33 2021//
+/smbiosvar.h/1.1/Sat Jan 23 12:10:08 2021//
+/trap.h/1.7/Mon Jan  4 07:11:05 2021//
 D
