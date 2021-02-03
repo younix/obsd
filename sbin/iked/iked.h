@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.h,v 1.180 2021/01/21 16:46:47 tobhe Exp $	*/
+/*	$OpenBSD: iked.h,v 1.183 2021/02/01 16:37:48 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -99,7 +99,7 @@ struct ctl_conn {
 TAILQ_HEAD(ctl_connlist, ctl_conn);
 extern  struct ctl_connlist ctl_conns;
 
-enum privsep_procid privsep_process;
+extern enum privsep_procid privsep_process;
 
 /*
  * Runtime structures
@@ -334,6 +334,7 @@ struct iked_dsa {
 	void		*dsa_key;	/* parsed public or private key */
 	int		 dsa_hmac;	/* HMAC or public/private key */
 	int		 dsa_sign;	/* Sign or verify operation */
+	uint32_t	 dsa_flags;	/* State flags */
 };
 
 struct iked_id {
@@ -847,7 +848,7 @@ int	 config_getcertpartialchain(struct iked *, struct imsg *);
 /* policy.c */
 void	 policy_init(struct iked *);
 int	 policy_lookup(struct iked *, struct iked_message *,
-	    struct iked_proposals *proposals);
+	    struct iked_proposals *, struct iked_flows *, int);
 int	 policy_lookup_sa(struct iked *, struct iked_sa *);
 struct iked_policy *
 	 policy_test(struct iked *, struct iked_policy *);

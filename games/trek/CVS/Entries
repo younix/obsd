@@ -26,7 +26,6 @@
 /klmove.c/1.7/Thu Jan  7 14:37:51 2016//
 /lose.c/1.7/Thu Jan  7 14:37:51 2016//
 /lrscan.c/1.7/Thu Jan  7 14:37:51 2016//
-/main.c/1.18/Thu Aug  9 17:51:22 2018//
 /move.c/1.8/Thu Jan  7 14:37:51 2016//
 /nova.c/1.7/Thu Jan  7 14:37:51 2016//
 /out.c/1.9/Thu Jan  7 14:37:51 2016//
@@ -45,8 +44,9 @@
 /systemname.c/1.7/Thu Jan  7 14:37:51 2016//
 /torped.c/1.10/Thu Jan  7 14:37:51 2016//
 /trek.6/1.16/Fri May 26 19:48:28 2017//
-/trek.h/1.14/Fri May 26 19:19:23 2017//
 /visual.c/1.7/Thu Jan  7 14:37:51 2016//
 /warp.c/1.8/Thu Jan  7 14:37:51 2016//
 /win.c/1.7/Thu Jan  7 14:37:51 2016//
 D/USD.doc////
+/main.c/1.19/Wed Feb  3 13:03:58 2021//
+/trek.h/1.15/Wed Feb  3 13:03:58 2021//

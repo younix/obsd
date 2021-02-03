@@ -7,7 +7,6 @@
 /bitset.h/1.1/Thu May 14 06:08:40 2020//
 /buffer.c/1.1.1.5/Tue Nov 26 12:50:19 2013//
 /buffer.h/1.2/Wed Aug 31 07:31:20 2016//
-/configyyrename.h/1.1.1.5/Fri Jul 17 17:36:01 2015//
 /dbcreate.c/1.5/Thu May 14 06:08:40 2020//
 /difffile.c/1.15/Thu May 14 06:08:40 2020//
 /difffile.h/1.2/Fri Feb 17 20:04:45 2017//
@@ -104,3 +103,4 @@ D/doc////
 /zonec.c/1.27/Fri Dec 18 08:57:37 2020//
 /zonec.h/1.10/Fri Dec 18 08:57:37 2020//
 /zparser.y/1.22/Fri Dec 18 08:57:37 2020//
+/configyyrename.h/1.2/Wed Feb  3 13:05:10 2021//

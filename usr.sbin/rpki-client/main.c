@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.90 2021/01/08 08:45:55 claudio Exp $ */
+/*	$OpenBSD: main.c,v 1.92 2021/02/02 18:35:38 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -83,10 +83,11 @@
  * An rsync repository.
  */
 struct	repo {
-	char	*host; /* hostname */
-	char	*module; /* module name */
-	int	 loaded; /* whether loaded or not */
-	size_t	 id; /* identifier (array index) */
+	char		*repo;	/* repository rsync URI */
+	char		*local;	/* local path name */
+	char		*notify; /* RRDB notify URI if available */
+	size_t		 id; /* identifier (array index) */
+	int		 loaded; /* whether loaded or not */
 };
 
 size_t	entity_queue;
@@ -109,8 +110,6 @@ static struct	repotab {
 struct	entity {
 	enum rtype	 type; /* type of entity (not RTYPE_EOF) */
 	char		*uri; /* file or rsync:// URI */
-	int		 has_dgst; /* whether dgst is specified */
-	unsigned char	 dgst[SHA256_DIGEST_LENGTH]; /* optional */
 	ssize_t		 repo; /* repo index or <0 if w/o repo */
 	int		 has_pkey; /* whether pkey/sz is specified */
 	unsigned char	*pkey; /* public key (optional) */
@@ -227,9 +226,6 @@ entity_read_req(int fd, struct entity *ent)
 
 	io_simple_read(fd, &ent->type, sizeof(enum rtype));
 	io_str_read(fd, &ent->uri);
-	io_simple_read(fd, &ent->has_dgst, sizeof(int));
-	if (ent->has_dgst)
-		io_simple_read(fd, ent->dgst, sizeof(ent->dgst));
 	io_simple_read(fd, &ent->has_pkey, sizeof(int));
 	if (ent->has_pkey)
 		io_buf_read_alloc(fd, (void **)&ent->pkey, &ent->pkeysz);
@@ -246,9 +242,6 @@ entity_buffer_req(struct ibuf *b, const struct entity *ent)
 
 	io_simple_buffer(b, &ent->type, sizeof(ent->type));
 	io_str_buffer(b, ent->uri);
-	io_simple_buffer(b, &ent->has_dgst, sizeof(int));
-	if (ent->has_dgst)
-		io_simple_buffer(b, ent->dgst, sizeof(ent->dgst));
 	io_simple_buffer(b, &ent->has_pkey, sizeof(int));
 	if (ent->has_pkey)
 		io_buf_buffer(b, ent->pkey, ent->pkeysz);
@@ -296,6 +289,7 @@ repo_lookup(struct msgbuf *msgq, const char *uri)
 {
 	const char	*host, *mod;
 	size_t		 hostsz, modsz, i;
+	char		*local;
 	struct repo	*rp;
 	struct ibuf	*b;
 
@@ -303,17 +297,16 @@ repo_lookup(struct msgbuf *msgq, const char *uri)
 	    &mod, &modsz, NULL, NULL, NULL, uri))
 		errx(1, "%s: malformed", uri);
 
+	if (asprintf(&local, "%.*s/%.*s", (int)hostsz, host,
+	    (int)modsz, mod) == -1)
+		err(1, "asprintf");
+
 	/* Look up in repository table. */
 
 	for (i = 0; i < rt.reposz; i++) {
-		if (strlen(rt.repos[i].host) != hostsz)
+		if (strcmp(rt.repos[i].local, local))
 			continue;
-		if (strlen(rt.repos[i].module) != modsz)
-			continue;
-		if (strncasecmp(rt.repos[i].host, host, hostsz))
-			continue;
-		if (strncasecmp(rt.repos[i].module, mod, modsz))
-			continue;
+		free(local);
 		return &rt.repos[i];
 	}
 
@@ -325,25 +318,25 @@ repo_lookup(struct msgbuf *msgq, const char *uri)
 	rp = &rt.repos[rt.reposz++];
 	memset(rp, 0, sizeof(struct repo));
 	rp->id = rt.reposz - 1;
+	rp->local = local;
 
-	if ((rp->host = strndup(host, hostsz)) == NULL ||
-	    (rp->module = strndup(mod, modsz)) == NULL)
-		err(1, "strndup");
-
-	i = rt.reposz - 1;
+	if ((rp->repo = strndup(uri, mod + modsz - uri)) == NULL)
+		err(1, "strdup");
 
 	if (!noop) {
-		logx("%s/%s: pulling from network", rp->host, rp->module);
-		if ((b = ibuf_dynamic(128, UINT_MAX)) == NULL)
+		if (asprintf(&local, "%s", rp->local) == -1)
+			err(1, "asprintf");
+		logx("%s: pulling from network", local);
+		if ((b = ibuf_dynamic(256, UINT_MAX)) == NULL)
 			err(1, NULL);
-		io_simple_buffer(b, &i, sizeof(i));
-		io_str_buffer(b, rp->host);
-		io_str_buffer(b, rp->module);
-
+		io_simple_buffer(b, &rp->id, sizeof(rp->id));
+		io_str_buffer(b, local);
+		io_str_buffer(b, rp->repo);
 		ibuf_close(msgq, b);
+		free(local);
 	} else {
 		rp->loaded = 1;
-		logx("%s/%s: using cache", rp->host, rp->module);
+		logx("%s: using cache", rp->local);
 		stats.repos++;
 		/* there is nothing in the queue so no need to flush */
 	}
@@ -358,9 +351,8 @@ repo_filename(const struct repo *repo, const char *uri)
 {
 	char *nfile;
 
-	uri += 8 + strlen(repo->host) + 1 + strlen(repo->module) + 1;
-
-	if (asprintf(&nfile, "%s/%s/%s", repo->host, repo->module, uri) == -1)
+	uri += strlen(repo->repo) + 1;
+	if (asprintf(&nfile, "%s/%s", repo->local, uri) == -1)
 		err(1, "asprintf");
 	return nfile;
 }
@@ -370,8 +362,8 @@ repo_filename(const struct repo *repo, const char *uri)
  */
 static void
 entityq_add(struct msgbuf *msgq, struct entityq *q, char *file, enum rtype type,
-    const struct repo *rp, const unsigned char *dgst,
-    const unsigned char *pkey, size_t pkeysz, char *descr)
+    const struct repo *rp, const unsigned char *pkey, size_t pkeysz,
+    char *descr)
 {
 	struct entity	*p;
 
@@ -381,10 +373,7 @@ entityq_add(struct msgbuf *msgq, struct entityq *q, char *file, enum rtype type,
 	p->type = type;
 	p->uri = file;
 	p->repo = (rp != NULL) ? (ssize_t)rp->id : -1;
-	p->has_dgst = dgst != NULL;
 	p->has_pkey = pkey != NULL;
-	if (p->has_dgst)
-		memcpy(p->dgst, dgst, sizeof(p->dgst));
 	if (p->has_pkey) {
 		p->pkeysz = pkeysz;
 		if ((p->pkey = malloc(pkeysz)) == NULL)
@@ -422,8 +411,6 @@ queue_add_from_mft(struct msgbuf *msgq, struct entityq *q, const char *mft,
 	char		*cp, *nfile;
 
 	/* Construct local path from filename. */
-	/* We know this is host/module/... */
-
 	cp = strrchr(mft, '/');
 	assert(cp != NULL);
 	assert(cp - mft < INT_MAX);
@@ -435,7 +422,7 @@ queue_add_from_mft(struct msgbuf *msgq, struct entityq *q, const char *mft,
 	 * that the repository has already been loaded.
 	 */
 
-	entityq_add(msgq, q, nfile, type, NULL, file->hash, NULL, 0, NULL);
+	entityq_add(msgq, q, nfile, type, NULL, NULL, 0, NULL);
 }
 
 /*
@@ -526,7 +513,7 @@ queue_add_tal(struct msgbuf *msgq, struct entityq *q, const char *file)
 	}
 
 	/* Not in a repository, so directly add to queue. */
-	entityq_add(msgq, q, nfile, RTYPE_TAL, NULL, NULL, NULL, 0, buf);
+	entityq_add(msgq, q, nfile, RTYPE_TAL, NULL, NULL, 0, buf);
 	/* entityq_add makes a copy of buf */
 	free(buf);
 }
@@ -557,7 +544,7 @@ queue_add_from_tal(struct msgbuf *procq, struct msgbuf *rsyncq,
 	repo = repo_lookup(rsyncq, uri);
 	nfile = repo_filename(repo, uri);
 
-	entityq_add(procq, q, nfile, RTYPE_CER, repo, NULL, tal->pkey,
+	entityq_add(procq, q, nfile, RTYPE_CER, repo, tal->pkey,
 	    tal->pkeysz, tal->descr);
 }
 
@@ -566,19 +553,15 @@ queue_add_from_tal(struct msgbuf *procq, struct msgbuf *rsyncq,
  */
 static void
 queue_add_from_cert(struct msgbuf *procq, struct msgbuf *rsyncq,
-    struct entityq *q, const char *rsyncuri, const char *rrdpuri)
+    struct entityq *q, const struct cert *cert)
 {
-	char			*nfile;
 	const struct repo	*repo;
+	char			*nfile;
 
-	if (rsyncuri == NULL)
-		return;
+	repo = repo_lookup(rsyncq, cert->mft);
+	nfile = repo_filename(repo, cert->mft);
 
-	/* Look up the repository. */
-	repo = repo_lookup(rsyncq, rsyncuri);
-	nfile = repo_filename(repo, rsyncuri);
-
-	entityq_add(procq, q, nfile, RTYPE_MFT, repo, NULL, NULL, 0, NULL);
+	entityq_add(procq, q, nfile, RTYPE_MFT, repo, NULL, 0, NULL);
 }
 
 /*
@@ -598,8 +581,7 @@ proc_parser_roa(struct entity *entp,
 	STACK_OF(X509)		*chain;
 	STACK_OF(X509_CRL)	*crls;
 
-	assert(entp->has_dgst);
-	if ((roa = roa_parse(&x509, entp->uri, entp->dgst)) == NULL)
+	if ((roa = roa_parse(&x509, entp->uri)) == NULL)
 		return NULL;
 
 	a = valid_ski_aki(entp->uri, auths, roa->ski, roa->aki);
@@ -662,7 +644,6 @@ proc_parser_mft(struct entity *entp, X509_STORE *store, X509_STORE_CTX *ctx,
 	struct auth		*a;
 	STACK_OF(X509)		*chain;
 
-	assert(!entp->has_dgst);
 	if ((mft = mft_parse(&x509, entp->uri)) == NULL)
 		return NULL;
 
@@ -717,12 +698,11 @@ proc_parser_cert(const struct entity *entp,
 	STACK_OF(X509)		*chain;
 	STACK_OF(X509_CRL)	*crls;
 
-	assert(entp->has_dgst);
 	assert(!entp->has_pkey);
 
 	/* Extract certificate data and X509. */
 
-	cert = cert_parse(&x509, entp->uri, entp->dgst);
+	cert = cert_parse(&x509, entp->uri);
 	if (cert == NULL)
 		return NULL;
 
@@ -814,7 +794,6 @@ proc_parser_root_cert(const struct entity *entp,
 	struct auth		*na;
 	char			*tal;
 
-	assert(!entp->has_dgst);
 	assert(entp->has_pkey);
 
 	/* Extract certificate data and X509. */
@@ -902,10 +881,8 @@ proc_parser_crl(struct entity *entp, X509_STORE *store,
 {
 	X509_CRL		*x509_crl;
 	struct crl		*crl;
-	const unsigned char	*dgst;
 
-	dgst = entp->has_dgst ? entp->dgst : NULL;
-	if ((x509_crl = crl_parse(entp->uri, dgst)) != NULL) {
+	if ((x509_crl = crl_parse(entp->uri)) != NULL) {
 		if ((crl = malloc(sizeof(*crl))) == NULL)
 			err(1, NULL);
 		if ((crl->aki = x509_crl_get_aki(x509_crl)) == NULL)
@@ -1105,18 +1082,17 @@ proc_parser(int fd)
 
 		switch (entp->type) {
 		case RTYPE_TAL:
-			assert(!entp->has_dgst);
 			if ((tal = tal_parse(entp->uri, entp->descr)) == NULL)
 				goto out;
 			tal_buffer(b, tal);
 			tal_free(tal);
 			break;
 		case RTYPE_CER:
-			if (entp->has_dgst)
-				cert = proc_parser_cert(entp, store, ctx,
+			if (entp->has_pkey)
+				cert = proc_parser_root_cert(entp, store, ctx,
 				    &auths, &crlt);
 			else
-				cert = proc_parser_root_cert(entp, store, ctx,
+				cert = proc_parser_cert(entp, store, ctx,
 				    &auths, &crlt);
 			c = (cert != NULL);
 			io_simple_buffer(b, &c, sizeof(int));
@@ -1140,7 +1116,6 @@ proc_parser(int fd)
 			proc_parser_crl(entp, store, ctx, &crlt);
 			break;
 		case RTYPE_ROA:
-			assert(entp->has_dgst);
 			roa = proc_parser_roa(entp, store, ctx, &auths, &crlt);
 			c = (roa != NULL);
 			io_simple_buffer(b, &c, sizeof(int));
@@ -1225,7 +1200,7 @@ entity_process(int proc, struct msgbuf *procq, struct msgbuf *rsyncq,
 			 * process the MFT.
 			 */
 			queue_add_from_cert(procq, rsyncq,
-			    q, cert->mft, cert->notify);
+			    q, cert);
 		} else
 			st->certs_invalid++;
 		cert_free(cert);
@@ -1330,8 +1305,7 @@ repo_cleanup(const char *cachedir)
 		err(1, "%s: chdir", cachedir);
 
 	for (i = 0; i < rt.reposz; i++) {
-		if (asprintf(&argv[0], "%s/%s", rt.repos[i].host,
-		    rt.repos[i].module) == -1)
+		if (asprintf(&argv[0], "%s", rt.repos[i].local) == -1)
 			err(1, NULL);
 		argv[1] = NULL;
 		if ((fts = fts_open(argv, FTS_PHYSICAL | FTS_NOSTAT,
@@ -1622,8 +1596,11 @@ main(int argc, char *argv[])
 
 		if (c == 0) {
 			for (i = j = 0; i < rt.reposz; i++)
-				if (!rt.repos[i].loaded)
+				if (!rt.repos[i].loaded) {
+					logx("pending repo %s",
+					    rt.repos[i].local);
 					j++;
+				}
 			logx("period stats: %zu pending repos", j);
 			logx("period stats: %zu pending entries", entity_queue);
 			continue;
@@ -1665,15 +1642,15 @@ main(int argc, char *argv[])
 			io_simple_read(rsync, &i, sizeof(size_t));
 			io_simple_read(rsync, &ok, sizeof(ok));
 			assert(i < rt.reposz);
+
 			assert(!rt.repos[i].loaded);
 			rt.repos[i].loaded = 1;
 			if (ok)
-				logx("%s/%s: loaded from network",
-				    rt.repos[i].host, rt.repos[i].module);
+				logx("%s: loaded from network",
+				    rt.repos[i].local);
 			else
-				logx("%s/%s: load from network failed, "
-				    "fallback to cache",
-				    rt.repos[i].host, rt.repos[i].module);
+				logx("%s: load from network failed, "
+				    "fallback to cache", rt.repos[i].local);
 			stats.repos++;
 			entityq_flush(&procq, &q, &rt.repos[i]);
 		}
@@ -1752,8 +1729,8 @@ main(int argc, char *argv[])
 
 	/* Memory cleanup. */
 	for (i = 0; i < rt.reposz; i++) {
-		free(rt.repos[i].host);
-		free(rt.repos[i].module);
+		free(rt.repos[i].local);
+		free(rt.repos[i].repo);
 	}
 	free(rt.repos);
 

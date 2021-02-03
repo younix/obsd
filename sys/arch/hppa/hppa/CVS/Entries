@@ -19,7 +19,7 @@
 /wscons_machdep.c/1.7/Tue Oct  5 19:27:55 2004//
 /pmap.c/1.174/Mon Jun  1 06:23:24 2020//
 /trap.c/1.152/Fri Dec 18 08:57:37 2020//
-/conf.c/1.71/Sun Jan 24 00:13:31 2021//
-/locore.S/1.202/Sun Jan 24 00:13:31 2021//
-/machdep.c/1.263/Sun Jan 24 00:13:31 2021//
+/conf.c/1.71/Sun Jan 24 00:20:10 2021//
+/locore.S/1.202/Sun Jan 24 00:20:10 2021//
+/machdep.c/1.263/Sun Jan 24 00:20:10 2021//
 D

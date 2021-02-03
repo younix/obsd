@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.298 2021/01/23 21:35:48 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.301 2021/02/01 16:37:48 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -598,7 +598,7 @@ ikev2_recv(struct iked *env, struct iked_message *msg)
 	    betoh64(hdr->ike_ispi), betoh64(hdr->ike_rspi),
 	    initiator);
 	msg->msg_msgid = betoh32(hdr->ike_msgid);
-	if (policy_lookup(env, msg, NULL) != 0)
+	if (policy_lookup(env, msg, NULL, NULL, 0) != 0)
 		return;
 
 	logit(hdr->ike_exchange == IKEV2_EXCHANGE_INFORMATIONAL ?
@@ -882,7 +882,7 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 		old = sa->sa_policy;
 
 		sa->sa_policy = NULL;
-		if (policy_lookup(env, msg, &sa->sa_proposals) != 0 ||
+		if (policy_lookup(env, msg, &sa->sa_proposals, NULL, 0) != 0 ||
 		    msg->msg_policy == NULL) {
 			log_info("%s: no compatible policy found",
 			    SPI_SA(sa, __func__));
@@ -917,8 +917,8 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 
 		/* verify policy on initiator */
 		sa->sa_policy = NULL;
-		if (policy_lookup(env, msg, &sa->sa_proposals) != 0 ||
-		    msg->msg_policy != old) {
+		if (policy_lookup(env, msg, &sa->sa_proposals, &old->pol_flows,
+		    old->pol_nflows) != 0 || msg->msg_policy != old) {
 
 			/* get dstid */
 			if (msg->msg_id.id_type) {
@@ -5323,8 +5323,8 @@ ikev2_sa_responder(struct iked *env, struct iked_sa *sa, struct iked_sa *osa,
 	if (osa == NULL) {
 		old = sa->sa_policy;
 		sa->sa_policy = NULL;
-		if (policy_lookup(env, msg, &msg->msg_proposals) != 0 ||
-		    msg->msg_policy == NULL) {
+		if (policy_lookup(env, msg, &msg->msg_proposals,
+		    NULL, 0) != 0 || msg->msg_policy == NULL) {
 			sa->sa_policy = old;
 			log_info("%s: no proposal chosen", __func__);
 			msg->msg_error = IKEV2_N_NO_PROPOSAL_CHOSEN;
@@ -5929,8 +5929,10 @@ ikev2_childsa_negotiate(struct iked *env, struct iked_sa *sa,
 			flowa->flow_local = &sa->sa_local;
 			flowa->flow_peer = &sa->sa_peer;
 			flowa->flow_ikesa = sa;
-			if (ikev2_cp_fixflow(sa, flow, flowa) == -1)
+			if (ikev2_cp_fixflow(sa, flow, flowa) == -1) {
+				flow_free(flowa);
 				continue;
+			}
 
 			skip = 0;
 			TAILQ_FOREACH(saflow, &sa->sa_flows, flow_entry) {
@@ -5957,8 +5959,11 @@ ikev2_childsa_negotiate(struct iked *env, struct iked_sa *sa,
 			    sizeof(flow->flow_dst));
 			memcpy(&flowb->flow_dst, &flow->flow_src,
 			    sizeof(flow->flow_src));
-			if (ikev2_cp_fixflow(sa, flow, flowb) == -1)
+			if (ikev2_cp_fixflow(sa, flow, flowb) == -1) {
+				flow_free(flowa);
+				flow_free(flowb);
 				continue;
+			}
 
 			TAILQ_INSERT_TAIL(&sa->sa_flows, flowa, flow_entry);
 			TAILQ_INSERT_TAIL(&sa->sa_flows, flowb, flow_entry);
@@ -6964,7 +6969,7 @@ ikev2_cp_fixaddr(struct iked_sa *sa, struct iked_addr *addr,
 			return (-1);
 		in4 = (struct sockaddr_in *)&addr->addr;
 		if (in4->sin_addr.s_addr)
-			return (-1);
+			return (-2);
 		memcpy(patched, naddr, sizeof(*patched));
 		patched->addr_net = 0;
 		patched->addr_mask = 32;
@@ -6976,7 +6981,7 @@ ikev2_cp_fixaddr(struct iked_sa *sa, struct iked_addr *addr,
 			return (-1);
 		in6 = (struct sockaddr_in6 *)&addr->addr;
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6->sin6_addr))
-			return (-1);
+			return (-2);
 		memcpy(patched, naddr, sizeof(*patched));
 		patched->addr_net = 0;
 		patched->addr_mask = 128;

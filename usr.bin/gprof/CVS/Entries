@@ -11,10 +11,8 @@
 /dfn.c/1.8/Sun Mar 16 18:38:30 2014//
 /elf.c/1.6/Sun Oct 29 08:45:53 2017//
 /gprof.1/1.24/Thu Oct  6 07:17:06 2016//
-/gprof.c/1.26/Sat Oct  8 19:55:39 2016//
 /gprof.callg/1.1.1.1/Wed Oct 18 08:45:20 1995//
 /gprof.flat/1.1.1.1/Wed Oct 18 08:45:20 1995//
-/gprof.h/1.16/Sun Dec  6 23:22:51 2015//
 /hertz.c/1.7/Fri Jan 16 06:40:08 2015//
 /hppa.c/1.4/Tue Jan 20 04:41:01 2015//
 /hppa.h/1.4/Tue Jun  3 02:56:08 2003//
@@ -37,3 +35,5 @@
 D/PSD.doc////
 /powerpc64.c/1.1/Fri Dec 11 17:58:24 2020//
 /powerpc64.h/1.1/Fri Dec 11 17:58:24 2020//
+/gprof.c/1.27/Wed Feb  3 13:05:05 2021//
+/gprof.h/1.17/Wed Feb  3 13:05:05 2021//

@@ -34,6 +34,6 @@
 /sendsig.c/1.34/Fri Dec 18 08:57:37 2020//
 /softintr.c/1.22/Fri Dec 18 08:57:37 2020//
 /trap.c/1.152/Fri Dec 18 08:57:37 2020//
-/mips64_machdep.c/1.34/Sun Jan 24 00:13:32 2021//
-/pmap.c/1.115/Mon Jan  4 07:11:05 2021//
+/mips64_machdep.c/1.34/Sun Jan 24 00:20:10 2021//
+/pmap.c/1.115/Sun Jan 24 00:20:10 2021//
 D

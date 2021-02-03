@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_mcx.c,v 1.94 2021/01/20 10:04:26 jmatthew Exp $ */
+/*	$OpenBSD: if_mcx.c,v 1.98 2021/01/27 07:46:11 dlg Exp $ */
 
 /*
  * Copyright (c) 2017 David Gwynne <dlg@openbsd.org>
@@ -34,6 +34,7 @@
 #include <sys/task.h>
 #include <sys/atomic.h>
 #include <sys/timetc.h>
+#include <sys/intrmap.h>
 
 #include <machine/bus.h>
 #include <machine/intr.h>
@@ -84,7 +85,7 @@
 #define MCX_LOG_RQ_SIZE			10
 #define MCX_LOG_SQ_SIZE			11
 
-#define MCX_MAX_QUEUES			1
+#define MCX_MAX_QUEUES			16
 
 /* completion event moderation - about 10khz, or 90% of the cq */
 #define MCX_CQ_MOD_PERIOD		50
@@ -2477,8 +2478,8 @@ struct mcx_softc {
 	uint32_t		 sc_mhz;
 	uint32_t		 sc_khz;
 
-	struct mcx_queues	 sc_queues[MCX_MAX_QUEUES];
-	unsigned int		 sc_nqueues;
+	struct intrmap		*sc_intrmap;
+	struct mcx_queues	*sc_queues;
 
 	int			 sc_mcam_reg;
 
@@ -2830,6 +2831,12 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 		goto teardown;
 	}
 
+	msix = pci_intr_msix_count(pa->pa_pc, pa->pa_tag);
+	if (msix < 2) {
+		printf(": not enough msi-x vectors\n");
+		goto teardown;
+	}
+
 	/*
 	 * PRM makes no mention of msi interrupts, just legacy and msi-x.
 	 * mellanox support tells me legacy interrupts are not supported,
@@ -2877,8 +2884,19 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 	printf(", %s, address %s\n", intrstr,
 	    ether_sprintf(sc->sc_ac.ac_enaddr));
 
-	msix = pci_intr_msix_count(pa->pa_pc, pa->pa_tag);
-	sc->sc_nqueues = 1;
+	msix--; /* admin ops took one */
+	sc->sc_intrmap = intrmap_create(&sc->sc_dev, msix, MCX_MAX_QUEUES,
+	    INTRMAP_POWEROF2);
+	if (sc->sc_intrmap == NULL) {
+		printf("%s: unable to create interrupt map\n", DEVNAME(sc));
+		goto teardown;
+	}
+	sc->sc_queues = mallocarray(intrmap_count(sc->sc_intrmap),
+	    sizeof(*sc->sc_queues), M_DEVBUF, M_WAITOK|M_ZERO);
+	if (sc->sc_queues == NULL) {
+		printf("%s: unable to create queues\n", DEVNAME(sc));
+		goto intrunmap;
+	}
 
 	strlcpy(ifp->if_xname, DEVNAME(sc), IFNAMSIZ);
 	ifp->if_softc = sc;
@@ -2905,9 +2923,9 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 	if_attach(ifp);
 	ether_ifattach(ifp);
 
-	if_attach_iqueues(ifp, sc->sc_nqueues);
-	if_attach_queues(ifp, sc->sc_nqueues);
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	if_attach_iqueues(ifp, intrmap_count(sc->sc_intrmap));
+	if_attach_queues(ifp, intrmap_count(sc->sc_intrmap));
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		struct ifiqueue *ifiq = ifp->if_iqs[i];
 		struct ifqueue *ifq = ifp->if_ifqs[i];
 		struct mcx_queues *q = &sc->sc_queues[i];
@@ -2923,13 +2941,13 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 		if (mcx_alloc_uar(sc, &q->q_uar) != 0) {
 			printf("%s: unable to alloc uar %d\n",
 			    DEVNAME(sc), i);
-			goto teardown;
+			goto intrdisestablish;
 		}
 
 		if (mcx_create_eq(sc, &q->q_eq, q->q_uar, 0, vec) != 0) {
 			printf("%s: unable to create event queue %d\n",
 			    DEVNAME(sc), i);
-			goto teardown;
+			goto intrdisestablish;
 		}
 
 		rx->rx_softc = sc;
@@ -2944,12 +2962,18 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 		if (pci_intr_map_msix(pa, vec, &ih) != 0) {
 			printf("%s: unable to map queue interrupt %d\n",
 			    DEVNAME(sc), i);
-			goto teardown;
+			goto intrdisestablish;
 		}
 		snprintf(q->q_name, sizeof(q->q_name), "%s:%d",
 		    DEVNAME(sc), i);
-		q->q_ihc = pci_intr_establish(sc->sc_pc, ih,
-		    IPL_NET | IPL_MPSAFE, mcx_cq_intr, q, q->q_name);
+		q->q_ihc = pci_intr_establish_cpu(sc->sc_pc, ih,
+		    IPL_NET | IPL_MPSAFE, intrmap_cpu(sc->sc_intrmap, i),
+		    mcx_cq_intr, q, q->q_name);
+		if (q->q_ihc == NULL) {
+			printf("%s: unable to establish interrupt %d\n",
+			    DEVNAME(sc), i);
+			goto intrdisestablish;
+		}
 	}
 
 	timeout_set(&sc->sc_calibrate, mcx_calibrate, sc);
@@ -2976,6 +3000,19 @@ mcx_attach(struct device *parent, struct device *self, void *aux)
 	mcx_timecounter_attach(sc);
 	return;
 
+intrdisestablish:
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
+		struct mcx_queues *q = &sc->sc_queues[i];
+		if (q->q_ihc == NULL)
+			continue;
+		pci_intr_disestablish(sc->sc_pc, q->q_ihc);
+		q->q_ihc = NULL;
+	}
+	free(sc->sc_queues, M_DEVBUF,
+	    intrmap_count(sc->sc_intrmap) * sizeof(*sc->sc_queues));
+intrunmap:
+	intrmap_destroy(sc->sc_intrmap);
+	sc->sc_intrmap = NULL;
 teardown:
 	mcx_teardown_hca(sc, htobe16(MCX_CMD_TEARDOWN_HCA_GRACEFUL));
 	/* error printed by mcx_teardown_hca, and we're already unwinding */
@@ -6785,7 +6822,7 @@ mcx_process_rx(struct mcx_softc *sc, struct mcx_rx *rx,
 
 	flags = bemtoh32(&cqe->cq_flags);
 	if (flags & MCX_CQ_ENTRY_FLAGS_L3_OK)
-		m->m_pkthdr.csum_flags = M_IPV4_CSUM_IN_OK;
+		m->m_pkthdr.csum_flags |= M_IPV4_CSUM_IN_OK;
 	if (flags & MCX_CQ_ENTRY_FLAGS_L4_OK)
 		m->m_pkthdr.csum_flags |= M_TCP_CSUM_IN_OK |
 		    M_UDP_CSUM_IN_OK;
@@ -7156,7 +7193,7 @@ mcx_up(struct mcx_softc *sc)
 	if (mcx_create_tis(sc, &sc->sc_tis) != 0)
 		goto down;
 
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		if (mcx_queue_up(sc, &sc->sc_queues[i]) != 0) {
 			goto down;
 		}
@@ -7264,10 +7301,11 @@ mcx_up(struct mcx_softc *sc)
 	 * since we also restrict the number of queues to a power of two,
 	 * we can just put each rx queue in once.
 	 */
-	for (i = 0; i < sc->sc_nqueues; i++)
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++)
 		rqns[i] = sc->sc_queues[i].q_rx.rx_rqn;
 
-	if (mcx_create_rqt(sc, sc->sc_nqueues, rqns, &sc->sc_rqt) != 0)
+	if (mcx_create_rqt(sc, intrmap_count(sc->sc_intrmap), rqns,
+	    &sc->sc_rqt) != 0)
 		goto down;
 
 	start = 0;
@@ -7297,7 +7335,7 @@ mcx_up(struct mcx_softc *sc)
 		flow_index++;
 	}
 
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		struct mcx_queues *q = &sc->sc_queues[i];
 		rx = &q->q_rx;
 		tx = &q->q_tx;
@@ -7371,7 +7409,7 @@ mcx_down(struct mcx_softc *sc)
 		flow_index++;
 	}
 	intr_barrier(sc->sc_ihc);
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		struct ifqueue *ifq = sc->sc_queues[i].q_tx.tx_ifq;
 		ifq_barrier(ifq);
 
@@ -7400,7 +7438,7 @@ mcx_down(struct mcx_softc *sc)
 		sc->sc_rqt = -1;
 	}
 
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		struct mcx_queues *q = &sc->sc_queues[i];
 		struct mcx_rx *rx = &q->q_rx;
 		struct mcx_tx *tx = &q->q_tx;
@@ -7607,12 +7645,12 @@ mcx_rxrinfo(struct mcx_softc *sc, struct if_rxrinfo *ifri)
 	unsigned int i;
 	int error;
 
-	ifrs = mallocarray(sc->sc_nqueues, sizeof(*ifrs), M_TEMP,
-	    M_WAITOK|M_ZERO|M_CANFAIL);
+	ifrs = mallocarray(intrmap_count(sc->sc_intrmap), sizeof(*ifrs),
+	    M_TEMP, M_WAITOK|M_ZERO|M_CANFAIL);
 	if (ifrs == NULL)
 		return (ENOMEM);
 
-	for (i = 0; i < sc->sc_nqueues; i++) {
+	for (i = 0; i < intrmap_count(sc->sc_intrmap); i++) {
 		struct mcx_rx *rx = &sc->sc_queues[i].q_rx;
 		struct if_rxring_info *ifr = &ifrs[i];
 
@@ -8564,7 +8602,7 @@ mcx_kstat_attach_queues(struct mcx_softc *sc)
 	struct kstat_kv *kvs;
 	int q, i;
 
-	for (q = 0; q < sc->sc_nqueues; q++) {
+	for (q = 0; q < intrmap_count(sc->sc_intrmap); q++) {
 		ks = kstat_create(DEVNAME(sc), 0, "mcx-queues", q,
 		    KSTAT_T_KV, 0);
 		if (ks == NULL) {

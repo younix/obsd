@@ -12,8 +12,6 @@
 /config.h/1.10/Sun Mar  2 11:58:45 2008//
 /cvs.1/1.128/Thu Dec 24 16:54:37 2015//
 /cvs.5/1.9/Sat Jun 29 09:08:41 2013//
-/cvs.c/1.159/Thu Jun  1 08:08:24 2017//
-/cvs.h/1.184/Thu Jun  1 08:08:24 2017//
 /cvsintro.7/1.16/Wed Dec  5 15:34:52 2018//
 /date.y/1.26/Thu Jul 20 13:39:11 2017//
 /diff.c/1.163/Thu Jun  1 08:08:24 2017//
@@ -46,7 +44,6 @@
 /repository.h/1.6/Fri Jul 23 08:31:19 2010//
 /root.c/1.49/Thu Jun  1 08:08:24 2017//
 /status.c/1.100/Thu Jun  1 08:08:24 2017//
-/tag.c/1.87/Thu Jun  1 08:08:24 2017//
 /trigger.c/1.23/Thu Nov  5 09:48:21 2015//
 /trigger.h/1.2/Tue Jun 10 05:29:14 2008//
 /update.c/1.176/Thu Jun  1 08:08:24 2017//
@@ -66,4 +63,7 @@
 /logmsg.c/1.61/Fri Dec 18 08:57:37 2020//
 /rcs.c/1.320/Fri Dec 18 08:57:37 2020//
 /server.c/1.106/Fri Dec 18 08:57:37 2020//
+/cvs.c/1.160/Wed Feb  3 13:05:05 2021//
+/cvs.h/1.185/Wed Feb  3 13:05:05 2021//
+/tag.c/1.88/Wed Feb  3 13:05:05 2021//
 D

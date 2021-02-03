@@ -1,15 +1,15 @@
 /Makefile/1.24/Thu Feb 12 01:49:02 2015//
-/inet6.c/1.54/Sun Dec  8 11:08:22 2019//
 /mbuf.c/1.43/Tue Jul 16 17:39:02 2019//
 /mroute.c/1.26/Mon Sep  2 12:48:44 2019//
 /mroute6.c/1.24/Mon Jun  4 19:20:12 2018//
 /net80211.c/1.19/Fri Jun 28 13:35:02 2019//
 /unix.c/1.32/Thu Apr 26 12:42:51 2018//
-/main.c/1.120/Fri Dec 11 17:58:24 2020//
-/netstat.h/1.75/Fri Dec 11 17:58:24 2020//
-/if.c/1.77/Sun Jan 24 00:13:39 2021//
-/inet.c/1.170/Sun Jan 24 00:13:39 2021//
-/netstat.1/1.92/Mon Jan  4 07:11:05 2021//
-/route.c/1.106/Mon Jan  4 07:11:05 2021//
-/show.c/1.57/Sun Jan 24 00:13:39 2021//
+/if.c/1.77/Sun Jan 24 00:20:10 2021//
+/inet.c/1.171/Wed Feb  3 13:05:06 2021//
+/inet6.c/1.55/Wed Feb  3 13:05:06 2021//
+/main.c/1.121/Wed Feb  3 13:05:06 2021//
+/netstat.1/1.92/Sun Jan 24 00:20:10 2021//
+/netstat.h/1.76/Wed Feb  3 13:05:06 2021//
+/route.c/1.106/Sun Jan 24 00:20:10 2021//
+/show.c/1.58/Wed Feb  3 13:05:06 2021//
 D

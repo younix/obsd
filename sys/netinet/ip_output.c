@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_output.c,v 1.361 2021/01/16 07:58:12 claudio Exp $	*/
+/*	$OpenBSD: ip_output.c,v 1.363 2021/02/02 17:47:42 claudio Exp $	*/
 /*	$NetBSD: ip_output.c,v 1.28 1996/02/13 23:43:07 christos Exp $	*/
 
 /*
@@ -625,6 +625,9 @@ ip_output_ipsec_send(struct tdb *tdb, struct mbuf *m, struct route *ro, int fwd)
 		m_freem(m);
 		return EMSGSIZE;
 	}
+	/* propagate IP_DF for v4-over-v6 */
+	if (ip_mtudisc && ip->ip_off & htons(IP_DF))
+		SET(m->m_pkthdr.csum_flags, M_IPV6_DF_OUT);
 
 	/*
 	 * Clear these -- they'll be set in the recursive invocation
@@ -1444,8 +1447,10 @@ ip_setmoptions(int optname, struct ip_moptions **imop, struct mbuf *m,
 			 */
 			if (mreqn.imr_ifindex != 0) {
 				ifp = if_get(mreqn.imr_ifindex);
-				if (ifp == NULL) {
+				if (ifp == NULL ||
+				    ifp->if_rdomain != rtable_l2(rtableid)) {
 					error = EADDRNOTAVAIL;
+					if_put(ifp);
 					break;
 				}
 				imo->imo_ifidx = ifp->if_index;
@@ -1534,7 +1539,8 @@ ip_setmoptions(int optname, struct ip_moptions **imop, struct mbuf *m,
 		 * supports multicast.
 		 */
 		ifp = if_get(ifidx);
-		if (ifp == NULL || (ifp->if_flags & IFF_MULTICAST) == 0) {
+		if (ifp == NULL || ifp->if_rdomain != rtable_l2(rtableid) ||
+		    (ifp->if_flags & IFF_MULTICAST) == 0) {
 			error = EADDRNOTAVAIL;
 			if_put(ifp);
 			break;

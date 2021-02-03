@@ -2,11 +2,9 @@
 /dir.c/1.32/Tue Jan 20 18:22:21 2015//
 /extern.h/1.14/Fri Sep  9 15:37:15 2016//
 /fsck_ffs.8/1.26/Thu Sep  1 13:48:15 2016//
-/main.c/1.52/Mon Sep 24 21:26:02 2018//
 /pass2.c/1.37/Tue Jan 20 18:22:21 2015//
 /pass3.c/1.18/Tue Jan 20 18:22:21 2015//
 D/SMM.doc////
-/fsck.h/1.33/Fri Dec 11 17:58:22 2020//
 /inode.c/1.50/Fri Dec 11 17:58:22 2020//
 /pass1.c/1.47/Fri Dec 11 17:58:22 2020//
 /pass1b.c/1.22/Fri Dec 11 17:58:22 2020//
@@ -14,3 +12,5 @@ D/SMM.doc////
 /pass5.c/1.50/Fri Dec 11 17:58:22 2020//
 /setup.c/1.67/Fri Dec 11 17:58:22 2020//
 /utilities.c/1.54/Fri Dec 11 17:58:22 2020//
+/fsck.h/1.34/Wed Feb  3 13:04:56 2021//
+/main.c/1.53/Wed Feb  3 13:04:56 2021//
