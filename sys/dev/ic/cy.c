@@ -268,7 +268,7 @@ cyopen(dev, flag, mode, p)
 	struct cy_softc *sc;
 	struct cy_port *cy;
 	struct tty *tp;
-	int s, error;
+	int s;//, error;
 
 	if (card >= cy_cd.cd_ndevs ||
 	    (sc = cy_cd.cd_devs[card]) == NULL) {
@@ -400,14 +400,15 @@ printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				return EBUSY;
 			}
 		} else {
+/*
 			while (cy->cy_cua ||
 			    (!ISSET(tp->t_cflag, CLOCAL) &&
 			    !ISSET(tp->t_state, TS_CARR_ON))) {
 				SET(tp->t_state, TS_WOPEN);
 
 printf("%s %s:%d enter ttysleep\n", sc->sc_dev.dv_xname, __func__, __LINE__);
-//				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
-//				    "cydcd");
+				error = ttysleep(tp, &tp->t_rawq, TTIPRI | PCATCH,
+				    "cydcd");
 printf("%s %s:%d exit ttysleep\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 				if (error != 0 && ISSET(tp->t_state, TS_WOPEN)) {
 					CLR(tp->t_state, TS_WOPEN);
@@ -416,6 +417,7 @@ printf("%s %s:%d return EBUSY\n", sc->sc_dev.dv_xname, __func__, __LINE__);
 					return (error);
 				}
 			}
+*/
 		}
 	}
 	splx(s);
@@ -505,10 +507,17 @@ cywrite(dev, uio, flag)
 	struct cy_port *cy = &sc->sc_ports[port];
 	struct tty *tp = cy->cy_tty;
 
-#ifdef CY_DEBUG
+//#ifdef CY_DEBUG
 	printf("%s write port %d uio %p flag 0x%x\n", sc->sc_dev.dv_xname,
 	    port, uio, flag);
-#endif
+
+	printf("%s write: ", sc->sc_dev.dv_xname);
+	for (int i = 0; i < uio->uio_iovcnt; i++)
+		for (size_t l = 0; l < uio->uio_iov[i].iov_len; l++)
+			printf("%c", ((char *)(uio->uio_iov[i].iov_base))[l]);
+	printf("\n");
+
+//#endif
 
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
 }
