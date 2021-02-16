@@ -772,9 +772,6 @@ nvme_scsi_inquiry(struct scsi_xfer *xs)
 	struct scsi_inquiry_data inq;
 	struct scsi_link *link = xs->sc_link;
 	struct nvme_softc *sc = link->bus->sb_adapter_softc;
-	struct nvm_identify_namespace *ns;
-
-	ns = sc->sc_namespaces[link->target].ident;
 
 	memset(&inq, 0, sizeof(inq));
 
@@ -812,13 +809,17 @@ nvme_scsi_capacity16(struct scsi_xfer *xs)
 		return;
 	}
 
-	/* sd_read_cap_16() will add one */
-	nsze = lemtoh64(&ns->nsze) - 1;
-	f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
-
 	memset(&rcd, 0, sizeof(rcd));
-	_lto8b(nsze, rcd.addr);
-	_lto4b(1 << f->lbads, rcd.length);
+
+	if (ns != NULL) {
+		/* sd_read_cap_16() will add one */
+		nsze = lemtoh64(&ns->nsze) - 1;
+		f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
+
+		_lto8b(nsze, rcd.addr);
+		_lto4b(1 << f->lbads, rcd.length);
+	}
+
 	_lto2b(tpe, rcd.lowest_aligned);
 
 	memcpy(xs->data, &rcd, MIN(sizeof(rcd), xs->datalen));
@@ -845,16 +846,19 @@ nvme_scsi_capacity(struct scsi_xfer *xs)
 		return;
 	}
 
-	/* sd_read_cap_10() will add one */
-	nsze = lemtoh64(&ns->nsze) - 1;
-	if (nsze > 0xffffffff)
-		nsze = 0xffffffff;
-
-	f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
-
 	memset(&rcd, 0, sizeof(rcd));
-	_lto4b(nsze, rcd.addr);
-	_lto4b(1 << f->lbads, rcd.length);
+
+	if (ns != NULL) {
+		/* sd_read_cap_10() will add one */
+		nsze = lemtoh64(&ns->nsze) - 1;
+		if (nsze > 0xffffffff)
+			nsze = 0xffffffff;
+
+		f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
+
+		_lto4b(nsze, rcd.addr);
+		_lto4b(1 << f->lbads, rcd.length);
+	}
 
 	memcpy(xs->data, &rcd, MIN(sizeof(rcd), xs->datalen));
 
