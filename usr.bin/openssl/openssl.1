@@ -4599,6 +4599,7 @@ will be used.
 .Op Fl keymatexportlen Ar len
 .Op Fl msg
 .Op Fl mtu Ar mtu
+.Op Fl naccept Ar n
 .Op Fl named_curve Ar arg
 .Op Fl nbio
 .Op Fl nbio_test
@@ -4795,6 +4796,10 @@ Export len bytes of keying material (default 20).
 Show all protocol messages with hex dump.
 .It Fl mtu Ar mtu
 Set the link layer MTU.
+.It Fl naccept Ar n
+Exit after
+.Ar n
+connections.
 .It Fl named_curve Ar arg
 Specify the elliptic curve name to use for ephemeral ECDH keys.
 This option is deprecated; use
