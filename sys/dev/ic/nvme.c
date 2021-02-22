@@ -468,6 +468,9 @@ nvme_scsi_probe(struct scsi_link *link)
 		identify = malloc(sizeof(*identify), M_DEVBUF, M_WAITOK);
 		memcpy(identify, NVME_DMA_KVA(mem), sizeof(*identify));
 		sc->sc_namespaces[link->target].ident = identify;
+	} else {
+		/* Don't attach a namespace if its size is zero. */
+		rv = 0;
 	}
 
 	nvme_dmamem_free(sc, mem);
