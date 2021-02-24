@@ -23,6 +23,7 @@ SUBDIR += ecdsa
 SUBDIR += engine
 SUBDIR += evp
 SUBDIR += exp
+SUBDIR += expcert
 SUBDIR += free
 SUBDIR += gcm128
 SUBDIR += gost
