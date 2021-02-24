@@ -15,6 +15,8 @@ REGRESS_TARGETS =	test-chain-with-root-CA
 REGRESS_TARGETS +=	test-chain-without-root-CA
 REGRESS_SETUP_ONCE =	create-certs
 
+REGRESS_EXPECTED_FAILURES = test-chain-without-root-CA
+
 create-certs: create-certs.pl ${PROG}
 	perl ${.CURDIR}/create-certs.pl
 
