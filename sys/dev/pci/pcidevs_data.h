@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.1954 2021/01/31 10:51:53 patrick Exp 
+ *	OpenBSD: pcidevs,v 1.1956 2021/02/22 01:17:23 jsg Exp 
  */
 
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
@@ -1208,6 +1208,38 @@ static const struct pci_known_product pci_known_products[] = {
 	    "16h PCIE",
 	},
 	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_1,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_2,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_3,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_4,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_5,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_6,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_7,
+	    "17h Data Fabric",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_DF_8,
+	    "17h Data Fabric",
+	},
+	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_6X_DF_0,
 	    "17h/6xh Data Fabric",
 	},
@@ -1321,15 +1353,35 @@ static const struct pci_known_product pci_known_products[] = {
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_3X_RC,
-	    "17h/3xh Root Complex",
+	    "17h Root Complex",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_IOMMU,
+	    "17h IOMMU",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_HB,
+	    "17h Host",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_PCIE_1,
+	    "17h PCIE",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_PCIE_2,
+	    "17h PCIE",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_3X_CCP,
-	    "17h/3xh Crypto",
+	    "17h Crypto",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_3X_HDA,
-	    "17h/3xh HD Audio",
+	    "17h HD Audio",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_17_7X_XHCI,
+	    "17h xHCI",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_14_HB,
@@ -1762,6 +1814,22 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_400SERIES_XHCI,
 	    "400 Series xHCI",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_500SERIES_PCIE_1,
+	    "500 Series PCIE",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_500SERIES_PCIE_2,
+	    "500 Series PCIE",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_500SERIES_AHCI,
+	    "500 Series AHCI",
+	},
+	{
+	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_500SERIES_XHCI,
+	    "500 Series xHCI",
 	},
 	{
 	    PCI_VENDOR_AMD, PCI_PRODUCT_AMD_SC751_SC,
@@ -2372,6 +2440,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "BCM5701",
 	},
 	{
+	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_M1_PCIE,
+	    "M1 PCIe",
+	},
+	{
 	    PCI_VENDOR_APPLE, PCI_PRODUCT_APPLE_NVME1,
 	    "NVMe",
 	},
@@ -2802,6 +2874,14 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_KAVERI_22,
 	    "Kaveri Radeon R6",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_NAVI10_PPB_1,
+	    "Navi 10 PCIE",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_NAVI10_PPB_2,
+	    "Navi 10 PCIE",
 	},
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_PICASSO,
@@ -7008,6 +7088,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "Radeon Rx Vega HD Audio",
 	},
 	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_NAVI10_HDA_1,
+	    "Navi 10 HD Audio",
+	},
+	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RS100_AGP,
 	    "RS100 AGP",
 	},
@@ -9518,6 +9602,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_FRESCO, PCI_PRODUCT_FRESCO_FL1009,
 	    "FL1009 xHCI",
+	},
+	{
+	    PCI_VENDOR_FRESCO, PCI_PRODUCT_FRESCO_FL1100,
+	    "FL1100 xHCI",
 	},
 	{
 	    PCI_VENDOR_FRESCO, PCI_PRODUCT_FRESCO_FL1400,
@@ -22144,6 +22232,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "xD",
 	},
 	{
+	    PCI_VENDOR_KINGSTON, PCI_PRODUCT_KINGSTON_A2000,
+	    "A2000",
+	},
+	{
 	    PCI_VENDOR_KTI, PCI_PRODUCT_KTI_KTIE,
 	    "KTI",
 	},
@@ -32630,6 +32722,10 @@ static const struct pci_known_vendor pci_known_vendors[] = {
 	{
 	    PCI_VENDOR_SUNIX2,
 	    "Sunix",
+	},
+	{
+	    PCI_VENDOR_KINGSTON,
+	    "Kingston",
 	},
 	{
 	    PCI_VENDOR_HINT,
