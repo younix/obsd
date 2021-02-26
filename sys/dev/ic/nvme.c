@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvme.c,v 1.89 2020/10/15 13:22:13 krw Exp $ */
+/*	$OpenBSD: nvme.c,v 1.91 2021/02/25 07:30:36 jan Exp $ */
 
 /*
  * Copyright (c) 2014 David Gwynne <dlg@openbsd.org>
@@ -463,14 +463,16 @@ nvme_scsi_probe(struct scsi_link *link)
 	scsi_io_put(&sc->sc_iopool, ccb);
 
 	identify = NVME_DMA_KVA(mem);
-	if (rv == 0 && lemtoh64(&identify->nsze) > 0) {
-		/* Commit namespace if it has a size greater than zero. */
-		identify = malloc(sizeof(*identify), M_DEVBUF, M_WAITOK);
-		memcpy(identify, NVME_DMA_KVA(mem), sizeof(*identify));
-		sc->sc_namespaces[link->target].ident = identify;
-	} else {
-		/* Don't attach a namespace if its size is zero. */
-		rv = 0;
+	if (rv == 0) {
+		if (lemtoh64(&identify->nsze) > 0) {
+			/* Commit namespace if it has a size greater than zero. */
+			identify = malloc(sizeof(*identify), M_DEVBUF, M_WAITOK);
+			memcpy(identify, NVME_DMA_KVA(mem), sizeof(*identify));
+			sc->sc_namespaces[link->target].ident = identify;
+		} else {
+			/* Don't attach a namespace if its size is zero. */
+			rv = ENXIO;
+		}
 	}
 
 	nvme_dmamem_free(sc, mem);
@@ -775,6 +777,9 @@ nvme_scsi_inquiry(struct scsi_xfer *xs)
 	struct scsi_inquiry_data inq;
 	struct scsi_link *link = xs->sc_link;
 	struct nvme_softc *sc = link->bus->sb_adapter_softc;
+	struct nvm_identify_namespace *ns;
+
+	ns = sc->sc_namespaces[link->target].ident;
 
 	memset(&inq, 0, sizeof(inq));
 
@@ -812,17 +817,13 @@ nvme_scsi_capacity16(struct scsi_xfer *xs)
 		return;
 	}
 
+	/* sd_read_cap_16() will add one */
+	nsze = lemtoh64(&ns->nsze) - 1;
+	f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
+
 	memset(&rcd, 0, sizeof(rcd));
-
-	if (ns != NULL) {
-		/* sd_read_cap_16() will add one */
-		nsze = lemtoh64(&ns->nsze) - 1;
-		f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
-
-		_lto8b(nsze, rcd.addr);
-		_lto4b(1 << f->lbads, rcd.length);
-	}
-
+	_lto8b(nsze, rcd.addr);
+	_lto4b(1 << f->lbads, rcd.length);
 	_lto2b(tpe, rcd.lowest_aligned);
 
 	memcpy(xs->data, &rcd, MIN(sizeof(rcd), xs->datalen));
@@ -849,19 +850,16 @@ nvme_scsi_capacity(struct scsi_xfer *xs)
 		return;
 	}
 
+	/* sd_read_cap_10() will add one */
+	nsze = lemtoh64(&ns->nsze) - 1;
+	if (nsze > 0xffffffff)
+		nsze = 0xffffffff;
+
+	f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
+
 	memset(&rcd, 0, sizeof(rcd));
-
-	if (ns != NULL) {
-		/* sd_read_cap_10() will add one */
-		nsze = lemtoh64(&ns->nsze) - 1;
-		if (nsze > 0xffffffff)
-			nsze = 0xffffffff;
-
-		f = &ns->lbaf[NVME_ID_NS_FLBAS(ns->flbas)];
-
-		_lto4b(nsze, rcd.addr);
-		_lto4b(1 << f->lbads, rcd.length);
-	}
+	_lto4b(nsze, rcd.addr);
+	_lto4b(1 << f->lbads, rcd.length);
 
 	memcpy(xs->data, &rcd, MIN(sizeof(rcd), xs->datalen));
 
@@ -1000,6 +998,8 @@ nvme_q_complete(struct nvme_softc *sc, struct nvme_queue *q)
 		flags = lemtoh16(&cqe->flags);
 		if ((flags & NVME_CQE_PHASE) != q->q_cq_phase)
 			break;
+
+		membar_consumer();
 
 		ccb = &sc->sc_ccbs[cqe->cid];
 		ccb->ccb_done(sc, ccb, cqe);
