@@ -1,6 +1,5 @@
 /dot.profile/1.44/Sat Apr 27 22:08:58 2019//
 /group/1.6/Sat Apr 18 21:09:29 2020//
-/list2sh.awk/1.22/Tue Apr 30 17:46:04 2019//
 /makeconf.awk/1.28/Fri Jun  7 14:38:42 2019//
 /maketz.sh/1.4/Fri May  3 14:28:58 2019//
 /master.passwd/1.8/Sat Jul  8 15:41:25 2017//
@@ -10,4 +9,5 @@
 /services/1.6/Sun Sep 11 13:31:12 2016//
 /trimcerts.awk/1.2/Wed May 15 20:27:42 2019//
 /install.sub/1.1161/Wed Feb  3 13:03:55 2021//
+/list2sh.awk/1.23/Tue Mar  9 08:11:17 2021//
 D

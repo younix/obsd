@@ -132,7 +132,7 @@ init_client(int *sock, char *host, char *port, int type, int af)
 int
 do_server(int port, int type, int *ret,
     int (*cb) (char *hostname, int s, unsigned char *context),
-    unsigned char *context, int naccept)
+    unsigned char *context)
 {
 	int sock;
 	char *name = NULL;
@@ -161,9 +161,7 @@ do_server(int port, int type, int *ret,
 			shutdown(sock, SHUT_RDWR);
 			close(sock);
 		}
-		if (naccept != -1)
-			naccept--;
-		if (i < 0 || naccept == 0) {
+		if (i < 0) {
 			shutdown(accept_socket, SHUT_RDWR);
 			close(accept_socket);
 			return (i);

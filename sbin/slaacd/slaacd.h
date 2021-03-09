@@ -1,4 +1,4 @@
-/*	$OpenBSD: slaacd.h,v 1.28 2021/01/19 16:48:20 florian Exp $	*/
+/*	$OpenBSD: slaacd.h,v 1.31 2021/03/07 10:31:20 florian Exp $	*/
 
 /*
  * Copyright (c) 2017 Florian Obser <florian@openbsd.org>
@@ -18,7 +18,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#define	SLAACD_SOCKET		"/dev/slaacd.sock"
+#define	_PATH_SLAACD_SOCKET	"/dev/slaacd.sock"
 #define SLAACD_USER		"_slaacd"
 #define SLAACD_RTA_LABEL	"slaacd"
 
@@ -55,7 +55,6 @@ enum imsg_type {
 	IMSG_CTL_SHOW_INTERFACE_INFO_RDNS_PROPOSAL,
 	IMSG_CTL_END,
 	IMSG_UPDATE_ADDRESS,
-	IMSG_UPDATE_LINK_STATE,
 	IMSG_PROPOSE_RDNS,
 	IMSG_REPROPOSE_RDNS,
 #endif	/* SMALL */
@@ -169,18 +168,11 @@ struct ctl_engine_info_rdns_proposal {
 
 struct imsg_addrinfo {
 	uint32_t		if_index;
-	struct ether_addr	hw_address;
-	struct sockaddr_in6	ll_address;
 	struct sockaddr_in6	addr;
 	struct in6_addr		mask;
 	int			privacy;
 	uint32_t		vltime;
 	uint32_t		pltime;
-};
-
-struct imsg_link_state {
-	uint32_t	if_index;
-	int		link_state;
 };
 
 struct imsg_propose_rdns {
@@ -196,6 +188,7 @@ struct imsg_ifinfo {
 	uint32_t		if_index;
 	int			rdomain;
 	int			running;
+	int			link_state;
 	int			autoconfprivacy;
 	int			soii;
 	struct ether_addr	hw_address;

@@ -9,12 +9,12 @@
 /rbus_machdep.c/1.13/Wed Aug  7 07:29:19 2013//
 /wscons_machdep.c/1.6/Wed Jan 23 16:37:56 2008//
 /cpu.c/1.83/Mon Jun  1 06:23:24 2020//
-/clock.c/1.47/Thu Dec 17 19:39:58 2020//
 /locore.S/1.58/Fri Dec 18 08:57:37 2020//
 /machdep.c/1.193/Fri Dec 18 08:57:37 2020//
 /mainbus.c/1.26/Thu Dec 17 19:39:58 2020//
-/ofw_machdep.c/1.62/Fri Dec 18 08:57:37 2020//
 /ofwreal.S/1.7/Fri Dec 18 08:57:37 2020//
 /openprom.c/1.5/Fri Dec 18 08:57:37 2020//
 /conf.c/1.73/Sun Jan 24 00:20:10 2021//
+/clock.c/1.48/Fri Feb 26 10:30:10 2021//
+/ofw_machdep.c/1.63/Tue Mar  9 08:12:24 2021//
 D

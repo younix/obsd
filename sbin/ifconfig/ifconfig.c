@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.432 2021/01/16 17:44:29 claudio Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.435 2021/03/04 07:46:26 jsg Exp $	*/
 /*	$NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $	*/
 
 /*
@@ -468,6 +468,8 @@ const struct	cmd {
 	{ "-autoconfprivacy",	IFXF_INET6_NOPRIVACY,	0,	setifxflags },
 	{ "soii",	-IFXF_INET6_NOSOII,	0,	setifxflags },
 	{ "-soii",	IFXF_INET6_NOSOII,	0,	setifxflags },
+	{ "monitor",	IFXF_MONITOR,	0,		setifxflags },
+	{ "-monitor",	-IFXF_MONITOR,	0,		setifxflags },
 #ifndef SMALL
 	{ "hwfeatures", NEXTARG0,	0,		printifhwfeatures },
 	{ "metric",	NEXTARG,	0,		setifmetric },
@@ -675,7 +677,7 @@ const struct	cmd {
 	"\7RUNNING\10NOARP\11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX"	\
 	"\15LINK0\16LINK1\17LINK2\20MULTICAST"				\
 	"\23INET6_NOPRIVACY\24MPLS\25WOL\26AUTOCONF6\27INET6_NOSOII"	\
-	"\30AUTOCONF4"
+	"\30AUTOCONF4" "\31MONITOR"
 
 int	getinfo(struct ifreq *, int);
 void	getsock(int);
@@ -1634,16 +1636,20 @@ void
 setifgroup(const char *group_name, int dummy)
 {
 	struct ifgroupreq ifgr;
+	size_t namelen;
 
 	memset(&ifgr, 0, sizeof(ifgr));
 	strlcpy(ifgr.ifgr_name, ifname, IFNAMSIZ);
 
-	if (group_name[0] &&
-	    isdigit((unsigned char)group_name[strlen(group_name) - 1]))
+	namelen = strlen(group_name);
+	if (namelen == 0)
+		errx(1, "setifgroup: group name empty");
+	if (namelen >= IFNAMSIZ)
+		errx(1, "setifgroup: group name too long");
+	if (isdigit((unsigned char)group_name[namelen - 1]))
 		errx(1, "setifgroup: group names may not end in a digit");
 
-	if (strlcpy(ifgr.ifgr_group, group_name, IFNAMSIZ) >= IFNAMSIZ)
-		errx(1, "setifgroup: group name too long");
+	strlcpy(ifgr.ifgr_group, group_name, IFNAMSIZ);
 	if (ioctl(sock, SIOCAIFGROUP, (caddr_t)&ifgr) == -1) {
 		if (errno != EEXIST)
 			err(1," SIOCAIFGROUP");
@@ -1658,10 +1664,6 @@ unsetifgroup(const char *group_name, int dummy)
 
 	memset(&ifgr, 0, sizeof(ifgr));
 	strlcpy(ifgr.ifgr_name, ifname, IFNAMSIZ);
-
-	if (group_name[0] &&
-	    isdigit((unsigned char)group_name[strlen(group_name) - 1]))
-		errx(1, "unsetifgroup: group names may not end in a digit");
 
 	if (strlcpy(ifgr.ifgr_group, group_name, IFNAMSIZ) >= IFNAMSIZ)
 		errx(1, "unsetifgroup: group name too long");
@@ -2641,7 +2643,7 @@ join_status(void)
 				if (wpa->i_protos & IEEE80211_WPA_PROTO_WPA2)
 					printf("%swpa2", sep);
 
-				printf(" wpaakms ", stdout); sep = "";
+				printf(" wpaakms "); sep = "";
 				if (wpa->i_akms & IEEE80211_WPA_AKM_PSK) {
 					printf("psk");
 					sep = ",";

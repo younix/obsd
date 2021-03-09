@@ -3,11 +3,11 @@
 /cons.c/1.2/Tue Feb 16 21:28:39 2010//
 /devopen.c/1.1/Sun Feb 14 22:39:33 2010//
 /exec.c/1.4/Wed Apr 10 04:17:35 2019//
-/ld.script/1.1/Sun Feb 14 22:39:33 2010//
 /machdep.c/1.8/Sun Jul 13 09:26:08 2014//
-/start.S/1.3/Fri Apr 20 14:36:42 2018//
 /conf.c/1.16/Fri Dec 18 08:57:37 2020//
 /dev.c/1.11/Fri Dec 18 08:57:37 2020//
 /libsa.h/1.7/Fri Dec 18 08:57:37 2020//
 /rd.c/1.5/Fri Dec 18 08:57:37 2020//
+/ld.script/1.2/Fri Feb 26 10:30:10 2021//
+/start.S/1.4/Fri Feb 26 10:30:10 2021//
 D

@@ -3,7 +3,6 @@
 /HAS_HOOK.pm/1.1.1.1/Fri Sep 24 14:48:48 2010/-ko/
 /HAS_OVERLOAD.pm/1.1.1.1/Fri Sep 24 14:48:48 2010/-ko/
 /attach.t/1.1.1.1/Mon Nov 17 20:53:04 2014/-kb/
-/attach_errors.t/1.3/Wed Feb 13 21:15:21 2019/-ko/
 /attach_singleton.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
 /blessed.t/1.1.1.4/Wed Feb 13 21:11:28 2019/-ko/
 /canonical.t/1.3/Wed Feb 13 21:15:21 2019/-ko/
@@ -19,7 +18,6 @@
 /flags.t/1.1.1.1/Wed Feb 13 21:11:28 2019/-ko/
 /forgive.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
 /freeze.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
-/huge.t/1.1.1.1/Wed Feb 13 21:11:28 2019/-ko/
 /hugeids.t/1.1.1.1/Wed Feb 13 21:11:28 2019/-ko/
 /integer.t/1.1.1.2/Mon Mar 25 20:08:40 2013/-ko/
 /interwork56.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
@@ -31,8 +29,6 @@
 /make_overload.pl/1.1.1.1/Fri Sep 24 14:48:48 2010/-ko/
 /malice.t/1.1.1.5/Wed Feb 13 21:11:28 2019/-ko/
 /overload.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
-/recurse.t/1.3/Mon Dec 30 02:13:52 2019/-ko/
-/regexp.t/1.1.1.1/Wed Feb 13 21:11:28 2019/-ko/
 /restrict.t/1.1.1.4/Wed Feb 13 21:11:28 2019/-ko/
 /retrieve.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
 /robust.t/1.1.1.1/Mon Mar 25 20:08:40 2013/-ko/
@@ -48,5 +44,9 @@
 /tied_store.t/1.1.1.1/Mon Nov 17 20:53:05 2014/-kb/
 /utf8.t/1.2/Sun Feb  5 00:32:10 2017/-ko/
 /utf8hash.t/1.1.1.2/Wed Feb 13 21:11:28 2019/-ko/
-/weak.t/1.1.1.3/Wed Feb 13 21:11:28 2019/-ko/
+/attach_errors.t/1.4/Tue Mar  9 08:11:58 2021/-ko/
+/huge.t/1.1.1.2/Tue Mar  9 08:11:58 2021/-ko/
+/recurse.t/1.4/Tue Mar  9 08:11:58 2021/-ko/
+/regexp.t/1.1.1.2/Tue Mar  9 08:11:58 2021/-ko/
+/weak.t/1.1.1.4/Tue Mar  9 08:11:58 2021/-ko/
 D

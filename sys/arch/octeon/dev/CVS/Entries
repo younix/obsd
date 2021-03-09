@@ -25,16 +25,13 @@
 /octcib.c/1.5/Sun Sep  1 12:16:01 2019//
 /octcit.c/1.12/Sun Sep  1 12:16:01 2019//
 /octciu.c/1.17/Sun Sep  1 12:16:01 2019//
-/octcrypto.c/1.3/Sun Mar 10 14:20:44 2019//
 /octcrypto_asm.S/1.2/Thu Jan  3 17:06:22 2019//
 /octdwctwo.c/1.12/Sun Jul 28 12:57:09 2019//
 /octehci.c/1.3/Tue Jul 25 11:01:28 2017//
 /octeon_bus_space.c/1.1/Thu Oct 28 22:52:10 2010//
 /octeon_intr.c/1.25/Sun Mar 17 05:25:06 2019//
 /octeon_iobus.c/1.25/Sun Sep 15 07:15:14 2019//
-/octeon_pcibus.c/1.20/Wed Jun 13 14:38:42 2018//
 /octeon_pcibus.h/1.3/Mon Jul 20 01:38:31 2015//
-/octeon_pcibusvar.h/1.3/Sun May  8 13:24:55 2011//
 /octgpio.c/1.2/Sun Sep 29 04:28:52 2019//
 /octhcireg.h/1.3/Wed Jun  8 15:46:03 2016//
 /octmmc.c/1.14/Mon Oct  7 22:40:35 2019//
@@ -52,8 +49,6 @@
 /simplebus.c/1.2/Sat Jan  5 11:59:39 2019//
 /simplebusvar.h/1.1/Thu Dec  8 16:24:51 2016//
 /octrng.c/1.9/Mon Jun  1 06:23:25 2020//
-/cn30xxgmxreg.h/1.7/Thu Dec 17 19:39:58 2020//
-/cn30xxgmxvar.h/1.11/Thu Dec 17 19:39:58 2020//
 /cn30xxipd.c/1.14/Thu Dec 17 19:39:58 2020//
 /cn30xxipdvar.h/1.7/Thu Dec 17 19:39:58 2020//
 /cn30xxpip.c/1.10/Thu Dec 17 19:39:58 2020//
@@ -61,7 +56,6 @@
 /cn30xxpipvar.h/1.4/Thu Dec 17 19:39:58 2020//
 /cn30xxpko.c/1.7/Thu Dec 17 19:39:58 2020//
 /cn30xxpkoreg.h/1.2/Thu Dec 17 19:39:58 2020//
-/if_cnmac.c/1.80/Fri Dec 18 08:57:37 2020//
 /if_cnmacvar.h/1.19/Thu Dec 17 19:39:58 2020//
 /mainbus.c/1.13/Thu Dec 17 19:39:58 2020//
 /octboot.c/1.4/Thu Dec 17 19:39:58 2020//
@@ -70,7 +64,12 @@
 /if_ogx.c/1.5/Sun Jan 24 00:20:10 2021//
 /ogxreg.h/1.3/Sun Jan 24 00:20:10 2021//
 /amdcf.c/1.7/Wed Feb  3 13:05:01 2021//
-/cn30xxgmx.c/1.48/Wed Feb  3 13:05:01 2021//
-/cn30xxsmi.c/1.8/Wed Feb  3 13:05:01 2021//
 /octrtc.c/1.13/Wed Feb  3 13:05:01 2021//
+/cn30xxgmx.c/1.50/Fri Feb 26 10:30:11 2021//
+/cn30xxgmxreg.h/1.8/Fri Feb 26 10:30:11 2021//
+/cn30xxgmxvar.h/1.12/Fri Feb 26 10:30:11 2021//
+/cn30xxsmi.c/1.9/Fri Feb 26 10:30:11 2021//
+/if_cnmac.c/1.82/Fri Feb 26 10:30:11 2021//
+/octcrypto.c/1.4/Tue Mar  9 08:12:25 2021//
+/octeon_pcibus.c/1.23/Tue Mar  9 08:12:25 2021//
 D

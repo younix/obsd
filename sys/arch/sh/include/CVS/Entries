@@ -42,7 +42,6 @@
 /reloc.h/1.1/Fri Nov 10 02:39:47 2006//
 /rtcreg.h/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /setjmp.h/1.2/Fri Mar  2 06:11:54 2007//
-/sh_opcode.h/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /signal.h/1.7/Tue May 10 18:39:47 2016//
 /spinlock.h/1.6/Tue Sep  5 02:40:54 2017//
 /tcb.h/1.2/Wed May 18 20:21:13 2016//

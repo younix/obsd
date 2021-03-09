@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.c,v 1.52 2020/12/17 20:43:07 tobhe Exp $	*/
+/*	$OpenBSD: iked.c,v 1.56 2021/03/03 22:18:00 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -43,12 +43,13 @@ void	 parent_shutdown(struct iked *);
 void	 parent_sig_handler(int, short, void *);
 int	 parent_dispatch_ca(int, struct privsep_proc *, struct imsg *);
 int	 parent_dispatch_control(int, struct privsep_proc *, struct imsg *);
+int	 parent_dispatch_ikev2(int, struct privsep_proc *, struct imsg *);
 int	 parent_configure(struct iked *);
 
 static struct privsep_proc procs[] = {
 	{ "ca",		PROC_CERT,	parent_dispatch_ca, caproc, IKED_CA },
 	{ "control",	PROC_CONTROL,	parent_dispatch_control, control },
-	{ "ikev2",	PROC_IKEV2,	NULL, ikev2 }
+	{ "ikev2",	PROC_IKEV2,	parent_dispatch_ikev2, ikev2 }
 };
 
 __dead void
@@ -198,6 +199,8 @@ main(int argc, char *argv[])
 
 	proc_listen(ps, procs, nitems(procs));
 
+	vroute_init(env);
+
 	if (parent_configure(env) == -1)
 		fatalx("configuration failed");
 
@@ -225,7 +228,7 @@ parent_configure(struct iked *env)
 	}
 
 	env->sc_pfkey = -1;
-	config_setpfkey(env, PROC_IKEV2);
+	config_setpfkey(env);
 
 	/* Send private and public keys to cert after forking the children */
 	if (config_setkeys(env) == -1)
@@ -265,9 +268,10 @@ parent_configure(struct iked *env)
 	 * dns - for reload and ocsp connect.
 	 * inet - for ocsp connect.
 	 * route - for using interfaces in iked.conf (SIOCGIFGMEMB)
+	 * wroute - for adding and removing addresses (SIOCAIFGMEMB)
 	 * sendfd - for ocsp sockets.
 	 */
-	if (pledge("stdio rpath proc dns inet route sendfd", NULL) == -1)
+	if (pledge("stdio rpath proc dns inet route wroute sendfd", NULL) == -1)
 		fatal("pledge");
 
 	config_setstatic(env);
@@ -341,8 +345,10 @@ parent_sig_handler(int sig, short event, void *arg)
 		break;
 	case SIGTERM:
 	case SIGINT:
-		die = 1;
-		/* FALLTHROUGH */
+		log_info("%s: stopping iked", __func__);
+		config_setreset(ps->ps_env, RESET_EXIT, PROC_IKEV2);
+		config_setreset(ps->ps_env, RESET_ALL, PROC_CERT);
+		break;
 	case SIGCHLD:
 		do {
 			int len;
@@ -445,11 +451,35 @@ parent_dispatch_control(int fd, struct privsep_proc *p, struct imsg *imsg)
 	return (0);
 }
 
+int
+parent_dispatch_ikev2(int fd, struct privsep_proc *p, struct imsg *imsg)
+{
+	struct iked	*env = p->p_ps->ps_env;
+
+	switch (imsg->hdr.type) {
+	case IMSG_IF_ADDADDR:
+	case IMSG_IF_DELADDR:
+		return (vroute_getaddr(env, imsg));
+	case IMSG_VROUTE_ADD:
+	case IMSG_VROUTE_DEL:
+		return (vroute_getroute(env, imsg));
+	case IMSG_VROUTE_CLONE:
+		return (vroute_getcloneroute(env, imsg));
+	case IMSG_CTL_EXIT:
+		parent_shutdown(env);
+	default:
+		return (-1);
+	}
+
+	return (0);
+}
+
 void
 parent_shutdown(struct iked *env)
 {
 	proc_kill(&env->sc_ps);
 
+	free(env->sc_vroute);
 	free(env);
 
 	log_warnx("parent terminating");

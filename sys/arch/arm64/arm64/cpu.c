@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.46 2021/01/29 08:48:19 jsg Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.49 2021/03/04 18:32:52 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -153,6 +153,10 @@ const struct implementers {
 char cpu_model[64];
 int cpu_node;
 
+#ifdef CRYPTO
+int arm64_has_aes;
+#endif
+
 struct cpu_info *cpu_info_list = &cpu_info_primary;
 
 int	cpu_match(struct device *, void *, void *);
@@ -242,6 +246,7 @@ cpu_identify(struct cpu_info *ci)
 		if (clidr & CLIDR_CTYPE_INSN) {
 			WRITE_SPECIALREG(csselr_el1,
 			    i << CSSELR_LEVEL_SHIFT | CSSELR_IND);
+			__asm volatile("isb");
 			ccsidr = READ_SPECIALREG(ccsidr_el1);
 			sets = CCSIDR_SETS(ccsidr);
 			ways = CCSIDR_WAYS(ccsidr);
@@ -254,6 +259,7 @@ cpu_identify(struct cpu_info *ci)
 		}
 		if (clidr & CLIDR_CTYPE_DATA) {
 			WRITE_SPECIALREG(csselr_el1, i << CSSELR_LEVEL_SHIFT);
+			__asm volatile("isb");
 			ccsidr = READ_SPECIALREG(ccsidr_el1);
 			sets = CCSIDR_SETS(ccsidr);
 			ways = CCSIDR_WAYS(ccsidr);
@@ -264,6 +270,7 @@ cpu_identify(struct cpu_info *ci)
 		}
 		if (clidr & CLIDR_CTYPE_UNIFIED) {
 			WRITE_SPECIALREG(csselr_el1, i << CSSELR_LEVEL_SHIFT);
+			__asm volatile("isb");
 			ccsidr = READ_SPECIALREG(ccsidr_el1);
 			sets = CCSIDR_SETS(ccsidr);
 			ways = CCSIDR_WAYS(ccsidr);
@@ -375,6 +382,9 @@ cpu_identify(struct cpu_info *ci)
 	if (ID_AA64ISAR0_AES(id) >= ID_AA64ISAR0_AES_BASE) {
 		printf("%sAES", sep);
 		sep = ",";
+#ifdef CRYPTO
+		arm64_has_aes = 1;
+#endif
 	}
 	if (ID_AA64ISAR0_AES(id) >= ID_AA64ISAR0_AES_PMULL)
 		printf("+PMULL");
@@ -386,6 +396,18 @@ cpu_identify(struct cpu_info *ci)
 
 	if (ID_AA64ISAR1_DPB(id) >= ID_AA64ISAR1_DPB_IMPL) {
 		printf("%sDPB", sep);
+		sep = ",";
+	}
+
+	/*
+	 * ID_AA64MMFR0
+	 *
+	 * We only print ASIDBits for now.
+	 */
+	id = READ_SPECIALREG(id_aa64mmfr0_el1);
+
+	if (ID_AA64MMFR0_ASID_BITS(id) == ID_AA64MMFR0_ASID_BITS_16) {
+		printf("%sASID16", sep);
 		sep = ",";
 	}
 

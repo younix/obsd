@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpe.c,v 1.68 2021/01/22 06:33:27 martijn Exp $	*/
+/*	$OpenBSD: snmpe.c,v 1.70 2021/02/22 11:31:09 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>
@@ -57,6 +57,8 @@ void	 snmp_msgfree(struct snmp_message *);
 
 struct imsgev	*iev_parent;
 static const struct timeval	snmpe_tcp_timeout = { 10, 0 }; /* 10s */
+
+struct snmp_messages snmp_messages = RB_INITIALIZER(&snmp_messages);
 
 static struct privsep_proc procs[] = {
 	{ "parent",	PROC_PARENT }
@@ -210,6 +212,11 @@ snmpe_parse(struct snmp_message *msg)
 
 	msg->sm_errstr = "invalid message";
 
+	do {
+		msg->sm_transactionid = arc4random();
+	} while (msg->sm_transactionid == 0 ||
+	    RB_INSERT(snmp_messages, &snmp_messages, msg) != NULL);
+
 	if (ober_scanf_elements(root, "{ie", &ver, &a) != 0)
 		goto parsefail;
 
@@ -220,7 +227,7 @@ snmpe_parse(struct snmp_message *msg)
 	case SNMP_V2:
 		if (env->sc_min_seclevel != 0)
 			goto badversion;
-		if (ober_scanf_elements(a, "se", &comn, &msg->sm_pdu) != 0)
+		if (ober_scanf_elements(a, "seS$", &comn, &msg->sm_pdu) != 0)
 			goto parsefail;
 		if (strlcpy(msg->sm_community, comn,
 		    sizeof(msg->sm_community)) >= sizeof(msg->sm_community)) {
@@ -230,7 +237,7 @@ snmpe_parse(struct snmp_message *msg)
 		}
 		break;
 	case SNMP_V3:
-		if (ober_scanf_elements(a, "{iisi}e",
+		if (ober_scanf_elements(a, "{iisi$}e",
 		    &msg->sm_msgid, &msg->sm_max_msg_size, &flagstr,
 		    &msg->sm_secmodel, &a) != 0)
 			goto parsefail;
@@ -248,7 +255,7 @@ snmpe_parse(struct snmp_message *msg)
 			goto parsefail;
 		}
 
-		if (ober_scanf_elements(a, "{xxe",
+		if (ober_scanf_elements(a, "{xxeS$}$",
 		    &msg->sm_ctxengineid, &msg->sm_ctxengineid_len,
 		    &ctxname, &len, &msg->sm_pdu) != 0)
 			goto parsefail;
@@ -370,7 +377,7 @@ snmpe_parse(struct snmp_message *msg)
 	}
 
 	/* SNMP PDU */
-	if (ober_scanf_elements(a, "iiie{et",
+	if (ober_scanf_elements(a, "iiie{et}$",
 	    &req, &errval, &erridx, &msg->sm_pduend,
 	    &msg->sm_varbind, &class, &type) != 0) {
 		stats->snmp_silentdrops++;
@@ -429,7 +436,7 @@ snmpe_parsevarbinds(struct snmp_message *msg)
 
 	for (i = 1; varbind != NULL && i < SNMPD_MAXVARBIND;
 	    varbind = varbind->be_next, i++) {
-		if (ober_scanf_elements(varbind, "{oe}", &o, &value) == -1) {
+		if (ober_scanf_elements(varbind, "{oeS$}", &o, &value) == -1) {
 			stats->snmp_inasnparseerrs++;
 			msg->sm_errstr = "invalid varbind";
 			goto varfail;
@@ -834,6 +841,8 @@ snmpe_response(struct snmp_message *msg)
 void
 snmp_msgfree(struct snmp_message *msg)
 {
+	if (msg->sm_transactionid != 0)
+		RB_REMOVE(snmp_messages, &snmp_messages, msg);
 	event_del(&msg->sm_sockev);
 	ober_free(&msg->sm_ber);
 	if (msg->sm_req != NULL)
@@ -896,3 +905,12 @@ snmpe_encode(struct snmp_message *msg)
 #endif
 	return 0;
 }
+
+int
+snmp_messagecmp(struct snmp_message *m1, struct snmp_message *m2)
+{
+	return (m1->sm_transactionid < m2->sm_transactionid ? -1 :
+	    m1->sm_transactionid > m2->sm_transactionid);
+}
+
+RB_GENERATE(snmp_messages, snmp_message, sm_entry, snmp_messagecmp)

@@ -1,10 +1,10 @@
-/Unix.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/VMS.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/Windows.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/aix.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/android.pm/1.4/Mon Dec 30 02:13:51 2019/-kb/
-/cygwin.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/darwin.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/dec_osf.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
-/os2.pm/1.4/Mon Dec 30 02:13:51 2019/-ko/
 D/Windows////
+/Unix.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/VMS.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/Windows.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/aix.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/android.pm/1.5/Tue Mar  9 08:11:58 2021/-kb/
+/cygwin.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/darwin.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/dec_osf.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/
+/os2.pm/1.5/Tue Mar  9 08:11:58 2021/-ko/

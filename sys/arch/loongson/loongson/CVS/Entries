@@ -7,7 +7,6 @@
 /generic2e_machdep.c/1.10/Sat Feb 24 11:42:31 2018//
 /hibernate_machdep.c/1.8/Tue May  5 02:13:46 2015//
 /isa_machdep.c/1.4/Sat Feb 24 11:42:31 2018//
-/locore.S/1.8/Thu Jun  8 11:44:00 2017//
 /locore0.S/1.1/Thu Jun  8 11:44:00 2017//
 /loongson2_machdep.c/1.17/Fri Dec 20 13:34:41 2019//
 /loongson3_intr.c/1.7/Sat Feb 24 11:42:31 2018//
@@ -20,4 +19,5 @@
 /generic3a_machdep.c/1.10/Fri Dec 11 17:58:22 2020//
 /conf.c/1.30/Sun Jan 24 00:20:10 2021//
 /machdep.c/1.94/Sun Jan 24 00:20:10 2021//
+/locore.S/1.9/Fri Feb 26 10:30:10 2021//
 D

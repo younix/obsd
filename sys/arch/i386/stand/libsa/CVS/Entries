@@ -3,7 +3,6 @@
 /biosprobe.c/1.5/Sat Mar 29 18:09:29 2014//
 /cmd_i386.c/1.36/Fri Jun 10 18:36:06 2016//
 /cpuprobe.c/1.2/Sat Mar 29 18:09:29 2014//
-/cpuprobe.h/1.1/Sat Jun 26 05:19:37 2004//
 /debug.c/1.16/Mon Dec  6 22:51:46 2010//
 /debug.h/1.7/Tue Feb 10 00:41:44 2004//
 /debug_i386.S/1.12/Tue Mar  9 19:12:12 2004//

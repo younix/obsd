@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.626 2021/02/01 07:43:33 mvs Exp $	*/
+/*	$OpenBSD: if.c,v 1.632 2021/02/20 04:55:52 dlg Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -423,8 +423,6 @@ if_attachsetup(struct ifnet *ifp)
 
 	NET_ASSERT_LOCKED();
 
-	TAILQ_INIT(&ifp->if_groups);
-
 	if_addgroup(ifp, IFG_ALL);
 
 	if_attachdomain(ifp);
@@ -596,6 +594,7 @@ if_attach_common(struct ifnet *ifp)
 
 	TAILQ_INIT(&ifp->if_addrlist);
 	TAILQ_INIT(&ifp->if_maddrlist);
+	TAILQ_INIT(&ifp->if_groups);
 
 	if (!ISSET(ifp->if_xflags, IFXF_MPSAFE)) {
 		KASSERTMSG(ifp->if_qstart == NULL,
@@ -630,6 +629,10 @@ if_attach_common(struct ifnet *ifp)
 		ifp->if_rtrequest = if_rtrequest_dummy;
 	if (ifp->if_enqueue == NULL)
 		ifp->if_enqueue = if_enqueue_ifq;
+#if NBPFILTER > 0
+	if (ifp->if_bpf_mtap == NULL)
+		ifp->if_bpf_mtap = bpf_mtap_ether;
+#endif
 	ifp->if_llprio = IFQ_DEFPRIO;
 }
 
@@ -850,17 +853,22 @@ if_vinput(struct ifnet *ifp, struct mbuf *m)
 	counters_pkt(ifp->if_counters,
 	    ifc_ipackets, ifc_ibytes, m->m_pkthdr.len);
 
+#if NPF > 0
+	pf_pkt_addr_changed(m);
+#endif
+
 #if NBPFILTER > 0
 	if_bpf = ifp->if_bpf;
 	if (if_bpf) {
-		if (bpf_mtap_ether(if_bpf, m, BPF_DIRECTION_IN)) {
+		if ((*ifp->if_bpf_mtap)(if_bpf, m, BPF_DIRECTION_IN)) {
 			m_freem(m);
 			return;
 		}
 	}
 #endif
 
-	(*ifp->if_input)(ifp, m);
+	if (__predict_true(!ISSET(ifp->if_xflags, IFXF_MONITOR)))
+		(*ifp->if_input)(ifp, m);
 }
 
 void
@@ -1497,6 +1505,42 @@ p2p_rtrequest(struct ifnet *ifp, int req, struct rtentry *rt)
 	}
 }
 
+int
+p2p_bpf_mtap(caddr_t if_bpf, const struct mbuf *m, u_int dir)
+{
+#if NBPFILTER > 0
+	return (bpf_mtap_af(if_bpf, m->m_pkthdr.ph_family, m, dir));
+#else
+	return (0);
+#endif
+}
+
+void
+p2p_input(struct ifnet *ifp, struct mbuf *m)
+{
+	void (*input)(struct ifnet *, struct mbuf *);
+
+	switch (m->m_pkthdr.ph_family) {
+	case AF_INET:
+		input = ipv4_input;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		input = ipv6_input;
+		break;
+#endif
+#ifdef MPLS
+	case AF_MPLS:
+		input = mpls_input;
+		break;
+#endif
+	default:
+		m_freem(m);
+		return;
+	}
+
+	(*input)(ifp, m);
+}
 
 /*
  * Bring down all interfaces
@@ -2601,7 +2645,7 @@ if_creategroup(const char *groupname)
 		return (NULL);
 
 	strlcpy(ifg->ifg_group, groupname, sizeof(ifg->ifg_group));
-	ifg->ifg_refcnt = 0;
+	ifg->ifg_refcnt = 1;
 	ifg->ifg_carp_demoted = 0;
 	TAILQ_INIT(&ifg->ifg_members);
 #if NPF > 0
@@ -2621,9 +2665,11 @@ if_addgroup(struct ifnet *ifp, const char *groupname)
 	struct ifg_list		*ifgl;
 	struct ifg_group	*ifg = NULL;
 	struct ifg_member	*ifgm;
+	size_t			 namelen;
 
-	if (groupname[0] && groupname[strlen(groupname) - 1] >= '0' &&
-	    groupname[strlen(groupname) - 1] <= '9')
+	namelen = strlen(groupname);
+	if (namelen == 0 || namelen >= IFNAMSIZ ||
+	    (groupname[namelen - 1] >= '0' && groupname[namelen - 1] <= '9'))
 		return (EINVAL);
 
 	TAILQ_FOREACH(ifgl, &ifp->if_groups, ifgl_next)
@@ -2642,13 +2688,17 @@ if_addgroup(struct ifnet *ifp, const char *groupname)
 		if (!strcmp(ifg->ifg_group, groupname))
 			break;
 
-	if (ifg == NULL && (ifg = if_creategroup(groupname)) == NULL) {
-		free(ifgl, M_TEMP, sizeof(*ifgl));
-		free(ifgm, M_TEMP, sizeof(*ifgm));
-		return (ENOMEM);
-	}
+	if (ifg == NULL) {
+		ifg = if_creategroup(groupname);
+		if (ifg == NULL) {
+			free(ifgl, M_TEMP, sizeof(*ifgl));
+			free(ifgm, M_TEMP, sizeof(*ifgm));
+			return (ENOMEM);
+		}
+	} else
+		ifg->ifg_refcnt++;
+	KASSERT(ifg->ifg_refcnt != 0);
 
-	ifg->ifg_refcnt++;
 	ifgl->ifgl_group = ifg;
 	ifgm->ifgm_ifp = ifp;
 
@@ -2692,6 +2742,7 @@ if_delgroup(struct ifnet *ifp, const char *groupname)
 	pfi_group_change(groupname);
 #endif
 
+	KASSERT(ifgl->ifgl_group->ifg_refcnt != 0);
 	if (--ifgl->ifgl_group->ifg_refcnt == 0) {
 		TAILQ_REMOVE(&ifg_head, ifgl->ifgl_group, ifg_next);
 #if NPF > 0

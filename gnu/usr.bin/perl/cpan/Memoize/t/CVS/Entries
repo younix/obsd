@@ -5,11 +5,9 @@
 /expfile.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /expire.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /expmod_n.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
-/expmod_t.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /flush.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /normalize.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /prototype.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
-/speed.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /tie.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /tie_gdbm.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /tie_ndbm.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
@@ -17,4 +15,6 @@
 /tie_storable.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /tiefeatures.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
 /unmemoize.t/1.1.1.1/Fri Sep 24 14:49:01 2010/-ko/
+/expmod_t.t/1.1.1.2/Tue Mar  9 08:11:55 2021/-ko/
+/speed.t/1.1.1.2/Tue Mar  9 08:11:55 2021/-ko/
 D

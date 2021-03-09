@@ -1,5 +1,12 @@
 /00-load.t/1.1.1.1/Fri Sep 24 14:49:05 2010/-ko/
 /constants.t/1.1.1.2/Mon Mar 25 20:08:12 2013/-ko/
 /facilities-routing.t/1.1.1.2/Mon Nov 17 20:52:58 2014/-kb/
-/syslog.t/1.1.1.4/Wed Feb 13 21:11:20 2019/-ko/
+/cpan-rt-21516.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/cpan-rt-21866.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/cpan-rt-25488.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/cpan-rt-49877.pl/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/cpan-rt-55151.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/cpan-rt-64287.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/syslog-inet-udp.t/1.1.1.1/Mon Mar  1 23:15:35 2021/-ko/
+/syslog.t/1.1.1.5/Tue Mar  9 08:11:56 2021/-ko/
 D

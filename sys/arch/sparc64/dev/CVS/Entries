@@ -104,7 +104,6 @@
 /msi.c/1.5/Fri Dec 11 17:58:22 2020//
 /msivar.h/1.2/Fri Dec 11 17:58:22 2020//
 /pci_machdep.c/1.51/Fri Dec 11 17:58:22 2020//
-/psycho.c/1.77/Fri Dec 11 17:58:22 2020//
 /pyrovar.h/1.5/Fri Dec 11 17:58:22 2020//
 /vcons.c/1.18/Fri Dec 11 17:58:22 2020//
 /pyro.c/1.36/Fri Dec 18 08:57:37 2020//
@@ -113,4 +112,5 @@
 /vpci.c/1.33/Fri Dec 18 08:57:37 2020//
 /com_ebus.c/1.24/Sun Jan 24 00:20:10 2021//
 /vldcp.c/1.21/Sun Jan 24 00:20:10 2021//
+/psycho.c/1.78/Fri Feb 26 10:30:12 2021//
 D

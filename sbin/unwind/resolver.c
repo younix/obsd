@@ -1,4 +1,4 @@
-/*	$OpenBSD: resolver.c,v 1.141 2021/01/31 16:07:27 florian Exp $	*/
+/*	$OpenBSD: resolver.c,v 1.143 2021/02/07 13:35:41 florian Exp $	*/
 
 /*
  * Copyright (c) 2018 Florian Obser <florian@openbsd.org>
@@ -422,8 +422,6 @@ resolver(int debug, int verbose)
 	TAILQ_INIT(&trust_anchors);
 	TAILQ_INIT(&new_trust_anchors);
 	TAILQ_INIT(&running_queries);
-
-	add_new_ta(&trust_anchors, KSK2017);
 
 	event_dispatch();
 
@@ -1144,6 +1142,8 @@ new_resolver(enum uw_resolver_type type, enum uw_resolver_state state)
 		/* FALLTHROUGH */
 	case RESOLVING:
 		resolvers[type]->state = state;
+		if (type == UW_RES_ASR)
+			check_dns64();
 		break;
 	}
 }
@@ -2055,7 +2055,6 @@ replace_autoconf_forwarders(struct imsg_rdns_proposal *rdns_proposal)
 		new_resolver(UW_RES_ASR, UNKNOWN);
 		new_resolver(UW_RES_DHCP, UNKNOWN);
 		new_resolver(UW_RES_ODOT_DHCP, UNKNOWN);
-		check_dns64();
 	} else {
 		while ((tmp = TAILQ_FIRST(&new_forwarder_list)) != NULL) {
 			TAILQ_REMOVE(&new_forwarder_list, tmp, entry);

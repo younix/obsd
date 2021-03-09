@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvme.c,v 1.89 2020/10/15 13:22:13 krw Exp $ */
+/*	$OpenBSD: nvme.c,v 1.91 2021/02/25 07:30:36 jan Exp $ */
 
 /*
  * Copyright (c) 2014 David Gwynne <dlg@openbsd.org>
@@ -463,11 +463,16 @@ nvme_scsi_probe(struct scsi_link *link)
 	scsi_io_put(&sc->sc_iopool, ccb);
 
 	identify = NVME_DMA_KVA(mem);
-	if (rv == 0 && lemtoh64(&identify->nsze) > 0) {
-		/* Commit namespace if it has a size greater than zero. */
-		identify = malloc(sizeof(*identify), M_DEVBUF, M_WAITOK);
-		memcpy(identify, NVME_DMA_KVA(mem), sizeof(*identify));
-		sc->sc_namespaces[link->target].ident = identify;
+	if (rv == 0) {
+		if (lemtoh64(&identify->nsze) > 0) {
+			/* Commit namespace if it has a size greater than zero. */
+			identify = malloc(sizeof(*identify), M_DEVBUF, M_WAITOK);
+			memcpy(identify, NVME_DMA_KVA(mem), sizeof(*identify));
+			sc->sc_namespaces[link->target].ident = identify;
+		} else {
+			/* Don't attach a namespace if its size is zero. */
+			rv = ENXIO;
+		}
 	}
 
 	nvme_dmamem_free(sc, mem);
@@ -993,6 +998,8 @@ nvme_q_complete(struct nvme_softc *sc, struct nvme_queue *q)
 		flags = lemtoh16(&cqe->flags);
 		if ((flags & NVME_CQE_PHASE) != q->q_cq_phase)
 			break;
+
+		membar_consumer();
 
 		ccb = &sc->sc_ccbs[cqe->cid];
 		ccb->ccb_done(sc, ccb, cqe);

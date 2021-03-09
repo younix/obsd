@@ -120,7 +120,7 @@ extern int verify_return_error;
 
 int do_server(int port, int type, int *ret,
     int (*cb)(char *hostname, int s, unsigned char *context),
-    unsigned char *context, int naccept);
+    unsigned char *context);
 #ifdef HEADER_X509_H
 int verify_callback(int ok, X509_STORE_CTX *ctx);
 #endif

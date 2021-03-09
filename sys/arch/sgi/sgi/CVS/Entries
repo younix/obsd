@@ -7,10 +7,8 @@
 /ip22.h/1.11/Wed Sep 23 21:22:26 2015//
 /ip27.h/1.6/Fri Dec 25 09:02:57 2015//
 /ip30.h/1.10/Sun Jun 17 12:34:19 2012//
-/ip30_nmi.S/1.6/Wed Oct  3 11:18:23 2012//
 /l1.c/1.11/Sat Sep 19 21:07:04 2015//
 /l1.h/1.6/Tue Nov 25 19:08:42 2014//
-/locore.S/1.19/Sun Jun 30 07:37:47 2019//
 /locore0.S/1.1/Thu Jun  8 11:47:25 2017//
 /sginode.c/1.32/Thu Dec  3 15:38:06 2015//
 /wscons_machdep.c/1.12/Tue Dec 22 21:36:57 2015//
@@ -21,4 +19,6 @@
 /machdep.c/1.164/Thu Dec 17 19:39:58 2020//
 /mainbus.c/1.14/Thu Dec 17 19:39:58 2020//
 /conf.c/1.44/Sun Jan 24 00:20:10 2021//
+/ip30_nmi.S/1.7/Fri Feb 26 10:30:11 2021//
+/locore.S/1.20/Fri Feb 26 10:30:11 2021//
 D

@@ -9,7 +9,6 @@
 /bcm2835_clock.c/1.2/Sun Apr 19 16:48:39 2020//
 /bcm2835_dmac.c/1.1/Tue Apr 21 18:56:54 2020//
 /bcm2835_dog.c/1.2/Thu Sep  5 16:58:36 2019//
-/bcm2835_dwctwo.c/1.1/Thu May 14 15:44:07 2020//
 /bcm2835_mbox.c/1.1/Sun Apr 19 14:51:52 2020//
 /bcm2835_sdhost.c/1.1/Wed Apr 22 09:48:44 2020//
 /bcm2835_temp.c/1.1/Sat Feb 24 11:06:59 2018//
@@ -36,9 +35,7 @@
 /imxspi.c/1.1/Thu Jul 26 10:59:07 2018//
 /imxsrc.c/1.4/Sun Oct 27 19:19:10 2019//
 /imxtmu.c/1.2/Fri Mar 20 09:13:03 2020//
-/imxuart.c/1.8/Fri Jul 19 00:17:15 2019//
 /imxuartreg.h/1.1/Thu Mar 29 20:33:53 2018//
-/imxuartvar.h/1.1/Thu Mar 29 20:33:53 2018//
 /ipmi_fdt.c/1.1/Sun Mar 29 09:31:11 2020//
 /moxtet.c/1.1/Mon Oct  7 19:35:07 2019//
 /mvdog.c/1.1/Thu Sep  5 18:38:30 2019//
@@ -75,7 +72,6 @@
 /sxisyscon.c/1.1/Sun Aug 11 11:19:41 2019//
 /sxits.c/1.2/Sat Sep 21 15:55:29 2019//
 /syscon.c/1.4/Sat Mar 17 18:04:15 2018//
-/tcpci.c/1.1/Mon Apr 27 21:30:52 2020//
 /virtio_mmio.c/1.8/Sun May 26 15:20:04 2019//
 /amlrng.c/1.2/Mon Jun  1 06:23:26 2020//
 /amlsm.c/1.2/Mon Jun  1 06:23:26 2020//
@@ -83,7 +79,6 @@
 /bcm2835_rng.c/1.3/Mon Jun  1 06:23:26 2020//
 /mvrng.c/1.3/Mon Jun  1 06:23:26 2020//
 /rkrng.c/1.3/Mon Jun  1 06:23:26 2020//
-/sdhc_fdt.c/1.12/Mon Jun  1 06:23:26 2020//
 /simplefb.c/1.11/Mon Jun  1 06:23:26 2020//
 /sxisid.c/1.3/Mon Jun  1 06:23:26 2020//
 /bcm2835_aux.c/1.6/Fri Dec 11 17:58:22 2020//
@@ -100,7 +95,6 @@
 /rkdwhdmi.c/1.5/Fri Dec 11 17:58:22 2020//
 /rkgpio.c/1.6/Fri Dec 11 17:58:22 2020//
 /rkiis.c/1.1/Fri Dec 11 17:58:22 2020//
-/rkpcie.c/1.11/Fri Dec 11 17:58:22 2020//
 /rkvop.c/1.4/Fri Dec 11 17:58:22 2020//
 /simpleamp.c/1.1/Fri Dec 11 17:58:22 2020//
 /simpleaudio.c/1.1/Fri Dec 11 17:58:22 2020//
@@ -124,7 +118,6 @@
 /rkclock_clocks.h/1.34/Thu Dec 17 19:39:58 2020//
 /rkgrf.c/1.4/Thu Dec 17 19:39:58 2020//
 /rkpinctrl.c/1.6/Thu Dec 17 19:39:58 2020//
-/rkpmic.c/1.7/Fri Dec 18 08:57:37 2020//
 /rkpwm.c/1.2/Thu Dec 17 19:39:58 2020//
 /rktemp.c/1.6/Thu Dec 17 19:39:58 2020//
 /sfp.c/1.4/Fri Dec 18 08:57:37 2020//
@@ -139,15 +132,23 @@
 /amlpinctrl.c/1.9/Sun Jan 24 00:20:10 2021//
 /amlpwm.c/1.2/Sun Jan 24 00:20:10 2021//
 /amlpwrc.c/1.3/Sun Jan 24 00:20:10 2021//
-/bcm2711_pcie.c/1.4/Sun Jan 24 00:20:10 2021//
-/dwpcie.c/1.24/Sun Jan 24 00:20:10 2021//
-/files.fdt/1.145/Sun Jan 24 00:20:10 2021//
 /if_dwge.c/1.8/Sun Jan 24 00:20:10 2021//
 /imxccm.c/1.26/Sun Jan 24 00:20:10 2021//
 /imxccm_clocks.h/1.25/Sun Jan 24 00:20:10 2021//
 /imxdwusb.c/1.4/Sun Jan 24 00:20:10 2021//
 /imxgpc.c/1.9/Sun Jan 24 00:20:10 2021//
-/mvkpcie.c/1.8/Sun Jan 24 00:20:10 2021//
 /xhci_fdt.c/1.16/Sun Jan 24 00:20:10 2021//
 /pinctrl.c/1.4/Wed Feb  3 13:05:02 2021//
+/bcm2835_dwctwo.c/1.2/Fri Feb 26 10:30:12 2021//
+/exuart.c/1.8/Mon Feb 22 18:32:02 2021//
+/exuartreg.h/1.4/Mon Feb 22 18:32:02 2021//
+/files.fdt/1.146/Fri Feb 26 10:30:12 2021//
+/imxuart.c/1.9/Fri Feb 26 10:30:12 2021//
+/sdhc_fdt.c/1.14/Fri Feb 26 10:30:12 2021//
+/tcpci.c/1.2/Fri Feb 26 10:30:12 2021//
+/bcm2711_pcie.c/1.5/Tue Mar  9 08:12:26 2021//
+/dwpcie.c/1.27/Tue Mar  9 08:12:26 2021//
+/mvkpcie.c/1.9/Tue Mar  9 08:12:26 2021//
+/rkpcie.c/1.13/Tue Mar  9 08:12:26 2021//
+/rkpmic.c/1.8/Tue Mar  9 08:12:26 2021//
 D

@@ -32,9 +32,7 @@
 /acpihid.c/1.2/Sat Jun  6 11:21:49 2020//
 /acpiac.c/1.33/Fri Dec 11 17:58:22 2020//
 /acpibat.c/1.68/Fri Dec 11 17:58:22 2020//
-/acpihpet.c/1.24/Fri Dec 11 17:58:22 2020//
 /acpisbs.c/1.10/Fri Dec 11 17:58:22 2020//
-/acpitimer.c/1.13/Fri Dec 11 17:58:22 2020//
 /acpiutil.c/1.9/Fri Dec 11 17:58:22 2020//
 /amdgpio.c/1.4/Fri Dec 11 17:58:22 2020//
 /abl.c/1.3/Fri Dec 18 08:57:37 2020//
@@ -42,7 +40,6 @@
 /acpicpu.c/1.89/Fri Dec 18 08:57:37 2020//
 /acpidebug.c/1.32/Thu Dec 17 19:39:58 2020//
 /acpidmar.h/1.1/Fri Dec 18 08:57:37 2020//
-/acpiec.c/1.62/Thu Dec 17 19:39:58 2020//
 /acpige.c/1.1/Fri Dec 18 08:57:37 2020//
 /acpivar.h/1.113/Fri Dec 18 08:57:37 2020//
 /acpivout.c/1.24/Fri Dec 18 08:57:37 2020//
@@ -58,10 +55,13 @@
 /acpipwrres.c/1.9/Mon Jan  4 07:11:05 2021//
 /acpitz.c/1.55/Mon Jan  4 07:11:05 2021//
 /atk0110.c/1.16/Mon Jan  4 07:11:05 2021//
-/dsdt.c/1.257/Mon Jan  4 07:11:05 2021//
-/acpi.c/1.395/Sun Jan 24 00:20:10 2021//
 /acpidmar.c/1.3/Sun Jan 24 00:20:10 2021//
 /acpireg.h/1.52/Sun Jan 24 00:20:10 2021//
-/sdhc_acpi.c/1.17/Sun Jan 24 00:20:10 2021//
 /tpm.c/1.11/Wed Feb  3 13:05:02 2021//
+/acpiec.c/1.63/Fri Feb 26 10:30:12 2021//
+/acpihpet.c/1.25/Fri Feb 26 10:30:12 2021//
+/acpitimer.c/1.14/Fri Feb 26 10:30:12 2021//
+/acpi.c/1.396/Tue Mar  9 08:12:26 2021//
+/dsdt.c/1.258/Tue Mar  9 08:12:26 2021//
+/sdhc_acpi.c/1.18/Tue Mar  9 08:12:26 2021//
 D

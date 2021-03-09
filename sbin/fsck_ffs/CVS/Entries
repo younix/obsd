@@ -1,7 +1,6 @@
 /Makefile/1.7/Sat Jun  5 07:36:23 2010//
 /dir.c/1.32/Tue Jan 20 18:22:21 2015//
 /extern.h/1.14/Fri Sep  9 15:37:15 2016//
-/fsck_ffs.8/1.26/Thu Sep  1 13:48:15 2016//
 /pass2.c/1.37/Tue Jan 20 18:22:21 2015//
 /pass3.c/1.18/Tue Jan 20 18:22:21 2015//
 D/SMM.doc////
@@ -14,3 +13,4 @@ D/SMM.doc////
 /utilities.c/1.54/Fri Dec 11 17:58:22 2020//
 /fsck.h/1.34/Wed Feb  3 13:04:56 2021//
 /main.c/1.53/Wed Feb  3 13:04:56 2021//
+/fsck_ffs.8/1.27/Tue Mar  9 08:12:20 2021//

@@ -1,4 +1,4 @@
-/*	$Id: test-cert.c,v 1.7 2021/01/29 10:15:42 claudio Exp $ */
+/*	$Id: test-cert.c,v 1.9 2021/02/16 08:53:53 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -44,6 +44,7 @@ cert_print(const struct cert *p)
 	assert(p != NULL);
 
 	printf("Manifest: %s\n", p->mft);
+	printf("caRepository: %s\n", p->repo);
 	if (p->notify != NULL)
 		printf("Notify URL: %s\n", p->notify);
 	if (p->crl != NULL)
@@ -51,6 +52,8 @@ cert_print(const struct cert *p)
 	printf("Subject key identifier: %s\n", p->ski);
 	if (p->aki != NULL)
 		printf("Authority key identifier: %s\n", p->aki);
+	if (p->aia != NULL)
+		printf("Authority info access: %s\n", p->aia);
 
 	for (i = 0; i < p->asz; i++)
 		switch (p->as[i].type) {

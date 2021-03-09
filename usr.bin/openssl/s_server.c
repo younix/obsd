@@ -267,7 +267,6 @@ static struct {
 	uint16_t min_version;
 	const SSL_METHOD *meth;
 	int msg;
-	int naccept;
 	char *named_curve;
 	int nbio;
 	int nbio_test;
@@ -321,19 +320,6 @@ static int
 s_server_opt_mtu(char *arg)
 {
 	s_server_config.socket_mtu = strtonum(arg, 0, LONG_MAX,
-	    &s_server_config.errstr);
-	if (s_server_config.errstr != NULL) {
-		BIO_printf(bio_err, "invalid argument %s: %s\n",
-		    arg, s_server_config.errstr);
-		return (1);
-	}
-	return (0);
-}
-
-static int
-s_server_opt_naccept(char *arg)
-{
-	s_server_config.naccept = strtonum(arg, 1, INT_MAX,
 	    &s_server_config.errstr);
 	if (s_server_config.errstr != NULL) {
 		BIO_printf(bio_err, "invalid argument %s: %s\n",
@@ -713,13 +699,6 @@ static const struct option s_server_options[] = {
 	},
 #endif
 	{
-		.name = "naccept",
-		.argname = "n",
-		.desc = "Exit after n connections",
-		.type = OPTION_ARG_FUNC,
-		.opt.argfunc = s_server_opt_naccept,
-	},
-	{
 		.name = "named_curve",
 		.argname = "arg",
 		.type = OPTION_ARG,
@@ -1070,7 +1049,6 @@ s_server_main(int argc, char *argv[])
 	s_server_config.dcert_format = FORMAT_PEM;
 	s_server_config.dkey_format = FORMAT_PEM;
 	s_server_config.key_format = FORMAT_PEM;
-	s_server_config.naccept = -1;
 	s_server_config.server_verify = SSL_VERIFY_NONE;
 	s_server_config.socket_type = SOCK_STREAM;
 	s_server_config.tlscstatp.timeout = -1;
@@ -1457,12 +1435,10 @@ s_server_main(int argc, char *argv[])
 	(void) BIO_flush(bio_s_out);
 	if (s_server_config.www)
 		do_server(s_server_config.port, s_server_config.socket_type,
-		    &accept_socket, www_body, s_server_config.context,
-		    s_server_config.naccept);
+		    &accept_socket, www_body, s_server_config.context);
 	else
 		do_server(s_server_config.port, s_server_config.socket_type,
-		    &accept_socket, sv_body, s_server_config.context,
-		    s_server_config.naccept);
+		    &accept_socket, sv_body, s_server_config.context);
 	print_stats(bio_s_out, ctx);
 	ret = 0;
  end:

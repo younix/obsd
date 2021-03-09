@@ -23,14 +23,14 @@
 /wsmousevar.h/1.15/Sun Jun 18 13:21:48 2017//
 /wsmuxvar.h/1.11/Mon Feb 18 17:39:14 2019//
 /wscons_features.h/1.4/Thu Dec 17 19:39:59 2020//
-/wsconsio.h/1.95/Fri Dec 18 08:57:37 2020//
-/wsdisplay.c/1.142/Fri Dec 18 09:03:31 2020//
 /wsdisplay_compat_usl.c/1.33/Thu Dec 17 19:39:59 2020//
 /wsdisplayvar.h/1.38/Fri Dec 18 09:03:31 2020//
 /wsemulvar.h/1.18/Thu Dec 17 19:39:59 2020//
 /wskbd.c/1.107/Fri Dec 18 08:57:37 2020//
 /wsmouse.c/1.66/Thu Dec 17 19:39:59 2020//
-/wstpad.c/1.26/Thu Dec 17 19:39:59 2020//
 /wsevent.c/1.25/Sun Jan 24 00:20:10 2021//
 /wsmux.c/1.54/Sun Jan 24 00:20:10 2021//
+/wsdisplay.c/1.143/Fri Feb 26 10:30:13 2021//
+/wsconsio.h/1.96/Tue Mar  9 08:12:29 2021//
+/wstpad.c/1.27/Tue Mar  9 08:12:29 2021//
 D

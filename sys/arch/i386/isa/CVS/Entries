@@ -1,6 +1,5 @@
 /ahc_isa.c/1.18/Sun Mar 29 21:53:52 2009//
 /icu.s/1.35/Mon Jul  9 19:20:30 2018//
-/isa_machdep.c/1.83/Thu Sep 22 10:25:34 2016//
 /isa_machdep.h/1.25/Sat Aug 22 02:54:50 2009//
 /isapnp_machdep.c/1.4/Thu Jun 26 05:42:11 2008//
 /isapnp_machdep.h/1.3/Thu Jun 26 05:42:11 2008//
@@ -11,6 +10,7 @@
 /lms.c/1.21/Sun Jun  5 20:02:36 2016//
 /mms.c/1.20/Sun Jun  5 20:02:36 2016//
 /nvram.h/1.7/Wed Jun  9 10:17:10 2004//
-/clock.c/1.59/Fri Dec 11 17:58:22 2020//
 /npx.c/1.72/Fri Dec 18 08:57:37 2020//
+/clock.c/1.60/Fri Feb 26 10:30:10 2021//
+/isa_machdep.c/1.84/Tue Mar  9 08:12:24 2021//
 D

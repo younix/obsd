@@ -8,12 +8,10 @@
 /dbmt_common.pl/1.1.1.2/Wed Feb 13 21:11:40 2019/-ko/
 /deprecate.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
 /h2ph.h/1.1.1.6/Mon Mar 25 20:09:33 2013/-ko/
-/h2ph.pht/1.16/Mon Dec 30 02:15:18 2019/-ko/
 /mypragma.pm/1.1.1.1/Mon Sep 29 17:18:59 2008/-ko/
 /mypragma.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
 /no_load.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
 /overload_fallback.t/1.1.1.2/Wed Feb 13 21:11:40 2019/-ko/
-/overload_nomethod.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
 /proxy_constant_subs.t/1.2/Sun Feb  5 00:32:19 2017/-ko/
 /test_require.pm/1.1.1.1/Mon Mar 24 14:59:09 2014/-kb/
 /test_use.pm/1.1.1.1/Fri Sep 24 14:49:15 2010/-ko/
@@ -28,3 +26,6 @@ D/locale////
 D/strict////
 D/subs////
 D/warnings////
+/CannotParse.pm/1.1.1.1/Mon Mar  1 23:16:14 2021/-ko/
+/h2ph.pht/1.18/Tue Mar  9 08:12:03 2021/-ko/
+/overload_nomethod.t/1.3/Tue Mar  9 08:12:03 2021/-ko/

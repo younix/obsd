@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhidev.c,v 1.85 2021/01/29 16:59:41 sthen Exp $	*/
+/*	$OpenBSD: uhidev.c,v 1.90 2021/03/08 14:35:57 jcs Exp $	*/
 /*	$NetBSD: uhidev.c,v 1.14 2003/03/11 16:44:00 augustss Exp $	*/
 
 /*
@@ -98,7 +98,6 @@ int uhidev_activate(struct device *, int);
 
 void uhidev_get_report_async_cb(struct usbd_xfer *, void *, usbd_status);
 void uhidev_set_report_async_cb(struct usbd_xfer *, void *, usbd_status);
-void uhidev_clear_iface_eps(struct uhidev_softc *, struct usbd_interface *);
 
 struct cfdriver uhidev_cd = {
 	NULL, "uhidev", DV_DULL
@@ -251,21 +250,37 @@ uhidev_attach(struct device *parent, struct device *self, void *aux)
 
 	uha.uaa = uaa;
 	uha.parent = sc;
-	uha.reportid = UHIDEV_CLAIM_ALLREPORTID;
+	uha.reportid = UHIDEV_CLAIM_MULTIPLE_REPORTID;
+	uha.nreports = nrepid;
+	uha.claimed = malloc(nrepid, M_TEMP, M_WAITOK|M_ZERO);
 
-	/* Look for a driver claiming all report IDs first. */
+	/* Look for a driver claiming multiple report IDs first. */
 	dev = config_found_sm(self, &uha, NULL, uhidevsubmatch);
 	if (dev != NULL) {
-		for (repid = 0; repid < nrepid; repid++)
-			sc->sc_subdevs[repid] = (struct uhidev *)dev;
-		return;
+		for (repid = 0; repid < nrepid; repid++) {
+			/*
+			 * Could already be assigned by uhidev_set_report_dev().
+			 */
+			if (sc->sc_subdevs[repid] != NULL)
+				continue;
+
+			if (uha.claimed[repid])
+				sc->sc_subdevs[repid] = (struct uhidev *)dev;
+		}
 	}
+
+	free(uha.claimed, M_TEMP, nrepid);
+	uha.claimed = NULL;
 
 	for (repid = 0; repid < nrepid; repid++) {
 		DPRINTF(("%s: try repid=%d\n", __func__, repid));
 		if (hid_report_size(desc, size, hid_input, repid) == 0 &&
 		    hid_report_size(desc, size, hid_output, repid) == 0 &&
 		    hid_report_size(desc, size, hid_feature, repid) == 0)
+			continue;
+
+		/* Could already be assigned by uhidev_set_report_dev(). */
+		if (sc->sc_subdevs[repid] != NULL)
 			continue;
 
 		uha.reportid = repid;
@@ -347,7 +362,7 @@ uhidevprint(void *aux, const char *pnp)
 
 	if (pnp)
 		printf("uhid at %s", pnp);
-	if (uha->reportid != 0 && uha->reportid != UHIDEV_CLAIM_ALLREPORTID)
+	if (uha->reportid != 0 && uha->reportid != UHIDEV_CLAIM_MULTIPLE_REPORTID)
 		printf(" reportid %d", uha->reportid);
 	return (UNCONF);
 }
@@ -509,9 +524,6 @@ uhidev_open(struct uhidev *scd)
 	DPRINTF(("uhidev_open: isize=%d, ep=0x%02x\n", sc->sc_isize,
 	    sc->sc_iep_addr));
 
-	/* Clear device endpoint toggle. */
-	uhidev_clear_iface_eps(sc, sc->sc_iface);
-
 	err = usbd_open_pipe_intr(sc->sc_iface, sc->sc_iep_addr,
 		  USBD_SHORT_XFER_OK, &sc->sc_ipipe, sc, sc->sc_ibuf,
 		  sc->sc_isize, uhidev_intr, USBD_DEFAULT_INTERVAL);
@@ -521,8 +533,6 @@ uhidev_open(struct uhidev *scd)
 		error = EIO;
 		goto out1;
 	}
-	/* Clear HC endpoint toggle. */
-	usbd_clear_endpoint_toggle(sc->sc_ipipe);
 
 	DPRINTF(("uhidev_open: sc->sc_ipipe=%p\n", sc->sc_ipipe));
 
@@ -548,8 +558,6 @@ uhidev_open(struct uhidev *scd)
 			error = EIO;
 			goto out2;
 		}
-		/* Clear HC endpoint toggle. */
-		usbd_clear_endpoint_toggle(sc->sc_opipe);
 
 		DPRINTF(("uhidev_open: sc->sc_opipe=%p\n", sc->sc_opipe));
 
@@ -959,36 +967,24 @@ uhidev_ioctl(struct uhidev *sc, u_long cmd, caddr_t addr, int flag,
 	return 0;
 }
 
-void
-uhidev_clear_iface_eps(struct uhidev_softc *sc, struct usbd_interface *iface)
+int
+uhidev_set_report_dev(struct uhidev_softc *sc, struct uhidev *dev, int repid)
 {
-	usb_interface_descriptor_t *id;
-	usb_endpoint_descriptor_t *ed;
-	uint8_t xfertype;
-	int i;
+	if ((dev->sc_state & UHIDEV_OPEN) == 0)
+		return ENODEV;
+	if (repid >= sc->sc_nrepid)
+		return EINVAL;
 
-	/* Only clear interface endpoints when none are in use. */
-	if (sc->sc_ipipe || sc->sc_opipe)
-		return;
-	DPRINTFN(1,("%s: clear interface eps\n", __func__));
+	sc->sc_subdevs[repid] = dev;
+	return 0;
+}
 
-	id = usbd_get_interface_descriptor(iface);
-	if (id == NULL)
-		goto bad;
+int
+uhidev_unset_report_dev(struct uhidev_softc *sc, int repid)
+{
+	if (repid >= sc->sc_nrepid)
+		return EINVAL;
 
-	for (i = 0; i < id->bNumEndpoints; i++) {
-		ed = usbd_interface2endpoint_descriptor(iface, i);
-		if (ed == NULL)
-			goto bad;
-
-		xfertype = UE_GET_XFERTYPE(ed->bmAttributes);
-		if (xfertype == UE_BULK || xfertype == UE_INTERRUPT) {
-			if (usbd_clear_endpoint_feature(sc->sc_udev,
-			    ed->bEndpointAddress, UF_ENDPOINT_HALT))
-				goto bad;
-		}
-	}
-	return;
-bad:
-	printf("%s: clear endpoints failed!\n", __func__);
+	sc->sc_subdevs[repid] = NULL;
+	return 0;
 }

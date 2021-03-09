@@ -1,12 +1,10 @@
 /ca.c/1.35/Fri May 31 15:15:37 2019//
 /carp.c/1.12/Thu Aug 18 00:45:52 2016//
 /check_icmp.c/1.48/Fri Jun 28 13:32:50 2019//
-/check_script.c/1.21/Sun May 28 10:39:15 2017//
 /check_tcp.c/1.57/Sun Sep 15 19:23:29 2019//
 /check_tls.c/1.2/Sun Sep 15 19:23:29 2019//
 /config.c/1.41/Sun Sep 15 19:23:29 2019//
 /control.c/1.56/Mon Jan  9 14:49:21 2017//
-/hce.c/1.79/Mon Aug  6 17:31:31 2018//
 /http.h/1.11/Wed May  8 23:22:19 2019//
 /log.c/1.35/Tue Mar 21 12:06:56 2017//
 /name2id.c/1.4/Thu Jan 22 17:42:09 2015//
@@ -27,4 +25,6 @@
 /relayd.conf.5/1.203/Sun Jan 24 00:20:11 2021//
 /relayd.h/1.265/Wed Feb  3 13:05:11 2021//
 /ssl.c/1.35/Wed Feb  3 13:05:11 2021//
+/check_script.c/1.22/Tue Mar  9 08:12:36 2021//
+/hce.c/1.80/Tue Mar  9 08:12:36 2021//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sig.c,v 1.270 2020/12/25 12:59:52 visa Exp $	*/
+/*	$OpenBSD: kern_sig.c,v 1.277 2021/03/08 18:09:15 claudio Exp $	*/
 /*	$NetBSD: kern_sig.c,v 1.54 1996/04/22 01:38:32 christos Exp $	*/
 
 /*
@@ -925,7 +925,7 @@ ptsignal(struct proc *p, int signum, enum signal_type type)
 			 * delayed.  Otherwise, mark it pending on the
 			 * main thread.
 			 */
-			SMR_TAILQ_FOREACH_LOCKED(q, &pr->ps_threads, p_thr_link) {
+			TAILQ_FOREACH(q, &pr->ps_threads, p_thr_link) {
 				/* ignore exiting threads */
 				if (q->p_flag & P_WEXIT)
 					continue;
@@ -1009,7 +1009,7 @@ ptsignal(struct proc *p, int signum, enum signal_type type)
 	 * XXX delay processing of SA_STOP signals unless action == SIG_DFL?
 	 */
 	if (prop & (SA_CONT | SA_STOP) && type != SPROPAGATED)
-		SMR_TAILQ_FOREACH_LOCKED(q, &pr->ps_threads, p_thr_link)
+		TAILQ_FOREACH(q, &pr->ps_threads, p_thr_link)
 			if (q != p)
 				ptsignal(q, signum, SPROPAGATED);
 
@@ -1035,7 +1035,7 @@ ptsignal(struct proc *p, int signum, enum signal_type type)
 			goto out;
 		/*
 		 * Process is sleeping and traced... make it runnable
-		 * so it can discover the signal in issignal() and stop
+		 * so it can discover the signal in cursig() and stop
 		 * for the parent.
 		 */
 		if (pr->ps_flags & PS_TRACED)
@@ -1159,27 +1159,37 @@ out:
 }
 
 /*
+ * Determine signal that should be delivered to process p, the current
+ * process, 0 if none.
+ *
  * If the current process has received a signal (should be caught or cause
  * termination, should interrupt current syscall), return the signal number.
  * Stop signals with default action are processed immediately, then cleared;
  * they aren't returned.  This is checked after each entry to the system for
- * a syscall or trap (though this can usually be done without calling issignal
- * by checking the pending signal masks in the CURSIG macro.) The normal call
- * sequence is
+ * a syscall or trap. The normal call sequence is
  *
- *	while (signum = CURSIG(curproc))
+ *	while (signum = cursig(curproc))
  *		postsig(signum);
  *
  * Assumes that if the P_SINTR flag is set, we're holding both the
  * kernel and scheduler locks.
  */
 int
-issignal(struct proc *p)
+cursig(struct proc *p)
 {
 	struct process *pr = p->p_p;
-	int signum, mask, prop;
+	int sigpending, signum, mask, prop;
 	int dolock = (p->p_flag & P_SINTR) == 0;
 	int s;
+
+	KERNEL_ASSERT_LOCKED();
+
+	sigpending = (p->p_siglist | pr->ps_siglist);
+	if (sigpending == 0)
+		return 0;
+
+	if (!ISSET(pr->ps_flags, PS_TRACED) && SIGPENDING(p) == 0)
+		return 0;
 
 	for (;;) {
 		mask = SIGPENDING(p);
@@ -1209,11 +1219,7 @@ issignal(struct proc *p)
 		    signum != SIGKILL) {
 			pr->ps_xsig = signum;
 
-			if (dolock)
-				KERNEL_LOCK();
 			single_thread_set(p, SINGLE_PTRACE, 0);
-			if (dolock)
-				KERNEL_UNLOCK();
 
 			if (dolock)
 				SCHED_LOCK(s);
@@ -1221,11 +1227,7 @@ issignal(struct proc *p)
 			if (dolock)
 				SCHED_UNLOCK(s);
 
-			if (dolock)
-				KERNEL_LOCK();
 			single_thread_clear(p, 0);
-			if (dolock)
-				KERNEL_UNLOCK();
 
 			/*
 			 * If we are no longer being traced, or the parent
@@ -1308,7 +1310,7 @@ issignal(struct proc *p)
 			 */
 			if ((prop & SA_CONT) == 0 &&
 			    (pr->ps_flags & PS_TRACED) == 0)
-				printf("issignal\n");
+				printf("%s\n", __func__);
 			break;		/* == ignore */
 		default:
 			/*
@@ -1770,7 +1772,7 @@ sys___thrsigdivert(struct proc *p, void *v, register_t *retval)
 
 	dosigsuspend(p, p->p_sigmask &~ mask);
 	for (;;) {
-		si.si_signo = CURSIG(p);
+		si.si_signo = cursig(p);
 		if (si.si_signo != 0) {
 			sigset_t smask = sigmask(si.si_signo);
 			if (smask & mask) {
@@ -1911,7 +1913,7 @@ userret(struct proc *p)
 
 	if (SIGPENDING(p) != 0) {
 		KERNEL_LOCK();
-		while ((signum = CURSIG(p)) != 0)
+		while ((signum = cursig(p)) != 0)
 			postsig(p, signum);
 		KERNEL_UNLOCK();
 	}
@@ -1927,7 +1929,7 @@ userret(struct proc *p)
 		p->p_sigmask = p->p_oldmask;
 
 		KERNEL_LOCK();
-		while ((signum = CURSIG(p)) != 0)
+		while ((signum = cursig(p)) != 0)
 			postsig(p, signum);
 		KERNEL_UNLOCK();
 	}
@@ -2009,7 +2011,6 @@ single_thread_set(struct proc *p, enum single_thread_mode mode, int deep)
 	struct proc *q;
 	int error, s;
 
-	KERNEL_ASSERT_LOCKED();
 	KASSERT(curproc == p);
 
 	SCHED_LOCK(s);
@@ -2038,7 +2039,7 @@ single_thread_set(struct proc *p, enum single_thread_mode mode, int deep)
 	pr->ps_singlecount = 0;
 	membar_producer();
 	pr->ps_single = p;
-	SMR_TAILQ_FOREACH_LOCKED(q, &pr->ps_threads, p_thr_link) {
+	TAILQ_FOREACH(q, &pr->ps_threads, p_thr_link) {
 		if (q == p)
 			continue;
 		if (q->p_flag & P_WEXIT) {
@@ -2106,7 +2107,7 @@ single_thread_wait(struct process *pr, int recheck)
 	/* wait until they're all suspended */
 	wait = pr->ps_singlecount > 0;
 	while (wait) {
-		sleep_setup(&sls, &pr->ps_singlecount, PWAIT, "suspend");
+		sleep_setup(&sls, &pr->ps_singlecount, PWAIT, "suspend", 0);
 		wait = pr->ps_singlecount > 0;
 		sleep_finish(&sls, wait);
 		if (!recheck)
@@ -2125,12 +2126,11 @@ single_thread_clear(struct proc *p, int flag)
 
 	KASSERT(pr->ps_single == p);
 	KASSERT(curproc == p);
-	KERNEL_ASSERT_LOCKED();
 
 	SCHED_LOCK(s);
 	pr->ps_single = NULL;
 	atomic_clearbits_int(&pr->ps_flags, PS_SINGLEUNWIND | PS_SINGLEEXIT);
-	SMR_TAILQ_FOREACH_LOCKED(q, &pr->ps_threads, p_thr_link) {
+	TAILQ_FOREACH(q, &pr->ps_threads, p_thr_link) {
 		if (q == p || (q->p_flag & P_SUSPSINGLE) == 0)
 			continue;
 		atomic_clearbits_int(&q->p_flag, P_SUSPSINGLE);
