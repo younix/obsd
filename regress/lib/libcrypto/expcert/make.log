@@ -1,0 +1,5 @@
+==== create-certs ====
+make: don't know how to make /usr/src/regress/lib/libcrypto/expcert/expcrt.c (prerequisite of: expcrt.o)
+Stop in .
+*** Error 2 in . (<bsd.regress.mk>:79 'stamp-create-certs': make -C /root/expcert create-certs)
+*** Error 2 in /root/expcert (<bsd.regress.mk>:87 'regress': make -C /root/expcert stamp-create-certs)
