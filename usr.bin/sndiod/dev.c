@@ -1,4 +1,4 @@
-/*	$OpenBSD: dev.c,v 1.97 2021/03/08 09:42:50 ratchov Exp $	*/
+/*	$OpenBSD: dev.c,v 1.99 2021/03/10 08:22:25 ratchov Exp $	*/
 /*
  * Copyright (c) 2008-2012 Alexandre Ratchov <alex@caoua.org>
  *
@@ -1713,6 +1713,7 @@ slot_new(struct opt *opt, unsigned int id, char *who,
 {
 	char *p;
 	char name[SLOT_NAMEMAX];
+	char ctl_name[CTL_NAMEMAX];
 	unsigned int i, ser, bestser, bestidx;
 	struct slot *unit[DEV_NSLOT];
 	struct slot *s;
@@ -1777,23 +1778,29 @@ slot_new(struct opt *opt, unsigned int id, char *who,
 			bestidx = i;
 		}
 	}
-	if (bestidx != DEV_NSLOT) {
-		s = slot_array + bestidx;
-		s->vol = MIDI_MAXCTL;
-		strlcpy(s->name, name, SLOT_NAMEMAX);
-		s->serial = slot_serial++;
-		for (i = 0; unit[i] != NULL; i++)
-			; /* nothing */
-		s->unit = i;
-		s->id = id;
-		goto found;
+
+	if (bestidx == DEV_NSLOT) {
+		if (log_level >= 1) {
+			log_puts(name);
+			log_puts(": out of sub-device slots\n");
+		}
+		return NULL;
 	}
 
-	if (log_level >= 1) {
-		log_puts(name);
-		log_puts(": out of sub-device slots\n");
-	}
-	return NULL;
+	s = slot_array + bestidx;
+	ctl_del(CTL_SLOT_LEVEL, s, NULL);
+	s->vol = MIDI_MAXCTL;
+	strlcpy(s->name, name, SLOT_NAMEMAX);
+	s->serial = slot_serial++;
+	for (i = 0; unit[i] != NULL; i++)
+		; /* nothing */
+	s->unit = i;
+	s->id = id;
+	s->opt = opt;
+	slot_ctlname(s, ctl_name, CTL_NAMEMAX);
+	ctl_new(CTL_SLOT_LEVEL, s, NULL,
+	    CTL_NUM, "app", ctl_name, -1, "level",
+	    NULL, -1, 127, s->vol);
 
 found:
 	if ((mode & MODE_REC) && (opt->mode & MODE_MON)) {
@@ -1829,7 +1836,6 @@ found:
 	s->appbufsz = s->opt->dev->bufsz;
 	s->round = s->opt->dev->round;
 	s->rate = s->opt->dev->rate;
-	dev_label(s->opt->dev, s - slot_array);
 	dev_midi_slotdesc(s->opt->dev, s);
 	dev_midi_vol(s->opt->dev, s);
 #ifdef DEBUG
@@ -2591,28 +2597,3 @@ dev_ctlsync(struct dev *d)
 	}
 }
 
-void
-dev_label(struct dev *d, int i)
-{
-	struct ctl *c;
-	char name[CTL_NAMEMAX];
-
-	slot_ctlname(&slot_array[i], name, CTL_NAMEMAX);
-
-	c = ctl_list;
-	for (;;) {
-		if (c == NULL) {
-			ctl_new(CTL_SLOT_LEVEL, slot_array + i, NULL,
-			    CTL_NUM, "app", name, -1, "level",
-			    NULL, -1, 127, slot_array[i].vol);
-			return;
-		}
-		if (ctl_match(c, CTL_SLOT_LEVEL, slot_array + i, NULL))
-			break;
-		c = c->next;
-	}
-	if (strcmp(c->node0.name, name) == 0)
-		return;
-	strlcpy(c->node0.name, name, CTL_NAMEMAX);
-	c->desc_mask = ~0;
-}

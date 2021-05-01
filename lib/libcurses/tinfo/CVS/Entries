@@ -33,7 +33,6 @@
 /lib_options.c/1.10/Tue Jan 12 23:22:06 2010//
 /lib_print.c/1.5/Tue Jan 12 23:22:06 2010//
 /lib_raw.c/1.8/Tue Jan 12 23:22:06 2010//
-/lib_setup.c/1.12/Tue Jan 12 23:22:06 2010//
 /lib_termcap.c/1.10/Tue Jan 12 23:22:06 2010//
 /lib_termname.c/1.5/Tue Jan 12 23:22:06 2010//
 /lib_tgoto.c/1.6/Thu Jan 14 22:53:22 2010//
@@ -51,4 +50,5 @@
 /trim_sgr0.c/1.1/Tue Jan 12 23:22:06 2010//
 /use_screen.c/1.1/Tue Jan 12 23:22:06 2010//
 /write_entry.c/1.13/Tue Jan 12 23:22:06 2010//
+/lib_setup.c/1.13/Fri Mar 12 08:58:41 2021//
 D

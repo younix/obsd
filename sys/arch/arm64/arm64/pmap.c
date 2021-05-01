@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.c,v 1.73 2021/03/08 11:16:26 kettenis Exp $ */
+/* $OpenBSD: pmap.c,v 1.76 2021/03/17 12:03:40 kettenis Exp $ */
 /*
  * Copyright (c) 2008-2009,2014-2016 Dale Rahn <drahn@dalerahn.com>
  *
@@ -556,7 +556,7 @@ PTED_VALID(struct pte_desc *pted)
  * One issue of making this a single data structure is that two pointers are
  * wasted for every page which does not map ram (device mappings), this
  * should be a low percentage of mapped pages in the system, so should not
- * have too noticable unnecessary ram consumption.
+ * have too noticeable unnecessary ram consumption.
  */
 
 void
@@ -1672,11 +1672,14 @@ pmap_init(void)
 	 * the identity mapping in TTBR0 and can set the TCR to a
 	 * more useful value.
 	 */
+	WRITE_SPECIALREG(ttbr0_el1, pmap_kernel()->pm_pt0pa);
+	__asm volatile("isb");
 	tcr = READ_SPECIALREG(tcr_el1);
 	tcr &= ~TCR_T0SZ(0x3f);
 	tcr |= TCR_T0SZ(64 - USER_SPACE_BITS);
 	tcr |= TCR_A1;
 	WRITE_SPECIALREG(tcr_el1, tcr);
+	cpu_tlb_flush();
 
 	pool_init(&pmap_pmap_pool, sizeof(struct pmap), 0, IPL_NONE, 0,
 	    "pmap", NULL);
@@ -1888,7 +1891,7 @@ pmap_fault_fixup(pmap_t pm, vaddr_t va, vm_prot_t ftype)
 
 		/*
 		 * Exec always includes a reference. Since we now know
-		 * the page has been accesed, we can enable read as well
+		 * the page has been accessed, we can enable read as well
 		 * if UVM allows it.
 		 */
 		atomic_setbits_int(&pg->pg_flags, PG_PMAP_REF);
@@ -2369,7 +2372,7 @@ pmap_map_early(paddr_t spa, psize_t len)
 		    ATTR_IDX(PTE_ATTR_WB) | ATTR_SH(SH_INNER) |
 		    ATTR_nG | ATTR_UXN | ATTR_AF | ATTR_AP(0);
 	}
-	__asm volatile("dsb sy");
+	__asm volatile("dsb sy" ::: "memory");
 	__asm volatile("isb");
 }
 

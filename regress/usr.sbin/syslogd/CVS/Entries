@@ -57,12 +57,9 @@
 /args-client-udp6.pl/1.5/Thu Jul 16 16:34:49 2015//
 /args-client-unix.pl/1.5/Mon Oct 19 20:16:09 2015//
 /args-default.pl/1.4/Wed Dec 30 13:15:52 2015//
-/args-dropped-filesystem.pl/1.1/Mon Oct 23 17:37:55 2017//
 /args-dropped-init.pl/1.1/Thu Oct  5 16:37:22 2017//
-/args-dropped-sighup-filesystem.pl/1.1/Mon Oct 23 17:37:55 2017//
 /args-dropped-sighup-tcp.pl/1.11/Fri Jan 18 15:46:14 2019//
 /args-dropped-sighup-tls.pl/1.15/Fri Jan 18 15:46:14 2019//
-/args-dropped-sigterm-filesystem.pl/1.1/Mon Oct 23 17:37:55 2017//
 /args-dropped-sigterm-tcp.pl/1.13/Fri Jan 18 15:46:14 2019//
 /args-dropped-sigterm-tls.pl/1.15/Fri Jan 18 15:46:14 2019//
 /args-dropped-tcp.pl/1.11/Fri Jan 18 15:46:14 2019//
@@ -107,7 +104,6 @@
 /args-privsep-daemon.pl/1.4/Tue Sep 12 15:24:21 2017//
 /args-privsep-foreground.pl/1.4/Tue Sep 12 15:24:21 2017//
 /args-privsep-relative.pl/1.1/Tue Dec 27 19:43:07 2016//
-/args-privsep.pl/1.4/Tue Sep 12 15:24:21 2017//
 /args-proto-invalid.pl/1.6/Fri Apr 28 15:04:49 2017//
 /args-proto-udp.pl/1.7/Thu Jul 16 16:34:49 2015//
 /args-proto-udp4-host6.pl/1.6/Fri Apr 28 15:04:49 2017//
@@ -129,7 +125,6 @@
 /args-selector.pl/1.3/Thu Apr  6 16:56:44 2017//
 /args-send46.pl/1.1/Tue Sep 12 15:24:21 2017//
 /args-sendsyslog-console.pl/1.3/Mon Mar 21 23:23:15 2016//
-/args-sendsyslog-dropped.pl/1.6/Tue May 22 15:01:16 2018//
 /args-sendsyslog-flags.pl/1.2/Tue Mar 29 21:12:12 2016//
 /args-sendsyslog-native.pl/1.4/Mon Mar 21 23:23:15 2016//
 /args-sendsyslog-syscall.pl/1.2/Mon Mar 21 23:23:15 2016//
@@ -178,10 +173,8 @@
 /args-zulu.pl/1.3/Tue Sep 12 15:24:21 2017//
 /syslogd.pl/1.11/Tue Sep 17 22:24:08 2019//
 /ttylog.c/1.7/Tue Jul  9 15:09:38 2019//
-/Client.pm/1.14/Fri Dec 18 08:57:36 2020//
 /Proc.pm/1.9/Thu Dec 17 19:39:58 2020//
 /Server.pm/1.13/Fri Dec 18 08:57:36 2020//
-/Syslogd.pm/1.25/Thu Dec 17 19:39:58 2020//
 /args-client-tls-error.pl/1.5/Fri Dec 18 08:57:36 2020//
 /args-client-tls-fake.pl/1.7/Fri Dec 18 08:57:36 2020//
 /args-secure-udp.pl/1.4/Thu Dec 17 19:39:58 2020//
@@ -194,7 +187,18 @@
 /args-tls-v12-verify.pl/1.1/Thu Dec 17 19:39:58 2020//
 /args-tls-version.pl/1.1/Thu Dec 17 19:39:58 2020//
 /funcs.pl/1.38/Fri Dec 18 08:57:36 2020//
-/Makefile/1.31/Mon Jan  4 07:11:05 2021//
-/LICENSE/1.4/Sun Jan 24 00:20:10 2021//
 /args-tls-cafile-fake.pl/1.14/Sun Jan 24 00:20:10 2021//
+/Client.pm/1.15/Fri Mar 12 08:58:58 2021//
+/LICENSE/1.5/Fri Mar 12 08:58:58 2021//
+/Makefile/1.32/Fri Mar 12 08:58:58 2021//
+/Syslogd.pm/1.26/Fri Mar 12 08:58:58 2021//
+/args-dropped-filesystem.pl/1.2/Fri Mar 12 08:58:58 2021//
+/args-dropped-sighup-filesystem.pl/1.2/Fri Mar 12 08:58:58 2021//
+/args-dropped-sigterm-filesystem.pl/1.2/Fri Mar 12 08:58:58 2021//
+/args-privsep.pl/1.5/Fri Mar 12 08:58:58 2021//
+/args-sendsyslog-dropped.pl/1.7/Fri Mar 12 08:58:58 2021//
+/args-sendsyslog-fault.pl/1.1/Tue Mar  9 15:16:28 2021//
+/args-sendsyslog-logstash.pl/1.1/Tue Mar  9 15:16:28 2021//
+/args-sendsyslog-nostash.pl/1.1/Tue Mar  9 15:16:28 2021//
+/logflush.c/1.1/Tue Mar  9 15:16:28 2021//
 D

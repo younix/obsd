@@ -1,5 +1,4 @@
 /cnv_float.h/1.9/Thu Apr 10 17:27:58 2003//
-/dbl_float.h/1.12/Tue Nov 26 20:33:12 2013//
 /dfadd.c/1.7/Fri Nov 29 09:27:34 2002//
 /dfcmp.c/1.6/Fri Sep 20 19:26:59 2002//
 /dfdiv.c/1.5/Tue May  7 22:19:30 2002//
@@ -31,7 +30,6 @@
 /mpyscv.c/1.7/Thu Apr 10 17:27:58 2003//
 /mpyu.c/1.6/Thu Apr 10 17:27:58 2003//
 /mpyucv.c/1.6/Thu Apr 10 17:27:58 2003//
-/quad_float.h/1.8/Thu Apr 10 17:27:58 2003//
 /sfadd.c/1.6/Fri Nov 29 09:27:34 2002//
 /sfcmp.c/1.6/Fri Sep 20 19:26:59 2002//
 /sfdiv.c/1.5/Tue May  7 22:19:30 2002//
@@ -39,5 +37,7 @@
 /sfrem.c/1.5/Tue May  7 22:19:30 2002//
 /sfsqrt.c/1.7/Thu Apr 10 17:27:59 2003//
 /sfsub.c/1.6/Fri Nov 29 09:27:34 2002//
-/sgl_float.h/1.12/Tue Nov 26 20:33:12 2013//
+/dbl_float.h/1.13/Fri Mar 12 08:59:01 2021//
+/quad_float.h/1.9/Fri Mar 12 08:59:01 2021//
+/sgl_float.h/1.13/Fri Mar 12 08:59:01 2021//
 D

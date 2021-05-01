@@ -180,7 +180,6 @@
 /clock_gettime.2/1.31/Fri Dec 18 08:57:36 2020//
 /kqueue.2/1.43/Fri Dec 18 08:57:36 2020//
 /select.2/1.43/Thu Dec 17 19:39:58 2020//
-/sendsyslog.2/1.12/Fri Dec 18 08:57:36 2020//
 /utimes.2/1.28/Fri Dec 18 08:57:36 2020//
 /acct.2/1.20/Sun Jan 24 00:20:10 2021//
 /bind.2/1.22/Sun Jan 24 00:20:10 2021//
@@ -196,4 +195,5 @@
 /sysctl.2/1.43/Sun Jan 24 00:20:10 2021//
 /getsockopt.2/1.57/Tue Mar  9 08:12:07 2021//
 /mmap.2/1.66/Tue Mar  9 08:12:07 2021//
+/sendsyslog.2/1.13/Fri Mar 12 08:58:40 2021//
 D

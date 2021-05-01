@@ -30,10 +30,8 @@
 /rijndael.h/1.13/Mon Jun  9 07:49:45 2008//
 /rmd160.c/1.5/Tue Jan 11 15:42:05 2011//
 /rmd160.h/1.5/Sun Jul  5 19:33:46 2009//
-/set_key.c/1.4/Thu Dec 10 21:00:51 2015//
 /sha1.c/1.11/Sun Dec 28 10:04:35 2014//
 /sha1.h/1.6/Sun Nov 16 17:39:09 2014//
-/sha2.c/1.18/Sat Mar 14 03:38:46 2015//
 /sha2.h/1.5/Sun Nov 16 17:39:09 2014//
 /siphash.c/1.5/Fri Jan  5 19:05:09 2018//
 /siphash.h/1.5/Fri Feb 20 11:51:03 2015//
@@ -55,4 +53,6 @@
 /idgen.c/1.8/Fri Dec 11 17:58:22 2020//
 /poly1305.c/1.2/Fri Dec 11 17:58:22 2020//
 /poly1305.h/1.2/Fri Dec 11 17:58:22 2020//
+/set_key.c/1.5/Sun Mar 14 00:53:58 2021//
+/sha2.c/1.19/Sun Mar 14 00:53:58 2021//
 D

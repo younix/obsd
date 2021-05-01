@@ -1,4 +1,4 @@
-/* $OpenBSD: smmu.c,v 1.9 2021/03/06 19:30:07 patrick Exp $ */
+/* $OpenBSD: smmu.c,v 1.11 2021/03/22 20:34:45 patrick Exp $ */
 /*
  * Copyright (c) 2008-2009,2014-2016 Dale Rahn <drahn@dalerahn.com>
  * Copyright (c) 2021 Patrick Wildt <patrick@blueri.se>
@@ -500,8 +500,9 @@ smmu_cb_write_8(struct smmu_softc *sc, int idx, bus_size_t off, uint64_t val)
 }
 
 bus_dma_tag_t
-smmu_device_hook(struct smmu_softc *sc, uint32_t sid, bus_dma_tag_t dmat)
+smmu_device_map(void *cookie, uint32_t sid, bus_dma_tag_t dmat)
 {
+	struct smmu_softc *sc = cookie;
 	struct smmu_domain *dom;
 
 	dom = smmu_domain_lookup(sc, sid);
@@ -525,15 +526,6 @@ smmu_device_hook(struct smmu_softc *sc, uint32_t sid, bus_dma_tag_t dmat)
 	}
 
 	return dom->sd_dmat;
-}
-
-void
-smmu_pci_device_hook(void *cookie, uint32_t rid, struct pci_attach_args *pa)
-{
-	struct smmu_softc *sc = cookie;
-
-	printf("%s: rid %x\n", sc->sc_dev.dv_xname, rid);
-	pa->pa_dmat = smmu_device_hook(sc, rid, pa->pa_dmat);
 }
 
 struct smmu_domain *
@@ -762,41 +754,9 @@ smmu_domain_create(struct smmu_softc *sc, uint32_t sid)
 	    M_DEVBUF, NULL, 0, EX_WAITOK | EX_NOCOALESCE);
 
 #if 0
-	/* FIXME MSI map & PCIe address space */
+	/* FIXME PCIe address space */
 	{
-#if 0
-		/* Reserve and map Ampere MSI */
-		paddr_t msi_pa = 0x78020000;
-		size_t msi_len = 0x20000;
-#endif
-#if 0
-		/* Reserve and map LX2K MSI */
-		paddr_t msi_pa = 0x6020000;
-		size_t msi_len = 0x20000;
-#endif
 #if 1
-		/* Reserve and map 8040 GICv2M */
-		paddr_t msi_pa = 0xf0280000;
-		size_t msi_len = 0x40000;
-#endif
-		extent_alloc_region(dom->sd_iovamap, msi_pa, msi_len, EX_WAITOK);
-		while (msi_len) {
-			smmu_enter(dom, msi_pa, msi_pa, PROT_READ | PROT_WRITE,
-			    PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
-			smmu_map(dom, msi_pa, msi_pa, PROT_READ | PROT_WRITE,
-			    PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
-			msi_pa += PAGE_SIZE;
-			msi_len -= PAGE_SIZE;
-		}
-#if 1
-		/* Reserve and map 8040 GICP */
-		msi_pa = 0xf03f0000;
-		msi_len = 0x1000;
-		extent_alloc_region(dom->sd_iovamap, msi_pa, msi_len, EX_WAITOK);
-		smmu_enter(dom, msi_pa, msi_pa, PROT_READ | PROT_WRITE,
-		    PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
-		smmu_map(dom, msi_pa, msi_pa, PROT_READ | PROT_WRITE,
-		    PROT_READ | PROT_WRITE, PMAP_CACHE_WB);
 		/* Reserve 8040 PCI address space */
 		extent_alloc_region(dom->sd_iovamap, 0xc0000000, 0x20000000,
 		    EX_WAITOK);
