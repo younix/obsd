@@ -1,16 +1,9 @@
-D/MacOSX-arm////
-D/MacOSX-arm64////
-D/MacOSX-i386////
-D/SysV-arc////
-D/SysV-arm////
-D/SysV-arm64////
-D/SysV-hexagon////
-D/SysV-i386////
-D/SysV-mips////
-D/SysV-mips64////
-D/SysV-ppc////
-D/SysV-ppc64////
-D/SysV-s390x////
-D/SysV-x86_64////
-D/Windows-x86_64////
-/CMakeLists.txt/1.1.1.1/Thu Dec 17 19:39:53 2020/-ko/
+/CMakeLists.txt/1.1.1.2/Sat May  1 08:31:59 2021/-ko/
+D/AArch64////
+D/ARC////
+D/ARM////
+D/Hexagon////
+D/Mips////
+D/PowerPC////
+D/SystemZ////
+D/X86////

@@ -6,7 +6,6 @@ D/debugserver////
 D/driver////
 D/intel-features////
 D/lldb-instr////
-D/lldb-mi////
 D/lldb-perf////
 D/lldb-server////
 D/lldb-test////

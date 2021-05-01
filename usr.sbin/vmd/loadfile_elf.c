@@ -1,5 +1,5 @@
 /* $NetBSD: loadfile.c,v 1.10 2000/12/03 02:53:04 tsutsui Exp $ */
-/* $OpenBSD: loadfile_elf.c,v 1.36 2020/10/26 04:04:31 visa Exp $ */
+/* $OpenBSD: loadfile_elf.c,v 1.38 2021/04/05 18:09:48 dv Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -115,11 +115,11 @@ union {
 
 static void setsegment(struct mem_segment_descriptor *, uint32_t,
     size_t, int, int, int, int);
-static int elf32_exec(FILE *, Elf32_Ehdr *, u_long *, int);
-static int elf64_exec(FILE *, Elf64_Ehdr *, u_long *, int);
+static int elf32_exec(gzFile, Elf32_Ehdr *, u_long *, int);
+static int elf64_exec(gzFile, Elf64_Ehdr *, u_long *, int);
 static size_t create_bios_memmap(struct vm_create_params *, bios_memmap_t *);
-static uint32_t push_bootargs(bios_memmap_t *, size_t, bios_bootmac_t *);
-static size_t push_stack(uint32_t, uint32_t, uint32_t, uint32_t);
+static uint32_t push_bootargs(bios_memmap_t *, size_t);
+static size_t push_stack(uint32_t, uint32_t);
 static void push_gdt(void);
 static void push_pt_32(void);
 static void push_pt_64(void);
@@ -260,21 +260,19 @@ push_pt_64(void)
  *
  * Return values:
  *  0 if successful
- *  various error codes returned from read(2) or loadelf functions
+ *  various error codes returned from gzread(3) or loadelf functions
  */
 int
-loadfile_elf(FILE *fp, struct vm_create_params *vcp,
-    struct vcpu_reg_state *vrs, uint32_t bootdev, uint32_t howto,
-    unsigned int bootdevice)
+loadfile_elf(gzFile fp, struct vm_create_params *vcp,
+    struct vcpu_reg_state *vrs)
 {
 	int r, is_i386 = 0;
 	uint32_t bootargsz;
 	size_t n, stacksize;
 	u_long marks[MARK_MAX];
 	bios_memmap_t memmap[VMM_MAX_MEM_RANGES + 1];
-	bios_bootmac_t bm, *bootmac = NULL;
 
-	if ((r = fread(&hdr, 1, sizeof(hdr), fp)) != sizeof(hdr))
+	if ((r = gzread(fp, &hdr, sizeof(hdr))) != sizeof(hdr))
 		return 1;
 
 	memset(&marks, 0, sizeof(marks));
@@ -303,13 +301,9 @@ loadfile_elf(FILE *fp, struct vm_create_params *vcp,
 	else
 		push_pt_64();
 
-	if (bootdevice & VMBOOTDEV_NET) {
-		bootmac = &bm;
-		memcpy(bootmac, vcp->vcp_macs[0], ETHER_ADDR_LEN);
-	}
 	n = create_bios_memmap(vcp, memmap);
-	bootargsz = push_bootargs(memmap, n, bootmac);
-	stacksize = push_stack(bootargsz, marks[MARK_END], bootdev, howto);
+	bootargsz = push_bootargs(memmap, n);
+	stacksize = push_stack(bootargsz, marks[MARK_END]);
 
 	vrs->vrs_gprs[VCPU_REGS_RIP] = (uint64_t)marks[MARK_ENTRY];
 	vrs->vrs_gprs[VCPU_REGS_RSP] = (uint64_t)(STACK_PAGE + PAGE_SIZE) - stacksize;
@@ -388,9 +382,9 @@ create_bios_memmap(struct vm_create_params *vcp, bios_memmap_t *memmap)
  *  The size of the bootargs
  */
 static uint32_t
-push_bootargs(bios_memmap_t *memmap, size_t n, bios_bootmac_t *bootmac)
+push_bootargs(bios_memmap_t *memmap, size_t n)
 {
-	uint32_t memmap_sz, consdev_sz, bootmac_sz, i;
+	uint32_t memmap_sz, consdev_sz, i;
 	bios_consdev_t consdev;
 	uint32_t ba[1024];
 
@@ -413,15 +407,6 @@ push_bootargs(bios_memmap_t *memmap, size_t n, bios_bootmac_t *bootmac)
 	ba[i + 2] = consdev_sz;
 	memcpy(&ba[i + 3], &consdev, sizeof(bios_consdev_t));
 	i += consdev_sz / sizeof(int);
-
-	if (bootmac) {
-		bootmac_sz = 3 * sizeof(int) + (sizeof(bios_bootmac_t) + 3) & ~3;
-		ba[i] = 0x7;   /* bootmac */
-		ba[i + 1] = bootmac_sz;
-		ba[i + 2] = bootmac_sz;
-		memcpy(&ba[i + 3], bootmac, sizeof(bios_bootmac_t));
-		i += bootmac_sz / sizeof(int);
-	} 
 
 	ba[i++] = 0xFFFFFFFF; /* BOOTARG_END */
 
@@ -458,7 +443,7 @@ push_bootargs(bios_memmap_t *memmap, size_t n, bios_bootmac_t *bootmac)
  *  size of the stack
  */
 static size_t
-push_stack(uint32_t bootargsz, uint32_t end, uint32_t bootdev, uint32_t howto)
+push_stack(uint32_t bootargsz, uint32_t end)
 {
 	uint32_t stack[1024];
 	uint16_t loc;
@@ -466,17 +451,14 @@ push_stack(uint32_t bootargsz, uint32_t end, uint32_t bootdev, uint32_t howto)
 	memset(&stack, 0, sizeof(stack));
 	loc = 1024;
 
-	if (bootdev == 0)
-		bootdev = MAKEBOOTDEV(0x4, 0, 0, 0, 0); /* bootdev: sd0a */
-
 	stack[--loc] = BOOTARGS_PAGE;
 	stack[--loc] = bootargsz;
 	stack[--loc] = 0; /* biosbasemem */
 	stack[--loc] = 0; /* biosextmem */
 	stack[--loc] = end;
 	stack[--loc] = 0x0e;
-	stack[--loc] = bootdev;
-	stack[--loc] = howto;
+	stack[--loc] = MAKEBOOTDEV(0x4, 0, 0, 0, 0); /* bootdev: sd0a */
+	stack[--loc] = 0;
 
 	write_mem(STACK_PAGE, &stack, PAGE_SIZE);
 
@@ -490,7 +472,7 @@ push_stack(uint32_t bootargsz, uint32_t end, uint32_t bootdev, uint32_t howto)
  * into the guest address space at paddr 'addr'.
  *
  * Parameters:
- *  fd: file descriptor of the kernel image file to read from.
+ *  fp: kernel image file to read from.
  *  addr: guest paddr_t to load to
  *  sz: number of bytes to load
  *
@@ -498,7 +480,7 @@ push_stack(uint32_t bootargsz, uint32_t end, uint32_t bootdev, uint32_t howto)
  *  returns 'sz' if successful, or 0 otherwise.
  */
 size_t
-mread(FILE *fp, paddr_t addr, size_t sz)
+mread(gzFile fp, paddr_t addr, size_t sz)
 {
 	size_t ct;
 	size_t i, rd, osz;
@@ -518,7 +500,7 @@ mread(FILE *fp, paddr_t addr, size_t sz)
 		else
 			ct = sz;
 
-		if (fread(buf, 1, ct, fp) != ct) {
+		if ((size_t)gzread(fp, buf, ct) != ct) {
 			log_warn("%s: error %d in mread", __progname, errno);
 			return (0);
 		}
@@ -542,7 +524,7 @@ mread(FILE *fp, paddr_t addr, size_t sz)
 		else
 			ct = PAGE_SIZE;
 
-		if (fread(buf, 1, ct, fp) != ct) {
+		if ((size_t)gzread(fp, buf, ct) != ct) {
 			log_warn("%s: error %d in mread", __progname, errno);
 			return (0);
 		}
@@ -647,13 +629,13 @@ mbcopy(void *src, paddr_t dst, int sz)
 /*
  * elf64_exec
  *
- * Load the kernel indicated by 'fd' into the guest physical memory
+ * Load the kernel indicated by 'fp' into the guest physical memory
  * space, at the addresses defined in the ELF header.
  *
  * This function is used for 64 bit kernels.
  *
  * Parameters:
- *  fd: file descriptor of the kernel to load
+ *  fp: kernel image file to load
  *  elf: ELF header of the kernel
  *  marks: array to store the offsets of various kernel structures
  *      (start, bss, etc)
@@ -665,7 +647,7 @@ mbcopy(void *src, paddr_t dst, int sz)
  *  1 if unsuccessful
  */
 static int
-elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
+elf64_exec(gzFile fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 {
 	Elf64_Shdr *shp;
 	Elf64_Phdr *phdr;
@@ -680,12 +662,12 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 	sz = elf->e_phnum * sizeof(Elf64_Phdr);
 	phdr = malloc(sz);
 
-	if (fseeko(fp, (off_t)elf->e_phoff, SEEK_SET) == -1)  {
+	if (gzseek(fp, (off_t)elf->e_phoff, SEEK_SET) == -1)  {
 		free(phdr);
 		return 1;
 	}
 
-	if (fread(phdr, 1, sz, fp) != sz) {
+	if ((size_t)gzread(fp, phdr, sz) != sz) {
 		free(phdr);
 		return 1;
 	}
@@ -725,7 +707,7 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 		    (IS_DATA(phdr[i]) && (flags & LOAD_DATA))) {
 
 			/* Read in segment. */
-			if (fseeko(fp, (off_t)phdr[i].p_offset,
+			if (gzseek(fp, (off_t)phdr[i].p_offset,
 			    SEEK_SET) == -1) {
 				free(phdr);
 				return 1;
@@ -770,14 +752,14 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 		maxp += sizeof(Elf64_Ehdr);
 
 	if (flags & (LOAD_SYM | COUNT_SYM)) {
-		if (fseeko(fp, (off_t)elf->e_shoff, SEEK_SET) == -1)  {
-			warn("lseek section headers");
+		if (gzseek(fp, (off_t)elf->e_shoff, SEEK_SET) == -1) {
+			warn("gzseek section headers");
 			return 1;
 		}
 		sz = elf->e_shnum * sizeof(Elf64_Shdr);
 		shp = malloc(sz);
 
-		if (fread(shp, 1, sz, fp) != sz) {
+		if ((size_t)gzread(fp, shp, sz) != sz) {
 			free(shp);
 			return 1;
 		}
@@ -787,13 +769,13 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 
 		size_t shstrsz = shp[elf->e_shstrndx].sh_size;
 		char *shstr = malloc(shstrsz);
-		if (fseeko(fp, (off_t)shp[elf->e_shstrndx].sh_offset,
+		if (gzseek(fp, (off_t)shp[elf->e_shstrndx].sh_offset,
 		    SEEK_SET) == -1) {
 			free(shstr);
 			free(shp);
 			return 1;
 		}
-		if (fread(shstr, 1, shstrsz, fp) != shstrsz) {
+		if ((size_t)gzread(fp, shstr, shstrsz) != shstrsz) {
 			free(shstr);
 			free(shp);
 			return 1;
@@ -816,7 +798,7 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 			    !strcmp(shstr + shp[i].sh_name, ".debug_line") ||
 			    !strcmp(shstr + shp[i].sh_name, ELF_CTF)) {
 				if (havesyms && (flags & LOAD_SYM)) {
-					if (fseeko(fp, (off_t)shp[i].sh_offset,
+					if (gzseek(fp, (off_t)shp[i].sh_offset,
 					    SEEK_SET) == -1) {
 						free(shstr);
 						free(shp);
@@ -869,13 +851,13 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
 /*
  * elf32_exec
  *
- * Load the kernel indicated by 'fd' into the guest physical memory
+ * Load the kernel indicated by 'fp' into the guest physical memory
  * space, at the addresses defined in the ELF header.
  *
  * This function is used for 32 bit kernels.
  *
  * Parameters:
- *  fd: file descriptor of the kernel to load
+ *  fp: kernel image file to load
  *  elf: ELF header of the kernel
  *  marks: array to store the offsets of various kernel structures
  *      (start, bss, etc)
@@ -887,7 +869,7 @@ elf64_exec(FILE *fp, Elf64_Ehdr *elf, u_long *marks, int flags)
  *  1 if unsuccessful
  */
 static int
-elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
+elf32_exec(gzFile fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 {
 	Elf32_Shdr *shp;
 	Elf32_Phdr *phdr;
@@ -902,12 +884,12 @@ elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 	sz = elf->e_phnum * sizeof(Elf32_Phdr);
 	phdr = malloc(sz);
 
-	if (fseeko(fp, (off_t)elf->e_phoff, SEEK_SET) == -1)  {
+	if (gzseek(fp, (off_t)elf->e_phoff, SEEK_SET) == -1)  {
 		free(phdr);
 		return 1;
 	}
 
-	if (fread(phdr, 1, sz, fp) != sz) {
+	if ((size_t)gzread(fp, phdr, sz) != sz) {
 		free(phdr);
 		return 1;
 	}
@@ -947,7 +929,7 @@ elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 		    (IS_DATA(phdr[i]) && (flags & LOAD_DATA))) {
 
 			/* Read in segment. */
-			if (fseeko(fp, (off_t)phdr[i].p_offset,
+			if (gzseek(fp, (off_t)phdr[i].p_offset,
 			    SEEK_SET) == -1) {
 				free(phdr);
 				return 1;
@@ -992,14 +974,14 @@ elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 		maxp += sizeof(Elf32_Ehdr);
 
 	if (flags & (LOAD_SYM | COUNT_SYM)) {
-		if (fseeko(fp, (off_t)elf->e_shoff, SEEK_SET) == -1)  {
+		if (gzseek(fp, (off_t)elf->e_shoff, SEEK_SET) == -1) {
 			warn("lseek section headers");
 			return 1;
 		}
 		sz = elf->e_shnum * sizeof(Elf32_Shdr);
 		shp = malloc(sz);
 
-		if (fread(shp, 1, sz, fp) != sz) {
+		if ((size_t)gzread(fp, shp, sz) != sz) {
 			free(shp);
 			return 1;
 		}
@@ -1009,13 +991,13 @@ elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 
 		size_t shstrsz = shp[elf->e_shstrndx].sh_size;
 		char *shstr = malloc(shstrsz);
-		if (fseeko(fp, (off_t)shp[elf->e_shstrndx].sh_offset,
+		if (gzseek(fp, (off_t)shp[elf->e_shstrndx].sh_offset,
 		    SEEK_SET) == -1) {
 			free(shstr);
 			free(shp);
 			return 1;
 		}
-		if (fread(shstr, 1, shstrsz, fp) != shstrsz) {
+		if ((size_t)gzread(fp, shstr, shstrsz) != shstrsz) {
 			free(shstr);
 			free(shp);
 			return 1;
@@ -1037,7 +1019,7 @@ elf32_exec(FILE *fp, Elf32_Ehdr *elf, u_long *marks, int flags)
 			    shp[i].sh_type == SHT_STRTAB ||
 			    !strcmp(shstr + shp[i].sh_name, ".debug_line")) {
 				if (havesyms && (flags & LOAD_SYM)) {
-					if (fseeko(fp, (off_t)shp[i].sh_offset,
+					if (gzseek(fp, (off_t)shp[i].sh_offset,
 					    SEEK_SET) == -1) {
 						free(shstr);
 						free(shp);

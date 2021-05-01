@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.c,v 1.516 2021/03/02 09:45:07 claudio Exp $ */
+/*	$OpenBSD: rde.c,v 1.519 2021/04/27 09:07:10 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -681,6 +681,7 @@ rde_dispatch_imsg_parent(struct imsgbuf *ibuf)
 	static struct l3vpn	*vpn;
 	struct imsg		 imsg;
 	struct mrt		 xmrt;
+	struct roa		 roa;
 	struct rde_rib		 rr;
 	struct filterstate	 state;
 	struct imsgbuf		*i;
@@ -889,6 +890,12 @@ rde_dispatch_imsg_parent(struct imsgbuf *ibuf)
 				    entry);
 			}
 			last_prefixset = ps;
+			break;
+		case IMSG_RECONF_ROA_ITEM:
+			if (imsg.hdr.len - IMSG_HEADER_SIZE != sizeof(roa))
+				fatalx("IMSG_RECONF_ROA_ITEM bad len");
+			memcpy(&roa, imsg.data, sizeof(roa));
+			rv = trie_roa_add(&last_prefixset->th, &roa);
 			break;
 		case IMSG_RECONF_PREFIX_SET_ITEM:
 			if (imsg.hdr.len - IMSG_HEADER_SIZE != sizeof(psi))
@@ -1703,7 +1710,7 @@ bad_flags:
 		 */
 		tmp32 = ntohl(nexthop.v4.s_addr);
 		if (IN_MULTICAST(tmp32) || IN_BADCLASS(tmp32)) {
-			rde_update_err(peer, ERR_UPDATE, ERR_UPD_NETWORK,
+			rde_update_err(peer, ERR_UPDATE, ERR_UPD_NEXTHOP,
 			    op, len);
 			return (-1);
 		}
@@ -2587,8 +2594,6 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 
 		peer = peer_match(&req->neighbor, 0);
 		if (peer == NULL) {
-			log_warnx("%s: no peer found for adj-rib-out",
-			    __func__);
 			error = CTL_RES_NOSUCHPEER;
 			imsg_compose(ibuf_se_ctl, IMSG_CTL_RESULT, 0, pid, -1,
 			    &error, sizeof(error));

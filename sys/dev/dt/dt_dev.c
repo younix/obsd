@@ -1,4 +1,4 @@
-/*	$OpenBSD: dt_dev.c,v 1.11 2021/02/08 08:18:45 mpi Exp $ */
+/*	$OpenBSD: dt_dev.c,v 1.13 2021/04/23 07:21:02 bluhm Exp $ */
 
 /*
  * Copyright (c) 2019 Martin Pieuchot <mpi@openbsd.org>
@@ -109,6 +109,8 @@ SIMPLEQ_HEAD(, dt_probe)	dt_probe_list;	/* [I] list of probes */
 struct rwlock			dt_lock = RWLOCK_INITIALIZER("dtlk");
 volatile uint32_t		dt_tracing = 0;	/* [K] # of processes tracing */
 
+int allowdt;
+
 void	dtattach(struct device *, struct device *, void *);
 int	dtopen(dev_t, int, int, struct proc *);
 int	dtclose(dev_t, int, int, struct proc *);
@@ -145,7 +147,6 @@ dtopen(dev_t dev, int flags, int mode, struct proc *p)
 {
 	struct dt_softc *sc;
 	int unit = minor(dev);
-	extern int allowdt;
 
 	if (!allowdt)
 		return EPERM;
@@ -213,7 +214,7 @@ dtread(dev_t dev, struct uio *uio, int flags)
 	struct dt_softc *sc;
 	struct dt_evt *estq;
 	struct dt_pcb *dp;
-	int error, unit = minor(dev);
+	int error = 0, unit = minor(dev);
 	size_t qlen, count, read = 0;
 	uint64_t dropped = 0;
 

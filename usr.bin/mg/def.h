@@ -1,4 +1,4 @@
-/*	$OpenBSD: def.h,v 1.168 2021/03/01 10:51:14 lum Exp $	*/
+/*	$OpenBSD: def.h,v 1.173 2021/04/22 19:50:55 lum Exp $	*/
 
 /* This file is in the public domain. */
 
@@ -363,6 +363,7 @@ int		 ask_makedir(void);
 
 /* dired.c */
 struct buffer	*dired_(char *);
+int		 dired_jump(int, int);
 int 		 do_dired(char *);
 
 /* file.c X */
@@ -582,7 +583,7 @@ int		 evalexpr(int, int);
 int		 evalbuffer(int, int);
 int		 evalfile(int, int);
 int		 load(const char *);
-int		 excline(char *);
+int		 excline(char *, int);
 char		*skipwhite(char *);
 
 /* help.c X */
@@ -672,6 +673,7 @@ int		 re_forwsearch(int, int);
 int		 re_backsearch(int, int);
 int		 re_searchagain(int, int);
 int		 re_queryrepl(int, int);
+int		 re_repl(int, int);
 int		 replstr(int, int);
 int		 setcasefold(int, int);
 int		 delmatchlines(int, int);
@@ -720,8 +722,8 @@ int		 dobeep_msg(const char *);
 void		 dobeep(void);
 
 /* interpreter.c */
-int		 foundparen(char *);
-int		 clearvars(void);
+int		 foundparen(char *, int);
+void		 cleanup(void);
 
 /*
  * Externals.
@@ -750,6 +752,7 @@ extern int		 doaudiblebell;
 extern int		 dovisiblebell;
 extern int		 dblspace;
 extern int		 allbro;
+extern int		 batch;
 extern char	 	 cinfo[];
 extern char		*keystrings[];
 extern char		 pat[NPAT];

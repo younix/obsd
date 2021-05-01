@@ -40,18 +40,13 @@
 /ar5212.c/1.59/Sat Feb  3 17:17:31 2018//
 /ar5212reg.h/1.12/Wed Jul 30 07:15:39 2008//
 /ar5212var.h/1.15/Wed Jul 30 07:15:39 2008//
-/ar5416.c/1.21/Fri Feb  1 16:15:07 2019//
 /ar5416reg.h/1.7/Fri Feb  1 16:15:07 2019//
 /ar5xxx.c/1.63/Wed Jan 31 11:27:03 2018//
 /ar5xxx.h/1.60/Fri Aug 25 12:17:27 2017//
 /ar9003reg.h/1.9/Fri May 19 11:42:48 2017//
-/ar9280.c/1.27/Fri Feb  1 16:15:07 2019//
 /ar9280reg.h/1.8/Fri Feb  1 16:15:07 2019//
-/ar9285.c/1.28/Fri Feb  1 16:15:07 2019//
 /ar9285reg.h/1.9/Fri Feb  1 16:15:07 2019//
-/ar9287.c/1.28/Sun Mar 31 11:00:11 2019//
 /ar9287reg.h/1.6/Fri Mar 29 11:04:40 2019//
-/ar9380.c/1.26/Fri Aug 18 11:00:38 2017//
 /ar9380reg.h/1.21/Tue Jan  5 18:41:15 2016//
 /arcofi.c/1.17/Mon Sep 19 22:21:09 2016//
 /arcofivar.h/1.3/Mon Sep 19 06:46:44 2016//
@@ -146,7 +141,6 @@
 /mc6845.h/1.5/Mon Dec 12 12:35:49 2005//
 /mc6845reg.h/1.2/Fri Apr  2 04:39:50 2004//
 /mfireg.h/1.50/Thu Feb 13 15:11:32 2020//
-/mk48txx.c/1.7/Tue Apr  5 19:54:35 2011//
 /mk48txxreg.h/1.5/Fri May 15 23:02:25 2009//
 /monitors.h/1.3/Thu Jun 26 05:42:15 2008//
 /mpireg.h/1.45/Tue Mar 25 05:41:44 2014//
@@ -212,9 +206,7 @@
 /smc91cxxreg.h/1.3/Mon Jan 23 14:42:55 2006//
 /smc91cxxvar.h/1.8/Tue Oct 13 19:33:16 2009//
 /smc93cx6var.h/1.17/Sat Sep 12 16:24:14 2015//
-/sti.c/1.80/Mon May 25 09:55:48 2020//
 /stireg.h/1.14/Sun Apr  5 23:25:57 2015//
-/stivar.h/1.25/Sun Apr  5 23:25:57 2015//
 /tc921x.c/1.3/Tue May 22 04:14:03 2007//
 /tc921x.h/1.3/Tue May 22 04:14:03 2007//
 /tcic2reg.h/1.4/Tue Nov 26 20:33:16 2013//
@@ -255,7 +247,6 @@
 /amivar.h/1.60/Fri Dec 11 17:58:22 2020//
 /anxdp.c/1.4/Fri Dec 11 17:58:22 2020//
 /anxdp.h/1.2/Fri Dec 11 17:58:22 2020//
-/athn.c/1.109/Fri Dec 11 17:58:22 2020//
 /atw.c/1.98/Fri Dec 11 17:58:22 2020//
 /bwi.c/1.130/Fri Dec 11 17:58:22 2020//
 /cacvar.h/1.9/Fri Dec 11 17:58:22 2020//
@@ -303,10 +294,7 @@
 /aic7xxx_openbsd.h/1.31/Thu Dec 17 19:39:58 2020//
 /aic7xxxvar.h/1.36/Thu Dec 17 19:39:58 2020//
 /ami.c/1.260/Fri Dec 18 08:57:37 2020//
-/ar5008.c/1.64/Fri Dec 18 08:57:37 2020//
-/ar9003.c/1.52/Fri Dec 18 08:57:37 2020//
 /ath.c/1.122/Fri Dec 18 08:57:37 2020//
-/athnvar.h/1.41/Fri Dec 18 08:57:37 2020//
 /athvar.h/1.35/Fri Dec 18 08:57:37 2020//
 /bcmgenet.c/1.4/Fri Dec 18 08:57:37 2020//
 /ciss.c/1.89/Fri Dec 18 08:57:37 2020//
@@ -342,7 +330,6 @@
 /aic7xxx_seeprom.c/1.9/Tue Mar  9 08:12:26 2021//
 /an.c/1.78/Tue Mar  9 08:12:26 2021//
 /ax88190.c/1.9/Tue Mar  9 08:12:26 2021//
-/bwfm.c/1.83/Tue Mar  9 08:12:26 2021//
 /bwfmreg.h/1.21/Tue Mar  9 08:12:26 2021//
 /bwfmvar.h/1.23/Tue Mar  9 08:12:26 2021//
 /cac.c/1.74/Tue Mar  9 08:12:26 2021//
@@ -362,4 +349,17 @@
 /tcic2var.h/1.5/Tue Mar  9 08:12:26 2021//
 /twe.c/1.65/Tue Mar  9 08:12:26 2021//
 /uha.c/1.40/Tue Mar  9 08:12:26 2021//
+/ar5008.c/1.65/Sat May  1 08:33:52 2021//
+/ar5416.c/1.22/Sat May  1 08:33:52 2021//
+/ar9003.c/1.53/Sat May  1 08:33:52 2021//
+/ar9280.c/1.28/Sat May  1 08:33:52 2021//
+/ar9285.c/1.29/Sat May  1 08:33:52 2021//
+/ar9287.c/1.29/Sat May  1 08:33:52 2021//
+/ar9380.c/1.27/Sat May  1 08:33:52 2021//
+/athn.c/1.111/Sat May  1 08:33:52 2021//
+/athnvar.h/1.42/Sat May  1 08:33:52 2021//
+/bwfm.c/1.84/Sat May  1 08:33:52 2021//
+/mk48txx.c/1.8/Sat May  1 08:33:52 2021//
+/sti.c/1.81/Sat May  1 08:33:52 2021//
+/stivar.h/1.26/Sat May  1 08:33:52 2021//
 D

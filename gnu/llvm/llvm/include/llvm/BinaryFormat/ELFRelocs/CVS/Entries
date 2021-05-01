@@ -1,4 +1,3 @@
-/AArch64.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /AMDGPU.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /ARC.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /ARM.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
@@ -9,10 +8,12 @@
 /MSP430.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /Mips.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /PowerPC.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/PowerPC64.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/RISCV.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /Sparc.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /SystemZ.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /i386.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /x86_64.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
+/AArch64.def/1.1.1.2/Sat May  1 08:32:05 2021/-ko/
+/PowerPC64.def/1.1.1.2/Sat May  1 08:32:05 2021/-ko/
+/RISCV.def/1.1.1.2/Sat May  1 08:32:05 2021/-ko/
+/VE.def/1.1.1.1/Wed Apr 28 12:27:30 2021/-ko/
 D

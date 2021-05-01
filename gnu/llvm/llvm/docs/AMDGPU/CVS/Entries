@@ -1,11 +1,3 @@
-/AMDGPUAsmGFX10.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX7.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX8.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX9.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX900.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX904.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX906.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/AMDGPUAsmGFX908.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx10_addr_buf.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx10_addr_ds.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx10_addr_flat.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
@@ -324,7 +316,6 @@
 /gfx908_opt.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx908_ret.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx908_rsrc_buf.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/gfx908_saddr_flat_global.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx908_src32_0.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx908_src32_1.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx908_src32_2.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
@@ -434,4 +425,19 @@
 /gfx9_vsrc32_1.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx9_vsrc64_0.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /gfx9_waitcnt.rst/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
+/AMDGPUAsmGFX10.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX1011.rst/1.1.1.1/Wed Apr 28 12:27:26 2021/-ko/
+/AMDGPUAsmGFX7.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX8.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX9.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX900.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX904.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX906.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/AMDGPUAsmGFX908.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
+/gfx1011_src32_0.rst/1.1.1.1/Wed Apr 28 12:27:24 2021/-ko/
+/gfx1011_src32_1.rst/1.1.1.1/Wed Apr 28 12:27:26 2021/-ko/
+/gfx1011_type_dev.rst/1.1.1.1/Wed Apr 28 12:27:26 2021/-ko/
+/gfx1011_vdst32_0.rst/1.1.1.1/Wed Apr 28 12:27:26 2021/-ko/
+/gfx1011_vsrc32_0.rst/1.1.1.1/Wed Apr 28 12:27:26 2021/-ko/
+/gfx908_saddr_flat_global.rst/1.1.1.2/Sat May  1 08:32:04 2021/-ko/
 D

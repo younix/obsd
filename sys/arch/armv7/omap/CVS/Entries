@@ -6,7 +6,6 @@
 /files.omap/1.26/Fri Apr 10 22:02:45 2020//
 /if_cpswreg.h/1.6/Wed Mar  2 01:31:41 2016//
 /nxphdmivar.h/1.3/Thu Aug 31 21:39:25 2017//
-/omap.c/1.21/Wed Mar  1 04:36:45 2017//
 /omap3.c/1.6/Tue Mar 31 10:33:10 2020//
 /omap3_prcmreg.h/1.3/Mon Oct 28 11:11:50 2013//
 /omap4_prcmreg.h/1.1/Wed Sep  4 14:38:30 2013//
@@ -38,4 +37,5 @@
 /omusbtll.c/1.4/Fri Mar 26 07:30:06 2021//
 /prcm.c/1.16/Fri Mar 26 07:30:06 2021//
 /ti_iic.c/1.14/Fri Mar 26 07:30:06 2021//
+/omap.c/1.22/Sat May  1 08:33:46 2021//
 D

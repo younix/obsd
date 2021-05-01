@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.389 2021/02/08 10:51:02 mpi Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.391 2021/04/30 13:52:48 bluhm Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -114,24 +114,21 @@
 #endif
 
 #include "audio.h"
-#include "video.h"
+#include "dt.h"
 #include "pf.h"
+#include "video.h"
 
 extern struct forkstat forkstat;
 extern struct nchstats nchstats;
 extern int nselcoll, fscale;
 extern struct disklist_head disklist;
 extern fixpt_t ccpu;
-extern  long numvnodes;
-#if NAUDIO > 0
+extern long numvnodes;
+extern int allowdt;
 extern int audio_record_enable;
-#endif
-#if NVIDEO > 0
 extern int video_record_enable;
-#endif
 
 int allowkmem;
-int allowdt;
 
 int sysctl_diskinit(int, struct proc *);
 int sysctl_proc_args(int *, u_int, void *, size_t *, struct proc *);
@@ -142,12 +139,8 @@ int sysctl_proc_vmmap(int *, u_int, void *, size_t *, struct proc *);
 int sysctl_intrcnt(int *, u_int, void *, size_t *);
 int sysctl_sensors(int *, u_int, void *, size_t *, void *, size_t);
 int sysctl_cptime2(int *, u_int, void *, size_t *, void *, size_t);
-#if NAUDIO > 0
 int sysctl_audio(int *, u_int, void *, size_t *, void *, size_t);
-#endif
-#if NVIDEO > 0
 int sysctl_video(int *, u_int, void *, size_t *, void *, size_t);
-#endif
 int sysctl_cpustats(int *, u_int, void *, size_t *, void *, size_t);
 int sysctl_utc_offset(void *, size_t *, void *, size_t);
 
@@ -479,10 +472,12 @@ kern_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 			return (EPERM);
 		securelevel = level;
 		return (0);
+#if NDT > 0
 	case KERN_ALLOWDT:
 		if (securelevel > 0)
 			return (sysctl_rdint(oldp, oldlenp, newp, allowdt));
 		return (sysctl_int(oldp, oldlenp, newp, newlen,  &allowdt));
+#endif
 	case KERN_ALLOWKMEM:
 		if (securelevel > 0)
 			return (sysctl_rdint(oldp, oldlenp, newp, allowkmem));
@@ -823,13 +818,14 @@ debug_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
  * Reads, or writes that lower the value
  */
 int
-sysctl_int_lower(void *oldp, size_t *oldlenp, void *newp, size_t newlen, int *valp)
+sysctl_int_lower(void *oldp, size_t *oldlenp, void *newp, size_t newlen,
+    int *valp)
 {
 	unsigned int oval = *valp, val = *valp;
 	int error;
 
 	if (newp == NULL)
-		return (sysctl_rdint(oldp, oldlenp, newp, *valp));
+		return (sysctl_rdint(oldp, oldlenp, newp, val));
 
 	if ((error = sysctl_int(oldp, oldlenp, newp, newlen, &val)))
 		return (error);
@@ -846,33 +842,38 @@ sysctl_int_lower(void *oldp, size_t *oldlenp, void *newp, size_t newlen, int *va
 int
 sysctl_int(void *oldp, size_t *oldlenp, void *newp, size_t newlen, int *valp)
 {
-	return (sysctl_int_bounded(oldp, oldlenp, newp, newlen, valp, 0, 0));
-}
-
-int
-sysctl_int_bounded(void *oldp, size_t *oldlenp, void *newp, size_t newlen,
-    int *valp, int minimum, int maximum)
-{
 	int error = 0;
-	int val;
 
 	if (oldp && *oldlenp < sizeof(int))
 		return (ENOMEM);
 	if (newp && newlen != sizeof(int))
 		return (EINVAL);
 	*oldlenp = sizeof(int);
-	val = *valp;
 	if (oldp)
-		error = copyout(&val, oldp, sizeof(int));
+		error = copyout(valp, oldp, sizeof(int));
 	if (error == 0 && newp)
-		error = copyin(newp, &val, sizeof(int));
-	if (error)
-		return (error);
-	if (minimum == maximum || (minimum <= val && val <= maximum))
-		*valp = val;
-	else
-		error = EINVAL;
+		error = copyin(newp, valp, sizeof(int));
 	return (error);
+}
+
+int
+sysctl_int_bounded(void *oldp, size_t *oldlenp, void *newp, size_t newlen,
+    int *valp, int minimum, int maximum)
+{
+	int val = *valp;
+	int error;
+
+	/* read only */
+	if (newp == NULL || minimum > maximum)
+		return (sysctl_rdint(oldp, oldlenp, newp, val));
+
+	if ((error = sysctl_int(oldp, oldlenp, newp, newlen, &val)))
+		return (error);
+	/* bounded and outside limits */
+	if (minimum < maximum && (val < minimum || maximum < val))
+		return (EINVAL);
+	*valp = val;
+	return (0);
 }
 
 /*
@@ -906,14 +907,8 @@ sysctl_bounded_arr(const struct sysctl_bounded_args *valpp, u_int valplen,
 		return (ENOTDIR);
 	for (i = 0; i < valplen; ++i) {
 		if (valpp[i].mib == name[0]) {
-			if (valpp[i].minimum <= valpp[i].maximum) {
-				return (sysctl_int_bounded(oldp, oldlenp, newp,
-				    newlen, valpp[i].var, valpp[i].minimum,
-				    valpp[i].maximum));
-			} else {
-				return (sysctl_rdint(oldp, oldlenp, newp,
-				    *valpp[i].var));
-			}
+			return (sysctl_int_bounded(oldp, oldlenp, newp, newlen,
+			    valpp[i].var, valpp[i].minimum, valpp[i].maximum));
 		}
 	}
 	return (EOPNOTSUPP);

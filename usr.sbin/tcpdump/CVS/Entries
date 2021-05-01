@@ -116,7 +116,6 @@
 /stime.awk/1.4/Thu Dec 12 16:22:23 1996//
 /version.c/1.5/Wed Jul 28 20:41:37 1999//
 /print-null.c/1.24/Fri Dec 11 17:58:25 2020//
-/print-wg.c/1.5/Fri Dec 11 17:58:25 2020//
 /INSTALL/1.7/Fri Dec 18 08:57:37 2020//
 /Makefile/1.67/Fri Dec 18 08:57:37 2020//
 /interface.h/1.86/Thu Dec 17 19:39:59 2020//
@@ -129,4 +128,5 @@
 /util.c/1.31/Fri Dec 18 08:57:37 2020//
 /print-pflog.c/1.33/Sun Jan 24 00:20:11 2021//
 /print-ppp.c/1.35/Tue Mar  9 08:12:36 2021//
+/print-wg.c/1.6/Sat May  1 08:34:07 2021//
 D

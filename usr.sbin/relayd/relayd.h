@@ -1,4 +1,4 @@
-/*	$OpenBSD: relayd.h,v 1.265 2021/01/27 20:33:05 eric Exp $	*/
+/*	$OpenBSD: relayd.h,v 1.267 2021/04/20 21:11:56 dv Exp $	*/
 
 /*
  * Copyright (c) 2006 - 2016 Reyk Floeter <reyk@openbsd.org>
@@ -269,6 +269,7 @@ struct ctl_keyop {
 	int			 cko_flen;
 	int			 cko_tlen;
 	int			 cko_padding;
+	u_int			 cko_cookie;
 };
 
 struct ctl_stats {
@@ -1155,8 +1156,6 @@ void	 control_dispatch_imsg(int, short, void *);
 void	 control_imsg_forward(struct privsep *ps, struct imsg *);
 struct ctl_conn	*
 	 control_connbyfd(int);
-
-extern  struct ctl_connlist ctl_conns;
 
 /* parse.y */
 int	 parse_config(const char *, struct relayd *);

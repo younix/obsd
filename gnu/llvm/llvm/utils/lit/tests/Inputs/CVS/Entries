@@ -24,3 +24,15 @@ D/testrunner-custom-parsers////
 D/unittest-adaptor////
 D/xunit-output////
 /lit.cfg/1.1.1.1/Thu Dec 17 19:39:57 2020/-ko/
+D/allow-retries////
+D/custom-result-category////
+D/googletest-discovery-failed////
+D/max-time////
+D/show-result-codes////
+D/show-used-features////
+D/shtest-format-argv0////
+D/shtest-inject////
+D/shtest-keyword-parse-errors////
+D/shtest-recursive-substitution////
+D/test_retry_attempts////
+D/unparsed-requirements////

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.355 2021/03/10 10:21:48 jsg Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.359 2021/04/30 13:52:48 bluhm Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -113,7 +113,7 @@ extern int ip_mrtproto;
 
 const struct sysctl_bounded_args ipctl_vars[] = {
 #ifdef MROUTING
-	{ IPCTL_MRTPROTO, &ip_mrtproto, 1, 0 },
+	{ IPCTL_MRTPROTO, &ip_mrtproto, SYSCTL_INT_READONLY },
 #endif
 	{ IPCTL_FORWARDING, &ipforwarding, 0, 2 },
 	{ IPCTL_SENDREDIRECTS, &ipsendredirects, 0, 1 },
@@ -126,7 +126,6 @@ const struct sysctl_bounded_args ipctl_vars[] = {
 	{ IPCTL_IPPORT_MAXQUEUE, &ip_maxqueue, 0, 10000 },
 	{ IPCTL_MFORWARDING, &ipmforwarding, 0, 1 },
 	{ IPCTL_MULTIPATH, &ipmultipath, 0, 1 },
-	{ IPCTL_ARPQUEUED, &la_hold_total, 0, 1000 },
 	{ IPCTL_ARPTIMEOUT, &arpt_keep, 0, INT_MAX },
 	{ IPCTL_ARPDOWN, &arpt_down, 0, INT_MAX },
 };
@@ -139,6 +138,7 @@ struct cpumem *ipcounters;
 int ip_sysctl_ipstat(void *, size_t *, void *);
 
 static struct mbuf_queue	ipsend_mq;
+static struct mbuf_queue	ipsendraw_mq;
 
 extern struct niqueue		arpinq;
 
@@ -147,7 +147,11 @@ int	ip_dooptions(struct mbuf *, struct ifnet *);
 int	in_ouraddr(struct mbuf *, struct ifnet *, struct rtentry **);
 
 static void ip_send_dispatch(void *);
+static void ip_sendraw_dispatch(void *);
 static struct task ipsend_task = TASK_INITIALIZER(ip_send_dispatch, &ipsend_mq);
+static struct task ipsendraw_task =
+	TASK_INITIALIZER(ip_sendraw_dispatch, &ipsendraw_mq);
+
 /*
  * Used to save the IP options in case a protocol wants to respond
  * to an incoming packet over the same route if the packet got here
@@ -217,7 +221,9 @@ ip_init(void)
 		DP_SET(rootonlyports.udp, defrootonlyports_udp[i]);
 
 	mq_init(&ipsend_mq, 64, IPL_SOFTNET);
+	mq_init(&ipsendraw_mq, 64, IPL_SOFTNET);
 
+	arpinit();
 #ifdef IPSEC
 	ipsec_init();
 #endif
@@ -1637,6 +1643,8 @@ ip_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 	case IPCTL_ARPQUEUE:
 		return (sysctl_niq(name + 1, namelen - 1,
 		    oldp, oldlenp, newp, newlen, &arpinq));
+	case IPCTL_ARPQUEUED:
+		return (sysctl_rdint(oldp, oldlenp, newp, la_hold_total));
 	case IPCTL_STATS:
 		return (ip_sysctl_ipstat(oldp, oldlenp, newp));
 #ifdef MROUTING
@@ -1777,7 +1785,7 @@ ip_savecontrol(struct inpcb *inp, struct mbuf **mp, struct ip *ip,
 }
 
 void
-ip_send_dispatch(void *xmq)
+ip_send_do_dispatch(void *xmq, int flags)
 {
 	struct mbuf_queue *mq = xmq;
 	struct mbuf *m;
@@ -1789,9 +1797,21 @@ ip_send_dispatch(void *xmq)
 
 	NET_LOCK();
 	while ((m = ml_dequeue(&ml)) != NULL) {
-		ip_output(m, NULL, NULL, 0, NULL, NULL, 0);
+		ip_output(m, NULL, NULL, flags, NULL, NULL, 0);
 	}
 	NET_UNLOCK();
+}
+
+void
+ip_sendraw_dispatch(void *xmq)
+{
+	ip_send_do_dispatch(xmq, IP_RAWOUTPUT);
+}
+
+void
+ip_send_dispatch(void *xmq)
+{
+	ip_send_do_dispatch(xmq, 0);
 }
 
 void
@@ -1799,4 +1819,11 @@ ip_send(struct mbuf *m)
 {
 	mq_enqueue(&ipsend_mq, m);
 	task_add(net_tq(0), &ipsend_task);
+}
+
+void
+ip_send_raw(struct mbuf *m)
+{
+	mq_enqueue(&ipsendraw_mq, m);
+	task_add(net_tq(0), &ipsendraw_task);
 }

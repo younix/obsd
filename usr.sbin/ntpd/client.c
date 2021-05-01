@@ -1,4 +1,4 @@
-/*	$OpenBSD: client.c,v 1.114 2020/09/11 07:09:41 otto Exp $ */
+/*	$OpenBSD: client.c,v 1.116 2021/04/21 09:38:11 bluhm Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -208,7 +208,7 @@ client_query(struct ntp_peer *p)
 
 	p->query->msg.xmttime.int_partl = arc4random();
 	p->query->msg.xmttime.fractionl = arc4random();
-	p->query->xmttime = gettime_corrected();
+	p->query->xmttime = gettime();
 
 	if (ntp_sendmsg(p->query->fd, NULL, &p->query->msg) == -1) {
 		p->senderrors++;
@@ -295,7 +295,6 @@ client_dispatch(struct ntp_peer *p, u_int8_t settime, u_int8_t automatic)
 	somsg.msg_control = cmsgbuf.buf;
 	somsg.msg_controllen = sizeof(cmsgbuf.buf);
 
-	T4 = getoffset();
 	if ((size = recvmsg(p->query->fd, &somsg, 0)) == -1) {
 		if (errno == EHOSTUNREACH || errno == EHOSTDOWN ||
 		    errno == ENETUNREACH || errno == ENETDOWN ||
@@ -325,10 +324,12 @@ client_dispatch(struct ntp_peer *p, u_int8_t settime, u_int8_t automatic)
 		if (cmsg->cmsg_level == SOL_SOCKET &&
 		    cmsg->cmsg_type == SCM_TIMESTAMP) {
 			memcpy(&tv, CMSG_DATA(cmsg), sizeof(tv));
-			T4 += gettime_from_timeval(&tv);
+			T4 = gettime_from_timeval(&tv);
 			break;
 		}
 	}
+	if (cmsg == NULL)
+		fatal("SCM_TIMESTAMP");
 
 	ntp_getmsg((struct sockaddr *)&p->addr->ss, buf, size, &msg);
 
@@ -384,7 +385,7 @@ client_dispatch(struct ntp_peer *p, u_int8_t settime, u_int8_t automatic)
 		return (0);
 	}
 
-	p->reply[p->shift].offset = ((T2 - T1) + (T3 - T4)) / 2;
+	p->reply[p->shift].offset = ((T2 - T1) + (T3 - T4)) / 2 - getoffset();
 	p->reply[p->shift].delay = (T4 - T1) - (T3 - T2);
 	p->reply[p->shift].status.stratum = msg.stratum;
 	if (p->reply[p->shift].delay < 0) {
@@ -472,7 +473,7 @@ client_dispatch(struct ntp_peer *p, u_int8_t settime, u_int8_t automatic)
 int
 client_update(struct ntp_peer *p)
 {
-	int	i, best = 0, good = 0;
+	int	shift, best = -1, good = 0;
 
 	/*
 	 * clock filter
@@ -481,27 +482,22 @@ client_update(struct ntp_peer *p)
 	 * invalidate it and all older ones
 	 */
 
-	for (i = 0; good == 0 && i < OFFSET_ARRAY_SIZE; i++)
-		if (p->reply[i].good) {
+	for (shift = 0; shift < OFFSET_ARRAY_SIZE; shift++)
+		if (p->reply[shift].good) {
 			good++;
-			best = i;
+			if (best == -1 ||
+			    p->reply[shift].delay < p->reply[best].delay)
+				best = shift;
 		}
 
-	for (; i < OFFSET_ARRAY_SIZE; i++)
-		if (p->reply[i].good) {
-			good++;
-			if (p->reply[i].delay < p->reply[best].delay)
-				best = i;
-		}
-
-	if (good < 8)
+	if (best == -1 || good < 8)
 		return (-1);
 
-	memcpy(&p->update, &p->reply[best], sizeof(p->update));
+	p->update = p->reply[best];
 	if (priv_adjtime() == 0) {
-		for (i = 0; i < OFFSET_ARRAY_SIZE; i++)
-			if (p->reply[i].rcvd <= p->reply[best].rcvd)
-				p->reply[i].good = 0;
+		for (shift = 0; shift < OFFSET_ARRAY_SIZE; shift++)
+			if (p->reply[shift].rcvd <= p->reply[best].rcvd)
+				p->reply[shift].good = 0;
 	}
 	return (0);
 }

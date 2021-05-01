@@ -1,4 +1,4 @@
-/*	$OpenBSD: frontend.c,v 1.52 2021/03/11 19:53:40 florian Exp $	*/
+/*	$OpenBSD: frontend.c,v 1.55 2021/03/21 18:25:24 florian Exp $	*/
 
 /*
  * Copyright (c) 2017 Florian Obser <florian@openbsd.org>
@@ -502,7 +502,7 @@ update_iface(uint32_t if_index, char* if_name)
 	    get_xflags(if_name)) == -1)
 		return;
 
-	if (!(xflags & IFXF_AUTOCONF6))
+	if (!(xflags & (IFXF_AUTOCONF6 | IFXF_AUTOCONF6TEMP)))
 		return;
 
 	if((ifrdomain = get_ifrdomain(if_name)) == -1)
@@ -532,7 +532,8 @@ update_iface(uint32_t if_index, char* if_name)
 	imsg_ifinfo.rdomain = ifrdomain;
 	imsg_ifinfo.running = (flags & (IFF_UP | IFF_RUNNING)) == (IFF_UP |
 	    IFF_RUNNING);
-	imsg_ifinfo.autoconfprivacy = (xflags & IFXF_AUTOCONF6TEMP);
+	imsg_ifinfo.autoconf = (xflags & IFXF_AUTOCONF6);
+	imsg_ifinfo.temporary = (xflags & IFXF_AUTOCONF6TEMP);
 	imsg_ifinfo.soii = !(xflags & IFXF_INET6_NOSOII);
 
 	if (getifaddrs(&ifap) != 0)
@@ -597,7 +598,7 @@ update_autoconf_addresses(uint32_t if_index, char* if_name)
 	if ((xflags = get_xflags(if_name)) == -1)
 		return;
 
-	if (!(xflags & IFXF_AUTOCONF6))
+	if (!(xflags & (IFXF_AUTOCONF6 | IFXF_AUTOCONF6TEMP)))
 		return;
 
 	memset(&imsg_addrinfo, 0, sizeof(imsg_addrinfo));
@@ -634,7 +635,7 @@ update_autoconf_addresses(uint32_t if_index, char* if_name)
 		    IN6_IFF_TEMPORARY)))
 			continue;
 
-		imsg_addrinfo.privacy = ifr6.ifr_ifru.ifru_flags6 &
+		imsg_addrinfo.temporary = ifr6.ifr_ifru.ifru_flags6 &
 		    IN6_IFF_TEMPORARY ? 1 : 0;
 
 		memset(&ifr6, 0, sizeof(ifr6));
@@ -684,7 +685,7 @@ const char*
 flags_to_str(int flags)
 {
 	static char	buf[sizeof(" anycast tentative duplicated detached "
-			    "deprecated autoconf autoconfprivacy")];
+			    "deprecated autoconf temporary")];
 
 	buf[0] = '\0';
 	if (flags & IN6_IFF_ANYCAST)
@@ -700,7 +701,7 @@ flags_to_str(int flags)
 	if (flags & IN6_IFF_AUTOCONF)
 		strlcat(buf, " autoconf", sizeof(buf));
 	if (flags & IN6_IFF_TEMPORARY)
-		strlcat(buf, " autoconfprivacy", sizeof(buf));
+		strlcat(buf, " temporary", sizeof(buf));
 
 	return (buf);
 }
@@ -796,7 +797,8 @@ handle_route_message(struct rt_msghdr *rtm, struct sockaddr **rti_info)
 			    &if_index, sizeof(if_index));
 		} else {
 			xflags = get_xflags(if_name);
-			if (xflags == -1 || !(xflags & IFXF_AUTOCONF6)) {
+			if (xflags == -1 || !(xflags & (IFXF_AUTOCONF6 |
+			    IFXF_AUTOCONF6TEMP))) {
 				log_debug("RTM_IFINFO: %s(%d) no(longer) "
 				   "autoconf6", if_name, ifm->ifm_index);
 				if_index = ifm->ifm_index;
@@ -954,7 +956,10 @@ icmp6_receive(int fd, short events, void *arg)
 	struct cmsghdr		*cm;
 	ssize_t			 len;
 	int			 if_index = 0, *hlimp = NULL;
-	char			 ntopbuf[INET6_ADDRSTRLEN], ifnamebuf[IFNAMSIZ];
+	char			 ntopbuf[INET6_ADDRSTRLEN];
+#ifndef SMALL
+	char			 ifnamebuf[IFNAMSIZ];
+#endif	/* SMALL */
 
 	icmp6ev = arg;
 	if ((len = recvmsg(fd, &icmp6ev->rcvmhdr, 0)) == -1) {

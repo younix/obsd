@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.c,v 1.57 2020/10/26 11:48:39 tb Exp $ */
+/* $OpenBSD: apps.c,v 1.60 2021/03/31 17:13:54 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -141,11 +141,11 @@
 #include <openssl/err.h>
 #include <openssl/pem.h>
 #include <openssl/pkcs12.h>
+#include <openssl/rsa.h>
 #include <openssl/safestack.h>
+#include <openssl/ssl.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-
-#include <openssl/rsa.h>
 
 typedef struct {
 	const char *name;
@@ -2304,6 +2304,10 @@ options_parse(int argc, char **argv, const struct option *opts, char **unnamed,
 			*opt->opt.ulvalue |= opt->ulvalue;
 			break;
 
+		case OPTION_ORDER:
+			*opt->opt.order = ++(*opt->order);
+			break;
+
 		default:
 			fprintf(stderr, "option %s - unknown type %i\n",
 			    opt->name, opt->type);
@@ -2336,4 +2340,3 @@ show_cipher(const OBJ_NAME *name, void *arg)
 
 	fprintf(stderr, " -%-24s%s", name->name, (++*n % 3 != 0 ? "" : "\n"));
 }
-

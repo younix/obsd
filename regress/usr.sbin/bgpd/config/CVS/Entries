@@ -2,9 +2,7 @@
 /bgpd.conf.1.in/1.1/Fri Sep  7 08:38:35 2018//
 /bgpd.conf.1.ok/1.5/Wed Jul 17 10:27:50 2019//
 /bgpd.conf.10.in/1.2/Wed Dec 12 08:55:44 2018//
-/bgpd.conf.10.ok/1.6/Wed Jul 17 10:27:50 2019//
 /bgpd.conf.11.in/1.2/Tue Feb 26 10:51:09 2019//
-/bgpd.conf.11.ok/1.5/Wed Jul 17 10:27:50 2019//
 /bgpd.conf.12.in/1.1/Wed Feb 27 04:11:40 2019//
 /bgpd.conf.12.ok/1.4/Wed Jul 17 10:27:50 2019//
 /bgpd.conf.13.in/1.1/Fri Apr 24 10:34:54 2020//
@@ -27,4 +25,6 @@
 /bgpd.conf.example.ok/1.4/Wed Jul 17 10:27:50 2019//
 /bgpd.conf.printconf/1.1/Fri Sep  7 08:38:35 2018//
 /bgpd.conf.9.ok/1.7/Sun Jan 24 00:20:10 2021//
+/bgpd.conf.10.ok/1.7/Sat May  1 08:33:42 2021//
+/bgpd.conf.11.ok/1.6/Sat May  1 08:33:42 2021//
 D

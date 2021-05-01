@@ -1,4 +1,4 @@
-/*	$OpenBSD: config.c,v 1.59 2021/02/28 22:56:09 dlg Exp $	*/
+/*	$OpenBSD: config.c,v 1.61 2021/03/29 23:37:01 dv Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -216,7 +216,7 @@ config_setvm(struct privsep *ps, struct vmd_vm *vm, uint32_t peerid, uid_t uid)
 	struct vmop_create_params *vmc = &vm->vm_params;
 	struct vm_create_params	*vcp = &vmc->vmc_params;
 	unsigned int		 i, j;
-	int			 fd = -1, vmboot = 0;
+	int			 fd = -1;
 	int			 kernfd = -1;
 	int			*tapfds = NULL;
 	int			 cdromfd = -1;
@@ -227,6 +227,7 @@ config_setvm(struct privsep *ps, struct vmd_vm *vm, uint32_t peerid, uid_t uid)
 	char			 base[PATH_MAX];
 	unsigned int		 unit;
 	struct timeval		 tv, rate, since_last;
+	struct vmop_addr_req	 var;
 
 	errno = 0;
 
@@ -295,16 +296,8 @@ config_setvm(struct privsep *ps, struct vmd_vm *vm, uint32_t peerid, uid_t uid)
 
 	if (!(vm->vm_state & VM_STATE_RECEIVED)) {
 		if (strlen(vcp->vcp_kernel)) {
-			/*
-			 * Boot kernel from disk image if path matches the
-			 * root disk.
-			 */
-			if (vcp->vcp_ndisks &&
-			    strcmp(vcp->vcp_kernel, vcp->vcp_disks[0]) == 0)
-				vmboot = 1;
 			/* Open external kernel for child */
-			else if ((kernfd =
-			    open(vcp->vcp_kernel, O_RDONLY)) == -1) {
+			if ((kernfd = open(vcp->vcp_kernel, O_RDONLY)) == -1) {
 				log_warn("%s: can't open kernel or BIOS "
 				    "boot image %s", __func__, vcp->vcp_kernel);
 				goto fail;
@@ -317,14 +310,14 @@ config_setvm(struct privsep *ps, struct vmd_vm *vm, uint32_t peerid, uid_t uid)
 		 * typically distributed separately due to an incompatible
 		 * license.
 		 */
-		if (kernfd == -1 && !vmboot &&
+		if (kernfd == -1 &&
 		    (kernfd = open(VM_DEFAULT_BIOS, O_RDONLY)) == -1) {
 			log_warn("can't open %s", VM_DEFAULT_BIOS);
 			errno = VMD_BIOS_MISSING;
 			goto fail;
 		}
 
-		if (!vmboot && vm_checkaccess(kernfd,
+		if (vm_checkaccess(kernfd,
 		    vmc->vmc_checkaccess & VMOP_CREATE_KERNEL,
 		    uid, R_OK) == -1) {
 			log_warnx("vm \"%s\" no read access to kernel %s",
@@ -507,6 +500,12 @@ config_setvm(struct privsep *ps, struct vmd_vm *vm, uint32_t peerid, uid_t uid)
 		proc_compose_imsg(ps, PROC_VMM, -1,
 		    IMSG_VMDOP_START_VM_IF, vm->vm_vmid, tapfds[i],
 		    &i, sizeof(i));
+
+		memset(&var, 0, sizeof(var));
+		var.var_vmid = vm->vm_vmid;
+		var.var_nic_idx = i;
+		proc_compose_imsg(ps, PROC_PRIV, -1, IMSG_VMDOP_PRIV_GET_ADDR,
+		    vm->vm_vmid, dup(tapfds[i]), &var, sizeof(var));
 	}
 
 	if (!(vm->vm_state & VM_STATE_RECEIVED))

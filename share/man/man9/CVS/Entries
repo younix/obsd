@@ -79,7 +79,6 @@
 /physio.9/1.11/Fri Dec  6 19:12:37 2019//
 /pmap.9/1.19/Mon Dec 16 10:34:04 2019//
 /pool_cache_init.9/1.8/Fri Jan 12 04:36:45 2018//
-/printf.9/1.24/Sat Nov  7 03:48:25 2015//
 /psignal.9/1.7/Mon Dec 17 14:51:57 2018//
 /radio.9/1.11/Wed Aug 31 16:54:33 2016//
 /rasops.9/1.18/Mon Aug 21 11:49:50 2017//
@@ -88,7 +87,6 @@
 /rssadapt.9/1.8/Mon Feb 16 16:38:54 2015//
 /rt_ifa_add.9/1.6/Wed Feb 13 23:47:43 2019//
 /rt_timer_add.9/1.4/Wed Mar 26 14:50:30 2014//
-/rtable_add.9/1.8/Mon Nov 14 10:32:46 2016//
 /rtable_walk.9/1.1/Fri Jul 12 16:53:57 2019//
 /rtalloc.9/1.12/Fri Jul 12 16:53:57 2019//
 /rtlabel_id2name.9/1.4/Wed Oct 15 11:58:13 2014//
@@ -140,7 +138,6 @@
 /wdog_register.9/1.7/Wed Jul 17 20:21:56 2013//
 /wsfont_init.9/1.2/Fri May 10 17:24:53 2019//
 /arc4random.9/1.15/Mon Jun  1 06:23:22 2020//
-/ifq_deq_begin.9/1.4/Mon Jun  1 06:23:23 2020//
 /ifiq_input.9/1.3/Sat Jun  6 11:21:49 2020//
 /hardclock.9/1.13/Fri Dec 11 17:58:22 2020//
 /inittodr.9/1.12/Fri Dec 11 17:58:22 2020//
@@ -159,13 +156,11 @@
 /getdevvp.9/1.9/Fri Dec 18 08:57:36 2020//
 /getnewvnode.9/1.11/Fri Dec 18 08:57:36 2020//
 /ieee80211_radiotap.9/1.15/Fri Dec 18 08:57:36 2020//
-/ifq_enqueue.9/1.11/Thu Dec 17 19:39:58 2020//
 /kstat_create.9/1.2/Thu Dec 17 19:39:58 2020//
 /kstat_kv_init.9/1.2/Thu Dec 17 19:39:58 2020//
 /mq_init.9/1.13/Thu Dec 17 19:39:58 2020//
 /pool.9/1.59/Fri Dec 18 08:57:36 2020//
 /sysctl_int.9/1.9/Thu Dec 17 19:39:58 2020//
-/timeout.9/1.51/Thu Dec 17 19:39:58 2020//
 /vclean.9/1.11/Fri Dec 18 08:57:36 2020//
 /vdevgone.9/1.8/Fri Dec 18 08:57:36 2020//
 /vflush.9/1.7/Fri Dec 18 08:57:36 2020//
@@ -179,4 +174,9 @@
 /kcov_remote_register.9/1.6/Wed Feb  3 13:04:58 2021//
 /mbuf.9/1.123/Tue Mar  9 08:12:22 2021//
 /stoeplitz_to_key.9/1.7/Tue Mar  9 08:12:22 2021//
+/ifq_deq_begin.9/1.5/Sat May  1 08:23:41 2021//
+/ifq_enqueue.9/1.12/Sat May  1 08:23:41 2021//
+/rtable_add.9/1.9/Sat May  1 08:23:41 2021//
+/printf.9/1.25/Sat May  1 08:33:45 2021//
+/timeout.9/1.52/Sat May  1 08:33:45 2021//
 D

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.86 2021/03/11 17:14:46 jsing Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.94 2021/04/30 19:26:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -226,8 +226,6 @@ ssl3_connect(SSL *s)
 				goto end;
 			}
 
-			s->internal->type = SSL_ST_CONNECT;
-
 			if (!ssl3_setup_init_buffer(s)) {
 				ret = -1;
 				goto end;
@@ -278,7 +276,7 @@ ssl3_connect(SSL *s)
 
 			if (SSL_is_dtls(s) && D1I(s)->send_cookie) {
 				S3I(s)->hs.state = SSL3_ST_CW_FLUSH;
-				S3I(s)->hs.next_state = SSL3_ST_CR_SRVR_HELLO_A;
+				S3I(s)->hs.tls12.next_state = SSL3_ST_CR_SRVR_HELLO_A;
 			} else
 				S3I(s)->hs.state = SSL3_ST_CR_SRVR_HELLO_A;
 
@@ -343,7 +341,7 @@ ssl3_connect(SSL *s)
 				break;
 			}
 			/* Check if it is anon DH/ECDH. */
-			if (!(S3I(s)->hs.new_cipher->algorithm_auth &
+			if (!(S3I(s)->hs.cipher->algorithm_auth &
 			    SSL_aNULL)) {
 				ret = ssl3_get_server_certificate(s);
 				if (ret <= 0)
@@ -393,7 +391,7 @@ ssl3_connect(SSL *s)
 				goto end;
 			if (SSL_is_dtls(s))
 				dtls1_stop_timer(s);
-			if (S3I(s)->tmp.cert_req)
+			if (S3I(s)->hs.tls12.cert_request)
 				S3I(s)->hs.state = SSL3_ST_CW_CERT_A;
 			else
 				S3I(s)->hs.state = SSL3_ST_CW_KEY_EXCH_A;
@@ -437,7 +435,7 @@ ssl3_connect(SSL *s)
 			 * message when client's ECDH public key is sent
 			 * inside the client certificate.
 			 */
-			if (S3I(s)->tmp.cert_req == 1) {
+			if (S3I(s)->hs.tls12.cert_request == 1) {
 				S3I(s)->hs.state = SSL3_ST_CW_CERT_VRFY_A;
 			} else {
 				S3I(s)->hs.state = SSL3_ST_CW_CHANGE_A;
@@ -477,7 +475,7 @@ ssl3_connect(SSL *s)
 			S3I(s)->hs.state = SSL3_ST_CW_FINISHED_A;
 			s->internal->init_num = 0;
 
-			s->session->cipher = S3I(s)->hs.new_cipher;
+			s->session->cipher = S3I(s)->hs.cipher;
 			if (!tls1_setup_key_block(s)) {
 				ret = -1;
 				goto end;
@@ -499,8 +497,7 @@ ssl3_connect(SSL *s)
 			if (SSL_is_dtls(s) && !s->internal->hit)
 				dtls1_start_timer(s);
 			ret = ssl3_send_finished(s, SSL3_ST_CW_FINISHED_A,
-			    SSL3_ST_CW_FINISHED_B, TLS_MD_CLIENT_FINISH_CONST,
-			    TLS_MD_CLIENT_FINISH_CONST_SIZE);
+			    SSL3_ST_CW_FINISHED_B);
 			if (ret <= 0)
 				goto end;
 			if (!SSL_is_dtls(s))
@@ -509,14 +506,14 @@ ssl3_connect(SSL *s)
 
 			/* clear flags */
 			if (s->internal->hit) {
-				S3I(s)->hs.next_state = SSL_ST_OK;
+				S3I(s)->hs.tls12.next_state = SSL_ST_OK;
 			} else {
 				/* Allow NewSessionTicket if ticket expected */
 				if (s->internal->tlsext_ticket_expected)
-					S3I(s)->hs.next_state =
+					S3I(s)->hs.tls12.next_state =
 					    SSL3_ST_CR_SESSION_TICKET_A;
 				else
-					S3I(s)->hs.next_state =
+					S3I(s)->hs.tls12.next_state =
 					    SSL3_ST_CR_FINISHED_A;
 			}
 			s->internal->init_num = 0;
@@ -567,14 +564,14 @@ ssl3_connect(SSL *s)
 					/* If the write error was fatal, stop trying */
 					if (!BIO_should_retry(s->wbio)) {
 						s->internal->rwstate = SSL_NOTHING;
-						S3I(s)->hs.state = S3I(s)->hs.next_state;
+						S3I(s)->hs.state = S3I(s)->hs.tls12.next_state;
 					}
 				}
 				ret = -1;
 				goto end;
 			}
 			s->internal->rwstate = SSL_NOTHING;
-			S3I(s)->hs.state = S3I(s)->hs.next_state;
+			S3I(s)->hs.state = S3I(s)->hs.tls12.next_state;
 			break;
 
 		case SSL_ST_OK:
@@ -625,7 +622,7 @@ ssl3_connect(SSL *s)
 		}
 
 		/* did we do anything */
-		if (!S3I(s)->tmp.reuse_message && !skip) {
+		if (!S3I(s)->hs.tls12.reuse_message && !skip) {
 			if (s->internal->debug) {
 				if ((ret = BIO_flush(s->wbio)) <= 0)
 					goto end;
@@ -806,9 +803,9 @@ ssl3_get_dtls_hello_verify(SSL *s)
 	if (!ok)
 		return ((int)n);
 
-	if (S3I(s)->tmp.message_type != DTLS1_MT_HELLO_VERIFY_REQUEST) {
+	if (S3I(s)->hs.tls12.message_type != DTLS1_MT_HELLO_VERIFY_REQUEST) {
 		D1I(s)->send_cookie = 0;
-		S3I(s)->tmp.reuse_message = 1;
+		S3I(s)->hs.tls12.reuse_message = 1;
 		return (1);
 	}
 
@@ -880,9 +877,9 @@ ssl3_get_server_hello(SSL *s)
 	CBS_init(&cbs, s->internal->init_msg, n);
 
 	if (SSL_is_dtls(s)) {
-		if (S3I(s)->tmp.message_type == DTLS1_MT_HELLO_VERIFY_REQUEST) {
+		if (S3I(s)->hs.tls12.message_type == DTLS1_MT_HELLO_VERIFY_REQUEST) {
 			if (D1I(s)->send_cookie == 0) {
-				S3I(s)->tmp.reuse_message = 1;
+				S3I(s)->hs.tls12.reuse_message = 1;
 				return (1);
 			} else {
 				/* Already sent a cookie. */
@@ -893,7 +890,7 @@ ssl3_get_server_hello(SSL *s)
 		}
 	}
 
-	if (S3I(s)->tmp.message_type != SSL3_MT_SERVER_HELLO) {
+	if (S3I(s)->hs.tls12.message_type != SSL3_MT_SERVER_HELLO) {
 		al = SSL_AD_UNEXPECTED_MESSAGE;
 		SSLerror(s, SSL_R_BAD_MESSAGE_TYPE);
 		goto fatal_err;
@@ -1054,7 +1051,7 @@ ssl3_get_server_hello(SSL *s)
 		SSLerror(s, SSL_R_OLD_SESSION_CIPHER_NOT_RETURNED);
 		goto fatal_err;
 	}
-	S3I(s)->hs.new_cipher = cipher;
+	S3I(s)->hs.cipher = cipher;
 
 	if (!tls1_transcript_hash_init(s))
 		goto err;
@@ -1063,7 +1060,7 @@ ssl3_get_server_hello(SSL *s)
 	 * Don't digest cached records if no sigalgs: we may need them for
 	 * client authentication.
 	 */
-	alg_k = S3I(s)->hs.new_cipher->algorithm_mkey;
+	alg_k = S3I(s)->hs.cipher->algorithm_mkey;
 	if (!(SSL_USE_SIGALGS(s) || (alg_k & SSL_kGOST)))
 		tls1_transcript_free(s);
 
@@ -1130,12 +1127,12 @@ ssl3_get_server_certificate(SSL *s)
 	if (!ok)
 		return ((int)n);
 
-	if (S3I(s)->tmp.message_type == SSL3_MT_SERVER_KEY_EXCHANGE) {
-		S3I(s)->tmp.reuse_message = 1;
+	if (S3I(s)->hs.tls12.message_type == SSL3_MT_SERVER_KEY_EXCHANGE) {
+		S3I(s)->hs.tls12.reuse_message = 1;
 		return (1);
 	}
 
-	if (S3I(s)->tmp.message_type != SSL3_MT_CERTIFICATE) {
+	if (S3I(s)->hs.tls12.message_type != SSL3_MT_CERTIFICATE) {
 		al = SSL_AD_UNEXPECTED_MESSAGE;
 		SSLerror(s, SSL_R_BAD_MESSAGE_TYPE);
 		goto fatal_err;
@@ -1276,7 +1273,7 @@ ssl3_get_server_kex_dhe(SSL *s, EVP_PKEY **pkey, CBS *cbs)
 	long alg_a;
 	int al;
 
-	alg_a = S3I(s)->hs.new_cipher->algorithm_auth;
+	alg_a = S3I(s)->hs.cipher->algorithm_auth;
 	sc = SSI(s)->sess_cert;
 
 	if ((dh = DH_new()) == NULL) {
@@ -1404,7 +1401,7 @@ ssl3_get_server_kex_ecdhe(SSL *s, EVP_PKEY **pkey, CBS *cbs)
 	int nid;
 	int al;
 
-	alg_a = S3I(s)->hs.new_cipher->algorithm_auth;
+	alg_a = S3I(s)->hs.cipher->algorithm_auth;
 	sc = SSI(s)->sess_cert;
 
 	/* Only named curves are supported. */
@@ -1483,8 +1480,8 @@ ssl3_get_server_key_exchange(SSL *s)
 
 	EVP_MD_CTX_init(&md_ctx);
 
-	alg_k = S3I(s)->hs.new_cipher->algorithm_mkey;
-	alg_a = S3I(s)->hs.new_cipher->algorithm_auth;
+	alg_k = S3I(s)->hs.cipher->algorithm_mkey;
+	alg_a = S3I(s)->hs.cipher->algorithm_auth;
 
 	/*
 	 * Use same message size as in ssl3_get_certificate_request()
@@ -1500,7 +1497,7 @@ ssl3_get_server_key_exchange(SSL *s)
 
 	CBS_init(&cbs, s->internal->init_msg, n);
 
-	if (S3I(s)->tmp.message_type != SSL3_MT_SERVER_KEY_EXCHANGE) {
+	if (S3I(s)->hs.tls12.message_type != SSL3_MT_SERVER_KEY_EXCHANGE) {
 		/*
 		 * Do not skip server key exchange if this cipher suite uses
 		 * ephemeral keys.
@@ -1511,7 +1508,7 @@ ssl3_get_server_key_exchange(SSL *s)
 			goto fatal_err;
 		}
 
-		S3I(s)->tmp.reuse_message = 1;
+		S3I(s)->hs.tls12.reuse_message = 1;
 		EVP_MD_CTX_cleanup(&md_ctx);
 		return (1);
 	}
@@ -1652,8 +1649,7 @@ ssl3_get_certificate_request(SSL *s)
 {
 	int			 ok, ret = 0;
 	long			 n;
-	uint8_t			 ctype_num;
-	CBS			 cert_request, ctypes, rdn_list;
+	CBS			 cert_request, cert_types, rdn_list;
 	X509_NAME		*xn = NULL;
 	const unsigned char	*q;
 	STACK_OF(X509_NAME)	*ca_sk = NULL;
@@ -1663,10 +1659,10 @@ ssl3_get_certificate_request(SSL *s)
 	if (!ok)
 		return ((int)n);
 
-	S3I(s)->tmp.cert_req = 0;
+	S3I(s)->hs.tls12.cert_request = 0;
 
-	if (S3I(s)->tmp.message_type == SSL3_MT_SERVER_DONE) {
-		S3I(s)->tmp.reuse_message = 1;
+	if (S3I(s)->hs.tls12.message_type == SSL3_MT_SERVER_DONE) {
+		S3I(s)->hs.tls12.reuse_message = 1;
 		/*
 		 * If we get here we don't need any cached handshake records
 		 * as we wont be doing client auth.
@@ -1675,14 +1671,14 @@ ssl3_get_certificate_request(SSL *s)
 		return (1);
 	}
 
-	if (S3I(s)->tmp.message_type != SSL3_MT_CERTIFICATE_REQUEST) {
+	if (S3I(s)->hs.tls12.message_type != SSL3_MT_CERTIFICATE_REQUEST) {
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_UNEXPECTED_MESSAGE);
 		SSLerror(s, SSL_R_WRONG_MESSAGE_TYPE);
 		goto err;
 	}
 
 	/* TLS does not like anon-DH with client cert */
-	if (S3I(s)->hs.new_cipher->algorithm_auth & SSL_aNULL) {
+	if (S3I(s)->hs.cipher->algorithm_auth & SSL_aNULL) {
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_UNEXPECTED_MESSAGE);
 		SSLerror(s, SSL_R_TLS_CLIENT_CERT_REQ_WITH_ANON_CIPHER);
 		goto err;
@@ -1697,18 +1693,8 @@ ssl3_get_certificate_request(SSL *s)
 		goto err;
 	}
 
-	/* get the certificate types */
-	if (!CBS_get_u8(&cert_request, &ctype_num))
+	if (!CBS_get_u8_length_prefixed(&cert_request, &cert_types))
 		goto decode_err;
-
-	if (ctype_num > SSL3_CT_NUMBER)
-		ctype_num = SSL3_CT_NUMBER;
-	if (!CBS_get_bytes(&cert_request, &ctypes, ctype_num) ||
-	    !CBS_write_bytes(&ctypes, (uint8_t *)S3I(s)->tmp.ctype,
-	    sizeof(S3I(s)->tmp.ctype), NULL)) {
-		SSLerror(s, SSL_R_DATA_LENGTH_TOO_LONG);
-		goto err;
-	}
 
 	if (SSL_USE_SIGALGS(s)) {
 		CBS sigalgs;
@@ -1780,10 +1766,9 @@ ssl3_get_certificate_request(SSL *s)
 	}
 
 	/* we should setup a certificate to return.... */
-	S3I(s)->tmp.cert_req = 1;
-	S3I(s)->tmp.ctype_num = ctype_num;
-	sk_X509_NAME_pop_free(S3I(s)->tmp.ca_names, X509_NAME_free);
-	S3I(s)->tmp.ca_names = ca_sk;
+	S3I(s)->hs.tls12.cert_request = 1;
+	sk_X509_NAME_pop_free(S3I(s)->hs.tls12.ca_names, X509_NAME_free);
+	S3I(s)->hs.tls12.ca_names = ca_sk;
 	ca_sk = NULL;
 
 	ret = 1;
@@ -1816,11 +1801,11 @@ ssl3_get_new_session_ticket(SSL *s)
 	if (!ok)
 		return ((int)n);
 
-	if (S3I(s)->tmp.message_type == SSL3_MT_FINISHED) {
-		S3I(s)->tmp.reuse_message = 1;
+	if (S3I(s)->hs.tls12.message_type == SSL3_MT_FINISHED) {
+		S3I(s)->hs.tls12.reuse_message = 1;
 		return (1);
 	}
-	if (S3I(s)->tmp.message_type != SSL3_MT_NEWSESSION_TICKET) {
+	if (S3I(s)->hs.tls12.message_type != SSL3_MT_NEWSESSION_TICKET) {
 		al = SSL_AD_UNEXPECTED_MESSAGE;
 		SSLerror(s, SSL_R_BAD_MESSAGE_TYPE);
 		goto fatal_err;
@@ -2016,9 +2001,8 @@ ssl3_send_client_kex_rsa(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	if (!CBB_flush(cbb))
 		goto err;
 
-	s->session->master_key_length =
-	    tls1_generate_master_secret(s,
-		s->session->master_key, pms, sizeof(pms));
+	if (!tls12_derive_master_secret(s, pms, sizeof(pms)))
+		goto err;
 
 	ret = 1;
 
@@ -2070,10 +2054,8 @@ ssl3_send_client_kex_dhe(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 		goto err;
 	}
 
-	/* Generate master key from the result. */
-	s->session->master_key_length =
-	    tls1_generate_master_secret(s,
-		s->session->master_key, key, key_len);
+	if (!tls12_derive_master_secret(s, key, key_len))
+		goto err;
 
 	if (!CBB_add_u16_length_prefixed(cbb, &dh_Yc))
 		goto err;
@@ -2119,8 +2101,8 @@ ssl3_send_client_kex_ecdhe_ecp(SSL *s, SESS_CERT *sc, CBB *cbb)
 
 	if (!ssl_kex_derive_ecdhe_ecp(ecdh, sc->peer_ecdh_tmp, &key, &key_len))
 		goto err;
-	s->session->master_key_length = tls1_generate_master_secret(s,
-		s->session->master_key, key, key_len);
+	if (!tls12_derive_master_secret(s, key, key_len))
+		goto err;
 
 	ret = 1;
 
@@ -2157,10 +2139,8 @@ ssl3_send_client_kex_ecdhe_ecx(SSL *s, SESS_CERT *sc, CBB *cbb)
 	if (!CBB_flush(cbb))
 		goto err;
 
-	/* Generate master key from the result. */
-	s->session->master_key_length =
-	    tls1_generate_master_secret(s,
-		s->session->master_key, shared_key, X25519_KEY_LENGTH);
+	if (!tls12_derive_master_secret(s, shared_key, X25519_KEY_LENGTH))
+		goto err;
 
 	ret = 1;
 
@@ -2230,7 +2210,7 @@ ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	/*
 	 * If we have client certificate, use its secret as peer key.
 	 */
-	if (S3I(s)->tmp.cert_req && s->cert->key->privatekey) {
+	if (S3I(s)->hs.tls12.cert_request && s->cert->key->privatekey) {
 		if (EVP_PKEY_derive_set_peer(pkey_ctx,
 		    s->cert->key->privatekey) <=0) {
 			/*
@@ -2251,7 +2231,7 @@ ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	}
 
 	/* XXX check handshake hash instead. */
-	if (S3I(s)->hs.new_cipher->algorithm2 & SSL_HANDSHAKE_MAC_GOST94)
+	if (S3I(s)->hs.cipher->algorithm2 & SSL_HANDSHAKE_MAC_GOST94)
 		nid = NID_id_GostR3411_94;
 	else
 		nid = NID_id_tc26_gost3411_2012_256;
@@ -2291,9 +2271,9 @@ ssl3_send_client_kex_gost(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 		s->s3->flags |= TLS1_FLAGS_SKIP_CERT_VERIFY;
 	}
 	EVP_PKEY_CTX_free(pkey_ctx);
-	s->session->master_key_length =
-	    tls1_generate_master_secret(s,
-		s->session->master_key, premaster_secret, 32);
+
+	if (!tls12_derive_master_secret(s, premaster_secret, 32))
+		goto err;
 
 	ret = 1;
 
@@ -2314,7 +2294,7 @@ ssl3_send_client_key_exchange(SSL *s)
 	memset(&cbb, 0, sizeof(cbb));
 
 	if (S3I(s)->hs.state == SSL3_ST_CW_KEY_EXCH_A) {
-		alg_k = S3I(s)->hs.new_cipher->algorithm_mkey;
+		alg_k = S3I(s)->hs.cipher->algorithm_mkey;
 
 		if ((sess_cert = SSI(s)->sess_cert) == NULL) {
 			ssl3_send_alert(s, SSL3_AL_FATAL,
@@ -2661,8 +2641,8 @@ ssl3_send_client_certificate(SSL *s)
 	if (S3I(s)->hs.state == SSL3_ST_CW_CERT_B) {
 		/*
 		 * If we get an error, we need to
-		 * ssl->rwstate=SSL_X509_LOOKUP; return(-1);
-		 * We then get retied later
+		 * ssl->internal->rwstate = SSL_X509_LOOKUP; return(-1);
+		 * We then get retried later.
 		 */
 		i = ssl_do_client_cert_cb(s, &x509, &pkey);
 		if (i < 0) {
@@ -2683,7 +2663,7 @@ ssl3_send_client_certificate(SSL *s)
 		X509_free(x509);
 		EVP_PKEY_free(pkey);
 		if (i == 0) {
-			S3I(s)->tmp.cert_req = 2;
+			S3I(s)->hs.tls12.cert_request = 2;
 
 			/* There is no client certificate to verify. */
 			tls1_transcript_free(s);
@@ -2698,7 +2678,7 @@ ssl3_send_client_certificate(SSL *s)
 		    SSL3_MT_CERTIFICATE))
 			goto err;
 		if (!ssl3_output_cert_chain(s, &client_cert,
-		    (S3I(s)->tmp.cert_req == 2) ? NULL : s->cert->key))
+		    (S3I(s)->hs.tls12.cert_request == 2) ? NULL : s->cert->key))
 			goto err;
 		if (!ssl3_handshake_msg_finish(s, &cbb))
 			goto err;
@@ -2726,8 +2706,8 @@ ssl3_check_cert_and_algorithm(SSL *s)
 	SESS_CERT	*sc;
 	DH		*dh;
 
-	alg_k = S3I(s)->hs.new_cipher->algorithm_mkey;
-	alg_a = S3I(s)->hs.new_cipher->algorithm_auth;
+	alg_k = S3I(s)->hs.cipher->algorithm_mkey;
+	alg_a = S3I(s)->hs.cipher->algorithm_auth;
 
 	/* We don't have a certificate. */
 	if (alg_a & SSL_aNULL)
@@ -2801,9 +2781,9 @@ ssl3_check_finished(SSL *s)
 	if (!ok)
 		return ((int)n);
 
-	S3I(s)->tmp.reuse_message = 1;
-	if ((S3I(s)->tmp.message_type == SSL3_MT_FINISHED) ||
-	    (S3I(s)->tmp.message_type == SSL3_MT_NEWSESSION_TICKET))
+	S3I(s)->hs.tls12.reuse_message = 1;
+	if ((S3I(s)->hs.tls12.message_type == SSL3_MT_FINISHED) ||
+	    (S3I(s)->hs.tls12.message_type == SSL3_MT_NEWSESSION_TICKET))
 		return (2);
 
 	return (1);

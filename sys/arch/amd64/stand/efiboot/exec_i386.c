@@ -63,78 +63,6 @@ extern struct cmd_state cmd;
 
 char *bootmac = NULL;
 
-static int
-has_overlap(unsigned long astart, size_t asize, unsigned long mstart,
-    size_t msize, const char *type)
-{
-	if (astart >= mstart + msize || mstart >= astart + asize)
-		return 0;
-
-	printf("Overlap %08lx-%08lx on %s %08lx-%08lx sz=%8lx",
-	    astart, astart + asize - 1, type,
-	    mstart, mstart + msize - 1, msize);
-
-	return 1;
-}
-
-void
-check_memmap(unsigned long astart, size_t asize)
-{
-	EFI_STATUS               status;
-	UINTN                    mapkey, mmsiz, siz;
-	UINT32                   mmver;
-	EFI_MEMORY_DESCRIPTOR   *mm0, *mm;
-	int                      i, n;
-
-	siz = 0;
-	status = EFI_CALL(BS->GetMemoryMap, &siz, NULL, &mapkey, &mmsiz,
-			&mmver);
-	if (status != EFI_BUFFER_TOO_SMALL)
-		panic("cannot get the size of memory map");
-	mm0 = alloc(siz);
-	status = EFI_CALL(BS->GetMemoryMap, &siz, mm0, &mapkey, &mmsiz, &mmver);
-	if (status != EFI_SUCCESS)
-		panic("cannot get the memory map");
-	n = siz / mmsiz;
-
-	for (i = 0, mm = mm0; i < n; i++, mm = NextMemoryDescriptor(mm, mmsiz)) {
-		unsigned long mstart = mm->PhysicalStart;
-		size_t msize = mm->NumberOfPages * EFI_PAGE_SIZE;
-		const char *type = NULL;
-
-		if (!has_overlap(astart, asize, mstart, msize, "EFI"))
-			continue;
-
-#define MM_CASE(t)  case t: type = #t; break
-
-		switch (mm->Type) {
-			MM_CASE(EfiReservedMemoryType);
-			MM_CASE(EfiLoaderCode);
-			MM_CASE(EfiLoaderData);
-			MM_CASE(EfiBootServicesCode);
-			MM_CASE(EfiBootServicesData);
-			MM_CASE(EfiRuntimeServicesCode);
-			MM_CASE(EfiRuntimeServicesData);
-			MM_CASE(EfiConventionalMemory);
-			MM_CASE(EfiUnusableMemory);
-			MM_CASE(EfiACPIReclaimMemory);
-			MM_CASE(EfiACPIMemoryNVS);
-			MM_CASE(EfiMemoryMappedIO);
-			MM_CASE(EfiMemoryMappedIOPortSpace);
-			MM_CASE(EfiPalCode);
-			default:
-			type = "unknown";
-			break;
-		}
-
-#undef MM_CASE
-
-		printf(" type=%d '%s'\n", mm->Type, type);
-	}
-
-	free(mm0, siz);
-}
-
 void
 run_loadfile(uint64_t *marks, int howto)
 {
@@ -162,11 +90,7 @@ run_loadfile(uint64_t *marks, int howto)
 	if ((av = alloc(ac)) == NULL)
 		panic("alloc for bootarg");
 	efi_makebootargs();
-
 	delta = DEFAULT_KERNEL_ADDRESS - efi_loadaddr;
-
-printf("delta: %lu = %lu - %lu\n", delta, DEFAULT_KERNEL_ADDRESS, efi_loadaddr);
-
 	if (sa_cleanup != NULL)
 		(*sa_cleanup)();
 
@@ -207,42 +131,6 @@ printf("delta: %lu = %lu - %lu\n", delta, DEFAULT_KERNEL_ADDRESS, efi_loadaddr);
 	entry = marks[MARK_ENTRY] & 0x0fffffff;
 	entry += delta;
 
-
-
-
-
-
-#ifdef __amd64__
-//typedef void (*funcp)(void) __attribute__ ((noreturn));
-//printf("try to stop...\n");
-//u_long stop = 0xfffffff0;
-//(*(funcp)stop)();
-//printf("...does not work\n");
-#endif
-
-
-
-
-
-
-
-
-
-
-#ifdef __amd64__
-printf("marks[START]:   0x%llu\n", marks[MARK_START]);
-printf("marks[ENTRY]:   0x%llu\n", marks[MARK_ENTRY]);
-printf("marks[NSYM]:    0x%llu\n", marks[MARK_NSYM]);
-printf("marks[SYM]:     0x%llu\n", marks[MARK_SYM]);
-printf("marks[END]:     0x%llu\n", marks[MARK_END]);
-printf("marks[RANDOM]:  0x%llu\n", marks[MARK_RANDOM]);
-printf("marks[ERANDOM]: 0x%llu\n", marks[MARK_ERANDOM]);
-printf("marks[VENTRY]:  0x%llu\n", marks[MARK_VENTRY]);
-
-check_memmap(marks[MARK_START] + delta, marks[MARK_END] - marks[MARK_START]);
-//protect_writeable(marks[MARK_START] + delta, marks[MARK_END] - marks[MARK_START]);
-#endif
-
 	printf("entry point at 0x%lx\n", entry);
 
 	/* Sync the memory map and call ExitBootServices() */
@@ -266,7 +154,8 @@ check_memmap(marks[MARK_START] + delta, marks[MARK_END] - marks[MARK_START]);
 	 * ExitBootServices().
 	 */
 #ifdef __amd64__
-protect_writeable(marks[MARK_START] + delta, marks[MARK_END] - marks[MARK_START]);
+	protect_writeable(marks[MARK_START] + delta,
+	    marks[MARK_END] - marks[MARK_START]);
 #endif
 	memmove((void *)marks[MARK_START] + delta, (void *)marks[MARK_START],
 	    marks[MARK_END] - marks[MARK_START]);
@@ -342,95 +231,47 @@ ucode_load(void)
 
 	close(fd);
 }
+
 #ifdef __amd64__
 void
-protect_writeable_p(uint64_t *cr3, uint64_t addr, int recurse)
+protect_writeable(uint64_t addr, size_t len)
 {
-	size_t idx;
-	uint64_t *p;
-
-	printf("%s: addr 0x%llx r %d\n", __func__, addr, recurse);
-
-/*
- * LEVEL 4
- */
-
-	idx = (addr & L4_MASK) >> L4_SHIFT;
-	if ((cr3[idx] & PG_RW) == 0) {
-		printf("try to write 0x%llx\n", (uint64_t)cr3);
-		cr3[idx] |= PG_RW;
-	}
-	if (cr3[idx] & PG_PS) {
-printf("%s:%d Page Size not set\n", __func__, __LINE__);
-		return;
-	}
-	p = (uint64_t *)(cr3[idx] & PG_FRAME);
-
-/*
- * LEVEL 3
- */
-
-	idx = (addr & L3_MASK) >> L3_SHIFT;
-	if ((p[idx] & PG_RW) == 0) {
-		printf("try to write 3 0x%llx\n", (uint64_t)p);
-		if (recurse)
-			protect_writeable_p(cr3, (uint64_t)p, recurse - 1);
-		p[idx] |= PG_RW;
-	}
-	if (p[idx] & PG_PS) {
-printf("%s:%d Page Size not set\n", __func__, __LINE__);
-		return;
-	}
-	p = (uint64_t *)(p[idx] & PG_FRAME);
-
-/*
- * LEVEL 2
- */
-
-	idx = (addr & L2_MASK) >> L2_SHIFT;
-	if ((p[idx] & PG_RW) == 0) {
-		printf("try to write 2 0x%llx\n", (uint64_t)p);
-		if (recurse)
-			protect_writeable_p(cr3, (uint64_t)p, recurse - 1);
-		p[idx] |= PG_RW;
-	}
-	if (p[idx] & PG_PS) {
-printf("%s:%d Page Size not set\n", __func__, __LINE__);
-		return;
-	}
-	p = (uint64_t *)(p[idx] & PG_FRAME);
-
-/*
- * LEVEL 1
- */
-
-	idx = (addr & L1_MASK) >> L1_SHIFT;
-	if ((p[idx] & PG_RW) == 0) {
-		printf("try to write 1 0x%llx\n", (uint64_t)p);
-		if (recurse)
-			protect_writeable_p(cr3, (uint64_t)p, recurse - 1);
-		p[idx] |= PG_RW;
-	}
-}
-
-void
-protect_writeable(uint64_t start, size_t len)
-{
-	uint64_t addr = start;
 	uint64_t end = addr + len;
-	uint64_t *cr3;
+	uint64_t *cr3, *p;
 	uint64_t cr0;
+	size_t idx;
 
 	__asm volatile("movq %%cr0, %0;" : "=r"(cr0) : :);
 	if ((cr0 & CR0_PG) == 0)
 		return;
 	__asm volatile("movq %%cr3, %0;" : "=r"(cr3) : :);
-printf("%s: start cr3: %p\n", __func__, cr3);
 
 	for (addr &= ~(uint64_t)PAGE_MASK; addr < end; addr += PAGE_SIZE) {
-		protect_writeable_p(cr3, addr, 5);
+		idx = (addr & L4_MASK) >> L4_SHIFT;
+		if ((cr3[idx] & PG_RW) == 0)
+			cr3[idx] |= PG_RW;
+		if (cr3[idx] & PG_PS)
+			continue;
+		p = (uint64_t *)(cr3[idx] & PG_FRAME);
+
+		idx = (addr & L3_MASK) >> L3_SHIFT;
+		if ((p[idx] & PG_RW) == 0)
+			p[idx] |= PG_RW;
+		if (p[idx] & PG_PS)
+			continue;
+		p = (uint64_t *)(p[idx] & PG_FRAME);
+
+		idx = (addr & L2_MASK) >> L2_SHIFT;
+		if ((p[idx] & PG_RW) == 0)
+			p[idx] |= PG_RW;
+		if (p[idx] & PG_PS)
+			continue;
+		p = (uint64_t *)(p[idx] & PG_FRAME);
+
+		idx = (addr & L1_MASK) >> L1_SHIFT;
+		if ((p[idx] & PG_RW) == 0)
+			p[idx] |= PG_RW;
 	}
-printf("%s: end\n", __func__);
 
 	/* tlb flush */
 	__asm volatile("movq %0,%%cr3" : : "r"(cr3) :);

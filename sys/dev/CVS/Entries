@@ -1,6 +1,5 @@
 /audio_if.h/1.36/Thu Sep  5 05:33:57 2019//
 /bio.c/1.17/Wed Aug 26 22:28:57 2015//
-/clock_subr.h/1.6/Sun May 17 13:21:20 2020//
 /cninit.c/1.15/Sat Dec 30 20:46:59 2017//
 /cons.c/1.29/Fri Apr  3 08:24:52 2020//
 /cons.h/1.18/Tue May 17 23:43:47 2016//
@@ -78,3 +77,4 @@ D/x86emu////
 /softraidvar.h/1.172/Fri Feb 26 10:30:12 2021//
 /video.c/1.54/Fri Feb 26 10:30:12 2021//
 /rnd.c/1.222/Tue Mar  9 08:12:26 2021//
+/clock_subr.h/1.7/Sat May  1 08:33:52 2021//

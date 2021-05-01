@@ -1,4 +1,4 @@
-/*	$OpenBSD: rsync.c,v 1.21 2021/03/04 14:24:17 claudio Exp $ */
+/*	$OpenBSD: rsync.c,v 1.24 2021/04/19 17:04:35 deraadt Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -55,6 +55,7 @@ char *
 rsync_base_uri(const char *uri)
 {
 	const char *host, *module, *rest;
+	char *base_uri;
 
 	/* Case-insensitive rsync URI. */
 	if (strncasecmp(uri, "rsync://", 8) != 0) {
@@ -82,13 +83,17 @@ rsync_base_uri(const char *uri)
 
 	/* The path component is optional. */
 	if ((rest = strchr(module, '/')) == NULL) {
-		return strdup(uri);
+		if ((base_uri = strdup(uri)) == NULL)
+			err(1, NULL);
+		return base_uri;
 	} else if (rest == module) {
 		warnx("%s: zero-length module", uri);
 		return NULL;
 	}
 
-	return strndup(uri, rest - uri);
+	if ((base_uri = strndup(uri, rest - uri)) == NULL)
+		err(1, NULL);
+	return base_uri;
 }
 
 static void
@@ -111,17 +116,10 @@ proc_child(int signal)
 void
 proc_rsync(char *prog, char *bind_addr, int fd)
 {
-	size_t			 id, i, idsz = 0;
-	ssize_t			 ssz;
-	char			*uri = NULL, *dst = NULL, *path, *save, *cmd;
-	const char		*pp;
-	pid_t			 pid;
-	char			*args[32];
-	int			 st, rc = 0;
-	struct stat		 stt;
+	size_t			 i, idsz = 0;
+	int			 rc = 0;
 	struct pollfd		 pfd;
 	struct msgbuf		 msgq;
-	struct ibuf		*b;
 	sigset_t		 mask, oldmask;
 	struct rsyncproc	*ids = NULL;
 
@@ -138,6 +136,10 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 	 */
 
 	if (strchr(prog, '/') == NULL) {
+		const char *pp;
+		char *save, *cmd, *path;
+		struct stat stt;
+
 		if (getenv("PATH") == NULL)
 			errx(1, "PATH is unset");
 		if ((path = strdup(getenv("PATH"))) == NULL)
@@ -175,6 +177,12 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 		err(1, NULL);
 
 	for (;;) {
+		char *uri = NULL, *dst = NULL;
+		ssize_t ssz;
+		size_t id;
+		pid_t pid;
+		int st;
+
 		pfd.events = POLLIN;
 		if (msgq.queued)
 			pfd.events |= POLLOUT;
@@ -191,6 +199,7 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 			 */
 
 			while ((pid = waitpid(WAIT_ANY, &st, WNOHANG)) > 0) {
+				struct ibuf *b;
 				int ok = 1;
 
 				for (i = 0; i < idsz; i++)
@@ -260,11 +269,14 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 			err(1, "fork");
 
 		if (pid == 0) {
+			char *args[32];
+
 			if (pledge("stdio exec", NULL) == -1)
 				err(1, "pledge");
 			i = 0;
 			args[i++] = (char *)prog;
 			args[i++] = "-rt";
+			args[i++] = "--no-motd";
 			args[i++] = "--timeout";
 			args[i++] = "180";
 			if (bind_addr != NULL) {
@@ -274,6 +286,7 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 			args[i++] = uri;
 			args[i++] = dst;
 			args[i] = NULL;
+			/* XXX args overflow not prevented */
 			execvp(args[0], args);
 			err(1, "%s: execvp", prog);
 		}

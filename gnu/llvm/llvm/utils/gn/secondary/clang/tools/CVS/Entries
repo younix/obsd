@@ -14,3 +14,4 @@ D/clang-scan-deps////
 D/diagtool////
 D/driver////
 D/libclang////
+D/scan-build////

@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_enc.c,v 1.133 2021/02/27 14:20:50 jsing Exp $ */
+/* $OpenBSD: t1_enc.c,v 1.140 2021/04/30 19:26:45 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -144,28 +144,12 @@
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
 
-int tls1_PRF(SSL *s, const unsigned char *secret, size_t secret_len,
-    const void *seed1, size_t seed1_len, const void *seed2, size_t seed2_len,
-    const void *seed3, size_t seed3_len, const void *seed4, size_t seed4_len,
-    const void *seed5, size_t seed5_len, unsigned char *out, size_t out_len);
-
 void
 tls1_cleanup_key_block(SSL *s)
 {
-	freezero(S3I(s)->hs.key_block, S3I(s)->hs.key_block_len);
-	S3I(s)->hs.key_block = NULL;
-	S3I(s)->hs.key_block_len = 0;
-}
-
-void
-tls1_record_sequence_increment(unsigned char *seq)
-{
-	int i;
-
-	for (i = SSL3_SEQUENCE_SIZE - 1; i >= 0; i--) {
-		if (++seq[i] != 0)
-			break;
-	}
+	freezero(S3I(s)->hs.tls12.key_block, S3I(s)->hs.tls12.key_block_len);
+	S3I(s)->hs.tls12.key_block = NULL;
+	S3I(s)->hs.tls12.key_block_len = 0;
 }
 
 /*
@@ -323,8 +307,8 @@ tls1_change_cipher_state(SSL *s, int which)
 	const EVP_AEAD *aead;
 	char is_read, use_client_keys;
 
-	cipher = S3I(s)->tmp.new_sym_enc;
-	aead = S3I(s)->tmp.new_aead;
+	aead = tls12_record_layer_aead(s->internal->rl);
+	cipher = tls12_record_layer_cipher(s->internal->rl);
 
 	/*
 	 * is_read is true if we have just read a ChangeCipherSpec message,
@@ -343,15 +327,15 @@ tls1_change_cipher_state(SSL *s, int which)
 
 	if (aead != NULL) {
 		key_len = EVP_AEAD_key_length(aead);
-		iv_len = SSL_CIPHER_AEAD_FIXED_NONCE_LEN(S3I(s)->hs.new_cipher);
+		iv_len = SSL_CIPHER_AEAD_FIXED_NONCE_LEN(S3I(s)->hs.cipher);
 	} else {
 		key_len = EVP_CIPHER_key_length(cipher);
 		iv_len = EVP_CIPHER_iv_length(cipher);
 	}
 
-	mac_secret_size = S3I(s)->tmp.new_mac_secret_size;
+	mac_secret_size = S3I(s)->hs.tls12.mac_secret_size;
 
-	key_block = S3I(s)->hs.key_block;
+	key_block = S3I(s)->hs.tls12.key_block;
 	client_write_mac_secret = key_block;
 	key_block += mac_secret_size;
 	server_write_mac_secret = key_block;
@@ -375,7 +359,8 @@ tls1_change_cipher_state(SSL *s, int which)
 		iv = server_write_iv;
 	}
 
-	if (key_block - S3I(s)->hs.key_block != S3I(s)->hs.key_block_len) {
+	if (key_block - S3I(s)->hs.tls12.key_block !=
+	    S3I(s)->hs.tls12.key_block_len) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		goto err;
 	}
@@ -410,7 +395,7 @@ tls1_setup_key_block(SSL *s)
 	const EVP_MD *mac_hash = NULL;
 	int ret = 0;
 
-	if (S3I(s)->hs.key_block_len != 0)
+	if (S3I(s)->hs.tls12.key_block_len != 0)
 		return (1);
 
 	if (s->session->cipher &&
@@ -434,9 +419,7 @@ tls1_setup_key_block(SSL *s)
 	if (!ssl_get_handshake_evp_md(s, &handshake_hash))
 		return (0);
 
-	S3I(s)->tmp.new_aead = aead;
-	S3I(s)->tmp.new_sym_enc = cipher;
-	S3I(s)->tmp.new_mac_secret_size = mac_secret_size;
+	S3I(s)->hs.tls12.mac_secret_size = mac_secret_size;
 
 	tls12_record_layer_set_aead(s->internal->rl, aead);
 	tls12_record_layer_set_cipher_hash(s->internal->rl, cipher,
@@ -451,8 +434,8 @@ tls1_setup_key_block(SSL *s)
 	}
 	key_block_len = (mac_secret_size + key_len + iv_len) * 2;
 
-	S3I(s)->hs.key_block_len = key_block_len;
-	S3I(s)->hs.key_block = key_block;
+	S3I(s)->hs.tls12.key_block_len = key_block_len;
+	S3I(s)->hs.tls12.key_block = key_block;
 
 	if (!tls1_generate_key_block(s, key_block, key_block_len))
 		goto err;
@@ -480,43 +463,6 @@ tls1_setup_key_block(SSL *s)
 
  err:
 	return (ret);
-}
-
-int
-tls1_final_finish_mac(SSL *s, const char *str, int str_len, unsigned char *out)
-{
-	unsigned char buf[EVP_MAX_MD_SIZE];
-	size_t hash_len;
-
-	if (str_len < 0)
-		return 0;
-
-	if (!tls1_transcript_hash_value(s, buf, sizeof(buf), &hash_len))
-		return 0;
-
-	if (!tls1_PRF(s, s->session->master_key, s->session->master_key_length,
-	    str, str_len, buf, hash_len, NULL, 0, NULL, 0, NULL, 0,
-	    out, TLS1_FINISH_MAC_LENGTH))
-		return 0;
-
-	return TLS1_FINISH_MAC_LENGTH;
-}
-
-int
-tls1_generate_master_secret(SSL *s, unsigned char *out, unsigned char *p,
-    int len)
-{
-	if (len < 0)
-		return 0;
-
-	if (!tls1_PRF(s, p, len,
-	    TLS_MD_MASTER_SECRET_CONST, TLS_MD_MASTER_SECRET_CONST_SIZE,
-	    s->s3->client_random, SSL3_RANDOM_SIZE, NULL, 0,
-	    s->s3->server_random, SSL3_RANDOM_SIZE, NULL, 0,
-	    s->session->master_key, SSL_MAX_MASTER_KEY_LENGTH))
-		return 0;
-
-	return (SSL_MAX_MASTER_KEY_LENGTH);
 }
 
 int

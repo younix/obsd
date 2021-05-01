@@ -1,4 +1,4 @@
-/*	$OpenBSD: apmd.c,v 1.100 2021/03/11 18:12:41 kn Exp $	*/
+/*	$OpenBSD: apmd.c,v 1.105 2021/04/18 23:51:47 jca Exp $	*/
 
 /*
  *  Copyright (c) 1995, 1996 John T. Kohl
@@ -64,15 +64,14 @@ extern char *__progname;
 void usage(void);
 int power_status(int fd, int force, struct apm_power_info *pinfo);
 int bind_socket(const char *sn);
-enum apm_state handle_client(int sock_fd, int ctl_fd);
-void suspend(int ctl_fd);
-void stand_by(int ctl_fd);
-void hibernate(int ctl_fd);
+void handle_client(int sock_fd, int ctl_fd);
+int suspend(int ctl_fd);
+int stand_by(int ctl_fd);
+int hibernate(int ctl_fd);
 void resumed(int ctl_fd);
 void setperfpolicy(char *policy);
 void sigexit(int signo);
 void do_etc_file(const char *file);
-void sockunlink(void);
 void error(const char *fmt, const char *arg);
 void set_driver_messages(int fd, int mode);
 
@@ -80,7 +79,6 @@ void set_driver_messages(int fd, int mode);
 void
 sigexit(int signo)
 {
-	sockunlink();
 	_exit(1);
 }
 
@@ -204,15 +202,6 @@ power_status(int fd, int force, struct apm_power_info *pinfo)
 	return acon;
 }
 
-char socketname[PATH_MAX];
-
-void
-sockunlink(void)
-{
-	if (socketname[0])
-		remove(socketname);
-}
-
 int
 bind_socket(const char *sockname)
 {
@@ -238,13 +227,11 @@ bind_socket(const char *sockname)
 		error("cannot set socket mode/owner/group to 660/0/0", NULL);
 
 	listen(sock, 1);
-	strlcpy(socketname, sockname, sizeof socketname);
-	atexit(sockunlink);
 
 	return sock;
 }
 
-enum apm_state
+void
 handle_client(int sock_fd, int ctl_fd)
 {
 	/* accept a handle from the client, process it, then clean up */
@@ -264,31 +251,35 @@ handle_client(int sock_fd, int ctl_fd)
 	cli_fd = accept(sock_fd, (struct sockaddr *)&from, &fromlen);
 	if (cli_fd == -1) {
 		logmsg(LOG_INFO, "client accept failure: %s", strerror(errno));
-		return NORMAL;
+		return;
 	}
 
 	if (recv(cli_fd, &cmd, sizeof(cmd), 0) != sizeof(cmd)) {
 		(void) close(cli_fd);
 		logmsg(LOG_INFO, "client size botch");
-		return NORMAL;
+		return;
 	}
 
 	if (cmd.vno != APMD_VNO) {
 		close(cli_fd);			/* terminate client */
 		/* no error message, just drop it. */
-		return NORMAL;
+		return;
 	}
 
+	bzero(&reply, sizeof(reply));
 	power_status(ctl_fd, 0, &reply.batterystate);
 	switch (cmd.action) {
 	case SUSPEND:
 		reply.newstate = SUSPENDING;
+		reply.error = suspend(ctl_fd);
 		break;
 	case STANDBY:
 		reply.newstate = STANDING_BY;
+		reply.error = stand_by(ctl_fd);
 		break;
 	case HIBERNATE:
 		reply.newstate = HIBERNATING;
+		reply.error = hibernate(ctl_fd);
 		break;
 	case SETPERF_LOW:
 		reply.newstate = NORMAL;
@@ -330,41 +321,63 @@ handle_client(int sock_fd, int ctl_fd)
 	if (send(cli_fd, &reply, sizeof(reply), 0) != sizeof(reply))
 		logmsg(LOG_INFO, "reply to client botched");
 	close(cli_fd);
-
-	return reply.newstate;
 }
 
-void
+int
 suspend(int ctl_fd)
 {
+	int error = 0;
+
 	logmsg(LOG_NOTICE, "system suspending");
 	power_status(ctl_fd, 1, NULL);
 	do_etc_file(_PATH_APM_ETC_SUSPEND);
 	sync();
 	sleep(1);
-	ioctl(ctl_fd, APM_IOC_SUSPEND, 0);
+
+	if (ioctl(ctl_fd, APM_IOC_SUSPEND, 0) == -1) {
+		error = errno;
+		logmsg(LOG_WARNING, "%s: %s", __func__, strerror(errno));
+	}
+
+	return error;
 }
 
-void
+int
 stand_by(int ctl_fd)
 {
+	int error = 0;
+
 	logmsg(LOG_NOTICE, "system entering standby");
 	power_status(ctl_fd, 1, NULL);
 	do_etc_file(_PATH_APM_ETC_STANDBY);
 	sync();
 	sleep(1);
-	ioctl(ctl_fd, APM_IOC_STANDBY, 0);
+
+	if (ioctl(ctl_fd, APM_IOC_STANDBY, 0) == -1) {
+		error = errno;
+		logmsg(LOG_WARNING, "%s: %s", __func__, strerror(errno));
+	}
+
+	return error;
 }
 
-void
+int
 hibernate(int ctl_fd)
 {
+	int error = 0;
+
 	logmsg(LOG_NOTICE, "system hibernating");
 	power_status(ctl_fd, 1, NULL);
 	do_etc_file(_PATH_APM_ETC_HIBERNATE);
 	sync();
 	sleep(1);
-	ioctl(ctl_fd, APM_IOC_HIBERNATE, 0);
+
+	if (ioctl(ctl_fd, APM_IOC_HIBERNATE, 0) == -1) {
+		error = errno;
+		logmsg(LOG_WARNING, "%s: %s", __func__, strerror(errno));
+	}
+
+	return error;
 }
 
 void
@@ -522,19 +535,7 @@ main(int argc, char *argv[])
 			break;
 
 		if (rv == 1 && ev->ident == sock_fd) {
-			switch (handle_client(sock_fd, ctl_fd)) {
-			case NORMAL:
-				break;
-			case SUSPENDING:
-				suspend(ctl_fd);
-				break;
-			case STANDING_BY:
-				stand_by(ctl_fd);
-				break;
-			case HIBERNATING:
-				hibernate(ctl_fd);
-				break;
-			}
+			handle_client(sock_fd, ctl_fd);
 			continue;
 		}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmapae.c,v 1.60 2020/09/23 15:13:26 deraadt Exp $	*/
+/*	$OpenBSD: pmapae.c,v 1.62 2021/04/29 15:34:22 bluhm Exp $	*/
 
 /*
  * Copyright (c) 2006-2008 Michael Shalayeff
@@ -738,7 +738,7 @@ pmap_bootstrap_pae(void)
 				    (uint32_t)VM_PAGE_TO_PHYS(ptppg));
 			}
 		}
-		uvm_km_free(kernel_map, (vaddr_t)pd, NBPG);
+		km_free(pd, NBPG, &kv_any, &kp_dirty);
 		DPRINTF("%s: freeing PDP 0x%x\n", __func__, (uint32_t)pd);
 	}
 
@@ -944,7 +944,8 @@ pmap_pinit_pd_pae(struct pmap *pmap)
 	paddr_t pdidx[4];
 
 	/* allocate PDP */
-	pmap->pm_pdir = uvm_km_alloc(kernel_map, 4 * NBPG);
+	pmap->pm_pdir = (vaddr_t)km_alloc(4 * NBPG, &kv_any, &kp_dirty,
+	    &kd_waitok);
 	if (pmap->pm_pdir == 0)
 		panic("pmap_pinit_pd_pae: kernel_map out of virtual space!");
 	/* page index is in the pmap! */
@@ -997,7 +998,8 @@ pmap_pinit_pd_pae(struct pmap *pmap)
 	if (cpu_meltdown) {
 		int i;
 
-		if ((va = uvm_km_zalloc(kernel_map, 4 * NBPG)) == 0)
+		va = (vaddr_t)km_alloc(4 * NBPG, &kv_any, &kp_zero, &kd_nowait);
+		if (va == 0)
 			panic("%s: kernel_map out of virtual space!", __func__);
 		if (!pmap_extract(pmap_kernel(),
 		    (vaddr_t)&pmap->pm_pdidx_intel, &pmap->pm_pdirpa_intel))

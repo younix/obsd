@@ -1,4 +1,4 @@
-/* $OpenBSD: clientloop.c,v 1.358 2021/01/27 10:05:28 djm Exp $ */
+/* $OpenBSD: clientloop.c,v 1.360 2021/04/30 04:29:53 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -688,6 +688,8 @@ client_status_confirm(struct ssh *ssh, int type, Channel *c, void *ctx)
 		 * their stderr.
 		 */
 		if (tochan) {
+			debug3_f("channel %d: mux request: %s", c->self,
+			    cr->request_type);
 			if ((r = sshbuf_put(c->extended, errmsg,
 			    strlen(errmsg))) != 0)
 				fatal_fr(r, "sshbuf_put");
@@ -1415,7 +1417,7 @@ client_loop(struct ssh *ssh, int have_pty, int escape_char_arg,
 
 	if (received_signal) {
 		verbose("Killed by signal %d.", (int) received_signal);
-		cleanup_exit(0);
+		cleanup_exit(255);
 	}
 
 	/*

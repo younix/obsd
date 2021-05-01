@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.793 2021/02/23 04:13:17 dlg Exp $
+#	$OpenBSD: Makefile,v 1.796 2021/04/24 07:49:11 visa Exp $
 
 MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	acpi.4 acpiac.4 acpials.4 acpiasus.4 acpibat.4 \
@@ -23,7 +23,8 @@ MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	bcmtmon.4 bdpmic.4 \
 	berkwdt.4 bge.4 bgw.4 bio.4 bpe.4 bktr.4 bmtphy.4 bnx.4 bnxt.4 \
 	boca.4 bpf.4 brgphy.4 bridge.4 brswphy.4 bse.4 bwfm.4 bwi.4 bytgpio.4 \
-	cac.4 cas.4 cardbus.4 carp.4 ccp.4 ccpmic.4 cd.4 cdce.4 cfxga.4 \
+	cac.4 cas.4 cardbus.4 carp.4 ccp.4 ccpmic.4 cd.4 cdce.4 \
+	cduart.4 cfxga.4 \
 	ch.4 chvgpio.4 ciphy.4 ciss.4 clcs.4 clct.4 cmpci.4 \
 	com.4 cue.4 cwfg.4 cy.4 cz.4 \
 	dc.4 dcphy.4 ddb.4 de.4 diskmap.4 divert.4 drm.4 dsxrtc.4 dt.4 \
@@ -31,9 +32,10 @@ MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	eap.4 ec.4 eephy.4 ef.4 eg.4 ehci.4 eisa.4 el.4 em.4 emc.4 gcu.4 \
 	emu.4 enc.4 endrun.4 envy.4 eoip.4 ep.4 epic.4 esa.4 escodec.4 \
 	eso.4 ess.4 et.4 etherip.4 etphy.4 ex.4 exphy.4 exrtc.4 \
-	fanpwr.4 fd.4 fdc.4 fec.4 fido.4 fins.4 fintek.4 fms.4 fusbtc.4 fuse.4 \
-	fxp.4 gdt.4 gentbi.4 gem.4 gif.4 \
-	glenv.4 glkgpio.4 gpio.4 gpiodcf.4 gpioiic.4 gpioow.4 gre.4 gscsio.4 \
+	fanpwr.4 fd.4 fdc.4 fec.4 fido.4 fins.4 fintek.4 fms.4 fusbtc.4 \
+	fuse.4 fxp.4 \
+	gdt.4 gentbi.4 gem.4 gfrtc.4 gif.4 glenv.4 glkgpio.4 gpio.4 gpiodcf.4 \
+	gpioiic.4 gpioow.4 graphaudio.4 gre.4 gscsio.4 \
 	hds.4 hiclock.4 hidwusb.4 hifn.4 hil.4 hilid.4 hilkbd.4 hilms.4 \
 	hireset.4 hitemp.4 hme.4 hotplug.4 hsq.4 \
 	hvn.4 hvs.4 hyperv.4 \

@@ -1,4 +1,4 @@
-/*	$Id: sender.c,v 1.26 2020/11/24 16:54:44 claudio Exp $ */
+/*	$Id: sender.c,v 1.28 2021/04/05 18:17:37 deraadt Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -350,7 +350,7 @@ send_dl_enqueue(struct sess *sess, struct send_dlq *q,
  * It queues requests for updates as soon as it receives them.
  * Returns zero on failure, non-zero on success.
  *
- * Pledges: stdio, rpath, unveil.
+ * Pledges: stdio, getpw, rpath.
  */
 int
 rsync_sender(struct sess *sess, int fdin,
@@ -370,7 +370,7 @@ rsync_sender(struct sess *sess, int fdin,
 	size_t		    wbufpos = 0, wbufsz = 0, wbufmax = 0;
 	ssize_t		    ssz;
 
-	if (pledge("stdio getpw rpath unveil", NULL) == -1) {
+	if (pledge("stdio getpw rpath", NULL) == -1) {
 		ERR("pledge");
 		return 0;
 	}
@@ -395,7 +395,7 @@ rsync_sender(struct sess *sess, int fdin,
 	/* Client sends zero-length exclusions if deleting. */
 
 	if (!sess->opts->server && sess->opts->del &&
-	     !io_write_int(sess, fdout, 0)) {
+	    !io_write_int(sess, fdout, 0)) {
 		ERRX1("io_write_int");
 		goto out;
 	}
@@ -568,8 +568,7 @@ rsync_sender(struct sess *sess, int fdin,
 		if ((pfd[1].revents & POLLOUT) && wbufsz > 0) {
 			assert(pfd[2].fd == -1);
 			assert(wbufsz - wbufpos);
-			ssz = write(fdout,
-				wbuf + wbufpos, wbufsz - wbufpos);
+			ssz = write(fdout, wbuf + wbufpos, wbufsz - wbufpos);
 			if (ssz == -1) {
 				ERR("write");
 				goto out;

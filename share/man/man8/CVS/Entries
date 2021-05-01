@@ -25,7 +25,6 @@ D/man8.octeon////
 D/man8.sgi////
 D/man8.sparc64////
 D/man8.powerpc64////
-/Makefile/1.100/Fri Dec 18 08:57:36 2020//
 /daily.8/1.29/Fri Dec 18 08:57:36 2020//
 /diskless.8/1.70/Fri Dec 18 08:57:36 2020//
 /netstart.8/1.25/Fri Dec 18 08:57:36 2020//
@@ -34,3 +33,5 @@ D/man8.powerpc64////
 /rc.d.8/1.36/Tue Mar  9 08:12:22 2021//
 /rc.subr.8/1.38/Tue Mar  9 08:12:22 2021//
 /ssl.8/1.69/Tue Mar  9 08:12:22 2021//
+/Makefile/1.101/Sat May  1 08:33:45 2021//
+D/man8.riscv64////
