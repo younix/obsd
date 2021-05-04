@@ -1435,10 +1435,8 @@ upper(s)
 {
 	char *p;
 
-	for (p = s; *p; p++) {
-		if (islower((unsigned char)*p))
-			*p = (char)toupper((unsigned char)*p);
-	}
+	for (p = s; *p; p++)
+		*p = (char)toupper((unsigned char)*p);
 }
 
 static void
