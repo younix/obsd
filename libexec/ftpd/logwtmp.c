@@ -54,7 +54,7 @@ static int fd = -1;
  * after login, but before logout).
  */
 void
-ftpdlogwtmp(char *line, char *name, char *host)
+ftpdlogwtmp(const char *line, const char *name, const char *host)
 {
 	struct timeval tv;
 	struct stat buf;
