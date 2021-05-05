@@ -17,7 +17,7 @@ LSDIR	= ${.CURDIR}/../../bin/ls
 SRCS	+= ls.c cmp.c print.c util.c utf8.c
 CFLAGS	+= -I${.CURDIR} -I${LSDIR}
 
-LDADD+=	-lutil
+LDADD+=	-lutil -ltls
 DPADD+=	${LIBUTIL}
 
 .include <bsd.prog.mk>

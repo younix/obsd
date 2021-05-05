@@ -94,6 +94,7 @@
 #include <string.h>
 #include <syslog.h>
 #include <time.h>
+#include <tls.h>
 #include <vis.h>
 #include <unistd.h>
 #include <utmp.h>
@@ -155,6 +156,9 @@ static struct utmp utmp;	/* for utmp */
 static	login_cap_t *lc;
 static	auth_session_t *as;
 static	volatile sig_atomic_t recvurg;
+struct tls *tls = NULL;
+struct tls *cctx = NULL;
+struct tls_config *tls_config;
 
 int epsvall = 0;
 
@@ -228,7 +232,7 @@ curdir(void)
 	return (guest ? path+1 : path);
 }
 
-char *argstr = "AdDhnlm:MSt:T:u:PUvW46";
+char *argstr = "AdDhnlm:MsSt:T:u:PUvW46";
 
 static void
 usage(void)
@@ -298,6 +302,17 @@ main(int argc, char *argv[])
 
 		case 'n':
 			anon_ok = 0;
+			break;
+
+		case 's':
+			if (tls == NULL) {
+				tls_init();
+				tls = tls_server();
+			}
+			if (tls == NULL) {
+				syslog(LOG_ERR, "could not setup tls");
+				exit(2);
+			}
 			break;
 
 		case 'S':
@@ -410,7 +425,19 @@ main(int argc, char *argv[])
 		hints.ai_socktype = SOCK_STREAM;
 		hints.ai_protocol = IPPROTO_TCP;
 		hints.ai_flags = AI_PASSIVE;
-		error = getaddrinfo(NULL, "ftp", &hints, &res0);
+		if (tls != NULL) {
+			error = getaddrinfo(NULL, "ftps", &hints, &res0);
+			tls_config = tls_config_new();
+
+			if (tls_config_set_cert_file(tls_config,
+			    "/etc/ssl/server.crt") == -1)
+
+			if (tls_config_set_key_file(tls_config,
+			    "/etc/ssl/private/server.key") == -1)
+
+			tls_configure(tls, tls_config);
+		} else
+			error = getaddrinfo(NULL, "ftp", &hints, &res0);
 		if (error) {
 			syslog(LOG_ERR, "%s", gai_strerror(error));
 			exit(1);
@@ -510,6 +537,15 @@ main(int argc, char *argv[])
 		if (getpeername(0, (struct sockaddr *)&his_addr,
 		    &addrlen) == -1) {
 			/* syslog(LOG_ERR, "getpeername (%s): %m", argv[0]); */
+			exit(1);
+		}
+	}
+
+	if (tls) {
+		tls_accept_fds(tls, &cctx, STDIN_FILENO, STDOUT_FILENO);
+		if (tls_handshake(cctx) == -1) {
+			/* TODO: add client info to log message */
+			syslog(LOG_ERR, "tls handshake failed");
 			exit(1);
 		}
 	}
@@ -1949,16 +1985,30 @@ reply_r(int n, const char *fmt, ...)
 }
 
 void
+ftp_send(const char *buf)
+{
+	if (cctx == NULL) {
+		fputs(buf, stdout);
+		(void)fflush(stdout);
+	} else {
+		tls_write(cctx, buf, strlen(buf));
+	}
+}
+
+void
 lreply(int n, const char *fmt, ...)
 {
+	char buf[BUFSIZ];
+	char msg[BUFSIZ];
 	va_list ap;
 
 	va_start(ap, fmt);
-	(void)printf("%d- ", n);
-	(void)vprintf(fmt, ap);
+	(void)vsnprintf(msg, sizeof msg, fmt, ap);
 	va_end(ap);
-	(void)printf("\r\n");
-	(void)fflush(stdout);
+
+	(void)snprintf(buf, sizeof buf, "%d- %s\r\n", n, msg);
+	ftp_send(buf);
+
 	if (debug) {
 		va_start(ap, fmt);
 		syslog(LOG_DEBUG, "<--- %d- ", n);

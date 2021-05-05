@@ -39,10 +39,10 @@ regress:
 .endif
 
 setup-ftpd:
-${SUDO} pkill tcpserver || true
-${SUDO} pkill ftpd || true
-# start ftpd
-	${SUDO} ${TCPSERVER} 127.0.0.1 21 ${KTRACE} ${FTPD} -Ad & \
+	${SUDO} pkill tcpserver || true
+	${SUDO} pkill ftpd || true
+	# start ftpd
+	${SUDO} ${TCPSERVER} 127.0.0.1 21 ${KTRACE} ${FTPD} -A -d & \
 	    timeout=$$(($$(date +%s) + 5)); \
 	    while fstat -p $$! | ! grep -q 'tcp .* 127.0.0.1:21$$'; \
 		do test $$(date +%s) -lt $$timeout || exit 1; done
