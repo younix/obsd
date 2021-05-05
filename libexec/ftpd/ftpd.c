@@ -568,7 +568,6 @@ main(int argc, char *argv[])
 			line[strcspn(line, "\n")] = '\0';
 			lreply(530, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 		reply(530, "System not available.");
 		exit(0);
@@ -578,7 +577,6 @@ main(int argc, char *argv[])
 			line[strcspn(line, "\n")] = '\0';
 			lreply(220, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 		/* reply(220,) must follow */
 	}
@@ -1078,7 +1076,6 @@ pass(char *passwd)
 			line[strcspn(line, "\n")] = '\0';
 			lreply(230, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 	}
 	free(motd);
@@ -2029,7 +2026,6 @@ cwd(char *path)
 				line[strcspn(line, "\n")] = '\0';
 				lreply(250, "%s", line);
 			}
-			(void) fflush(stdout);
 			(void) fclose(message);
 		}
 		ack("CWD");
