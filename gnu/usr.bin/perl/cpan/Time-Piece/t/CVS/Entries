@@ -6,9 +6,9 @@
 /06subclass.t/1.3/Mon Dec 30 02:13:48 2019/-ko/
 /07arith.t/1.1.1.3/Wed Feb 13 21:11:22 2019/-ko/
 D/lib////
-/02core_dst.t/1.3/Tue Mar  9 08:11:57 2021/-ko/
-/06large.t/1.1.1.1/Mon Mar  1 23:15:38 2021/-ko/
-/08truncate.t/1.1.1.1/Mon Mar  1 23:15:38 2021/-ko/
-/09locales.t/1.1.1.1/Mon Mar  1 23:15:38 2021/-ko/
-/10overload.t/1.1.1.1/Mon Mar  1 23:15:38 2021/-ko/
-/99legacy.t/1.1.1.1/Mon Mar  1 23:15:38 2021/-ko/
+/02core_dst.t/1.3/Sat May  1 08:41:49 2021/-ko/
+/06large.t/1.1.1.1/Sat May  1 08:41:49 2021/-ko/
+/08truncate.t/1.1.1.1/Sat May  1 08:41:49 2021/-ko/
+/09locales.t/1.1.1.1/Sat May  1 08:41:49 2021/-ko/
+/10overload.t/1.1.1.1/Sat May  1 08:41:49 2021/-ko/
+/99legacy.t/1.1.1.1/Sat May  1 08:41:49 2021/-ko/

@@ -16,10 +16,10 @@
 /vm_machdep.c/1.83/Sun Jul 16 22:47:37 2017//
 /wscons_machdep.c/1.7/Tue Oct  5 19:27:55 2004//
 /pmap.c/1.174/Mon Jun  1 06:23:24 2020//
-/conf.c/1.71/Sun Jan 24 00:20:10 2021//
-/locore.S/1.203/Fri Feb 26 10:30:09 2021//
-/intr.c/1.51/Fri Mar 12 08:59:01 2021//
-/machdep.c/1.264/Fri Mar 12 08:59:01 2021//
-/mainbus.c/1.89/Fri Mar 12 08:59:01 2021//
-/trap.c/1.153/Fri Mar 12 08:59:01 2021//
+/conf.c/1.71/Sat May  1 08:41:51 2021//
+/intr.c/1.51/Sat May  1 08:41:51 2021//
+/locore.S/1.203/Sat May  1 08:41:51 2021//
+/machdep.c/1.264/Sat May  1 08:41:51 2021//
+/mainbus.c/1.89/Sat May  1 08:41:51 2021//
+/trap.c/1.153/Sat May  1 08:41:51 2021//
 D

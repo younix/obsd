@@ -12,8 +12,8 @@ D/loongson////
 D/luna88k////
 D/macppc////
 D/octeon////
-D/sgi////
 D/sparc64////
 D/powerpc64////
-/Makefile/1.49/Fri Dec 11 17:58:09 2020//
 /m4.common/1.130/Fri Dec 11 17:58:09 2020//
+/Makefile/1.50/Wed May  5 14:27:51 2021//
+D/riscv64////

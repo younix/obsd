@@ -14,14 +14,14 @@
 /pcmciareg.h/1.7/Sat Sep  4 12:59:27 2010//
 /pcmciavar.h/1.21/Sat Sep  4 12:59:27 2010//
 /if_malo.c/1.96/Fri Dec 11 17:58:24 2020//
-/aic_pcmcia.c/1.18/Tue Mar  9 08:12:28 2021//
-/com_pcmcia.c/1.58/Tue Mar  9 08:12:28 2021//
-/if_ep_pcmcia.c/1.49/Tue Mar  9 08:12:28 2021//
-/if_ne_pcmcia.c/1.100/Tue Mar  9 08:12:28 2021//
-/if_sm_pcmcia.c/1.38/Tue Mar  9 08:12:28 2021//
-/if_xe.c/1.61/Tue Mar  9 08:12:28 2021//
-/pcmcia.c/1.49/Tue Mar  9 08:12:28 2021//
-/pcmcia_cis.c/1.22/Tue Mar  9 08:12:28 2021//
-/pcmcia_cis_quirks.c/1.15/Tue Mar  9 08:12:28 2021//
-/wdc_pcmcia.c/1.33/Tue Mar  9 08:12:28 2021//
+/aic_pcmcia.c/1.18/Sat May  1 08:41:51 2021//
+/com_pcmcia.c/1.58/Sat May  1 08:41:51 2021//
+/if_ep_pcmcia.c/1.49/Sat May  1 08:41:51 2021//
+/if_ne_pcmcia.c/1.100/Sat May  1 08:41:51 2021//
+/if_sm_pcmcia.c/1.38/Sat May  1 08:41:51 2021//
+/if_xe.c/1.61/Sat May  1 08:41:51 2021//
+/pcmcia.c/1.49/Sat May  1 08:41:51 2021//
+/pcmcia_cis.c/1.22/Sat May  1 08:41:51 2021//
+/pcmcia_cis_quirks.c/1.15/Sat May  1 08:41:51 2021//
+/wdc_pcmcia.c/1.33/Sat May  1 08:41:51 2021//
 D

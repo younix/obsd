@@ -3,9 +3,9 @@
 /nslookup.1/1.1/Fri Feb  7 09:58:52 2020//
 D/lib////
 /Makefile/1.4/Thu Dec 17 19:39:59 2020//
-/dig.h/1.15/Fri Dec 18 08:57:37 2020//
-/host.c/1.17/Fri Dec 18 08:57:37 2020//
-/nslookup.c/1.13/Fri Dec 18 08:57:37 2020//
-/dig.c/1.19/Sun Jan 24 00:20:10 2021//
-/dighost.c/1.37/Sun Jan 24 00:20:10 2021//
-/dig.1/1.5/Fri Mar 12 08:59:07 2021//
+/dig.1/1.5/Sat May  1 08:41:52 2021//
+/dig.c/1.19/Sat May  1 08:41:52 2021//
+/dig.h/1.15/Sat May  1 08:41:52 2021//
+/dighost.c/1.37/Sat May  1 08:41:52 2021//
+/host.c/1.17/Sat May  1 08:41:52 2021//
+/nslookup.c/1.13/Sat May  1 08:41:52 2021//

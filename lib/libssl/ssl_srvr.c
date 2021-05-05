@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.105 2021/04/30 19:26:45 jsing Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.108 2021/05/02 17:46:58 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -641,27 +641,22 @@ ssl3_accept(SSL *s)
 
 		case SSL3_ST_SW_CHANGE_A:
 		case SSL3_ST_SW_CHANGE_B:
-			s->session->cipher = S3I(s)->hs.cipher;
-			if (!tls1_setup_key_block(s)) {
-				ret = -1;
-				goto end;
-			}
-
 			ret = ssl3_send_change_cipher_spec(s,
 			    SSL3_ST_SW_CHANGE_A, SSL3_ST_SW_CHANGE_B);
 			if (ret <= 0)
 				goto end;
 			S3I(s)->hs.state = SSL3_ST_SW_FINISHED_A;
 			s->internal->init_num = 0;
+			s->session->cipher = S3I(s)->hs.cipher;
 
-			if (!tls1_change_cipher_state(s,
-			    SSL3_CHANGE_CIPHER_SERVER_WRITE)) {
+			if (!tls1_setup_key_block(s)) {
 				ret = -1;
 				goto end;
 			}
-
-			if (SSL_is_dtls(s))
-				dtls1_reset_seq_numbers(s, SSL3_CC_WRITE);
+			if (!tls1_change_write_cipher_state(s)) {
+				ret = -1;
+				goto end;
+			}
 			break;
 
 		case SSL3_ST_SW_FINISHED_A:

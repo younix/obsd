@@ -8,18 +8,17 @@ major	{ sd = 0 }
 #major	{ wd = 4 }
 major	{ rd = 8 }
 
-file	dev/cninit.c
-
 file	arch/riscv64/riscv64/autoconf.c
 file	arch/riscv64/riscv64/ast.c
 file	arch/riscv64/riscv64/bus_space.c
 file	arch/riscv64/riscv64/bus_dma.c
+file	arch/riscv64/riscv64/clock.c
 file	arch/riscv64/riscv64/conf.c
 file	arch/riscv64/riscv64/disksubr.c		disk
 file	arch/riscv64/riscv64/locore.S
 file	arch/riscv64/riscv64/copy.S
 file	arch/riscv64/riscv64/copystr.S
-file	arch/riscv64/riscv64/trap.S
+file	arch/riscv64/riscv64/exception.S
 file	arch/riscv64/riscv64/cpuswitch.S
 file	arch/riscv64/riscv64/machdep.c
 file	arch/riscv64/riscv64/intr.c
@@ -32,7 +31,7 @@ file	arch/riscv64/riscv64/softintr.c
 file	arch/riscv64/riscv64/support.S
 file	arch/riscv64/riscv64/syscall.c
 file	arch/riscv64/riscv64/pagezero.S
-file	arch/riscv64/riscv64/trap_machdep.c
+file	arch/riscv64/riscv64/trap.c
 file	arch/riscv64/riscv64/sbi.c
 file	arch/riscv64/riscv64/cpufunc_asm.S
 file	arch/riscv64/riscv64/fpu.c
@@ -61,13 +60,6 @@ define	cpu {}
 device	cpu
 attach	cpu at mainbus
 file	arch/riscv64/riscv64/cpu.c		cpu
-
-#
-# timer
-#
-device	timer
-attach	timer at cpu
-file	arch/riscv64/dev/timer.c		timer
 
 #
 # HART-specific interrupt controller

@@ -20,7 +20,6 @@
 /as.h/1.2/Sun Apr 24 20:19:24 2011//
 /asintl.h/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /atof-generic.c/1.1.1.1/Sun Apr 24 20:14:44 2011//
-/bfin-lex.c/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /bfin-parse.c/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /bfin-parse.h/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /bignum.h/1.1.1.1/Sun Apr 24 20:14:44 2011//
@@ -89,4 +88,5 @@
 D/config////
 D/doc////
 D/po////
-/dwarf2dbg.h/1.2/Wed Feb  3 13:04:23 2021//
+/bfin-lex.c/1.2/Wed May  5 14:30:34 2021//
+/dwarf2dbg.h/1.2/Sat May  1 08:41:48 2021//

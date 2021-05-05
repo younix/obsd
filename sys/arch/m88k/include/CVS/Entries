@@ -2,7 +2,6 @@
 /_types.h/1.18/Mon Mar  5 01:15:25 2018//
 /asm.h/1.15/Fri May 27 16:32:38 2016//
 /asm_macro.h/1.10/Sat Mar 29 18:09:29 2014//
-/atomic.h/1.14/Wed Aug 22 11:25:58 2018//
 /cdefs.h/1.6/Thu Mar 28 17:30:45 2013//
 /cmmu.h/1.32/Sat Nov 16 18:45:20 2013//
 /db_machdep.h/1.19/Wed Apr 27 11:10:48 2016//
@@ -38,5 +37,6 @@
 /tcb.h/1.6/Wed Dec 11 07:21:40 2019//
 /vmparam.h/1.20/Sun Nov  1 20:10:00 2015//
 /cpu.h/1.68/Mon Jun  1 06:23:24 2020//
-/trap.h/1.12/Fri Dec 18 08:57:37 2020//
+/atomic.h/1.15/Wed May  5 14:31:13 2021//
+/trap.h/1.12/Sat May  1 08:41:51 2021//
 D

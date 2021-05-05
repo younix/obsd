@@ -1,6 +1,5 @@
 /_float.h/1.1/Tue Jun 26 16:12:44 2012//
 /_types.h/1.23/Mon Mar  5 01:15:25 2018//
-/arcbios.h/1.25/Fri Feb  6 22:11:49 2015//
 /archtype.h/1.16/Wed Oct  3 21:44:51 2012//
 /atomic.h/1.12/Mon Oct 28 09:41:37 2019//
 /autoconf.h/1.2/Thu Jun  8 12:02:52 2017//
@@ -24,10 +23,8 @@
 /mplock.h/1.2/Sat Oct 21 06:11:22 2017//
 /mutex.h/1.5/Thu Jan 25 15:06:29 2018//
 /param.h/1.36/Fri Sep 14 13:58:20 2018//
-/pmap.h/1.48/Wed Aug 21 16:14:34 2019//
 /proc.h/1.11/Thu Apr 13 03:52:25 2017//
 /profile.h/1.5/Fri Apr 19 09:19:22 2019//
-/pte.h/1.22/Fri Apr 26 16:27:36 2019//
 /ptrace.h/1.3/Wed Mar 23 16:54:36 2011//
 /reg.h/1.3/Wed Mar 23 16:54:36 2011//
 /regdef.h/1.5/Mon Mar 10 21:10:36 2014//
@@ -40,10 +37,12 @@
 /tcb.h/1.4/Thu Apr 20 16:07:52 2017//
 /trap.h/1.16/Wed Apr  9 21:10:34 2014//
 /vmparam.h/1.29/Fri Dec 23 12:38:16 2016//
-/cpu.h/1.130/Fri Dec 11 17:58:22 2020//
-/mips_cpu.h/1.9/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.3/Fri Dec 11 17:58:22 2020//
-/asm.h/1.26/Fri Mar 12 08:59:02 2021//
-/frame.h/1.8/Sat May  1 08:33:49 2021//
-/pcb.h/1.9/Sat May  1 08:33:49 2021//
+/asm.h/1.27/Wed May  5 14:31:13 2021//
+/cpu.h/1.131/Wed May  5 14:31:13 2021//
+/frame.h/1.8/Sat May  1 08:41:51 2021//
+/mips_cpu.h/1.10/Wed May  5 14:31:13 2021//
+/pcb.h/1.9/Sat May  1 08:41:51 2021//
+/pmap.h/1.49/Wed May  5 14:31:13 2021//
+/pte.h/1.23/Wed May  5 14:31:13 2021//
 D

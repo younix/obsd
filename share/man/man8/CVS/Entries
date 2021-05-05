@@ -25,13 +25,13 @@ D/man8.octeon////
 D/man8.sgi////
 D/man8.sparc64////
 D/man8.powerpc64////
-/daily.8/1.29/Fri Dec 18 08:57:36 2020//
-/diskless.8/1.70/Fri Dec 18 08:57:36 2020//
-/netstart.8/1.25/Fri Dec 18 08:57:36 2020//
 /release.8/1.96/Thu Dec 17 19:39:58 2020//
-/afterboot.8/1.168/Sun Jan 24 00:20:10 2021//
-/rc.d.8/1.36/Tue Mar  9 08:12:22 2021//
-/rc.subr.8/1.38/Tue Mar  9 08:12:22 2021//
-/ssl.8/1.69/Tue Mar  9 08:12:22 2021//
-/Makefile/1.101/Sat May  1 08:33:45 2021//
 D/man8.riscv64////
+/Makefile/1.102/Wed May  5 14:31:11 2021//
+/afterboot.8/1.168/Sat May  1 08:41:50 2021//
+/daily.8/1.29/Sat May  1 08:41:50 2021//
+/diskless.8/1.71/Wed May  5 14:31:11 2021//
+/netstart.8/1.25/Sat May  1 08:41:50 2021//
+/rc.d.8/1.36/Sat May  1 08:41:50 2021//
+/rc.subr.8/1.38/Sat May  1 08:41:50 2021//
+/ssl.8/1.69/Sat May  1 08:41:50 2021//

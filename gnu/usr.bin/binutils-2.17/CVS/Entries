@@ -7,8 +7,6 @@
 /config-ml.in/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /config.guess/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /config.sub/1.1.1.1/Sun Apr 24 20:14:40 2011//
-/configure/1.4/Mon May 25 12:42:54 2015//
-/configure.in/1.4/Mon May 25 12:42:54 2015//
 /gettext.m4/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /install-sh/1.1.1.1/Sun Apr 24 20:14:40 2011//
 /libtool.m4/1.1.1.1/Sun Apr 24 20:14:40 2011//
@@ -39,4 +37,6 @@ D/intl////
 D/ld////
 D/opcodes////
 D/texinfo////
-/Makefile.bsd-wrapper/1.21/Mon Jun  1 06:22:54 2020//
+/Makefile.bsd-wrapper/1.22/Wed May  5 14:30:34 2021//
+/configure/1.5/Wed May  5 14:30:34 2021//
+/configure.in/1.5/Wed May  5 14:30:34 2021//

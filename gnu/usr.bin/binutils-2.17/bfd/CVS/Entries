@@ -9,8 +9,6 @@
 /ChangeLog-9697/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /ChangeLog-9899/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /MAINTAINERS/1.1.1.1/Sun Apr 24 20:14:41 2011//
-/Makefile.am/1.3/Wed Jan 25 08:56:07 2017//
-/Makefile.in/1.6/Mon Sep 11 10:18:38 2017//
 /PORTING/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /README/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /TODO/1.1.1.1/Sun Apr 24 20:14:41 2011//
@@ -32,10 +30,8 @@
 /aoutx.h/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /archive.c/1.4/Mon Feb 27 07:13:54 2017//
 /archive64.c/1.3/Sun Apr  2 04:01:52 2017//
-/archures.c/1.3/Wed Jan 25 08:56:07 2017//
 /armnetbsd.c/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /bfd-in.h/1.3/Mon Feb 27 07:13:54 2017//
-/bfd-in2.h/1.10/Mon Feb 27 07:13:54 2017//
 /bfd.c/1.2/Sat Aug  9 22:34:35 2014//
 /bfd.m4/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /bfdio.c/1.2/Fri Apr 19 23:20:53 2013//
@@ -86,7 +82,6 @@
 /cofflink.c/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /coffswap.h/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /config.in/1.1.1.1/Sun Apr 24 20:14:41 2011//
-/configure/1.5/Wed Jan 25 08:56:07 2017//
 /configure.com/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /configure.host/1.1.1.1/Sun Apr 24 20:14:41 2011//
 /configure.in/1.3/Mon Jun  1 19:03:10 2015//
@@ -358,7 +353,6 @@
 /sunos.c/1.1.1.1/Sun Apr 24 20:14:42 2011//
 /syms.c/1.1.1.1/Sun Apr 24 20:14:42 2011//
 /sysdep.h/1.1.1.1/Sun Apr 24 20:14:42 2011//
-/targets.c/1.5/Wed Jan 25 08:56:08 2017//
 /targmatch.sed/1.1.1.1/Sun Apr 24 20:14:42 2011//
 /tekhex.c/1.1.1.1/Sun Apr 24 20:14:42 2011//
 /ticoff.h/1.1.1.1/Sun Apr 24 20:14:42 2011//
@@ -384,7 +378,15 @@
 D/doc////
 D/hosts////
 D/po////
-/config.bfd/1.8/Mon Jun  1 06:22:54 2020//
 /elf64-ppc.c/1.3/Fri Dec 11 17:58:18 2020//
 /elf64-x86-64.c/1.8/Fri Dec 11 17:58:18 2020//
 /elfxx-mips.c/1.9/Thu Dec 17 19:39:57 2020//
+/Makefile.am/1.4/Wed May  5 14:30:34 2021//
+/Makefile.in/1.7/Wed May  5 14:30:34 2021//
+/archures.c/1.4/Wed May  5 14:30:34 2021//
+/bfd-in2.h/1.11/Wed May  5 14:30:34 2021//
+/config.bfd/1.9/Wed May  5 14:30:34 2021//
+/configure/1.6/Wed May  5 14:30:34 2021//
+/cpu-riscv64.c/1.1/Wed May  5 04:52:39 2021//
+/elf64-riscv.c/1.1/Wed May  5 04:52:39 2021//
+/targets.c/1.6/Wed May  5 14:30:34 2021//
