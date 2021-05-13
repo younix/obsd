@@ -24,25 +24,25 @@ FTPDIR != getent passwd ftp | cut -d: -f6
 
 .if empty(FTPDIR)
 regress:
-	@echo user ftp is required in /etc/passwd for this regress
-	@echo SKIPPED
+@echo user ftp is required in /etc/passwd for this regress
+@echo SKIPPED
 .elif ! exists(${FTPDIR})
 regress:
-	@echo user ftp needs existing home directory ${FTPDIR} for this regress
-	@echo SKIPPED
+@echo user ftp needs existing home directory ${FTPDIR} for this regress
+@echo SKIPPED
 .endif
 
 .if ! exists(${TCPSERVER})
 regress:
-	@echo package ucspi-tcp is required for this regress
-	@echo SKIPPED
+@echo package ucspi-tcp is required for this regress
+@echo SKIPPED
 .endif
 
 setup-ftpd:
-	${SUDO} pkill tcpserver || true
-	${SUDO} pkill ftpd || true
-	# start ftpd
-	${SUDO} ${TCPSERVER} 127.0.0.1 21 ${KTRACE} ${FTPD} -A & \
+${SUDO} pkill tcpserver || true
+${SUDO} pkill ftpd || true
+# start ftpd
+	${SUDO} ${TCPSERVER} 127.0.0.1 21 ${KTRACE} ${FTPD} -Ad & \
 	    timeout=$$(($$(date +%s) + 5)); \
 	    while fstat -p $$! | ! grep -q 'tcp .* 127.0.0.1:21$$'; \
 		do test $$(date +%s) -lt $$timeout || exit 1; done
