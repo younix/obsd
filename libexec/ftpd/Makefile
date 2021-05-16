@@ -15,7 +15,7 @@ CLEANFILES+=y.tab.c
 LSDIR	= ${.CURDIR}/../../bin/ls
 .PATH:	${LSDIR}
 SRCS	+= ls.c cmp.c print.c util.c utf8.c
-CFLAGS	+= -I${.CURDIR} -I${LSDIR}
+CFLAGS	+= -I${.CURDIR} -I${LSDIR} -g
 
 LDADD+=	-lutil -ltls
 DPADD+=	${LIBUTIL}

@@ -157,7 +157,7 @@ static	login_cap_t *lc;
 static	auth_session_t *as;
 static	volatile sig_atomic_t recvurg;
 struct tls *tls = NULL;
-struct tls *cctx = NULL;
+struct tls *cctx = NULL;	/* tls client context */
 struct tls_config *tls_config;
 
 int epsvall = 0;
@@ -431,11 +431,14 @@ main(int argc, char *argv[])
 
 			if (tls_config_set_cert_file(tls_config,
 			    "/etc/ssl/server.crt") == -1)
+				exit(3);	/* TODO: error message  */
 
 			if (tls_config_set_key_file(tls_config,
 			    "/etc/ssl/private/server.key") == -1)
+				exit(3);	/* TODO: error message  */
 
-			tls_configure(tls, tls_config);
+			if (tls_configure(tls, tls_config) == -1)
+				exit(3);	/* TODO: error message  */
 		} else
 			error = getaddrinfo(NULL, "ftp", &hints, &res0);
 		if (error) {
@@ -542,7 +545,14 @@ main(int argc, char *argv[])
 	}
 
 	if (tls) {
-		tls_accept_fds(tls, &cctx, STDIN_FILENO, STDOUT_FILENO);
+syslog(LOG_ERR, "tls_accept_fds");
+		if (tls_accept_fds(tls, &cctx, STDIN_FILENO, STDOUT_FILENO) == -1) {
+			/* TODO: add client info to log message */
+			syslog(LOG_ERR, "tls handshake failed");
+			exit(1);
+		}
+
+syslog(LOG_ERR, "tls_handshake");
 		if (tls_handshake(cctx) == -1) {
 			/* TODO: add client info to log message */
 			syslog(LOG_ERR, "tls handshake failed");
@@ -604,7 +614,6 @@ main(int argc, char *argv[])
 			line[strcspn(line, "\n")] = '\0';
 			lreply(530, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 		reply(530, "System not available.");
 		exit(0);
@@ -614,7 +623,6 @@ main(int argc, char *argv[])
 			line[strcspn(line, "\n")] = '\0';
 			lreply(220, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 		/* reply(220,) must follow */
 	}
@@ -1114,7 +1122,6 @@ pass(char *passwd)
 			line[strcspn(line, "\n")] = '\0';
 			lreply(230, "%s", line);
 		}
-		(void) fflush(stdout);
 		(void) fclose(fp);
 	}
 	free(motd);
@@ -1733,7 +1740,7 @@ receive_data(FILE *instr, FILE *outstr)
 			lreply(226,
 			    "WARNING! %d bare linefeeds received in ASCII mode",
 			    bare_lfs);
-			printf("   File may not have transferred correctly.\r\n");
+			ftpd_send("   File may not have transferred correctly.\r\n");
 		}
 		return (0);
 	default:
@@ -1809,31 +1816,31 @@ statcmd(void)
 	lreply(211, "%s FTP server status:", hostname);
 	error = getnameinfo((struct sockaddr *)&his_addr, his_addr.su_len,
 	    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
-	printf("     Connected to %s", remotehost);
+	ftpd_sendf("     Connected to %s", remotehost);
 	if (error == 0 && strcmp(remotehost, hbuf) != 0)
-		printf(" (%s)", hbuf);
-	printf("\r\n");
+		ftpd_sendf(" (%s)", hbuf);
+	ftpd_send("\r\n");
 	if (logged_in) {
 		if (guest)
-			printf("     Logged in anonymously\r\n");
+			ftpd_send("     Logged in anonymously\r\n");
 		else
-			printf("     Logged in as %s\r\n", pw->pw_name);
+			ftpd_sendf("     Logged in as %s\r\n", pw->pw_name);
 	} else if (askpasswd)
-		printf("     Waiting for password\r\n");
+		ftpd_send("     Waiting for password\r\n");
 	else
-		printf("     Waiting for user name\r\n");
-	printf("     TYPE: %s", typenames[type]);
+		ftpd_send("     Waiting for user name\r\n");
+	ftpd_sendf("     TYPE: %s", typenames[type]);
 	if (type == TYPE_A || type == TYPE_E)
-		printf(", FORM: %s", formnames[form]);
+		ftpd_sendf(", FORM: %s", formnames[form]);
 	if (type == TYPE_L)
-		printf(" 8");
-	printf("; STRUcture: %s; transfer MODE: %s\r\n",
+		ftpd_send(" 8");
+	ftpd_sendf("; STRUcture: %s; transfer MODE: %s\r\n",
 	    strunames[stru], modenames[mode]);
 	ispassive = 0;
 	if (data != -1)
-		printf("     Data connection open\r\n");
+		ftpd_send("     Data connection open\r\n");
 	else if (pdata != -1) {
-		printf("     in Passive mode\r\n");
+		ftpd_send("     in Passive mode\r\n");
 		su = (union sockunion *)&pasv_addr;
 		ispassive++;
 		goto printaddr;
@@ -1846,12 +1853,12 @@ printaddr:
 		/* PASV/PORT */
 		if (su->su_family == AF_INET) {
 			if (ispassive)
-				printf("211- PASV ");
+				ftpd_send("211- PASV ");
 			else
-				printf("211- PORT ");
+				ftpd_send("211- PORT ");
 			a = (u_char *)&su->su_sin.sin_addr;
 			p = (u_char *)&su->su_sin.sin_port;
-			printf("(%u,%u,%u,%u,%u,%u)\r\n",
+			ftpd_sendf("(%u,%u,%u,%u,%u,%u)\r\n",
 			    a[0], a[1], a[2], a[3],
 			    p[0], p[1]);
 		}
@@ -1877,13 +1884,13 @@ printaddr:
 		}
 		if (af) {
 			if (ispassive)
-				printf("211- LPSV ");
+				ftpd_send("211- LPSV ");
 			else
-				printf("211- LPRT ");
-			printf("(%u,%llu", af, (unsigned long long)alen);
+				ftpd_send("211- LPRT ");
+			ftpd_sendf("(%u,%llu", af, (unsigned long long)alen);
 			for (i = 0; i < alen; i++)
-				printf(",%u", a[i]);
-			printf(",%u,%u,%u)\r\n", 2, p[0], p[1]);
+				ftpd_sendf(",%u", a[i]);
+			ftpd_sendf(",%u,%u,%u)\r\n", 2, p[0], p[1]);
 		}
 
 		/* EPRT/EPSV */
@@ -1908,15 +1915,15 @@ printaddr:
 			    hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
 			    NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
 				if (ispassive)
-					printf("211- EPSV ");
+					ftpd_send("211- EPSV ");
 				else
-					printf("211- EPRT ");
-				printf("(|%u|%s|%s|)\r\n",
+					ftpd_send("211- EPRT ");
+				ftpd_sendf("(|%u|%s|%s|)\r\n",
 				    af, hbuf, pbuf);
 			}
 		}
 	} else
-		printf("     No data connection\r\n");
+		ftpd_send("     No data connection\r\n");
 	reply(211, "End of status");
 }
 
@@ -1941,18 +1948,16 @@ reply(int n, const char *fmt, ...)
 	rval = vasprintf(&buf, fmt, ap);
 	va_end(ap);
 	if (rval == -1 || buf == NULL) {
-		printf("421 Local resource failure: malloc\r\n");
-		fflush(stdout);
+		ftpd_send("421 Local resource failure: malloc\r\n");
 		dologout(1);
 	}
 	next = buf;
 	while ((p = strsep(&next, "\n\r"))) {
-		printf("%d%s %s\r\n", n, (next != NULL) ? "-" : "", p);
+		ftpd_sendf("%d%s %s\r\n", n, (next != NULL) ? "-" : "", p);
 		if (debug)
 			syslog(LOG_DEBUG, "<--- %d%s %s", n,
 			    (next != NULL) ? "-" : "", p);
 	}
-	(void)fflush(stdout);
 	free(buf);
 }
 
@@ -1985,14 +1990,25 @@ reply_r(int n, const char *fmt, ...)
 }
 
 void
-ftp_send(const char *buf)
+ftpd_send(const char *buf)
 {
-	if (cctx == NULL) {
-		fputs(buf, stdout);
-		(void)fflush(stdout);
-	} else {
+	if (cctx != NULL)
 		tls_write(cctx, buf, strlen(buf));
-	}
+	else
+		write(STDOUT_FILENO, buf, strlen(buf));
+}
+
+void
+ftpd_sendf(const char *fmt, ...)
+{
+	char buf[BUFSIZ];
+	va_list ap;
+
+	va_start(ap, fmt);
+	(void)vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+
+	ftpd_send(buf);
 }
 
 void
@@ -2007,7 +2023,7 @@ lreply(int n, const char *fmt, ...)
 	va_end(ap);
 
 	(void)snprintf(buf, sizeof buf, "%d- %s\r\n", n, msg);
-	ftp_send(buf);
+	ftpd_send(buf);
 
 	if (debug) {
 		va_start(ap, fmt);
@@ -2079,7 +2095,6 @@ cwd(char *path)
 				line[strcspn(line, "\n")] = '\0';
 				lreply(250, "%s", line);
 			}
-			(void) fflush(stdout);
 			(void) fclose(message);
 		}
 		ack("CWD");

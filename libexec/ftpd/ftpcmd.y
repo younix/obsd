@@ -1083,6 +1083,9 @@ lookup(p, cmd)
 	return (NULL);
 }
 
+int
+getc(void)
+
 #include <arpa/telnet.h>
 
 /*
@@ -1120,14 +1123,12 @@ get_line(s, n, iop)
 			case WILL:
 			case WONT:
 				c = getc(iop);
-				printf("%c%c%c", IAC, DONT, 0377&c);
-				(void) fflush(stdout);
+				ftpd_sendf("%c%c%c", IAC, DONT, 0377&c);
 				continue;
 			case DO:
 			case DONT:
 				c = getc(iop);
-				printf("%c%c%c", IAC, WONT, 0377&c);
-				(void) fflush(stdout);
+				ftpd_sendf("%c%c%c", IAC, WONT, 0377&c);
 				continue;
 			case IAC:
 				break;
@@ -1472,10 +1473,10 @@ help(ctab, s)
 			columns = 1;
 		lines = (NCMDS + columns - 1) / columns;
 		for (i = 0; i < lines; i++) {
-			printf("   ");
+			ftpd_send("   ");
 			for (j = 0; j < columns; j++) {
 				c = ctab + j * lines + i;
-				printf("%s%c", c->name,
+				ftpd_sendf("%s%c", c->name,
 					c->implemented ? ' ' : '*');
 				if (c + lines >= &ctab[NCMDS])
 					break;
@@ -1485,9 +1486,8 @@ help(ctab, s)
 					w++;
 				}
 			}
-			printf("\r\n");
+			ftpd_send("\r\n");
 		}
-		(void) fflush(stdout);
 		reply(214, "Direct comments to ftp-bugs@%s.", hostname);
 		return;
 	}

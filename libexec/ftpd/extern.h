@@ -100,6 +100,9 @@ void	upper(char *);
 void	user(char *);
 void	yyerror(char *);
 void	toolong(int);
+void	ftpd_send(const char *);
+void	ftpd_sendf(const char *, ...);
+
 
 struct utmp;
 void	ftpd_login(struct utmp *ut);
