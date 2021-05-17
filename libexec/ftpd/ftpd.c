@@ -2179,7 +2179,7 @@ myoob(void)
 	if (!transflag)
 		return;
 	cp = tmpline;
-	ret = get_line(cp, sizeof(tmpline)-1, stdin);
+	ret = get_line(cp, sizeof(tmpline)-1);
 	if (ret == -1) {
 		reply(221, "You could at least say goodbye.");
 		dologout(0);
