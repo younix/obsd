@@ -1,3 +1,5 @@
+/*	$OpenBSD: copy.S,v 1.4 2021/05/15 20:14:05 deraadt Exp $	*/
+
 /*
  * Copyright (c) 2020 Brian Bamsch <bbamsch@google.com>
  * Copyright (c) 2015 Dale Rahn <drahn@dalerahn.com>
@@ -42,7 +44,7 @@ ENTRY(copyin)
 	bltu	a3, a0, .Lcopyiofault_nopcb
 	/* Check that source+len is in userspace. */
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, .Lcopyiofault_nopcb
+	bgtu	a3, a4, .Lcopyiofault_nopcb
 
 	la	a3, .Lcopyiofault_user
 	SWAP_FAULT_HANDLER(a3, a4, a5)
@@ -90,9 +92,9 @@ ENTRY(copyout)
 	bltu	a3, a1, .Lcopyiofault_nopcb
 	/* Check that source+len is in userspace. */
 	li	a4, VM_MAXUSER_ADDRESS
-	bgt	a3, a4, .Lcopyiofault_nopcb
+	bgtu	a3, a4, .Lcopyiofault_nopcb
 
-	la	a4, .Lcopyiofault_user
+	la	a3, .Lcopyiofault_user
 	SWAP_FAULT_HANDLER(a3, a4, a5)
 	ENTER_USER_ACCESS(a4)
 

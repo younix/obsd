@@ -1,3 +1,5 @@
+/*	$OpenBSD: vm_machdep.c,v 1.5 2021/05/16 06:20:29 jsg Exp $	*/
+
 /*-
  * Copyright (c) 1995 Charles M. Hannum.  All rights reserved.
  * Copyright (c) 1982, 1986 The Regents of the University of California.
@@ -38,18 +40,12 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
-#include <sys/malloc.h>
-#include <sys/vnode.h>
 #include <sys/buf.h>
 #include <sys/user.h>
-#include <sys/exec.h>
-#include <sys/ptrace.h>
-#include <sys/signalvar.h>
 
 #include <uvm/uvm_extern.h>
 
 #include <machine/cpu.h>
-#include <machine/reg.h>
 
 /*
  * Finish a fork operation, with process p2 nearly set up.
@@ -180,5 +176,5 @@ vunmapbuf(struct buf *bp, vsize_t len)
 	pmap_update(pmap_kernel());
 	km_free((void *)addr, len, &kv_physwait, &kp_none);
 	bp->b_data = bp->b_saveaddr;
-	bp->b_saveaddr = 0;
+	bp->b_saveaddr = NULL;
 }

@@ -1,3 +1,5 @@
+/*	$OpenBSD: process_machdep.c,v 1.4 2021/05/14 06:48:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
  *
@@ -46,7 +48,6 @@
 
 #include <machine/pcb.h>
 #include <machine/reg.h>
-#include <machine/riscvreg.h>
 
 int
 process_read_regs(struct proc *p, struct reg *regs)
@@ -59,9 +60,9 @@ process_read_regs(struct proc *p, struct reg *regs)
 	regs->r_ra = tf->tf_ra;
 	regs->r_sp = tf->tf_sp;
 	regs->r_gp = tf->tf_gp;
-	regs->r_tp = tf->tf_tp;//following Freebsd 
+	regs->r_tp = tf->tf_tp;//following Freebsd
 	//regs->r_tp = (uint64_t)p->p_addr->u_pcb.pcb_tcb;//XXX why?
-	//XXX freebsd adds the following two fields so we just follow. 
+	//XXX freebsd adds the following two fields so we just follow.
 	regs->r_sepc = tf->tf_sepc;
 	regs->r_sstatus = tf->tf_sstatus;
 
@@ -93,7 +94,7 @@ process_write_regs(struct proc *p, struct reg *regs)
 	tf->tf_ra = regs->r_ra;
 	tf->tf_sp = regs->r_sp;
 	tf->tf_gp = regs->r_gp;
-	tf->tf_tp = regs->r_tp; //XXX 
+	tf->tf_tp = regs->r_tp; //XXX
 	tf->tf_sepc = regs->r_sepc;
 	//p->p_addr->u_pcb.pcb_tcb = (void *)regs->r_tp;//XXX why? freebsd just copied r_tp to tf_tp
 	//XXX should we add r_sepc and sstatus also?

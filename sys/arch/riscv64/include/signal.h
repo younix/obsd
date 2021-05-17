@@ -1,3 +1,5 @@
+/*	$OpenBSD: signal.h,v 1.3 2021/05/13 08:44:18 jsg Exp $	*/
+
 /*-
  * Copyright (c) 1986, 1989, 1991, 1993
  *      The Regents of the University of California.  All rights reserved.
@@ -37,7 +39,7 @@
 
 #include <sys/cdefs.h>
 
-typedef	long sig_atomic_t;
+typedef int sig_atomic_t;
 
 #if __BSD_VISIBLE || __XPG_VISIBLE >= 420
 

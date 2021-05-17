@@ -1,3 +1,5 @@
+/*	$OpenBSD: conf.c,v 1.8 2021/05/14 06:48:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 1994, 1995 Charles M. Hannum.  All rights reserved.
  *
@@ -33,7 +35,6 @@
 #include <sys/disklabel.h>
 #include <sys/ioctl.h>
 #include <sys/tty.h>
-#include <sys/vnode.h>
 
 #include <machine/conf.h>
 
@@ -179,7 +180,7 @@ struct cdevsw	cdevsw[] =
 	cdev_openprom_init(NOPENPROM,openprom),	/* 70: /dev/openprom */
 	cdev_notdef(),			/* 71: was: Cyclades-Z serial port */
 #ifdef USER_PCICONF
-	cdev_pci_init(NPCI,pci),        /* 72: PCI user */
+	cdev_pci_init(NPCI,pci),	/* 72: PCI user */
 #else
 	cdev_notdef(),
 #endif
@@ -201,7 +202,7 @@ struct cdevsw	cdevsw[] =
 	cdev_notdef(),			/* 88: GPIO interface */
 	cdev_vscsi_init(NVSCSI,vscsi),	/* 89: vscsi */
 	cdev_disk_init(1,diskmap),	/* 90: disk mapper */
-	cdev_pppx_init(NPPPX,pppx),     /* 91: pppx */
+	cdev_pppx_init(NPPPX,pppx),	/* 91: pppx */
 	cdev_fuse_init(NFUSE,fuse),	/* 92: fuse */
 	cdev_tun_init(NTUN,tap),	/* 93: Ethernet network tunnel */
 	cdev_notdef(),			/* 94 */

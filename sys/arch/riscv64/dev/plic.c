@@ -1,3 +1,5 @@
+/*	$OpenBSD: plic.c,v 1.6 2021/05/13 19:26:25 kettenis Exp $	*/
+
 /*
  * Copyright (c) 2020, Mars Li <mengshi.li.mars@gmail.com>
  * Copyright (c) 2020, Brian Bamsch <bbamsch@google.com>
@@ -82,8 +84,8 @@ struct plic_intrhand {
  */
 struct plic_irqsrc {
 	TAILQ_HEAD(, plic_intrhand) is_list; /* handler list */
-	int 	is_irq_max;	/* IRQ to mask while handling */
-	int 	is_irq_min;	/* lowest IRQ when shared */
+	int	is_irq_max;	/* IRQ to mask while handling */
+	int	is_irq_min;	/* lowest IRQ when shared */
 };
 
 struct plic_context {
@@ -99,7 +101,7 @@ struct plic_softc {
 	struct plic_irqsrc	*sc_isrcs;
 	struct plic_context	sc_contexts[MAXCPUS];
 	int			sc_ndev;
-	struct interrupt_controller 	sc_intc;
+	struct interrupt_controller	sc_intc;
 };
 struct plic_softc *plic = NULL;
 
@@ -326,7 +328,7 @@ plic_irq_handler(void *frame)
 	pending = bus_space_read_4(sc->sc_iot, sc->sc_ioh,
 			PLIC_CLAIM(sc, cpu));
 
-	if(pending >= sc->sc_ndev) {
+	if (pending >= sc->sc_ndev) {
 		printf("plic0: pending %x\n", pending);
 		return 0;
 	}
@@ -381,10 +383,9 @@ plic_irq_dispatch(uint32_t irq,	void *frame)
 		else
 			arg = frame;
 
-// comment for now, ?!
-//		enable_interrupts();	//XXX allow preemption?
+		intr_enable();
 		handled = ih->ih_func(arg);
-//		disable_interrupts();
+		intr_disable();
 		if (handled)
 			ih->ih_count.ec_count++;
 
@@ -404,12 +405,11 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 {
 	struct plic_softc *sc = plic;
 	struct plic_intrhand *ih;
-	int sie;
+	u_long sie;
 
 	if (irqno < 0 || irqno >= PLIC_MAX_IRQS)
 		panic("plic_intr_establish: bogus irqnumber %d: %s",
-		     irqno, name);
-	sie = disable_interrupts();
+		    irqno, name);
 
 	ih = malloc(sizeof *ih, M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
@@ -418,6 +418,8 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 	ih->ih_flags = level & IPL_FLAGMASK;
 	ih->ih_irq = irqno;
 	ih->ih_name = name;
+
+	sie = intr_disable();
 
 	TAILQ_INSERT_TAIL(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 
@@ -431,7 +433,7 @@ plic_intr_establish(int irqno, int level, int (*func)(void *),
 
 	plic_calc_mask();
 
-	restore_interrupts(sie);
+	intr_restore(sie);
 	return (ih);
 }
 
@@ -448,14 +450,17 @@ plic_intr_disestablish(void *cookie)
 	struct plic_softc *sc = plic;
 	struct plic_intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	int sie;
+	u_long sie;
 
-	sie = disable_interrupts();
+	sie = intr_disable();
+
 	TAILQ_REMOVE(&sc->sc_isrcs[irqno].is_list, ih, ih_list);
 	if (ih->ih_name != NULL)
 		evcount_detach(&ih->ih_count);
+
+	intr_restore(sie);
+
 	free(ih, M_DEVBUF, 0);
-	restore_interrupts(sie);
 }
 
 void
@@ -466,7 +471,7 @@ plic_intr_route(void *cookie, int enable, struct cpu_info *ci)
 
 	int		irq = ih->ih_irq;
 	int		cpu = ci->ci_cpuid;
-	uint32_t 	min_pri = sc->sc_isrcs[irq].is_irq_min;
+	uint32_t	min_pri = sc->sc_isrcs[irq].is_irq_min;
 
 	if (enable == IRQ_ENABLE) {
 		plic_intr_enable_with_pri(irq, min_pri, cpu);
@@ -531,18 +536,18 @@ void
 plic_setipl(int new)
 {
 	struct cpu_info		*ci = curcpu();
-	uint64_t sie;
+	u_long sie;
 
 	/* disable here is only to keep hardware in sync with ci->ci_cpl */
-	sie = disable_interrupts();
+	sie = intr_disable();
 	ci->ci_cpl = new;
 
 	/* higher values are higher priority */
 	plic_set_threshold(ci->ci_cpuid, new);
 
-	restore_interrupts(sie);
+	intr_restore(sie);
 }
- 
+
  /*
   * update the max/min priority for an interrupt src,
   * and enforce the updated priority to plic.
@@ -551,10 +556,10 @@ plic_setipl(int new)
 void
 plic_calc_mask(void)
 {
-	struct cpu_info 	*ci = curcpu();
-	struct plic_softc 	*sc = plic;
-	struct plic_intrhand 	*ih;
-	int 			irq;
+	struct cpu_info		*ci = curcpu();
+	struct plic_softc	*sc = plic;
+	struct plic_intrhand	*ih;
+	int			irq;
 
 	/* PLIC irq 0 is reserved, thus we start from 1 */
 	for (irq = 1; irq <= sc->sc_ndev; irq++) {
@@ -617,7 +622,7 @@ plic_get_cpuid(int intc)
 	 */
 	parent_node = OF_parent(intc);
 	CPU_INFO_FOREACH(cii, ci) {
-		if(ci->ci_node == parent_node)
+		if (ci->ci_node == parent_node)
 			return ci->ci_cpuid;
 	}
 	return -1;
@@ -636,7 +641,7 @@ plic_set_priority(int irq, uint32_t pri)
 	 * is for IPI. They should NEVER be passed to plic.
 	 * So we calculate plic priority in the following way:
 	 */
-	if(pri <= 4 || pri >= 12)//invalid input
+	if (pri <= 4 || pri >= 12)//invalid input
 		prival = 0;//effectively disable this intr source
 	else
 		prival = pri - 4;
@@ -673,7 +678,7 @@ plic_intr_route_grid(int irq, int enable, int cpu)
 	struct plic_softc	*sc = plic;
 	uint32_t		val, mask;
 
-	if(irq == 0)
+	if (irq == 0)
 		return;
 
 	KASSERT(cpu < MAXCPUS);

@@ -36,7 +36,6 @@
 /spl.S/1.17/Tue Jul 10 16:01:26 2018//
 /sys_machdep.c/1.20/Mon Feb 19 08:59:52 2018//
 /ucode.c/1.5/Fri Jun 28 21:54:05 2019//
-/vm_machdep.c/1.43/Tue Aug 21 13:10:13 2018//
 /wscons_machdep.c/1.14/Sat Oct 14 04:44:43 2017//
 /via.c/1.33/Mon Jun  1 06:23:23 2020//
 /efifb.c/1.33/Fri Dec 11 17:58:22 2020//
@@ -55,13 +54,14 @@
 /identcpu.c/1.118/Sat May  1 08:41:51 2021//
 /intr.c/1.55/Sat May  1 08:41:51 2021//
 /locore.S/1.122/Sat May  1 08:41:51 2021//
-/machdep.c/1.274/Wed May  5 14:31:12 2021//
 /mem.c/1.35/Sat May  1 08:41:51 2021//
 /mpbios.c/1.30/Sat May  1 08:41:51 2021//
-/pmap.c/1.141/Sat May  1 08:41:51 2021//
-/trap.c/1.88/Wed May  5 14:31:12 2021//
 /tsc.c/1.23/Sat May  1 08:41:51 2021//
 /vector.S/1.84/Sat May  1 08:41:51 2021//
-/vmm.c/1.280/Sat May  1 08:41:51 2021//
 /vmm_support.S/1.17/Sat May  1 08:41:51 2021//
+/machdep.c/1.274/Wed May  5 15:00:12 2021//
+/pmap.c/1.142/Mon May 17 11:40:30 2021//
+/trap.c/1.88/Wed May  5 15:00:12 2021//
+/vm_machdep.c/1.44/Mon May 17 11:40:30 2021//
+/vmm.c/1.282/Mon May 17 11:40:30 2021//
 D

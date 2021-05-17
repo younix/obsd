@@ -1,4 +1,4 @@
-/* $OpenBSD: ec.h,v 1.22 2021/04/20 17:32:57 tb Exp $ */
+/* $OpenBSD: ec.h,v 1.24 2021/05/10 16:58:19 tb Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -280,12 +280,11 @@ unsigned char *EC_GROUP_get0_seed(const EC_GROUP *x);
 size_t EC_GROUP_get_seed_len(const EC_GROUP *);
 size_t EC_GROUP_set_seed(EC_GROUP *, const unsigned char *, size_t len);
 
-#if defined(LIBRESSL_INTERNAL)
 int EC_GROUP_set_curve(EC_GROUP *group, const BIGNUM *p, const BIGNUM *a,
     const BIGNUM *b, BN_CTX *ctx);
 int EC_GROUP_get_curve(const EC_GROUP *group, BIGNUM *p, BIGNUM *a, BIGNUM *b,
     BN_CTX *ctx);
-#else
+#if !defined(LIBRESSL_INTERNAL)
 /** Sets the parameter of a ec over GFp defined by y^2 = x^3 + a*x + b
  *  \param  group  EC_GROUP object
  *  \param  p      BIGNUM with the prime number
@@ -454,18 +453,19 @@ const EC_METHOD *EC_POINT_method_of(const EC_POINT *point);
  */
 int EC_POINT_set_to_infinity(const EC_GROUP *group, EC_POINT *point);
 
-#if defined(LIBRESSL_INTERNAL)
-
-int EC_POINT_set_Jprojective_coordinates(const EC_GROUP *group, EC_POINT *p,
-    const BIGNUM *x, const BIGNUM *y, const BIGNUM *z, BN_CTX *ctx);
-int EC_POINT_get_Jprojective_coordinates(const EC_GROUP *group,
-    const EC_POINT *p, BIGNUM *x, BIGNUM *y, BIGNUM *z, BN_CTX *ctx);
 int EC_POINT_set_affine_coordinates(const EC_GROUP *group, EC_POINT *p,
     const BIGNUM *x, const BIGNUM *y, BN_CTX *ctx);
 int EC_POINT_get_affine_coordinates(const EC_GROUP *group, const EC_POINT *p,
     BIGNUM *x, BIGNUM *y, BN_CTX *ctx);
 int EC_POINT_set_compressed_coordinates(const EC_GROUP *group, EC_POINT *p,
     const BIGNUM *x, int y_bit, BN_CTX *ctx);
+
+#if defined(LIBRESSL_INTERNAL)
+
+int EC_POINT_set_Jprojective_coordinates(const EC_GROUP *group, EC_POINT *p,
+    const BIGNUM *x, const BIGNUM *y, const BIGNUM *z, BN_CTX *ctx);
+int EC_POINT_get_Jprojective_coordinates(const EC_GROUP *group,
+    const EC_POINT *p, BIGNUM *x, BIGNUM *y, BIGNUM *z, BN_CTX *ctx);
 
 #else
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_both.c,v 1.69 2021/04/19 16:51:56 jsing Exp $ */
+/* $OpenBSD: d1_both.c,v 1.72 2021/05/16 14:10:43 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -117,15 +117,15 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "ssl_locl.h"
-
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 
-#include "pqueue.h"
 #include "bytestring.h"
+#include "dtls_locl.h"
+#include "pqueue.h"
+#include "ssl_locl.h"
 
 #define RSMBLY_BITMASK_SIZE(msg_len) (((msg_len) + 7) / 8)
 
@@ -972,7 +972,8 @@ dtls1_buffer_message(SSL *s, int is_ccs)
 
 	/* save current state*/
 	frag->msg_header.saved_retransmit_state.session = s->session;
-	frag->msg_header.saved_retransmit_state.epoch = D1I(s)->w_epoch;
+	frag->msg_header.saved_retransmit_state.epoch =
+	    tls12_record_layer_write_epoch(s->internal->rl);
 
 	memset(seq64be, 0, sizeof(seq64be));
 	seq64be[6] = (unsigned char)(dtls1_get_queue_priority(
@@ -1039,15 +1040,14 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	/* save current state */
 	saved_state.session = s->session;
-	saved_state.epoch = D1I(s)->w_epoch;
+	saved_state.epoch = tls12_record_layer_write_epoch(s->internal->rl);
 
 	D1I(s)->retransmitting = 1;
 
 	/* restore state in which the message was originally sent */
 	s->session = frag->msg_header.saved_retransmit_state.session;
-	D1I(s)->w_epoch = frag->msg_header.saved_retransmit_state.epoch;
-
-	if (!tls12_record_layer_use_write_epoch(s->internal->rl, D1I(s)->w_epoch))
+	if (!tls12_record_layer_use_write_epoch(s->internal->rl,
+	    frag->msg_header.saved_retransmit_state.epoch))
 		return 0;
 
 	ret = dtls1_do_write(s, frag->msg_header.is_ccs ?
@@ -1055,9 +1055,8 @@ dtls1_retransmit_message(SSL *s, unsigned short seq, unsigned long frag_off,
 
 	/* restore current state */
 	s->session = saved_state.session;
-	D1I(s)->w_epoch = saved_state.epoch;
-
-	if (!tls12_record_layer_use_write_epoch(s->internal->rl, D1I(s)->w_epoch))
+	if (!tls12_record_layer_use_write_epoch(s->internal->rl,
+	    saved_state.epoch))
 		return 0;
 
 	D1I(s)->retransmitting = 0;

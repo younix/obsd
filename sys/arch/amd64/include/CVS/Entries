@@ -8,7 +8,6 @@
 /codepatch.h/1.14/Wed Mar 11 07:27:08 2020//
 /conf.h/1.8/Wed May 13 08:32:43 2020//
 /cpu_full.h/1.5/Fri May 17 19:07:47 2019//
-/cpuvar.h/1.10/Fri Aug  9 15:20:05 2019//
 /db_machdep.h/1.18/Thu Nov  7 14:44:52 2019//
 /disklabel.h/1.11/Wed Sep 30 14:57:03 2015//
 /efifbvar.h/1.10/Sat May  4 11:34:47 2019//
@@ -72,7 +71,8 @@
 /pci_machdep.h/1.30/Sat May  1 08:41:51 2021//
 /setjmp.h/1.2/Sat May  1 08:41:51 2021//
 /smbiosvar.h/1.13/Sat May  1 08:41:51 2021//
-/specialreg.h/1.89/Sat May  1 08:41:51 2021//
 /trap.h/1.4/Sat May  1 08:41:51 2021//
 /vmmvar.h/1.71/Sat May  1 08:41:51 2021//
+/cpuvar.h/1.11/Mon May 17 11:40:30 2021//
+/specialreg.h/1.90/Mon May 17 11:40:30 2021//
 D

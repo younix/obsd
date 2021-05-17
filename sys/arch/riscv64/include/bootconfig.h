@@ -1,3 +1,5 @@
+/*	$OpenBSD: bootconfig.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*-
  * Copyright (c) 2015-2017 Ruslan Bukin <br@bsdpad.com>
  * All rights reserved.
@@ -44,7 +46,7 @@ struct riscv_bootparams {
 	vaddr_t		kern_l1pt;	/* L1 page table for the kernel */
 	uint64_t	kern_delta;	/* PA - VA */
 	vaddr_t		kern_stack;
-#if 0 
+#if 0
 	void		*arg0; // passed to kernel in R0
 	void		*arg1; // passed to kernel in R1
 	void		*arg2; // passed to kernel in R2

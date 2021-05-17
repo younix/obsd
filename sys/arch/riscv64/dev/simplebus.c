@@ -1,3 +1,5 @@
+/*	$OpenBSD: simplebus.c,v 1.4 2021/05/14 06:48:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2016 Patrick Wildt <patrick@blueri.se>
  *
@@ -16,7 +18,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
 
@@ -339,7 +340,7 @@ simplebus_dmamap_load_buffer(bus_dma_tag_t t, bus_dmamap_t map, void *buf,
 
 		/* For each range. */
 		for (range = sc->sc_dmaranges; rlen >= rone;
-		     rlen -= rone, range += rone) {
+		    rlen -= rone, range += rone) {
 			/* Extract from and size, so we can see if we fit. */
 			rfrom = range[sc->sc_acells];
 			if (sc->sc_pacells == 2)

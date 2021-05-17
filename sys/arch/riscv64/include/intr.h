@@ -1,3 +1,5 @@
+/*	$OpenBSD: intr.h,v 1.4 2021/05/13 19:26:25 kettenis Exp $	*/
+
 /*
  * Copyright (c) 2001-2004 Opsycon AB  (www.opsycon.se / www.opsycon.com)
  *
@@ -148,43 +150,12 @@ extern struct riscv_intr_func riscv_intr_func;
 
 void	 intr_barrier(void *);
 
-static inline void
-enable_interrupts(void)
-{
-	__asm volatile(
-		"csrsi sstatus, %0"
-		:: "i" (SSTATUS_SIE)
-	);
-}
-
-static inline uint64_t
-disable_interrupts(void)
-{
-	uint64_t ret;
-
-	__asm volatile(
-		"csrrci %0, sstatus, %1"
-		: "=&r" (ret) : "i" (SSTATUS_SIE)
-	);
-
-	return (ret & (SSTATUS_SIE));
-}
-
-static inline void
-restore_interrupts(uint64_t s)
-{
-	__asm volatile(
-		"csrs sstatus, %0"
-		:: "r" (s & (SSTATUS_SIE))
-	);
-}
-
 void	 riscv_init_smask(void); /* XXX */
 extern uint32_t riscv_smask[NIPL];
 
 #include <machine/softintr.h>
 
-void 	riscv_clock_register(void (*)(void), void (*)(u_int), void (*)(int),
+void	riscv_clock_register(void (*)(void), void (*)(u_int), void (*)(int),
     void (*)(void));
 
 /*

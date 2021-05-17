@@ -7,8 +7,8 @@
 D/OpenBSD////
 /fw_update.1/1.5/Thu Dec 17 19:39:59 2020//
 /Makefile/1.91/Sat May  1 08:41:52 2021//
-/pkg_add/1.486/Wed May  5 14:31:25 2021//
 /pkg_add.1/1.164/Sat May  1 08:41:52 2021//
 /pkg_check.8/1.12/Sat May  1 08:41:52 2021//
 /pkg_create.1/1.120/Sat May  1 08:41:52 2021//
-/pkg_mklocatedb/1.47/Wed May  5 14:31:25 2021//
+/pkg_add/1.486/Wed May  5 15:00:12 2021//
+/pkg_mklocatedb/1.47/Wed May  5 15:00:12 2021//

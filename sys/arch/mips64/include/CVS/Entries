@@ -38,11 +38,11 @@
 /trap.h/1.16/Wed Apr  9 21:10:34 2014//
 /vmparam.h/1.29/Fri Dec 23 12:38:16 2016//
 /timetc.h/1.3/Fri Dec 11 17:58:22 2020//
-/asm.h/1.27/Wed May  5 14:31:13 2021//
-/cpu.h/1.131/Wed May  5 14:31:13 2021//
 /frame.h/1.8/Sat May  1 08:41:51 2021//
-/mips_cpu.h/1.10/Wed May  5 14:31:13 2021//
 /pcb.h/1.9/Sat May  1 08:41:51 2021//
-/pmap.h/1.49/Wed May  5 14:31:13 2021//
-/pte.h/1.23/Wed May  5 14:31:13 2021//
+/asm.h/1.27/Wed May  5 15:00:12 2021//
+/cpu.h/1.132/Mon May 17 11:40:31 2021//
+/mips_cpu.h/1.10/Wed May  5 15:00:12 2021//
+/pmap.h/1.49/Wed May  5 15:00:12 2021//
+/pte.h/1.23/Wed May  5 15:00:12 2021//
 D

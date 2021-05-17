@@ -1,3 +1,5 @@
+/*	$OpenBSD: mem.c,v 1.4 2021/05/14 06:48:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -71,17 +73,14 @@
  */
 
 #include <sys/param.h>
-#include <sys/conf.h>
 #include <sys/buf.h>
 #include <sys/filio.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
 #include <sys/malloc.h>
 #include <sys/proc.h>
-#include <sys/fcntl.h>
 #include <sys/rwlock.h>
 
-#include <machine/cpu.h>
 #include <machine/conf.h>
 
 #include <uvm/uvm_extern.h>
@@ -244,12 +243,12 @@ mmmmap(dev_t dev, off_t off, int prot)
 int
 mmioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
 {
-        switch (cmd) {
-        case FIONBIO:
-        case FIOASYNC:
-                /* handled by fd layer */
-                return 0;
-        }
+	switch (cmd) {
+	case FIONBIO:
+	case FIOASYNC:
+		/* handled by fd layer */
+		return 0;
+	}
 
 	return (EOPNOTSUPP);
 }

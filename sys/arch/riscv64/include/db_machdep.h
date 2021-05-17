@@ -1,3 +1,5 @@
+/*	$OpenBSD: db_machdep.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2019 Brian Bamsch <bbamsch@google.com>
  * Copyright (c) 2015-2016 Ruslan Bukin <br@bsdpad.com>
@@ -47,7 +49,7 @@
 #define	T_BREAKPOINT	(EXCP_BREAKPOINT)
 #define	T_WATCHPOINT	(0)
 
-typedef vaddr_t 	db_addr_t;
+typedef vaddr_t		db_addr_t;
 typedef long		db_expr_t;
 
 typedef trapframe_t	db_regs_t;

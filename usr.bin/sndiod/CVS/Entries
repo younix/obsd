@@ -15,7 +15,6 @@
 /utils.c/1.7/Thu Jan 23 05:40:09 2020//
 /utils.h/1.5/Thu Jan 23 05:40:09 2020//
 /fdpass.c/1.10/Fri Dec 11 17:58:24 2020//
-/dev.c/1.102/Wed May  5 14:31:21 2021//
 /dev.h/1.40/Sat May  1 08:41:52 2021//
 /dev_sioctl.c/1.7/Sat May  1 08:41:52 2021//
 /dsp.c/1.17/Sat May  1 08:41:52 2021//
@@ -29,4 +28,5 @@
 /sndiod.8/1.10/Sat May  1 08:41:52 2021//
 /sndiod.c/1.45/Sat May  1 08:41:52 2021//
 /sock.c/1.44/Sat May  1 08:41:52 2021//
+/dev.c/1.102/Wed May  5 15:00:12 2021//
 D

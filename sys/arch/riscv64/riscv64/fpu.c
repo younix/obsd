@@ -1,3 +1,5 @@
+/*	$OpenBSD: fpu.c,v 1.7 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2020 Dale Rahn <drahn@openbsd.org>
  *
@@ -20,52 +22,11 @@
 #include <sys/user.h>
 #include "machine/asm.h"
 
-void fpu_clear(struct fpreg *fp)
+void
+fpu_clear(struct fpreg *fp)
 {
 	/* rounding mode set to 0, should be RND_NEAREST */
 	bzero(fp, sizeof (*fp));
-}
-
-// may look into optimizing this, bit map lookup ?
-
-int fpu_valid_opcode(uint32_t instr)
-{
-	int opcode = instr & 0x7f;
-	int valid = 0;
-
-	if ((opcode & 0x3) == 0x3) {
-		/* 32 bit instruction */
-		switch(opcode) {
-		case 0x07:	// LOAD-FP
-		case 0x27:	// STORE-FP
-		case 0x53:	// OP-FP
-			valid = 1;
-			break;
-		default:
-			;
-		}
-	} else {
-		/* 16 bit instruction */
-		int opcode16 = instr & 0xe003;
-		switch (opcode16) {
-		case 0x1000:	// C.FLD
-		case 0xa000:	// C.SLD
-			valid = 1;
-			break;
-		case 0x2002:	// C.FLDSP
-			// must verify dest register is float
-			valid = opcode16 & (1 << 11);
-			break;
-		case 0xa002:	// C.FSDSP
-			// must verify dest register is float
-			valid = opcode16 & (1 << 6);
-			break;
-		default:
-			;
-		}
-	}
-	//printf("FPU check requested %d\n", valid);
-	return valid;
 }
 
 void
@@ -77,13 +38,13 @@ fpu_discard(struct proc *p)
 }
 
 void
-fpu_disable()
+fpu_disable(void)
 {
 	__asm volatile ("csrc sstatus, %0" :: "r"(SSTATUS_FS_MASK));
 }
 
 void
-fpu_enable_clean()
+fpu_enable_clean(void)
 {
 	__asm volatile ("csrc sstatus, %0" :: "r"(SSTATUS_FS_MASK));
 	__asm volatile ("csrs sstatus, %0" :: "r"(SSTATUS_FS_CLEAN));
@@ -163,7 +124,7 @@ fpu_save(struct proc *p, struct trapframe *frame)
 
 	/*
 	 * pcb->pcb_fpcpu and ci->ci_fpuproc are still valid
-	 * until some other fpu context steals either the cpu 
+	 * until some other fpu context steals either the cpu
 	 * context or another cpu steals the fpu context.
 	 */
 

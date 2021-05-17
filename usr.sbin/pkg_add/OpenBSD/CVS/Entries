@@ -49,7 +49,6 @@ D/PackageRepository////
 D/ProgressMeter////
 /PackingElement.pm/1.277/Fri Dec 11 17:58:25 2020//
 /AddCreateDelete.pm/1.50/Sat May  1 08:41:52 2021//
-/AddDelete.pm/1.95/Wed May  5 14:31:25 2021//
 /Getopt.pod/1.1/Sat May  1 08:41:52 2021//
 /IdCache.pod/1.1/Sat May  1 08:41:52 2021//
 /Intro.pod/1.1/Sat May  1 08:41:52 2021//
@@ -71,3 +70,4 @@ D/ProgressMeter////
 /Vstat.pod/1.1/Sat May  1 08:41:52 2021//
 /md5.pod/1.1/Sat May  1 08:41:52 2021//
 /style.pod/1.1/Sat May  1 08:41:52 2021//
+/AddDelete.pm/1.95/Wed May  5 15:00:12 2021//

@@ -9,8 +9,6 @@
 /ecp_nistputil.c/1.6/Thu Jul 10 22:45:57 2014//
 /ecp_nistz256_table.h/1.2/Wed Dec 21 15:49:29 2016//
 D/asm////
-/ec.h/1.22/Sat May  1 08:41:50 2021//
-/ec2_oct.c/1.16/Wed May  5 14:30:55 2021//
 /ec2_smpl.c/1.22/Sat May  1 08:41:50 2021//
 /ec_asn1.c/1.33/Sat May  1 08:41:50 2021//
 /ec_curve.c/1.21/Sat May  1 08:41:50 2021//
@@ -28,3 +26,5 @@ D/asm////
 /ecp_nistz256.c/1.9/Sat May  1 08:41:50 2021//
 /ecp_oct.c/1.14/Sat May  1 08:41:50 2021//
 /ecp_smpl.c/1.32/Sat May  1 08:41:50 2021//
+/ec.h/1.24/Mon May 17 11:40:13 2021//
+/ec2_oct.c/1.16/Wed May  5 15:00:12 2021//

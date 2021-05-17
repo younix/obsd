@@ -188,7 +188,6 @@
 /mount.2/1.50/Sat May  1 08:41:50 2021//
 /mquery.2/1.12/Sat May  1 08:41:50 2021//
 /open.2/1.50/Sat May  1 08:41:50 2021//
-/ptrace.2/1.40/Wed May  5 14:30:55 2021//
 /revoke.2/1.15/Sat May  1 08:41:50 2021//
 /sendsyslog.2/1.13/Sat May  1 08:41:50 2021//
 /stat.2/1.48/Sat May  1 08:41:50 2021//
@@ -196,4 +195,5 @@
 /symlink.2/1.22/Sat May  1 08:41:50 2021//
 /sysctl.2/1.43/Sat May  1 08:41:50 2021//
 /utimes.2/1.28/Sat May  1 08:41:50 2021//
+/ptrace.2/1.40/Wed May  5 15:00:12 2021//
 D

@@ -17,7 +17,6 @@
 /mpath.c/1.54/Sat May  1 08:41:52 2021//
 /mpath_sym.c/1.26/Sat May  1 08:41:52 2021//
 /safte.c/1.66/Sat May  1 08:41:52 2021//
-/scsi_base.c/1.278/Sat May  1 08:41:52 2021//
 /scsi_changer.h/1.9/Sat May  1 08:41:52 2021//
 /scsi_disk.h/1.42/Sat May  1 08:41:52 2021//
 /scsi_ioctl.c/1.67/Sat May  1 08:41:52 2021//
@@ -27,4 +26,5 @@
 /sdvar.h/1.52/Sat May  1 08:41:52 2021//
 /ses.c/1.63/Sat May  1 08:41:52 2021//
 /st.c/1.186/Sat May  1 08:41:52 2021//
+/scsi_base.c/1.279/Mon May 17 11:40:36 2021//
 D

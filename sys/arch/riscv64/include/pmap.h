@@ -1,3 +1,5 @@
+/*	$OpenBSD: pmap.h,v 1.6 2021/05/16 03:29:35 jsg Exp $	*/
+
 /*
  * Copyright (c) 2019-2020 Brian Bamsch <bbamsch@google.com>
  * Copyright (c) 2008,2009,2014 Dale Rahn <drahn@dalerahn.com>
@@ -42,10 +44,10 @@
 /* cache flags */
 // XXX These are duplicated from arm64 and may need some reworking
 #define PMAP_CACHE_CI		(PMAP_MD0)		/* cache inhibit */
-#define PMAP_CACHE_WT		(PMAP_MD1)	 	/* writethru */
+#define PMAP_CACHE_WT		(PMAP_MD1)		/* writethru */
 #define PMAP_CACHE_WB		(PMAP_MD1|PMAP_MD0)	/* writeback */
 #define PMAP_CACHE_DEV		(PMAP_MD2)		/* device mapping */
-#define PMAP_CACHE_BITS		(PMAP_MD0|PMAP_MD1|PMAP_MD2)	
+#define PMAP_CACHE_BITS		(PMAP_MD0|PMAP_MD1|PMAP_MD2)
 
 #define PTED_VA_MANAGED_M	(PMAP_MD3)
 #define PTED_VA_WIRED_M		(PMAP_MD3 << 1)
@@ -87,7 +89,7 @@ extern paddr_t copy_dst_page;
 void pagezero(vaddr_t);
 
 extern struct pmap kernel_pmap_;
-#define pmap_kernel()   		(&kernel_pmap_)
+#define pmap_kernel()			(&kernel_pmap_)
 #define	pmap_resident_count(pmap)	((pmap)->pm_stats.resident_count)
 #define	pmap_wired_count(pmap)		((pmap)->pm_stats.wired_count)
 
@@ -99,8 +101,8 @@ void pmap_kenter_cache(vaddr_t va, paddr_t pa, vm_prot_t prot, int cacheable);
 void pmap_page_ro(pmap_t pm, vaddr_t va, vm_prot_t prot);
 
 paddr_t pmap_steal_avail(size_t size, int align, void **kva);
-void pmap_avail_fixup();
-void pmap_physload_avail();
+void pmap_avail_fixup(void);
+void pmap_physload_avail(void);
 
 #define PMAP_GROWKERNEL
 
@@ -108,7 +110,7 @@ struct pv_entry;
 
 /* investigate */
 #define pmap_unuse_final(p)		do { /* nothing */ } while (0)
-int	pmap_fault_fixup(pmap_t, vaddr_t, vm_prot_t, int);
+int	pmap_fault_fixup(pmap_t, vaddr_t, vm_prot_t);
 void	pmap_postinit(void);
 
 #endif /* _KERNEL && !_LOCORE */

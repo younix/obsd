@@ -19,9 +19,9 @@
 /io.c/1.19/Sat May  1 08:41:52 2021//
 /main.c/1.53/Sat May  1 08:41:52 2021//
 /misc.c/1.2/Sat May  1 08:41:52 2021//
-/receiver.c/1.25/Sat May  1 08:41:52 2021//
 /rsync.1/1.24/Sat May  1 08:41:52 2021//
 /sender.c/1.28/Sat May  1 08:41:52 2021//
 /socket.c/1.29/Sat May  1 08:41:52 2021//
-/uploader.c/1.24/Sat May  1 08:41:52 2021//
+/receiver.c/1.26/Mon May 17 11:40:39 2021//
+/uploader.c/1.25/Mon May 17 11:40:39 2021//
 D

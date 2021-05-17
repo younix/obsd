@@ -1,3 +1,5 @@
+/*	$OpenBSD: machdep.c,v 1.17 2021/05/16 10:38:53 kettenis Exp $	*/
+
 /*
  * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
  * Copyright (c) 2021 Mark Kettenis <kettenis@openbsd.org>
@@ -26,14 +28,11 @@
 #include <sys/user.h>
 #include <sys/conf.h>
 #include <sys/kcore.h>
-#include <sys/core.h>
 #include <sys/msgbuf.h>
 #include <sys/buf.h>
-#include <sys/termios.h>
 #include <sys/sensors.h>
 #include <sys/malloc.h>
 #include <sys/syscallargs.h>
-#include <sys/stdarg.h>
 
 #include <net/if.h>
 #include <uvm/uvm.h>
@@ -89,7 +88,7 @@ struct uvm_constraint_range *uvm_md_constraints[] = {
 };
 
 /* the following is used externally (sysctl_hw) */
-char    machine[] = MACHINE;            /* from <machine/param.h> */
+char    machine[] = MACHINE;		/* from <machine/param.h> */
 
 int safepri = 0;
 
@@ -200,7 +199,7 @@ void
 cpu_idle_cycle(void)
 {
 	// Enable interrupts
-	enable_interrupts();
+	intr_enable();
 	// XXX Data Sync Barrier? (Maybe SFENCE???)
 	__asm volatile("wfi");
 }
@@ -260,7 +259,7 @@ cpu_startup(void)
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, 0, FALSE, NULL);
+	    VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
 	 * Set up buffers, so they can be used to read disk labels.
@@ -303,7 +302,7 @@ cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 		node = OF_finddevice("/");
 		len = OF_getproplen(node, "compatible");
 		if (len <= 0)
-			return (EOPNOTSUPP); 
+			return (EOPNOTSUPP);
 		compatible = malloc(len, M_TEMP, M_WAITOK | M_ZERO);
 		OF_getprop(node, "compatible", compatible, len);
 		compatible[len - 1] = 0;
@@ -418,7 +417,7 @@ need_resched(struct cpu_info *ci)
  * Size of memory segments, before any memory is stolen.
  */
 phys_ram_seg_t mem_clusters[VM_PHYSSEG_MAX];
-int     mem_cluster_cnt;
+int	mem_cluster_cnt;
 
 /*
  * cpu_dumpsize: calculate size of machine-dependent kernel core dump headers.
@@ -460,8 +459,8 @@ cpu_dump_mempagecnt(void)
  * These variables are needed by /sbin/savecore
  */
 u_long	dumpmag = 0x8fca0101;	/* magic number */
-int 	dumpsize = 0;		/* pages */
-long	dumplo = 0; 		/* blocks */
+int	dumpsize = 0;		/* pages */
+long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
@@ -507,7 +506,7 @@ sys_sysarch(struct proc *p, void *v, register_t *retval)
 	} */ *uap = v;
 	int error = 0;
 
-	switch(SCARG(uap, op)) {
+	switch (SCARG(uap, op)) {
 	default:
 		error = EINVAL;
 		break;
@@ -794,7 +793,7 @@ initriscv(struct riscv_bootparams *rbp)
 	node = fdt_find_node("/reserved-memory");
 	if (node) {
 		for (node = fdt_child_node(node); node;
-		     node = fdt_next_node(node)) {
+		    node = fdt_next_node(node)) {
 			if (fdt_get_reg(node, 0, &reg))
 				continue;
 			if (reg.size == 0)
@@ -875,7 +874,7 @@ process_kernel_args(void)
 			return;
 
 	while (*cp != 0) {
-		switch(*cp) {
+		switch (*cp) {
 		case 'a':
 			boothowto |= RB_ASKNAME;
 			break;
@@ -924,6 +923,20 @@ pmap_bootstrap_bs_map(bus_space_tag_t t, bus_addr_t bpa, bus_size_t size,
 void
 memreg_add(const struct fdt_reg *reg)
 {
+	int i;
+
+	for (i = 0; i < nmemreg; i++) {
+		if (reg->addr == memreg[i].addr + memreg[i].size) {
+			memreg[i].size += reg->size;
+			return;
+		}
+		if (reg->addr + reg->size == memreg[i].addr) {
+			memreg[i].addr = reg->addr;
+			memreg[i].size += reg->size;
+			return;
+		}
+	}
+
 	if (nmemreg >= nitems(memreg))
 		return;
 

@@ -1,3 +1,5 @@
+/*	$OpenBSD: riscv_cpu_intc.c,v 1.8 2021/05/14 06:48:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2020, Mars Li <mengshi.li.mars@gmail.com>
  *
@@ -16,19 +18,14 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/queue.h>
 #include <sys/malloc.h>
 #include <sys/device.h>
-#include <sys/evcount.h>
 
-#include <machine/bus.h>
 #include <machine/fdt.h>
 #include <machine/riscvreg.h>
 
 #include <dev/ofw/openfirm.h>
-#include <dev/ofw/fdt.h>
 
-#include "riscv64/dev/plic.h"
 #include "riscv_cpu_intc.h"
 
 struct intrhand {
@@ -50,12 +47,12 @@ void	*riscv_intc_intr_establish(int, int, int (*)(void *),
 void	riscv_intc_intr_disestablish(void *);
 
 
-struct cfattach        intc_ca = {
-       sizeof (struct device), riscv_intc_match, riscv_intc_attach
+struct cfattach intc_ca = {
+	sizeof (struct device), riscv_intc_match, riscv_intc_attach
 };
 
 struct cfdriver intc_cd = {
-       NULL, "intc", DV_DULL
+	NULL, "intc", DV_DULL
 };
 
 int
@@ -64,7 +61,7 @@ riscv_intc_match(struct device *parent, void *match, void *aux)
 	struct fdt_attach_args *faa = aux;
 	int node = faa->fa_node;
 	return (OF_getproplen(node, "interrupt-controller") >= 0 &&
-		OF_is_compatible(node, "riscv,cpu-intc"));
+	    OF_is_compatible(node, "riscv,cpu-intc"));
 }
 
 void
@@ -95,7 +92,7 @@ riscv_intc_attach(struct device *parent, struct device *self, void *aux)
 	 * XXX right time to enable interrupts ??
 	 * might need to postpone untile autoconf is finished
 	 */
-	enable_interrupts();
+	intr_enable();
 }
 
 
@@ -105,8 +102,7 @@ riscv_intc_irq_handler(void *frame)
 {
 	int irq;
 	struct intrhand *ih;
-	struct trapframe *_frame;
-        _frame = (struct trapframe*) frame;
+	struct trapframe *_frame = (struct trapframe*) frame;
 
 	KASSERTMSG(_frame->tf_scause & EXCP_INTR,
 		"riscv_cpu_intr: wrong frame passed");
@@ -129,13 +125,12 @@ void *
 riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
     void *arg, char *name)
 {
-	int sie;
 	struct intrhand *ih;
+	u_long sie;
 
 	if (irqno < 0 || irqno >= INTC_NIRQS)
 		panic("intc_intr_establish: bogus irqnumber %d: %s",
-		     irqno, name);
-	sie = disable_interrupts();
+		    irqno, name);
 
 	ih = malloc(sizeof(*ih), M_DEVBUF, M_WAITOK);
 	ih->ih_func = func;
@@ -143,24 +138,23 @@ riscv_intc_intr_establish(int irqno, int dummy_level, int (*func)(void *),
 	ih->ih_irq = irqno;
 	ih->ih_name = name;
 
+	sie = intr_disable();
 	intc_handler[irqno] = ih;
-#ifdef DEBUG_INTC
-	printf("\nintc_intr_establish irq %d [%s]\n", irqno, name);
-#endif
-	restore_interrupts(sie);
+	intr_restore(sie);
+
 	return (ih);
 }
 
 void
 riscv_intc_intr_disestablish(void *cookie)
 {
-	int sie;
 	struct intrhand *ih = cookie;
 	int irqno = ih->ih_irq;
-	sie = disable_interrupts();
+	u_long sie;
 
+	sie = intr_disable();
 	intc_handler[irqno] = NULL;
-	free(ih, M_DEVBUF, 0);
+	intr_restore(sie);
 
-	restore_interrupts(sie);
+	free(ih, M_DEVBUF, 0);
 }

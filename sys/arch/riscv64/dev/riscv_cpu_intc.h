@@ -1,3 +1,5 @@
+/*	$OpenBSD: riscv_cpu_intc.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2020 Mars Li <mengshi.li.mars@gmai..com>
  *
@@ -17,11 +19,11 @@
 #ifndef _RISCV_CPU_INTC_H_
 #define _RISCV_CPU_INTC_H_
 
-void 	*riscv_intc_intr_establish(int, int, int (*func)(void *),
+void	*riscv_intc_intr_establish(int, int, int (*func)(void *),
 		void *, char *);
-void 	*riscv_intc_intr_establish_fdt(void *, int *, int, int (*)(void *),
+void	*riscv_intc_intr_establish_fdt(void *, int *, int, int (*)(void *),
 		void *, char *);
-void 	riscv_intc_intr_disestablish(void *cookie);
+void	riscv_intc_intr_disestablish(void *cookie);
 
 #endif /* _RISCV_CPU_INTC_H_ */
 

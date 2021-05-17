@@ -1,4 +1,5 @@
-/* $OpenBSD: mainbus.c,v 1.5 2021/05/04 16:38:06 kettenis Exp $ */
+/*	$OpenBSD: mainbus.c,v 1.7 2021/05/14 06:48:52 jsg Exp $ */
+
 /*
  * Copyright (c) 2016 Patrick Wildt <patrick@blueri.se>
  * Copyright (c) 2017 Mark Kettenis <kettenis@openbsd.org>
@@ -18,7 +19,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
 

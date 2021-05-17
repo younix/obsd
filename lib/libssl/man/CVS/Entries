@@ -2,7 +2,6 @@
 /DTLSv1_listen.3/1.4/Tue Mar 27 17:35:50 2018//
 /OPENSSL_init_ssl.3/1.4/Fri Jun 14 13:41:31 2019//
 /PEM_read_SSL_SESSION.3/1.4/Wed Jun 12 09:36:30 2019//
-/SSL_CIPHER_get_name.3/1.11/Tue Apr 14 15:27:35 2020//
 /SSL_COMP_add_compression_method.3/1.5/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_add1_chain_cert.3/1.1/Fri Apr  5 18:29:43 2019//
 /SSL_CTX_add_extra_chain_cert.3/1.7/Thu Jan  2 09:09:16 2020//
@@ -33,7 +32,6 @@
 /SSL_CTX_set_read_ahead.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_CTX_set_session_cache_mode.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_session_id_context.3/1.6/Sat Jun  8 15:25:43 2019//
-/SSL_CTX_set_ssl_version.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_CTX_set_timeout.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_CTX_set_tlsext_servername_callback.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_tlsext_status_cb.3/1.7/Wed Jun 12 09:36:30 2019//
@@ -97,7 +95,6 @@
 /SSL_want.3/1.5/Tue Mar 27 17:35:50 2018//
 /d2i_SSL_SESSION.3/1.7/Sat Jun  8 15:25:43 2019//
 /SSL_read.3/1.7/Mon Jun  1 06:23:15 2020//
-/Makefile/1.70/Sat May  1 08:41:50 2021//
 /SSL_CTX_new.3/1.16/Sat May  1 08:41:50 2021//
 /SSL_CTX_set_min_proto_version.3/1.5/Sat May  1 08:41:50 2021//
 /SSL_CTX_set_mode.3/1.7/Sat May  1 08:41:50 2021//
@@ -118,4 +115,8 @@
 /SSL_set_bio.3/1.6/Sat May  1 08:41:50 2021//
 /SSL_write.3/1.6/Sat May  1 08:41:50 2021//
 /ssl.3/1.20/Sat May  1 08:41:50 2021//
+/Makefile/1.71/Mon May 17 11:40:16 2021//
+/SSL_CIPHER_get_name.3/1.12/Mon May 17 11:40:16 2021//
+/SSL_CTX_set_ssl_version.3/1.5/Mon May 17 11:40:16 2021//
+/SSL_SESSION_get0_cipher.3/1.1/Wed May 12 14:16:25 2021//
 D

@@ -1,3 +1,5 @@
+/*	$OpenBSD: db_interface.c,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 1996 Scott K. Stevens
  *
@@ -85,9 +87,9 @@ struct db_variable db_regs[] = {
 	{ "t6", (long *)&DDB_REGS->tf_t[6], FCN_NULL, }		/* x31 */
 };
 
-extern label_t       *db_recover;
+extern label_t	*db_recover;
 
-struct db_variable * db_eregs = db_regs + nitems(db_regs);
+struct db_variable *db_eregs = db_regs + nitems(db_regs);
 
 #ifdef DDB
 /*
@@ -96,7 +98,7 @@ struct db_variable * db_eregs = db_regs + nitems(db_regs);
 int
 kdb_trap(int type, db_regs_t *regs)
 {
-	int s;	
+	int s;
 
 	switch (type) {
 	case T_BREAKPOINT:	/* breakpoint */
@@ -118,7 +120,7 @@ kdb_trap(int type, db_regs_t *regs)
 	cnpollc(0);
 	db_active--;
 	splx(s);
-	
+
 	*regs = ddb_regs;
 
 	return (1);
@@ -205,13 +207,13 @@ int
 db_trapper(vaddr_t addr, u_int inst, trapframe_t *frame, int fault_code)
 {
 
-        if (fault_code == EXCP_BREAKPOINT) {
-                kdb_trap(T_BREAKPOINT, frame);
-                frame->tf_sepc += 4;
-        } else
-                kdb_trap(-1, frame);
+	if (fault_code == EXCP_BREAKPOINT) {
+		kdb_trap(T_BREAKPOINT, frame);
+		frame->tf_sepc += 4;
+	} else
+		kdb_trap(-1, frame);
 
-        return (0);
+	return (0);
 }
 
 

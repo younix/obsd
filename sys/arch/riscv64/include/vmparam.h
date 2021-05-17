@@ -1,3 +1,5 @@
+/*	$OpenBSD: vmparam.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
  * All rights reserved.
@@ -45,7 +47,7 @@
  * Virtual memory related constants, all in bytes
  */
 #ifndef MAXTSIZ
-#define	MAXTSIZ	        ((paddr_t)1*1024*1024*1024)	/* max text size */
+#define	MAXTSIZ		((paddr_t)1*1024*1024*1024)	/* max text size */
 #endif
 #ifndef DFLDSIZ
 #define	DFLDSIZ		((paddr_t)128*1024*1024)	/* initial data size limit */
@@ -75,7 +77,7 @@
 /*
  * Size of User Raw I/O map
  */
-#define	USRIOSIZE 	300
+#define	USRIOSIZE	300
 
 /**
  * Address space layout.

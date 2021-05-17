@@ -1,3 +1,5 @@
+/*	$OpenBSD: plic.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+
 /*
  * Copyright (c) 2020, Mars Li <mengshi.li.mars@gmail.com>
  * Copyright (c) 2020, Brian Bamsch <bbamsch@google.com>
@@ -25,11 +27,11 @@ int	plic_spllower(int);
 int	plic_splraise(int);
 void	plic_setipl(int);
 
-void 	*plic_intr_establish(int, int, int (*)(void *),
+void	*plic_intr_establish(int, int, int (*)(void *),
 		void *, char *);
-void 	*plic_intr_establish_fdt(void *, int *, int,
+void	*plic_intr_establish_fdt(void *, int *, int,
 		int (*)(void *), void *, char *);
-void 	plic_intr_disestablish(void *);
+void	plic_intr_disestablish(void *);
 
 #endif /* ! _LOCORE */
 
