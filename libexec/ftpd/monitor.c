@@ -296,7 +296,7 @@ handle_cmds(void)
 				break;
 			case AUTH_SLAVE:
 				if (pledge("stdio rpath wpath cpath inet recvfd"
-				   " sendfd proc tty getpw", NULL) == -1)
+				    " sendfd proc tty getpw", NULL) == -1)
 					fatalx("pledge");
 				/* User-privileged slave */
 				debugmsg("user-privileged slave started");
