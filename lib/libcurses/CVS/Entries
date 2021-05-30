@@ -85,9 +85,9 @@ D/trace////
 D/tty////
 D/widechar////
 /nc_tparm.h/1.2/Sat Jun  6 11:21:49 2020//
-/curs_getch.3/1.5/Sat May  1 08:41:50 2021//
 /curses.h/1.62/Sat May  1 08:41:50 2021//
-/curses.priv.h/1.35/Sat May  1 08:41:50 2021//
-/resizeterm.3/1.6/Sat May  1 08:41:50 2021//
 /term.h/1.16/Sat May  1 08:41:50 2021//
 /termcap.h/1.11/Sat May  1 08:41:50 2021//
+/curs_getch.3/1.5/Tue May 18 14:06:16 2021//
+/curses.priv.h/1.35/Tue May 18 14:06:16 2021//
+/resizeterm.3/1.6/Tue May 18 14:06:16 2021//

@@ -23,14 +23,14 @@
 /sio.c/1.3/Tue Oct 29 21:49:07 2013//
 /status.h/1.1/Mon Oct 28 22:13:13 2013//
 /ufs_disksubr.c/1.4/Tue Nov  5 00:51:58 2013//
-/bmd.c/1.5/Sat May  1 08:41:51 2021//
 /conf.c/1.4/Sat May  1 08:41:51 2021//
-/dev_net.c/1.5/Sat May  1 08:41:51 2021//
 /dev_net.h/1.2/Sat May  1 08:41:51 2021//
-/lance.c/1.3/Sat May  1 08:41:51 2021//
 /samachdep.h/1.4/Sat May  1 08:41:51 2021//
-/sc.c/1.4/Sat May  1 08:41:51 2021//
-/scsivar.h/1.3/Sat May  1 08:41:51 2021//
 /sd.c/1.6/Sat May  1 08:41:51 2021//
-/sioreg.h/1.2/Sat May  1 08:41:51 2021//
+/bmd.c/1.5/Tue May 18 14:06:16 2021//
+/dev_net.c/1.5/Tue May 18 14:06:16 2021//
+/lance.c/1.3/Tue May 18 14:06:16 2021//
+/sc.c/1.4/Tue May 18 14:06:16 2021//
+/scsivar.h/1.3/Tue May 18 14:06:16 2021//
+/sioreg.h/1.2/Tue May 18 14:06:16 2021//
 D

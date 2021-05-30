@@ -1,4 +1,3 @@
-/Makefile/1.46/Mon May 13 23:18:22 2019//
 D/arch////
 D/bioctl////
 D/cat////
@@ -68,4 +67,7 @@ D/sync////
 D/sysctl////
 D/tee////
 D/umount////
-/Makefile.inc/1.9/Sat May  1 08:41:43 2021//
+/Makefile/1.47/Sat May 22 14:19:12 2021//
+/Makefile.inc/1.9/Tue May 18 14:06:10 2021//
+D/dhcpleased////
+D/resolvd////

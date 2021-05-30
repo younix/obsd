@@ -17,7 +17,7 @@
 /wscons_machdep.c/1.13/Sun Oct  9 11:25:39 2016//
 /yeeloong_machdep.c/1.28/Wed Sep 26 14:58:16 2018//
 /generic3a_machdep.c/1.10/Fri Dec 11 17:58:22 2020//
-/conf.c/1.30/Sat May  1 08:41:51 2021//
-/locore.S/1.9/Sat May  1 08:41:51 2021//
-/machdep.c/1.96/Mon May 17 11:40:31 2021//
+/conf.c/1.30/Tue May 18 14:06:16 2021//
+/locore.S/1.9/Tue May 18 14:06:16 2021//
+/machdep.c/1.96/Tue May 18 14:06:16 2021//
 D

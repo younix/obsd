@@ -1,4 +1,4 @@
-/*	$OpenBSD: ieee80211_input.c,v 1.235 2021/05/17 08:02:20 stsp Exp $	*/
+/*	$OpenBSD: ieee80211_input.c,v 1.237 2021/05/18 08:10:45 stsp Exp $	*/
 
 /*-
  * Copyright (c) 2001 Atsushi Onoe
@@ -384,6 +384,20 @@ ieee80211_inputm(struct ifnet *ifp, struct mbuf *m, struct ieee80211_node *ni,
 		}
 	}
 
+	/*
+	 * We do not yet support fragments. Drop any fragmented packets.
+	 * Counter-measure against attacks where an arbitrary packet is
+	 * injected via a fragment with attacker-controlled content.
+	 * See https://papers.mathyvanhoef.com/usenix2021.pdf
+	 * Section 6.8 "Treating fragments as full frames"
+	 */
+	if (ieee80211_has_seq(wh)) {
+		uint16_t rxseq = letoh16(*(const u_int16_t *)wh->i_seq);
+		if ((wh->i_fc[1] & IEEE80211_FC1_MORE_FRAG) ||
+		    (rxseq & IEEE80211_SEQ_FRAG_MASK))
+			goto err;
+	}
+
 	/* duplicate detection (see 9.2.9) */
 	if (ieee80211_has_seq(wh) &&
 	    ic->ic_state != IEEE80211_S_SCAN) {
@@ -703,6 +717,7 @@ ieee80211_input(struct ifnet *ifp, struct mbuf *m, struct ieee80211_node *ni,
 	if_input(ifp, &ml);
 }
 
+#ifdef notyet
 /*
  * Handle defragmentation (see 9.5 and Annex C).  We support the concurrent
  * reception of fragments of three fragmented MSDUs or MMPDUs.
@@ -792,6 +807,7 @@ ieee80211_defrag_timeout(void *arg)
 
 	splx(s);
 }
+#endif
 
 /*
  * Process a received data MPDU related to a specific HT-immediate Block Ack

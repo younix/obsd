@@ -181,19 +181,19 @@
 /bind.2/1.22/Sat May  1 08:41:50 2021//
 /chroot.2/1.23/Sat May  1 08:41:50 2021//
 /clock_gettime.2/1.31/Sat May  1 08:41:50 2021//
-/getsockopt.2/1.57/Sat May  1 08:41:50 2021//
 /intro.2/1.70/Sat May  1 08:41:50 2021//
-/kqueue.2/1.44/Sat May  1 08:41:50 2021//
-/mmap.2/1.66/Sat May  1 08:41:50 2021//
 /mount.2/1.50/Sat May  1 08:41:50 2021//
-/mquery.2/1.12/Sat May  1 08:41:50 2021//
 /open.2/1.50/Sat May  1 08:41:50 2021//
 /revoke.2/1.15/Sat May  1 08:41:50 2021//
-/sendsyslog.2/1.13/Sat May  1 08:41:50 2021//
 /stat.2/1.48/Sat May  1 08:41:50 2021//
 /statfs.2/1.27/Sat May  1 08:41:50 2021//
 /symlink.2/1.22/Sat May  1 08:41:50 2021//
-/sysctl.2/1.43/Sat May  1 08:41:50 2021//
 /utimes.2/1.28/Sat May  1 08:41:50 2021//
-/ptrace.2/1.40/Wed May  5 15:00:12 2021//
+/getsockopt.2/1.57/Tue May 18 14:06:16 2021//
+/kqueue.2/1.44/Tue May 18 14:06:16 2021//
+/mmap.2/1.66/Tue May 18 14:06:16 2021//
+/mquery.2/1.12/Tue May 18 14:06:16 2021//
+/ptrace.2/1.40/Tue May 18 14:06:16 2021//
+/sendsyslog.2/1.13/Tue May 18 14:06:16 2021//
+/sysctl.2/1.44/Sat May 22 14:20:04 2021//
 D

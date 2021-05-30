@@ -4,8 +4,8 @@
 /newvers.sh/1.10/Sun Mar  9 12:03:03 2008//
 /prom_swpal.S/1.3/Wed Oct 30 22:40:45 1996//
 /version/1.11/Wed Mar 11 09:59:31 2020//
-/boot.c/1.29/Sat May  1 08:41:51 2021//
-/conf.c/1.7/Sat May  1 08:41:51 2021//
 /disk.c/1.19/Sat May  1 08:41:51 2021//
 /disk.h/1.6/Sat May  1 08:41:51 2021//
+/boot.c/1.29/Tue May 18 14:06:16 2021//
+/conf.c/1.7/Tue May 18 14:06:16 2021//
 D
