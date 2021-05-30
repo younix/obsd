@@ -19,7 +19,6 @@
 /dev.h/1.40/Tue May 18 14:06:17 2021//
 /dev_sioctl.c/1.7/Tue May 18 14:06:17 2021//
 /dsp.c/1.17/Tue May 18 14:06:17 2021//
-/dsp.h/1.9/Tue May 18 14:06:17 2021//
 /midi.c/1.28/Tue May 18 14:06:17 2021//
 /midi.h/1.14/Tue May 18 14:06:17 2021//
 /miofile.c/1.8/Tue May 18 14:06:17 2021//
@@ -29,4 +28,5 @@
 /sndiod.8/1.10/Tue May 18 14:06:17 2021//
 /sndiod.c/1.45/Tue May 18 14:06:17 2021//
 /sock.c/1.44/Tue May 18 14:06:17 2021//
+/dsp.h/1.10/Sun May 30 15:23:15 2021//
 D

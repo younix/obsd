@@ -214,7 +214,6 @@
 /tivar.h/1.2/Sat Aug 29 22:55:48 2009//
 /twereg.h/1.9/Mon Sep  1 17:30:56 2008//
 /uhareg.h/1.5/Wed Jun 30 19:06:16 2010//
-/vga.c/1.73/Mon May 25 09:55:48 2020//
 /vga_subr.c/1.5/Sat Jul 18 00:48:05 2015//
 /vgareg.h/1.5/Sun Feb  1 14:37:22 2009//
 /vgavar.h/1.13/Sun Jul 26 03:17:07 2015//
@@ -261,7 +260,6 @@
 /mfivar.h/1.55/Fri Dec 11 17:58:22 2020//
 /mpivar.h/1.41/Fri Dec 11 17:58:22 2020//
 /ncr53c9xvar.h/1.24/Fri Dec 11 17:58:22 2020//
-/nvmevar.h/1.20/Fri Dec 11 17:58:22 2020//
 /oosiopvar.h/1.6/Fri Dec 11 17:58:22 2020//
 /osiopvar.h/1.12/Fri Dec 11 17:58:22 2020//
 /qlavar.h/1.12/Fri Dec 11 17:58:22 2020//
@@ -347,7 +345,6 @@
 /mk48txx.c/1.8/Tue May 18 14:06:16 2021//
 /mtd8xx.c/1.34/Tue May 18 14:06:16 2021//
 /ncr53c9x.c/1.78/Tue May 18 14:06:16 2021//
-/nvme.c/1.91/Tue May 18 14:06:16 2021//
 /pgt.c/1.100/Tue May 18 14:06:16 2021//
 /re.c/1.211/Sat May 22 14:20:26 2021//
 /rtl80x9.c/1.12/Tue May 18 14:06:16 2021//
@@ -362,4 +359,7 @@
 /tcic2var.h/1.5/Tue May 18 14:06:16 2021//
 /twe.c/1.65/Tue May 18 14:06:16 2021//
 /uha.c/1.40/Tue May 18 14:06:17 2021//
+/nvme.c/1.97/Sun May 30 15:23:11 2021//
+/nvmevar.h/1.27/Sun May 30 15:23:11 2021//
+/vga.c/1.74/Sun May 30 15:23:11 2021//
 D

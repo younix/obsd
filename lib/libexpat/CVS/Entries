@@ -1,5 +1,4 @@
 /AUTHORS/1.1/Fri Jun 30 11:25:29 2017//
-/Makefile/1.15/Sat Jun 29 00:33:59 2019//
 /expat_config.h/1.5/Sat Jun 29 00:33:59 2019//
 /generate_pkgconfig.sh/1.2/Sat Jul  7 08:25:21 2012//
 D/doc////
@@ -7,6 +6,7 @@ D/examples////
 D/lib////
 D/tests////
 /COPYING/1.4/Sat May  1 08:41:50 2021//
-/Changes/1.16/Tue May 18 14:06:16 2021//
-/README.md/1.8/Tue May 18 14:06:16 2021//
-/shlib_version/1.7/Tue May 18 14:06:16 2021//
+/Changes/1.17/Sun May 30 15:22:53 2021//
+/Makefile/1.16/Sun May 30 15:22:53 2021//
+/README.md/1.9/Sun May 30 15:22:53 2021//
+/shlib_version/1.8/Sun May 30 15:22:53 2021//

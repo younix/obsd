@@ -49,7 +49,6 @@
 /fpu.c/1.42/Sat May  1 08:41:51 2021//
 /identcpu.c/1.118/Sat May  1 08:41:51 2021//
 /intr.c/1.55/Sat May  1 08:41:51 2021//
-/locore.S/1.122/Sat May  1 08:41:51 2021//
 /mpbios.c/1.30/Sat May  1 08:41:51 2021//
 /vector.S/1.84/Sat May  1 08:41:51 2021//
 /acpi_machdep.c/1.94/Tue May 18 14:06:16 2021//
@@ -64,4 +63,5 @@
 /vm_machdep.c/1.44/Tue May 18 14:06:16 2021//
 /vmm.c/1.284/Sat May 22 14:20:22 2021//
 /vmm_support.S/1.17/Tue May 18 14:06:16 2021//
+/locore.S/1.123/Sun May 30 15:23:07 2021//
 D

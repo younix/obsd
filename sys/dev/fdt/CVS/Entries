@@ -125,7 +125,6 @@
 /dwpcie.c/1.29/Sat May 22 14:20:26 2021//
 /exuart.c/1.8/Tue May 18 14:06:16 2021//
 /exuartreg.h/1.4/Tue May 18 14:06:16 2021//
-/files.fdt/1.151/Sat May 22 14:20:26 2021//
 /gfrtc.c/1.1/Tue May 18 14:06:16 2021//
 /graphaudio.c/1.1/Tue May 18 14:06:16 2021//
 /if_dwge.c/1.9/Tue May 18 14:06:16 2021//
@@ -155,4 +154,8 @@
 /syscon.c/1.6/Tue May 18 14:06:16 2021//
 /tcpci.c/1.2/Tue May 18 14:06:16 2021//
 /virtio_mmio.c/1.9/Tue May 18 14:06:16 2021//
+/files.fdt/1.153/Sun May 30 15:23:10 2021//
+/if_cad.c/1.1/Fri May 28 15:52:11 2021//
+/imxdog.c/1.3/Fri May 28 13:08:37 2021//
+/spmivar.h/1.1/Wed May 26 20:52:21 2021//
 D

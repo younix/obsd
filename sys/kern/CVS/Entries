@@ -28,7 +28,6 @@
 /tty_msts.c/1.21/Mon Feb 19 08:59:52 2018//
 /tty_nmea.c/1.49/Thu Aug 15 15:08:14 2019//
 /tty_subr.c/1.33/Mon Mar 14 23:08:06 2016//
-/uipc_proto.c/1.18/Mon Jul 15 12:28:06 2019//
 /vfs_biomem.c/1.48/Wed Apr 15 16:46:34 2020//
 /vfs_cache.c/1.57/Mon Jun  4 19:42:54 2018//
 /vfs_getcwd.c/1.36/Thu May 30 13:34:54 2019//
@@ -73,14 +72,12 @@
 /kern_watchdog.c/1.15/Tue May 18 14:06:17 2021//
 /sched_bsd.c/1.67/Tue May 18 14:06:17 2021//
 /spec_vnops.c/1.104/Tue May 18 14:06:17 2021//
-/subr_disk.c/1.241/Tue May 18 14:06:17 2021//
 /subr_hibernate.c/1.126/Tue May 18 14:06:17 2021//
 /subr_log.c/1.74/Tue May 18 14:06:17 2021//
 /subr_percpu.c/1.9/Tue May 18 14:06:17 2021//
 /subr_pool.c/1.233/Tue May 18 14:06:17 2021//
 /subr_prf.c/1.103/Tue May 18 14:06:17 2021//
 /subr_witness.c/1.47/Tue May 18 14:06:17 2021//
-/sys_futex.c/1.17/Tue May 18 14:06:17 2021//
 /sys_generic.c/1.135/Tue May 18 14:06:17 2021//
 /sys_process.c/1.88/Tue May 18 14:06:17 2021//
 /syscalls.c/1.226/Tue May 18 14:06:17 2021//
@@ -89,12 +86,7 @@
 /tty.c/1.169/Sat May 22 14:20:29 2021//
 /tty_pty.c/1.108/Tue May 18 14:06:17 2021//
 /tty_tty.c/1.28/Tue May 18 14:06:17 2021//
-/uipc_domain.c/1.58/Sat May 22 14:20:29 2021//
 /uipc_mbuf.c/1.279/Tue May 18 14:06:17 2021//
-/uipc_socket.c/1.261/Tue May 18 14:06:17 2021//
-/uipc_socket2.c/1.109/Tue May 18 14:06:17 2021//
-/uipc_syscalls.c/1.190/Tue May 18 14:06:17 2021//
-/uipc_usrreq.c/1.147/Sat May 22 14:20:29 2021//
 /vfs_bio.c/1.205/Tue May 18 14:06:17 2021//
 /vfs_default.c/1.48/Tue May 18 14:06:17 2021//
 /vfs_lookup.c/1.84/Tue May 18 14:06:17 2021//
@@ -103,4 +95,12 @@
 /vfs_syscalls.c/1.349/Tue May 18 14:06:17 2021//
 /vfs_vnops.c/1.116/Tue May 18 14:06:17 2021//
 /vfs_vops.c/1.30/Tue May 18 14:06:17 2021//
+/subr_disk.c/1.242/Sun May 30 15:23:13 2021//
+/sys_futex.c/1.18/Sun May 30 15:23:13 2021//
+/uipc_domain.c/1.59/Sun May 30 15:23:13 2021//
+/uipc_proto.c/1.19/Sun May 30 15:23:13 2021//
+/uipc_socket.c/1.263/Sun May 30 15:23:13 2021//
+/uipc_socket2.c/1.110/Sun May 30 15:23:13 2021//
+/uipc_syscalls.c/1.191/Sun May 30 15:23:13 2021//
+/uipc_usrreq.c/1.148/Sun May 30 15:23:13 2021//
 D

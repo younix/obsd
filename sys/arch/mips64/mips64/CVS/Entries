@@ -16,7 +16,6 @@
 /clock.c/1.44/Tue May 18 14:06:16 2021//
 /context.S/1.63/Tue May 18 14:06:16 2021//
 /cp0access.S/1.23/Tue May 18 14:06:16 2021//
-/cpu.c/1.78/Tue May 18 14:06:16 2021//
 /db_machdep.c/1.56/Tue May 18 14:06:16 2021//
 /exception.S/1.43/Tue May 18 14:06:16 2021//
 /fp_emulate.c/1.24/Tue May 18 14:06:16 2021//
@@ -27,4 +26,5 @@
 /tlbhandler.S/1.52/Tue May 18 14:06:16 2021//
 /trap.c/1.154/Tue May 18 14:06:16 2021//
 /vm_machdep.c/1.41/Tue May 18 14:06:16 2021//
+/cpu.c/1.79/Sun May 30 15:23:09 2021//
 D

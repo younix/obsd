@@ -48,7 +48,6 @@
 /percpu.h/1.8/Tue Aug 28 15:15:02 2018//
 /pledge.h/1.41/Sun Apr  5 07:31:45 2020//
 /poll.h/1.15/Tue Jun  7 06:12:37 2016//
-/protosw.h/1.31/Tue Jan 23 20:49:58 2018//
 /ptrace.h/1.16/Mon Mar 16 11:58:46 2020//
 /radioio.h/1.5/Wed Jan 14 21:15:36 2015//
 /reboot.h/1.19/Sat May 23 00:40:53 2020//
@@ -107,13 +106,11 @@
 /queue.h/1.46/Sat May  1 08:41:52 2021//
 /sched.h/1.57/Sat May  1 08:41:52 2021//
 /smr.h/1.8/Sat May  1 08:41:52 2021//
-/timeout.h/1.40/Sat May  1 08:41:52 2021//
 /tree.h/1.30/Sat May  1 08:41:52 2021//
 /videoio.h/1.17/Sat May  1 08:41:52 2021//
 /acct.h/1.10/Tue May 18 14:06:17 2021//
 /conf.h/1.156/Tue May 18 14:06:17 2021//
 /disklabel.h/1.78/Tue May 18 14:06:17 2021//
-/domain.h/1.21/Tue May 18 14:06:17 2021//
 /event.h/1.54/Tue May 18 14:06:17 2021//
 /eventvar.h/1.11/Tue May 18 14:06:17 2021//
 /exec.h/1.44/Tue May 18 14:06:17 2021//
@@ -138,4 +135,7 @@
 /unpcb.h/1.18/Tue May 18 14:06:17 2021//
 /vnode.h/1.157/Tue May 18 14:06:17 2021//
 /wait.h/1.18/Tue May 18 14:06:17 2021//
+/domain.h/1.22/Sun May 30 15:23:13 2021//
+/protosw.h/1.32/Sun May 30 15:23:13 2021//
+/timeout.h/1.41/Sun May 30 15:23:13 2021//
 D
