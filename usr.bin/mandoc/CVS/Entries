@@ -89,13 +89,13 @@
 /tbl_term.c/1.62/Sat May  1 08:41:52 2021//
 /arch.c/1.14/Tue May 18 14:06:17 2021//
 /cgi.c/1.113/Tue May 18 14:06:17 2021//
-/html.c/1.144/Sat May 22 14:20:31 2021//
 /main.c/1.256/Tue May 18 14:06:17 2021//
 /mandoc.1/1.174/Tue May 18 14:06:17 2021//
 /mandoc.css/1.35/Tue May 18 14:06:17 2021//
 /mdoc_html.c/1.217/Tue May 18 14:06:17 2021//
-/tbl_data.c/1.42/Sat May 22 14:20:31 2021//
 /tbl_html.c/1.30/Tue May 18 14:06:17 2021//
 /term_tag.c/1.6/Tue May 18 14:06:17 2021//
 /term_tag.h/1.4/Tue May 18 14:06:17 2021//
+/html.c/1.144/Sun May 30 15:25:27 2021//
+/tbl_data.c/1.42/Sun May 30 15:25:27 2021//
 D

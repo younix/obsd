@@ -3,7 +3,6 @@
 /alarm.3/1.15/Thu Jan 28 22:11:39 2016//
 /alarm.c/1.9/Fri Jun 28 13:32:41 2019//
 /assert.c/1.9/Sat Sep 12 15:18:40 2015//
-/auth_subr.3/1.24/Sat Dec 21 06:01:09 2019//
 /authenticate.3/1.18/Wed Mar 30 06:58:06 2016//
 /authenticate.c/1.28/Wed Dec  4 06:25:45 2019//
 /clock.3/1.8/Wed Jun  5 03:39:22 2013//
@@ -230,4 +229,5 @@
 /fts.c/1.60/Tue May 18 14:06:16 2021//
 /glob.c/1.50/Wed May 19 15:54:45 2021//
 /sleep.c/1.13/Tue May 18 14:06:16 2021//
+/auth_subr.3/1.25/Tue Jun  1 14:03:12 2021//
 D

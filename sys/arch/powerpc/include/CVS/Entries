@@ -20,7 +20,6 @@
 /param.h/1.38/Fri Sep 14 13:58:20 2018//
 /pcb.h/1.15/Wed Jul 29 18:52:44 2015//
 /pio.h/1.9/Sun Sep 15 09:01:59 2002//
-/pmap.h/1.59/Thu Oct  8 10:20:14 2015//
 /powerpc.h/1.8/Tue Apr  1 20:42:39 2014//
 /proc.h/1.8/Thu Apr 13 03:52:25 2017//
 /profile.h/1.7/Mon Aug 19 08:39:30 2013//
@@ -37,5 +36,6 @@
 /cpu.h/1.68/Sat Jun  6 11:21:49 2020//
 /asm.h/1.16/Sat May  1 08:41:51 2021//
 /exec.h/1.16/Tue May 18 14:06:16 2021//
-/mplock.h/1.5/Sat May 22 14:20:25 2021//
+/mplock.h/1.5/Sun May 30 15:25:26 2021//
+/pmap.h/1.60/Tue Jun  1 14:03:32 2021//
 D

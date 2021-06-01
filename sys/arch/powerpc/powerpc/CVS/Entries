@@ -10,8 +10,8 @@
 /softintr.c/1.10/Thu Dec 17 19:39:58 2020//
 /sys_machdep.c/1.5/Thu Dec 17 19:39:58 2020//
 /setjmp.S/1.10/Sat May  1 08:41:51 2021//
-/lock_machdep.c/1.10/Sat May 22 14:20:25 2021//
 /pmap.c/1.175/Tue May 18 14:06:16 2021//
-/trap.c/1.121/Sat May 22 14:20:25 2021//
 /vm_machdep.c/1.52/Tue May 18 14:06:16 2021//
+/lock_machdep.c/1.10/Sun May 30 15:25:26 2021//
+/trap.c/1.121/Sun May 30 15:25:26 2021//
 D
