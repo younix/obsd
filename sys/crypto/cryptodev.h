@@ -1,4 +1,4 @@
-/*	$OpenBSD: cryptodev.h,v 1.71 2017/08/10 18:57:20 tedu Exp $	*/
+/*	$OpenBSD: cryptodev.h,v 1.74 2021/07/26 21:27:56 bluhm Exp $	*/
 
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
@@ -171,6 +171,7 @@ struct cryptop {
 
 #define CRYPTO_F_IMBUF	0x0001	/* Input/output are mbuf chains, otherwise contig */
 #define CRYPTO_F_IOV	0x0002	/* Input/output are uio */
+#define CRYPTO_F_MPSAFE	0x0004	/* Do not use kernel lock for callback */
 #define CRYPTO_F_NOQUEUE	0x0008	/* Don't use crypto queue/thread */
 #define CRYPTO_F_DONE	0x0010	/* request completed */
 
@@ -197,14 +198,11 @@ struct cryptop {
 struct cryptocap {
 	u_int64_t	cc_operations;	/* Counter of how many ops done */
 	u_int64_t	cc_bytes;	/* Counter of how many bytes done */
-	u_int64_t	cc_koperations;	/* How many PK ops done */
 
 	u_int32_t	cc_sessions;	/* How many sessions allocated */
 
 	/* Symmetric/hash algorithms supported */
 	int		cc_alg[CRYPTO_ALGORITHM_MAX + 1];
-
-	int		cc_queued;	/* Operations queued */
 
 	u_int8_t	cc_flags;
 #define CRYPTOCAP_F_CLEANUP     0x01
@@ -216,6 +214,7 @@ struct cryptocap {
 	int		(*cc_freesession) (u_int64_t);
 };
 
+void	crypto_init(void);
 
 int	crypto_newsession(u_int64_t *, struct cryptoini *, int);
 int	crypto_freesession(u_int64_t);

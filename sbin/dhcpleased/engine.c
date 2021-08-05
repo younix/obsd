@@ -1,4 +1,4 @@
-/*	$OpenBSD: engine.c,v 1.14 2021/05/01 11:51:59 florian Exp $	*/
+/*	$OpenBSD: engine.c,v 1.24 2021/08/04 05:56:58 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -101,7 +101,12 @@ struct dhcpleased_iface {
 	struct in_addr			 dhcp_server; /* for unicast */
 	struct in_addr			 requested_ip;
 	struct in_addr			 mask;
-	struct in_addr			 router;
+	struct in_addr			 siaddr;
+	char				 file[4 * DHCP_FILE_LEN + 1];
+	char				 hostname[4 * 255 + 1];
+	char				 domainname[4 * 255 + 1];
+	struct dhcp_route		 routes[MAX_DHCP_ROUTES];
+	int				 routes_len;
 	struct in_addr			 nameservers[MAX_RDNS_COUNT];
 	uint32_t			 lease_time;
 	uint32_t			 renewal_time;
@@ -140,6 +145,10 @@ int			 engine_imsg_compose_main(int, pid_t, void *, uint16_t);
 void			 log_dhcp_hdr(struct dhcp_hdr *);
 const char		*dhcp_message_type2str(uint8_t);
 
+#ifndef SMALL
+struct dhcpleased_conf	*engine_conf;
+#endif /* SMALL */
+
 static struct imsgev	*iev_frontend;
 static struct imsgev	*iev_main;
 int64_t			 proposal_id;
@@ -167,6 +176,10 @@ engine(int debug, int verbose)
 	struct event		 ev_sigint, ev_sigterm;
 	struct passwd		*pw;
 
+#ifndef SMALL
+	engine_conf = config_new_empty();
+#endif /* SMALL */
+
 	log_init(debug, LOG_DAEMON);
 	log_setverbose(verbose);
 
@@ -177,9 +190,9 @@ engine(int debug, int verbose)
 		fatal("chdir(\"/\")");
 
 	if (unveil("/", "") == -1)
-		fatal("unveil(\"/\", \"\")");
+		fatal("unveil /");
 	if (unveil(NULL, NULL) == -1)
-		fatal("unveil(NULL, NULL)");
+		fatal("unveil");
 
 	setproctitle("%s", "engine");
 	log_procinit("engine");
@@ -304,7 +317,7 @@ engine_dispatch_frontend(int fd, short event, void *bula)
 			memcpy(&if_index, imsg.data, sizeof(if_index));
 			engine_showinfo_ctl(&imsg, if_index);
 			break;
-		case IMSG_CTL_SEND_REQUEST:
+		case IMSG_REQUEST_REBOOT:
 			if (IMSG_DATA_SIZE(imsg) != sizeof(if_index))
 				fatalx("%s: IMSG_CTL_SEND_DISCOVER wrong "
 				    "length: %lu", __func__,
@@ -317,13 +330,13 @@ engine_dispatch_frontend(int fd, short event, void *bula)
 					break;
 				case IF_INIT:
 				case IF_REQUESTING:
+					state_transition(iface, iface->state);
+					break;
 				case IF_RENEWING:
 				case IF_REBINDING:
 				case IF_REBOOTING:
-					state_transition(iface, iface->state);
-					break;
 				case IF_BOUND:
-					state_transition(iface, IF_RENEWING);
+					state_transition(iface, IF_REBOOTING);
 					break;
 				}
 			}
@@ -370,12 +383,16 @@ engine_dispatch_frontend(int fd, short event, void *bula)
 void
 engine_dispatch_main(int fd, short event, void *bula)
 {
-	struct imsg		 imsg;
-	struct imsgev		*iev = bula;
-	struct imsgbuf		*ibuf = &iev->ibuf;
-	struct imsg_ifinfo	 imsg_ifinfo;
-	ssize_t			 n;
-	int			 shut = 0;
+#ifndef SMALL
+	static struct dhcpleased_conf	*nconf;
+	static struct iface_conf	*iface_conf;
+#endif /* SMALL */
+	struct imsg			 imsg;
+	struct imsgev			*iev = bula;
+	struct imsgbuf			*ibuf = &iev->ibuf;
+	struct imsg_ifinfo		 imsg_ifinfo;
+	ssize_t				 n;
+	int				 shut = 0;
 
 	if (event & EV_READ) {
 		if ((n = imsg_read(ibuf)) == -1 && errno != EAGAIN)
@@ -434,6 +451,69 @@ engine_dispatch_main(int fd, short event, void *bula)
 			memcpy(&imsg_ifinfo, imsg.data, sizeof(imsg_ifinfo));
 			engine_update_iface(&imsg_ifinfo);
 			break;
+#ifndef SMALL
+		case IMSG_RECONF_CONF:
+			if (nconf != NULL)
+				fatalx("%s: IMSG_RECONF_CONF already in "
+				    "progress", __func__);
+			if ((nconf = malloc(sizeof(struct dhcpleased_conf))) ==
+			    NULL)
+				fatal(NULL);
+			SIMPLEQ_INIT(&nconf->iface_list);
+			break;
+		case IMSG_RECONF_IFACE:
+			if (IMSG_DATA_SIZE(imsg) != sizeof(struct
+			    iface_conf))
+				fatalx("%s: IMSG_RECONF_IFACE wrong length: "
+				    "%lu", __func__, IMSG_DATA_SIZE(imsg));
+			if ((iface_conf = malloc(sizeof(struct iface_conf)))
+			    == NULL)
+				fatal(NULL);
+			memcpy(iface_conf, imsg.data, sizeof(struct
+			    iface_conf));
+			iface_conf->vc_id = NULL;
+			iface_conf->vc_id_len = 0;
+			iface_conf->c_id = NULL;
+			iface_conf->c_id_len = 0;
+			SIMPLEQ_INSERT_TAIL(&nconf->iface_list,
+			    iface_conf, entry);
+			break;
+		case IMSG_RECONF_VC_ID:
+			if (iface_conf == NULL)
+				fatal("IMSG_RECONF_VC_ID without "
+				    "IMSG_RECONF_IFACE");
+			if (IMSG_DATA_SIZE(imsg) > 255 + 2)
+				fatalx("%s: IMSG_RECONF_VC_ID wrong length: "
+				    "%lu", __func__, IMSG_DATA_SIZE(imsg));
+			if ((iface_conf->vc_id = malloc(IMSG_DATA_SIZE(imsg)))
+			    == NULL)
+				fatal(NULL);
+			memcpy(iface_conf->vc_id, imsg.data,
+			    IMSG_DATA_SIZE(imsg));
+			iface_conf->vc_id_len = IMSG_DATA_SIZE(imsg);
+			break;
+		case IMSG_RECONF_C_ID:
+			if (iface_conf == NULL)
+				fatal("IMSG_RECONF_C_ID without "
+				    "IMSG_RECONF_IFACE");
+			if (IMSG_DATA_SIZE(imsg) > 255 + 2)
+				fatalx("%s: IMSG_RECONF_C_ID wrong length: "
+				    "%lu", __func__, IMSG_DATA_SIZE(imsg));
+			if ((iface_conf->c_id = malloc(IMSG_DATA_SIZE(imsg)))
+			    == NULL)
+				fatal(NULL);
+			memcpy(iface_conf->c_id, imsg.data,
+			    IMSG_DATA_SIZE(imsg));
+			iface_conf->c_id_len = IMSG_DATA_SIZE(imsg);
+			break;
+		case IMSG_RECONF_END:
+			if (nconf == NULL)
+				fatalx("%s: IMSG_RECONF_END without "
+				    "IMSG_RECONF_CONF", __func__);
+			merge_config(engine_conf, nconf);
+			nconf = NULL;
+			break;
+#endif /* SMALL */
 		default:
 			log_debug("%s: unexpected imsg %d", __func__,
 			    imsg.hdr.type);
@@ -467,7 +547,8 @@ send_interface_info(struct dhcpleased_iface *iface, pid_t pid)
 	cei.dhcp_server.s_addr = iface->dhcp_server.s_addr;
 	cei.requested_ip.s_addr = iface->requested_ip.s_addr;
 	cei.mask.s_addr = iface->mask.s_addr;
-	cei.router.s_addr = iface->router.s_addr;
+	cei.routes_len = iface->routes_len;
+	memcpy(cei.routes, iface->routes, sizeof(cei.routes));
 	memcpy(cei.nameservers, iface->nameservers, sizeof(cei.nameservers));
 	cei.lease_time = iface->lease_time;
 	cei.renewal_time = iface->renewal_time;
@@ -594,28 +675,40 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 {
 	static uint8_t		 cookie[] = DHCP_COOKIE;
 	static struct ether_addr bcast_mac;
+#ifndef SMALL
+	struct iface_conf	*iface_conf;
+#endif /* SMALL */
 	struct ether_header	*eh;
 	struct ether_addr	 ether_src, ether_dst;
 	struct ip		*ip;
 	struct udphdr		*udp;
 	struct dhcp_hdr		*dhcp_hdr;
-	struct in_addr		 server_identifier, subnet_mask, router;
+	struct in_addr		 server_identifier, subnet_mask;
 	struct in_addr		 nameservers[MAX_RDNS_COUNT];
+	struct dhcp_route	 routes[MAX_DHCP_ROUTES];
 	size_t			 rem, i;
 	uint32_t		 sum, usum, lease_time = 0, renewal_time = 0;
 	uint32_t		 rebinding_time = 0;
 	uint8_t			*p, dho = DHO_PAD, dho_len;
 	uint8_t			 dhcp_message_type = 0;
+	int			 routes_len = 0, routers = 0, csr = 0;
 	char			 from[sizeof("xx:xx:xx:xx:xx:xx")];
 	char			 to[sizeof("xx:xx:xx:xx:xx:xx")];
 	char			 hbuf_src[INET_ADDRSTRLEN];
 	char			 hbuf_dst[INET_ADDRSTRLEN];
 	char			 hbuf[INET_ADDRSTRLEN];
-	char			 vis_buf[4 * 255 + 1];
+	char			 domainname[4 * 255 + 1];
+	char			 hostname[4 * 255 + 1];
 	char			 ifnamebuf[IF_NAMESIZE], *if_name;
 
 	if (bcast_mac.ether_addr_octet[0] == 0)
 		memset(bcast_mac.ether_addr_octet, 0xff, ETHER_ADDR_LEN);
+
+	if_name = if_indextoname(iface->if_index, ifnamebuf);
+
+#ifndef SMALL
+	iface_conf = find_iface_conf(&engine_conf->iface_list, if_name);
+#endif /* SMALL*/
 
 	memset(hbuf_src, 0, sizeof(hbuf_src));
 	memset(hbuf_dst, 0, sizeof(hbuf_dst));
@@ -744,7 +837,7 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 
 	memset(&server_identifier, 0, sizeof(server_identifier));
 	memset(&subnet_mask, 0, sizeof(subnet_mask));
-	memset(&router, 0, sizeof(router));
+	memset(&routes, 0, sizeof(routes));
 	memset(&nameservers, 0, sizeof(nameservers));
 
 	while (rem > 0 && dho != DHO_END) {
@@ -822,19 +915,39 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 			rem -= dho_len;
 			break;
 		case DHO_ROUTERS:
-			if (dho_len < sizeof(router))
+			if (dho_len < sizeof(routes[routes_len].gw))
 				goto wrong_length;
-			if (dho_len % sizeof(router) != 0)
+			if (dho_len % sizeof(routes[routes_len].gw) != 0)
 				goto wrong_length;
-			/* we only use one router */
-			memcpy(&router, p, sizeof(router));
-			if (log_getverbose() > 1) {
-				log_debug("DHO_ROUTER: %s (1/%lu)",
-				    inet_ntop(AF_INET, &router, hbuf,
-				    sizeof(hbuf)), dho_len / sizeof(router));
+
+			/*
+			 * Ignore routers option if classless static routes
+			 * are present (RFC3442).
+			 */
+			if (!csr) {
+				routers = 1;
+				while (routes_len < MAX_DHCP_ROUTES &&
+				    dho_len > 0) {
+					memcpy(&routes[routes_len].gw, p,
+					    sizeof(routes[routes_len].gw));
+					if (log_getverbose() > 1) {
+						log_debug("DHO_ROUTER: %s",
+						    inet_ntop(AF_INET,
+						    &routes[routes_len].gw,
+						    hbuf, sizeof(hbuf)));
+					}
+					p += sizeof(routes[routes_len].gw);
+					rem -= sizeof(routes[routes_len].gw);
+					dho_len -=
+					    sizeof(routes[routes_len].gw);
+					routes_len++;
+				}
 			}
-			p += dho_len;
-			rem -= dho_len;
+			if (dho_len != 0) {
+				/* ignore > MAX_DHCP_ROUTES routes */
+				p += dho_len;
+				rem -= dho_len;
+			}
 			break;
 		case DHO_DOMAIN_NAME_SERVERS:
 			if (dho_len < sizeof(nameservers[0]))
@@ -857,13 +970,21 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 			p += dho_len;
 			rem -= dho_len;
 			break;
+		case DHO_HOST_NAME:
+			if ( dho_len < 1)
+				goto wrong_length;
+			strvisx(hostname, p, dho_len, VIS_SAFE);
+			if (log_getverbose() > 1)
+				log_debug("DHO_HOST_NAME: %s", hostname);
+			p += dho_len;
+			rem -= dho_len;
+			break;
 		case DHO_DOMAIN_NAME:
 			if ( dho_len < 1)
 				goto wrong_length;
-			if (log_getverbose() > 1) {
-				strvisx(vis_buf, p, dho_len, VIS_SAFE);
-				log_debug("DHO_DOMAIN_NAME: %s", vis_buf);
-			}
+			strvisx(domainname, p, dho_len, VIS_SAFE);
+			if (log_getverbose() > 1)
+				log_debug("DHO_DOMAIN_NAME: %s", domainname);
 			p += dho_len;
 			rem -= dho_len;
 			break;
@@ -893,21 +1014,100 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 			break;
 		case DHO_DHCP_CLIENT_IDENTIFIER:
 			/* the server is supposed to echo this back to us */
-			if (dho_len != 1 + sizeof(iface->hw_address))
-				goto wrong_length;
-			if (*p != HTYPE_ETHER) {
-				log_warn("DHO_DHCP_CLIENT_IDENTIFIER: wrong "
-				    "type");
-				return;
-			}
-			if (memcmp(p + 1, &iface->hw_address,
-			    sizeof(iface->hw_address)) != 0) {
-				log_warn("wrong DHO_DHCP_CLIENT_IDENTIFIER");
-				return;
+#ifndef SMALL
+			if (iface_conf != NULL && iface_conf->c_id_len > 0) {
+				if (dho_len != iface_conf->c_id[1]) {
+					log_warnx("wrong "
+					    "DHO_DHCP_CLIENT_IDENTIFIER");
+					return;
+				}
+				if (memcmp(p, &iface_conf->c_id[2], dho_len) !=
+				    0) {
+					log_warnx("wrong "
+					    "DHO_DHCP_CLIENT_IDENTIFIER");
+					return;
+				}
+			} else
+#endif /* SMALL */
+			{
+				if (dho_len != 1 + sizeof(iface->hw_address))
+					goto wrong_length;
+				if (*p != HTYPE_ETHER) {
+					log_warnx("DHO_DHCP_CLIENT_IDENTIFIER: "
+					    "wrong type");
+					return;
+				}
+				if (memcmp(p + 1, &iface->hw_address,
+				    sizeof(iface->hw_address)) != 0) {
+					log_warnx("wrong "
+					    "DHO_DHCP_CLIENT_IDENTIFIER");
+					return;
+				}
 			}
 			p += dho_len;
 			rem -= dho_len;
 			break;
+		case DHO_CLASSLESS_STATIC_ROUTES: {
+			int	prefixlen, compressed_prefixlen;
+
+			csr = 1;
+			if (routers) {
+				/*
+				 * Ignore routers option if classless static
+				 * routes are present (RFC3442).
+				 */
+				routers = 0;
+				routes_len = 0;
+			}
+			while (routes_len < MAX_DHCP_ROUTES && dho_len > 0) {
+				prefixlen = *p;
+				p += 1;
+				rem -= 1;
+				dho_len -= 1;
+
+				if (prefixlen < 0 || prefixlen > 32) {
+					log_warnx("%s: invalid prefixlen: %d",
+					    __func__, prefixlen);
+					return;
+				}
+
+				if (prefixlen > 0)
+					routes[routes_len].mask.s_addr =
+					    htonl(0xffffffff << (32 -
+						prefixlen));
+				else
+					routes[routes_len].mask.s_addr =
+					    INADDR_ANY;
+
+				compressed_prefixlen = (prefixlen + 7) / 8;
+				if (dho_len < compressed_prefixlen)
+					goto wrong_length;
+
+				memcpy(&routes[routes_len].dst, p,
+				    compressed_prefixlen);
+				p += compressed_prefixlen;
+				rem -= compressed_prefixlen;
+				dho_len -= compressed_prefixlen;
+
+				if (dho_len < sizeof(routes[routes_len].gw))
+					goto wrong_length;
+
+				memcpy(&routes[routes_len].gw, p,
+				    sizeof(routes[routes_len].gw));
+				p += sizeof(routes[routes_len].gw);
+				rem -= sizeof(routes[routes_len].gw);
+				dho_len -= sizeof(routes[routes_len].gw);
+
+				routes_len++;
+			}
+
+			if (dho_len != 0) {
+				/* ignore > MAX_DHCP_ROUTES routes */
+				p += dho_len;
+				rem -= dho_len;
+			}
+			break;
+		}
 		default:
 			if (log_getverbose() > 1)
 				log_debug("DHO_%u, len: %u", dho, dho_len);
@@ -926,7 +1126,6 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 		log_warnx("%s: %lu bytes garbage data from %s", __func__, rem,
 		    from);
 
-	if_name = if_indextoname(iface->if_index, ifnamebuf);
 	log_debug("%s on %s from %s/%s to %s/%s",
 	    dhcp_message_type2str(dhcp_message_type), if_name == NULL ? "?" :
 	    if_name, from, hbuf_src, to, hbuf_dst);
@@ -974,6 +1173,12 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 			return;
 		}
 
+		/* Defaults if we didn't receive renewal or rebinding time. */
+		if (renewal_time == 0)
+			renewal_time = lease_time / 2;
+		if (rebinding_time == 0)
+			rebinding_time = lease_time - (lease_time / 8);
+
 		/* RFC 2131 4.4.5 */
 		/* Ignore invalid T1/T2 options */
 		if (renewal_time >= rebinding_time) {
@@ -988,6 +1193,7 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 			renewal_time = rebinding_time = 0;
 		}
 
+		/* Defaults if we received wrong renewal or rebinding time. */
 		if (renewal_time == 0)
 			renewal_time = lease_time / 2;
 		if (rebinding_time == 0)
@@ -997,12 +1203,23 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 		iface->server_identifier.s_addr = server_identifier.s_addr;
 		iface->requested_ip.s_addr = dhcp_hdr->yiaddr.s_addr;
 		iface->mask.s_addr = subnet_mask.s_addr;
-		iface->router.s_addr = router.s_addr;
+		iface->routes_len = routes_len;
+		memcpy(iface->routes, routes, sizeof(iface->routes));
 		iface->lease_time = lease_time;
 		iface->renewal_time = renewal_time;
 		iface->rebinding_time = rebinding_time;
 		memcpy(iface->nameservers, nameservers,
 		    sizeof(iface->nameservers));
+
+		iface->siaddr.s_addr = dhcp_hdr->siaddr.s_addr;
+
+		/* we made sure this is a string futher up */
+		strnvis(iface->file, dhcp_hdr->file, sizeof(iface->file),
+		    VIS_SAFE);
+
+		strlcpy(iface->domainname, domainname,
+		    sizeof(iface->domainname));
+		strlcpy(iface->hostname, hostname, sizeof(iface->hostname));
 		state_transition(iface, IF_BOUND);
 		break;
 	case DHCPNAK:
@@ -1172,7 +1389,7 @@ iface_timeout(int fd, short events, void *arg)
 			state_transition(iface, IF_REBOOTING);
 		break;
 	case IF_REQUESTING:
-		if (iface->timo.tv_sec >= MAX_EXP_BACKOFF_FAST)
+		if (iface->timo.tv_sec >= MAX_EXP_BACKOFF_SLOW)
 			state_transition(iface, IF_INIT);
 		else
 			state_transition(iface, IF_REQUESTING);
@@ -1262,7 +1479,12 @@ send_configure_interface(struct dhcpleased_iface *iface)
 	imsg.rdomain = iface->rdomain;
 	imsg.addr.s_addr = iface->requested_ip.s_addr;
 	imsg.mask.s_addr = iface->mask.s_addr;
-	imsg.router.s_addr = iface->router.s_addr;
+	imsg.siaddr.s_addr = iface->siaddr.s_addr;
+	strlcpy(imsg.file, iface->file, sizeof(imsg.file));
+	strlcpy(imsg.domainname, iface->domainname, sizeof(imsg.domainname));
+	strlcpy(imsg.hostname, iface->hostname, sizeof(imsg.hostname));
+	imsg.routes_len = iface->routes_len;
+	memcpy(imsg.routes, iface->routes, sizeof(imsg.routes));
 	engine_imsg_compose_main(IMSG_CONFIGURE_INTERFACE, 0, &imsg,
 	    sizeof(imsg));
 }
@@ -1281,7 +1503,12 @@ send_deconfigure_interface(struct dhcpleased_iface *iface)
 	imsg.rdomain = iface->rdomain;
 	imsg.addr.s_addr = iface->requested_ip.s_addr;
 	imsg.mask.s_addr = iface->mask.s_addr;
-	imsg.router.s_addr = iface->router.s_addr;
+	imsg.siaddr.s_addr = iface->siaddr.s_addr;
+	strlcpy(imsg.file, iface->file, sizeof(imsg.file));
+	strlcpy(imsg.domainname, iface->domainname, sizeof(imsg.domainname));
+	strlcpy(imsg.hostname, iface->hostname, sizeof(imsg.hostname));
+	imsg.routes_len = iface->routes_len;
+	memcpy(imsg.routes, iface->routes, sizeof(imsg.routes));
 	engine_imsg_compose_main(IMSG_DECONFIGURE_INTERFACE, 0, &imsg,
 	    sizeof(imsg));
 
@@ -1289,7 +1516,8 @@ send_deconfigure_interface(struct dhcpleased_iface *iface)
 	iface->dhcp_server.s_addr = INADDR_ANY;
 	iface->requested_ip.s_addr = INADDR_ANY;
 	iface->mask.s_addr = INADDR_ANY;
-	iface->router.s_addr = INADDR_ANY;
+	iface->routes_len = 0;
+	memset(iface->routes, 0, sizeof(iface->routes));
 }
 
 void
@@ -1375,10 +1603,10 @@ parse_lease(struct dhcpleased_iface *iface, struct imsg_ifinfo *imsg_ifinfo)
 
 	iface->requested_ip.s_addr = INADDR_ANY;
 
-	if ((p = strstr(imsg_ifinfo->lease, LEASE_PREFIX)) == NULL)
+	if ((p = strstr(imsg_ifinfo->lease, LEASE_IP_PREFIX)) == NULL)
 		return;
 
-	p += sizeof(LEASE_PREFIX) - 1;
+	p += sizeof(LEASE_IP_PREFIX) - 1;
 	if ((p1 = strchr(p, '\n')) == NULL)
 		return;
 	*p1 = '\0';
@@ -1390,6 +1618,7 @@ parse_lease(struct dhcpleased_iface *iface, struct imsg_ifinfo *imsg_ifinfo)
 void
 log_dhcp_hdr(struct dhcp_hdr *dhcp_hdr)
 {
+#ifndef	SMALL
 	char	 hbuf[INET_ADDRSTRLEN];
 
 	log_debug("dhcp_hdr op: %s (%d)", dhcp_hdr->op == DHCP_BOOTREQUEST ?
@@ -1419,6 +1648,7 @@ log_dhcp_hdr(struct dhcp_hdr *dhcp_hdr)
 	    dhcp_hdr->chaddr[12], dhcp_hdr->chaddr[13], dhcp_hdr->chaddr[14],
 	    dhcp_hdr->chaddr[15]);
 	/* ignore sname and file, if we ever print it use strvis(3) */
+#endif
 }
 
 const char *

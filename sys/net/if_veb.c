@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_veb.c,v 1.18 2021/05/27 03:43:23 dlg Exp $ */
+/*	$OpenBSD: if_veb.c,v 1.20 2021/07/07 20:19:01 sashan Exp $ */
 
 /*
  * Copyright (c) 2021 David Gwynne <dlg@openbsd.org>
@@ -208,6 +208,9 @@ static void	*veb_eb_port_take(void *, void *);
 static void	 veb_eb_port_rele(void *, void *);
 static size_t	 veb_eb_port_ifname(void *, char *, size_t, void *);
 static void	 veb_eb_port_sa(void *, struct sockaddr_storage *, void *);
+
+static void	 veb_eb_brport_take(void *);
+static void	 veb_eb_brport_rele(void *);
 
 static const struct etherbridge_ops veb_etherbridge_ops = {
 	veb_eb_port_cmp,
@@ -495,12 +498,31 @@ veb_rule_filter(struct veb_port *p, int dir, struct mbuf *m,
 }
 
 #if NPF > 0
+struct veb_pf_ip_family {
+	sa_family_t	   af;
+	struct mbuf	*(*ip_check)(struct ifnet *, struct mbuf *);
+	void		 (*ip_input)(struct ifnet *, struct mbuf *);
+};
+
+static const struct veb_pf_ip_family veb_pf_ipv4 = {
+	.af		= AF_INET,
+	.ip_check	= ipv4_check,
+	.ip_input	= ipv4_input,
+};
+
+#ifdef INET6
+static const struct veb_pf_ip_family veb_pf_ipv6 = {
+	.af		= AF_INET6,
+	.ip_check	= ipv6_check,
+	.ip_input	= ipv6_input,
+};
+#endif
+
 static struct mbuf *
 veb_pf(struct ifnet *ifp0, int dir, struct mbuf *m)
 {
 	struct ether_header *eh, copy;
-	sa_family_t af = AF_UNSPEC;
-	void (*ip_input)(struct ifnet *, struct mbuf *) = NULL;
+	const struct veb_pf_ip_family *fam;
 
 	/*
 	 * pf runs on vport interfaces when they enter or leave the
@@ -515,13 +537,11 @@ veb_pf(struct ifnet *ifp0, int dir, struct mbuf *m)
 	eh = mtod(m, struct ether_header *);
 	switch (ntohs(eh->ether_type)) {
 	case ETHERTYPE_IP:
-		af = AF_INET;
-		ip_input = ipv4_input;
+		fam = &veb_pf_ipv4;
 		break;
 #ifdef INET6
 	case ETHERTYPE_IPV6:
-		af = AF_INET6;
-		ip_input = ipv6_input;
+		fam = &veb_pf_ipv6;
 		break;
 #endif
 	default:
@@ -531,7 +551,13 @@ veb_pf(struct ifnet *ifp0, int dir, struct mbuf *m)
 	copy = *eh;
 	m_adj(m, sizeof(*eh));
 
-	if (pf_test(af, dir, ifp0, &m) != PF_PASS) {
+	if (dir == PF_IN) {
+		m = (*fam->ip_check)(ifp0, m);
+		if (m == NULL)
+			return (NULL);
+	}
+
+	if (pf_test(fam->af, dir, ifp0, &m) != PF_PASS) {
 		m_freem(m);
 		return (NULL);
 	}
@@ -541,7 +567,7 @@ veb_pf(struct ifnet *ifp0, int dir, struct mbuf *m)
 	if (dir == PF_IN && ISSET(m->m_pkthdr.pf.flags, PF_TAG_DIVERTED)) {
 		pf_mbuf_unlink_state_key(m);
 		pf_mbuf_unlink_inpcb(m);
-		(*ip_input)(ifp0, m);
+		(*fam->ip_input)(ifp0, m);
 		return (NULL);
 	}
 
@@ -1037,8 +1063,13 @@ veb_port_input(struct ifnet *ifp0, struct mbuf *m, uint64_t dst, void *brport)
 
 		smr_read_enter();
 		tp = etherbridge_resolve(&sc->sc_eb, dst);
-		m = veb_transmit(sc, p, tp, m, src, dst);
+		if (tp != NULL)
+			veb_eb_port_take(NULL, tp);
 		smr_read_leave();
+		if (tp != NULL) {
+			m = veb_transmit(sc, p, tp, m, src, dst);
+			veb_eb_port_rele(NULL, tp);
+		}
 
 		if (m == NULL)
 			return (NULL);
@@ -1267,6 +1298,9 @@ veb_add_port(struct veb_softc *sc, const struct ifbreq *req, unsigned int span)
 		p->p_bif_flags = IFBIF_LEARNING | IFBIF_DISCOVER;
 		p->p_brport.eb_input = veb_port_input;
 	}
+
+	p->p_brport.eb_port_take = veb_eb_brport_take;
+	p->p_brport.eb_port_rele = veb_eb_brport_rele;
 
 	/* this might have changed if we slept for malloc or ifpromisc */
 	error = ether_brport_isset(ifp0);
@@ -1887,8 +1921,8 @@ veb_p_dtor(struct veb_softc *sc, struct veb_port *p, const char *op)
 	SMR_TAILQ_REMOVE_LOCKED(&port_list->l_list, p, p_entry);
 	port_list->l_count--;
 
-	smr_barrier();
 	refcnt_finalize(&p->p_refs, "vebpdtor");
+	smr_barrier();
 
 	veb_rule_list_free(TAILQ_FIRST(&p->p_vrl));
 
@@ -1991,6 +2025,18 @@ veb_eb_port_rele(void *arg, void *port)
 	struct veb_port *p = port;
 
 	refcnt_rele_wake(&p->p_refs);
+}
+
+static void
+veb_eb_brport_take(void *port)
+{
+	veb_eb_port_take(NULL, port);
+}
+
+static void
+veb_eb_brport_rele(void *port)
+{
+	veb_eb_port_rele(NULL, port);
 }
 
 static size_t
@@ -2158,6 +2204,9 @@ vport_enqueue(struct ifnet *ifp, struct mbuf *m)
 
 	smr_read_enter();
 	eb = SMR_PTR_GET(&ac->ac_brport);
+	if (eb != NULL)
+		eb->eb_port_take(eb->eb_port);
+	smr_read_leave();
 	if (eb != NULL) {
 		struct ether_header *eh;
 		uint64_t dst;
@@ -2176,8 +2225,9 @@ vport_enqueue(struct ifnet *ifp, struct mbuf *m)
 		m = (*eb->eb_input)(ifp, m, dst, eb->eb_port);
 
 		error = 0;
+
+		eb->eb_port_rele(eb->eb_port);
 	}
-	smr_read_leave();
 
 	m_freem(m);
 

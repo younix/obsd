@@ -1,4 +1,4 @@
-/*	$OpenBSD: pipex_local.h,v 1.41 2021/01/04 12:21:38 mvs Exp $	*/
+/*	$OpenBSD: pipex_local.h,v 1.43 2021/07/27 09:29:09 mvs Exp $	*/
 
 /*
  * Copyright (c) 2009 Internet Initiative Japan Inc.
@@ -57,22 +57,25 @@
  * Locks used to protect struct members:
  *      I       immutable after creation
  *      N       net lock
+ *      s       this pipex_session' `pxs_mtx'
+ *      m       this pipex_mppe' `pxm_mtx'
  */
 
 #ifdef PIPEX_MPPE
 /* mppe rc4 key */
 struct pipex_mppe {
+	struct mutex pxm_mtx;
 	int16_t	stateless:1,			/* [I] key change mode */
-		resetreq:1,			/* [N] */
+		resetreq:1,			/* [m] */
 		reserved:14;
 	int16_t	keylenbits;			/* [I] key length */
 	int16_t keylen;				/* [I] */
-	uint16_t coher_cnt;			/* [N] cohency counter */
-	struct  rc4_ctx rc4ctx;			/* [N] */
-	u_char master_key[PIPEX_MPPE_KEYLEN];	/* [N] master key of MPPE */
-	u_char session_key[PIPEX_MPPE_KEYLEN];	/* [N] session key of MPPE */
+	uint16_t coher_cnt;			/* [m] cohency counter */
+	struct  rc4_ctx rc4ctx;			/* [m] */
+	u_char master_key[PIPEX_MPPE_KEYLEN];	/* [m] master key of MPPE */
+	u_char session_key[PIPEX_MPPE_KEYLEN];	/* [m] session key of MPPE */
 	u_char (*old_session_keys)[PIPEX_MPPE_KEYLEN];
-						/* [N] old session keys */
+						/* [m] old session keys */
 };
 #endif /* PIPEX_MPPE */
 
@@ -148,12 +151,16 @@ struct pipex_l2tp_session {
 };
 #endif /* PIPEX_L2TP */
 
+struct cpumem;
+
 /* pppac ip-extension sessoin table */
 struct pipex_session {
 	struct radix_node	ps4_rn[2];
 					/* [N] tree glue, and other values */
 	struct radix_node	ps6_rn[2];
 					/* [N] tree glue, and other values */
+	struct mutex pxs_mtx;
+
 	LIST_ENTRY(pipex_session) session_list;	/* [N] all session chain */
 	LIST_ENTRY(pipex_session) state_list;	/* [N] state list chain */
 	LIST_ENTRY(pipex_session) id_chain;	/* [N] id hash chain */
@@ -166,6 +173,7 @@ struct pipex_session {
 #define PIPEX_STATE_CLOSE_WAIT2		0x0003
 #define PIPEX_STATE_CLOSED		0x0004
 
+	uint32_t	idle_time;	/* [N] idle time in seconds */
 	uint16_t	ip_forward:1,	/* [N] {en|dis}ableIP forwarding */
 			ip6_forward:1,	/* [I] {en|dis}able IPv6 forwarding */
 			is_multicast:1,	/* [I] virtual entry for multicast */
@@ -188,12 +196,14 @@ struct pipex_session {
 
 	uint32_t	ppp_flags;		/* [I] configure flags */
 #ifdef PIPEX_MPPE
-	int ccp_id;				/* [N] CCP packet id */
+	int ccp_id;				/* [s] CCP packet id */
 	struct pipex_mppe
 	    mppe_recv,				/* MPPE context for incoming */
 	    mppe_send;				/* MPPE context for outgoing */ 
 #endif /*PIPEXMPPE */
-	struct pipex_statistics stat;		/* [N] statistics */
+
+	struct cpumem	*stat_counters;
+
 	union {
 #ifdef PIPEX_PPPOE
 		struct pipex_pppoe_session pppoe;	/* context for PPPoE */
@@ -212,6 +222,16 @@ struct pipex_session {
 		struct sockaddr_in6	sin6;
 		struct sockaddr_dl	sdl;
 	} peer, local;					/* [I] */
+};
+
+enum pipex_counters {
+	pxc_ipackets,	/* packets received from tunnel */
+	pxc_ierrors,	/* error packets received from tunnel */
+	pxc_ibytes,	/* number of received bytes from tunnel */
+	pxc_opackets,	/* packets sent to tunnel */
+	pxc_oerrors,	/* error packets on sending to tunnel */
+	pxc_obytes,	/* number of sent bytes to tunnel */
+	pxc_ncounters
 };
 
 /* gre header */
@@ -384,6 +404,8 @@ void                  pipex_rele_session(struct pipex_session *);
 int                   pipex_link_session(struct pipex_session *,
                           struct ifnet *, void *);
 void                  pipex_unlink_session(struct pipex_session *);
+void                  pipex_export_session_stats(struct pipex_session *,
+                          struct pipex_statistics *);
 int                   pipex_config_session (struct pipex_session_config_req *,
                           void *);
 int                   pipex_get_stat (struct pipex_session_stat_req *,

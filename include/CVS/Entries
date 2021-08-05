@@ -11,7 +11,6 @@
 /db.h/1.12/Sat Oct 17 21:48:42 2015//
 /dirent.h/1.34/Fri Sep  9 18:12:37 2016//
 /disktab.h/1.3/Mon Jun  2 19:34:12 2003//
-/dlfcn.h/1.14/Tue Nov 28 17:19:47 2017//
 /elf.h/1.1/Tue Oct 17 09:34:52 2017//
 /elf_abi.h/1.4/Wed May 22 07:46:22 1996//
 /err.h/1.13/Mon Aug 31 02:53:56 2015//
@@ -36,7 +35,6 @@
 /link.h/1.15/Sat Oct 19 09:00:18 2013//
 /link_elf.h/1.7/Tue Sep 20 18:24:55 2016//
 /locale.h/1.11/Tue Sep  5 03:16:13 2017//
-/login_cap.h/1.16/Sun Jul 29 19:40:41 2018//
 /math.h/1.36/Sat Mar 10 20:52:58 2018//
 /md5.h/1.17/Wed Dec  5 23:19:57 2012//
 /memory.h/1.3/Mon Jun  2 19:34:12 2003//
@@ -89,5 +87,7 @@ D/rpcsvc////
 /tib.h/1.8/Fri Dec 11 17:58:18 2020//
 /assert.h/1.15/Thu Dec 17 19:39:57 2020//
 /stdio.h/1.54/Thu Dec 17 19:39:57 2020//
-/Makefile/1.228/Sat May  1 08:41:50 2021//
 /libgen.h/1.10/Sat May  1 08:41:50 2021//
+/Makefile/1.229/Thu Aug  5 11:01:19 2021//
+/dlfcn.h/1.15/Thu Aug  5 11:01:19 2021//
+/login_cap.h/1.17/Thu Aug  5 11:01:19 2021//

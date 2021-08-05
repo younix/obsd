@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_syscalls.c,v 1.349 2021/02/11 12:08:21 claudio Exp $	*/
+/*	$OpenBSD: vfs_syscalls.c,v 1.352 2021/07/16 07:59:38 claudio Exp $	*/
 /*	$NetBSD: vfs_syscalls.c,v 1.71 1996/04/23 10:29:02 mycroft Exp $	*/
 
 /*
@@ -339,7 +339,6 @@ checkdirs(struct vnode *olddp)
 			vref(newdp);
 			fdp->fd_rdir = newdp;
 		}
-		pr->ps_uvpcwd = NULL;
 	}
 	if (rootvnode == olddp) {
 		free_count++;
@@ -791,7 +790,6 @@ sys_chdir(struct proc *p, void *v, register_t *retval)
 	nd.ni_unveil = UNVEIL_READ;
 	if ((error = change_dir(&nd, p)) != 0)
 		return (error);
-	p->p_p->ps_uvpcwd = nd.ni_unveil_match;
 	old_cdir = fdp->fd_cdir;
 	fdp->fd_cdir = nd.ni_vp;
 	vrele(old_cdir);
@@ -923,8 +921,8 @@ sys___realpath(struct proc *p, void *v, register_t *retval)
 		if (*c != '/')
 			break;
 	}
-	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF | SAVENAME | REALPATH,
-	    UIO_SYSSPACE, pathname, p);
+	NDINIT(&nd, LOOKUP, FOLLOW | SAVENAME | REALPATH, UIO_SYSSPACE,
+	    pathname, p);
 
 	nd.ni_cnd.cn_rpbuf = rpbuf;
 	nd.ni_cnd.cn_rpi = strlen(rpbuf);
@@ -934,11 +932,10 @@ sys___realpath(struct proc *p, void *v, register_t *retval)
 	if ((error = namei(&nd)) != 0)
 		goto end;
 
-	/* release lock and reference from namei */
-	if (nd.ni_vp) {
-		VOP_UNLOCK(nd.ni_vp);
+	/* release reference from namei */
+	if (nd.ni_vp)
 		vrele(nd.ni_vp);
-	}
+
 	error = copyoutstr(nd.ni_cnd.cn_rpbuf, SCARG(uap, resolved),
 	    MAXPATHLEN, NULL);
 
@@ -1008,7 +1005,7 @@ sys_unveil(struct proc *p, void *v, register_t *retval)
 
 	nd.ni_pledge = PLEDGE_UNVEIL;
 	if ((error = namei(&nd)) != 0)
-		goto ndfree;
+		goto end;
 
 	/*
 	 * XXX Any access to the file or directory will allow us to
@@ -1041,8 +1038,6 @@ sys_unveil(struct proc *p, void *v, register_t *retval)
 		vrele(nd.ni_dvp);
 
 	pool_put(&namei_pool, nd.ni_cnd.cn_pnbuf);
-ndfree:
-	unveil_free_traversed_vnodes(&nd);
 end:
 	pool_put(&namei_pool, pathname);
 

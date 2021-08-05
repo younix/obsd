@@ -1,4 +1,4 @@
-/* $OpenBSD: key-string.c,v 1.65 2021/04/07 15:46:12 nicm Exp $ */
+/* $OpenBSD: key-string.c,v 1.68 2021/06/16 08:37:58 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -164,7 +164,7 @@ key_string_get_modifiers(const char **string)
 key_code
 key_string_lookup_string(const char *string)
 {
-	static const char	*other = "!#()+,-.0123456789:;<=>'\r\t\177";
+	static const char	*other = "!#()+,-.0123456789:;<=>'\r\t\177`/";
 	key_code		 key, modifiers;
 	u_int			 u, i;
 	struct utf8_data	 ud, *udp;
@@ -183,6 +183,8 @@ key_string_lookup_string(const char *string)
 	if (string[0] == '0' && string[1] == 'x') {
 		if (sscanf(string + 2, "%x", &u) != 1)
 			return (KEYC_UNKNOWN);
+		if (u < 32)
+			return (u);
 		mlen = wctomb(m, u);
 		if (mlen <= 0 || mlen > MB_LEN_MAX)
 			return (KEYC_UNKNOWN);
@@ -238,8 +240,12 @@ key_string_lookup_string(const char *string)
 	}
 
 	/* Convert the standard control keys. */
-	if (key < KEYC_BASE && (modifiers & KEYC_CTRL) &&
-	    strchr(other, key) == NULL) {
+	if (key <= 127 &&
+	    (modifiers & KEYC_CTRL) &&
+	    strchr(other, key) == NULL &&
+	    key != 9 &&
+	    key != 13 &&
+	    key != 27) {
 		if (key >= 97 && key <= 122)
 			key -= 96;
 		else if (key >= 64 && key <= 95)
@@ -364,8 +370,8 @@ key_string_lookup_key(key_code key, int with_flags)
 		goto out;
 	}
 
-	/* Is this a UTF-8 key? */
-	if (key > 127 && key < KEYC_BASE) {
+	/* Is this a Unicode key? */
+	if (KEYC_IS_UNICODE(key)) {
 		utf8_to_data(key, &ud);
 		off = strlen(out);
 		memcpy(out + off, ud.data, ud.size);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhcpleased.c,v 1.11 2021/05/01 11:52:36 florian Exp $	*/
+/*	$OpenBSD: dhcpleased.c,v 1.18 2021/07/26 09:26:36 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -77,16 +77,27 @@ void	 open_bpfsock(uint32_t);
 void	 configure_interface(struct imsg_configure_interface *);
 void	 deconfigure_interface(struct imsg_configure_interface *);
 void	 propose_rdns(struct imsg_propose_rdns *);
-void	 configure_gateway(struct imsg_configure_interface *, uint8_t);
+void	 configure_routes(uint8_t, struct imsg_configure_interface *);
+void	 configure_route(uint8_t, uint32_t, int, struct sockaddr_in *, struct
+	     sockaddr_in *, struct sockaddr_in *, struct sockaddr_in *, int);
 void	 read_lease_file(struct imsg_ifinfo *);
 
 static int	main_imsg_send_ipc_sockets(struct imsgbuf *, struct imsgbuf *);
 int		main_imsg_compose_frontend(int, int, void *, uint16_t);
 int		main_imsg_compose_engine(int, int, void *, uint16_t);
 
+#ifndef SMALL
+int		main_imsg_send_config(struct dhcpleased_conf *);
+#endif /* SMALL */
+int	main_reload(void);
+
 static struct imsgev	*iev_frontend;
 static struct imsgev	*iev_engine;
 
+#ifndef SMALL
+struct dhcpleased_conf	*main_conf;
+#endif
+char			*conffile;
 pid_t			 frontend_pid;
 pid_t			 engine_pid;
 
@@ -104,6 +115,14 @@ main_sig_handler(int sig, short event, void *arg)
 	case SIGTERM:
 	case SIGINT:
 		main_shutdown();
+	case SIGHUP:
+#ifndef SMALL
+		if (main_reload() == -1)
+			log_warnx("configuration reload failed");
+		else
+			log_debug("configuration reloaded");
+#endif /* SMALL */
+		break;
 	default:
 		fatalx("unexpected signal");
 	}
@@ -114,7 +133,7 @@ usage(void)
 {
 	extern char *__progname;
 
-	fprintf(stderr, "usage: %s [-dv] [-s socket]\n",
+	fprintf(stderr, "usage: %s [-dnv] [-f file] [-s socket]\n",
 	    __progname);
 	exit(1);
 }
@@ -122,14 +141,14 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	struct event		 ev_sigint, ev_sigterm;
+	struct event		 ev_sigint, ev_sigterm, ev_sighup;
 	int			 ch;
 	int			 debug = 0, engine_flag = 0, frontend_flag = 0;
-	int			 verbose = 0;
+	int			 verbose = 0, no_action = 0;
 	char			*saved_argv0;
 	int			 pipe_main2frontend[2];
 	int			 pipe_main2engine[2];
-	int			 frontend_routesock, rtfilter;
+	int			 frontend_routesock, rtfilter, lockfd;
 	int			 rtable_any = RTABLE_ANY;
 	char			*csock = _PATH_DHCPLEASED_SOCKET;
 #ifndef SMALL
@@ -143,7 +162,7 @@ main(int argc, char *argv[])
 	if (saved_argv0 == NULL)
 		saved_argv0 = "dhcpleased";
 
-	while ((ch = getopt(argc, argv, "dEFs:v")) != -1) {
+	while ((ch = getopt(argc, argv, "dEFf:ns:v")) != -1) {
 		switch (ch) {
 		case 'd':
 			debug = 1;
@@ -153,6 +172,12 @@ main(int argc, char *argv[])
 			break;
 		case 'F':
 			frontend_flag = 1;
+			break;
+		case 'f':
+			conffile = optarg;
+			break;
+		case 'n':
+			no_action = 1;
 			break;
 		case 's':
 			csock = optarg;
@@ -175,9 +200,27 @@ main(int argc, char *argv[])
 	else if (frontend_flag)
 		frontend(debug, verbose);
 
+#ifndef SMALL
+	/* parse config file */
+	if ((main_conf = parse_config(conffile)) == NULL)
+		exit(1);
+
+	if (no_action) {
+		if (verbose)
+			print_config(main_conf);
+		else
+			fprintf(stderr, "configuration OK\n");
+		exit(0);
+	}
+#endif /* SMALL */
+
 	/* Check for root privileges. */
 	if (geteuid())
 		errx(1, "need root privileges");
+
+	lockfd = open(_PATH_LOCKFILE, O_CREAT|O_RDWR|O_EXLOCK|O_NONBLOCK, 0600);
+	if (lockfd == -1)
+		errx(1, "already running");
 
 	/* Check for assigned daemon user */
 	if (getpwnam(DHCPLEASED_USER) == NULL)
@@ -214,10 +257,11 @@ main(int argc, char *argv[])
 	/* Setup signal handler. */
 	signal_set(&ev_sigint, SIGINT, main_sig_handler, NULL);
 	signal_set(&ev_sigterm, SIGTERM, main_sig_handler, NULL);
+	signal_set(&ev_sighup, SIGHUP, main_sig_handler, NULL);
 	signal_add(&ev_sigint, NULL);
 	signal_add(&ev_sigterm, NULL);
+	signal_add(&ev_sighup, NULL);
 	signal(SIGPIPE, SIG_IGN);
-	signal(SIGHUP, SIG_IGN);
 
 	/* Setup pipes to children. */
 
@@ -263,6 +307,13 @@ main(int argc, char *argv[])
 		warnx("control socket setup failed");
 #endif /* SMALL */
 
+	if (conffile != NULL) {
+		if (unveil(conffile, "r") == -1)
+			fatal("unveil %s", conffile);
+	} else {
+		if (unveil(_PATH_CONF_FILE, "r") == -1)
+			fatal("unveil %s", _PATH_CONF_FILE);
+	}
 	if (unveil("/dev/bpf", "rw") == -1)
 		fatal("unveil /dev/bpf");
 
@@ -272,7 +323,7 @@ main(int argc, char *argv[])
 	}
 
 	if (unveil(NULL, NULL) == -1)
-		fatal("locking unveil");
+		fatal("unveil");
 #if notyet
 	if (pledge("stdio inet rpath wpath sendfd wroute bpf", NULL) == -1)
 		fatal("pledge");
@@ -282,6 +333,7 @@ main(int argc, char *argv[])
 #ifndef SMALL
 	if (control_fd != -1)
 		main_imsg_compose_frontend(IMSG_CONTROLFD, control_fd, NULL, 0);
+	main_imsg_send_config(main_conf);
 #endif /* SMALL */
 
 	main_imsg_compose_frontend(IMSG_STARTUP, -1, NULL, 0);
@@ -303,6 +355,10 @@ main_shutdown(void)
 	close(iev_frontend->ibuf.fd);
 	msgbuf_clear(&iev_engine->ibuf.w);
 	close(iev_engine->ibuf.fd);
+
+#ifndef SMALL
+	config_clear(main_conf);
+#endif /* SMALL */
 
 	log_debug("waiting for children to terminate");
 	do {
@@ -414,6 +470,12 @@ main_dispatch_frontend(int fd, short event, void *bula)
 			open_bpfsock(if_index);
 			break;
 #ifndef	SMALL
+		case IMSG_CTL_RELOAD:
+			if (main_reload() == -1)
+				log_warnx("configuration reload failed");
+			else
+				log_warnx("configuration reloaded");
+			break;
 		case IMSG_CTL_LOG_VERBOSE:
 			if (IMSG_DATA_SIZE(imsg) != sizeof(verbose))
 				fatalx("%s: IMSG_CTL_LOG_VERBOSE wrong length: "
@@ -486,6 +548,8 @@ main_dispatch_engine(int fd, short event, void *bula)
 				    IMSG_DATA_SIZE(imsg));
 			memcpy(&imsg_interface, imsg.data,
 			    sizeof(imsg_interface));
+			if (imsg_interface.routes_len >= MAX_DHCP_ROUTES)
+				fatalx("%s: too many routes in imsg", __func__);
 			configure_interface(&imsg_interface);
 			break;
 		}
@@ -497,6 +561,8 @@ main_dispatch_engine(int fd, short event, void *bula)
 				    IMSG_DATA_SIZE(imsg));
 			memcpy(&imsg_interface, imsg.data,
 			    sizeof(imsg_interface));
+			if (imsg_interface.routes_len >= MAX_DHCP_ROUTES)
+				fatalx("%s: too many routes in imsg", __func__);
 			deconfigure_interface(&imsg_interface);
 			main_imsg_compose_frontend(IMSG_CLOSE_UDPSOCK, -1,
 			    &imsg_interface.if_index,
@@ -612,6 +678,55 @@ main_imsg_send_ipc_sockets(struct imsgbuf *frontend_buf,
 	return (0);
 }
 
+#ifndef SMALL
+int
+main_reload(void)
+{
+	struct dhcpleased_conf *xconf;
+
+	if ((xconf = parse_config(conffile)) == NULL)
+		return (-1);
+
+	if (main_imsg_send_config(xconf) == -1)
+		return (-1);
+
+	merge_config(main_conf, xconf);
+
+	return (0);
+}
+
+int
+main_imsg_send_config(struct dhcpleased_conf *xconf)
+{
+	struct iface_conf	*iface_conf;
+
+	main_imsg_compose_frontend(IMSG_RECONF_CONF, -1, NULL, 0);
+	main_imsg_compose_engine(IMSG_RECONF_CONF, -1, NULL, 0);
+
+	/* Send the interface list to the frontend & engine. */
+	SIMPLEQ_FOREACH(iface_conf, &xconf->iface_list, entry) {
+		main_imsg_compose_frontend(IMSG_RECONF_IFACE, -1, iface_conf,
+		    sizeof(*iface_conf));
+		main_imsg_compose_engine(IMSG_RECONF_IFACE, -1, iface_conf,
+		    sizeof(*iface_conf));
+		main_imsg_compose_frontend(IMSG_RECONF_VC_ID, -1,
+		    iface_conf->vc_id, iface_conf->vc_id_len);
+		main_imsg_compose_engine(IMSG_RECONF_VC_ID, -1,
+		    iface_conf->vc_id, iface_conf->vc_id_len);
+		main_imsg_compose_frontend(IMSG_RECONF_C_ID, -1,
+		    iface_conf->c_id, iface_conf->c_id_len);
+		main_imsg_compose_engine(IMSG_RECONF_C_ID, -1,
+		    iface_conf->c_id, iface_conf->c_id_len);
+	}
+
+	/* Config is now complete. */
+	main_imsg_compose_frontend(IMSG_RECONF_END, -1, NULL, 0);
+	main_imsg_compose_engine(IMSG_RECONF_END, -1, NULL, 0);
+
+	return (0);
+}
+#endif /* SMALL */
+
 void
 configure_interface(struct imsg_configure_interface *imsg)
 {
@@ -620,7 +735,8 @@ configure_interface(struct imsg_configure_interface *imsg)
 	struct sockaddr_in	*req_sin_addr, *req_sin_mask;
 	int			 found = 0, udpsock, opt = 1, len, fd = -1;
 	char			*if_name;
-	char			 ntop_buf[INET_ADDRSTRLEN];
+	char			 ip_ntop_buf[INET_ADDRSTRLEN];
+	char			 nextserver_ntop_buf[INET_ADDRSTRLEN];
 	char			 lease_buf[LEASE_SIZE];
 	char			 lease_file_buf[sizeof(_PATH_LEASE) +
 	    IF_NAMESIZE];
@@ -681,12 +797,11 @@ configure_interface(struct imsg_configure_interface *imsg)
 		req_sin_mask->sin_len = sizeof(*req_sin_mask);
 		req_sin_mask->sin_addr.s_addr = imsg->mask.s_addr;
 		if (ioctl(ioctl_sock, SIOCAIFADDR, &ifaliasreq) == -1)
-			fatal("SIOCAIFADDR");
-
-		/* XXX check weird shit in dhclient/kroute.c set_routes() */
-		if (imsg->router.s_addr != INADDR_ANY)
-			configure_gateway(imsg, RTM_ADD);
+			log_warn("SIOCAIFADDR");
 	}
+	if (imsg->routes_len > 0)
+		configure_routes(RTM_ADD, imsg);
+
 	req_sin_addr->sin_port = ntohs(CLIENT_PORT);
 	if ((udpsock = socket(AF_INET, SOCK_DGRAM, 0)) == -1) {
 		log_warn("socket");
@@ -718,12 +833,21 @@ configure_interface(struct imsg_configure_interface *imsg)
 	if (no_lease_files)
 		return;
 
-	if (inet_ntop(AF_INET, &imsg->addr, ntop_buf, sizeof(ntop_buf)) ==
+	if (inet_ntop(AF_INET, &imsg->addr, ip_ntop_buf, sizeof(ip_ntop_buf)) ==
 	    NULL) {
 		log_warn("%s: inet_ntop", __func__);
 		return;
 	}
 
+	if (imsg->siaddr.s_addr == INADDR_ANY)
+		nextserver_ntop_buf[0] = '\0';
+	else {
+		if (inet_ntop(AF_INET, &imsg->siaddr, nextserver_ntop_buf,
+		    sizeof(nextserver_ntop_buf)) == NULL) {
+			log_warn("%s: inet_ntop", __func__);
+			return;
+		}
+	}
 	len = snprintf(lease_file_buf, sizeof(lease_file_buf), "%s%s",
 	    _PATH_LEASE, if_name);
 	if ( len == -1 || (size_t) len >= sizeof(lease_file_buf)) {
@@ -732,11 +856,15 @@ configure_interface(struct imsg_configure_interface *imsg)
 		return;
 	}
 
-	len = snprintf(lease_buf, sizeof(lease_buf), "%s%s\n", LEASE_PREFIX,
-	    ntop_buf);
+	len = snprintf(lease_buf, sizeof(lease_buf),
+	    "%s\n%s%s\n%s%s\n%s%s\n%s%s\n%s%s\n",
+	    LEASE_VERSION, LEASE_IP_PREFIX, ip_ntop_buf,
+	    LEASE_NEXTSERVER_PREFIX, nextserver_ntop_buf, LEASE_BOOTFILE_PREFIX,
+	    imsg->file, LEASE_HOSTNAME_PREFIX, imsg->hostname,
+	    LEASE_DOMAIN_PREFIX, imsg->domainname);
 	if ( len == -1 || (size_t) len >= sizeof(lease_buf)) {
 		log_warnx("%s: failed to encode lease for %s", __func__,
-		    ntop_buf);
+		    ip_ntop_buf);
 		return;
 	}
 
@@ -773,8 +901,8 @@ deconfigure_interface(struct imsg_configure_interface *imsg)
 
 	memset(&ifaliasreq, 0, sizeof(ifaliasreq));
 
-	if (imsg->router.s_addr != INADDR_ANY)
-		configure_gateway(imsg, RTM_DELETE);
+	if (imsg->routes_len > 0)
+		configure_routes(RTM_DELETE, imsg);
 
 	if (if_indextoname(imsg->if_index, ifaliasreq.ifra_name) == NULL) {
 		log_warnx("%s: cannot find interface %d", __func__,
@@ -795,14 +923,87 @@ deconfigure_interface(struct imsg_configure_interface *imsg)
 	}
 }
 
+void
+configure_routes(uint8_t rtm_type, struct imsg_configure_interface *imsg)
+{
+	struct sockaddr_in	 dst, mask, gw, ifa;
+	in_addr_t		 addrnet, gwnet;
+	int			 i;
+
+	memset(&ifa, 0, sizeof(ifa));
+	ifa.sin_family = AF_INET;
+	ifa.sin_len = sizeof(ifa);
+	ifa.sin_addr.s_addr = imsg->addr.s_addr;
+
+	memset(&dst, 0, sizeof(dst));
+	dst.sin_family = AF_INET;
+	dst.sin_len = sizeof(dst);
+
+	memset(&mask, 0, sizeof(mask));
+	mask.sin_family = AF_INET;
+	mask.sin_len = sizeof(mask);
+
+	memset(&gw, 0, sizeof(gw));
+	gw.sin_family = AF_INET;
+	gw.sin_len = sizeof(gw);
+
+	addrnet = imsg->addr.s_addr & imsg->mask.s_addr;
+
+	for (i = 0; i < imsg->routes_len; i++) {
+		dst.sin_addr.s_addr = imsg->routes[i].dst.s_addr;
+		mask.sin_addr.s_addr = imsg->routes[i].mask.s_addr;
+		gw.sin_addr.s_addr = imsg->routes[i].gw.s_addr;
+
+		if (gw.sin_addr.s_addr == INADDR_ANY) {
+			/* direct route */
+			configure_route(rtm_type, imsg->if_index,
+			    imsg->rdomain, &dst, &mask, &ifa, NULL,
+			    RTF_CLONING);
+		} else if (mask.sin_addr.s_addr == INADDR_ANY) {
+			/* default route */
+			gwnet =  gw.sin_addr.s_addr & imsg->mask.s_addr;
+			if (addrnet != gwnet) {
+				/*
+				 * The gateway for the default route is outside
+				 * the configured prefix. Install a direct
+				 * cloning route for the gateway to make the
+				 * default route reachable.
+				 */
+				mask.sin_addr.s_addr = 0xffffffff;
+				configure_route(rtm_type, imsg->if_index,
+				    imsg->rdomain, &gw, &mask, &ifa, NULL,
+				    RTF_CLONING);
+				mask.sin_addr.s_addr =
+				    imsg->routes[i].mask.s_addr;
+			}
+
+			if (gw.sin_addr.s_addr == ifa.sin_addr.s_addr) {
+				/* directly connected default */
+				configure_route(rtm_type, imsg->if_index,
+				    imsg->rdomain, &dst, &mask, &gw, NULL, 0);
+			} else {
+				/* default route via gateway */
+				configure_route(rtm_type, imsg->if_index,
+				    imsg->rdomain, &dst, &mask, &gw, &ifa,
+				    RTF_GATEWAY);
+			}
+		} else {
+			/* non-default via gateway */
+			configure_route(rtm_type, imsg->if_index, imsg->rdomain,
+			    &dst, &mask, &gw, NULL, RTF_GATEWAY);
+		}
+	}
+}
+
 #define	ROUNDUP(a)	\
     (((a) & (sizeof(long) - 1)) ? (1 + ((a) | (sizeof(long) - 1))) : (a))
 void
-configure_gateway(struct imsg_configure_interface *imsg, uint8_t rtm_type)
+configure_route(uint8_t rtm_type, uint32_t if_index, int rdomain, struct
+    sockaddr_in *dst, struct sockaddr_in *mask, struct sockaddr_in *gw,
+    struct sockaddr_in *ifa, int rtm_flags)
 {
 	struct rt_msghdr		 rtm;
 	struct sockaddr_rtlabel		 rl;
-	struct sockaddr_in		 dst, gw, mask, ifa;
 	struct iovec			 iov[12];
 	long				 pad = 0;
 	int				 iovcnt = 0, padlen;
@@ -812,70 +1013,59 @@ configure_gateway(struct imsg_configure_interface *imsg, uint8_t rtm_type)
 	rtm.rtm_version = RTM_VERSION;
 	rtm.rtm_type = rtm_type;
 	rtm.rtm_msglen = sizeof(rtm);
-	rtm.rtm_tableid = imsg->rdomain;
-	rtm.rtm_index = imsg->if_index;
+	rtm.rtm_index = if_index;
+	rtm.rtm_tableid = rdomain;
 	rtm.rtm_seq = ++rtm_seq;
 	rtm.rtm_priority = RTP_NONE;
-	rtm.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFA |
-	    RTA_LABEL;
-	rtm.rtm_flags = RTF_UP | RTF_GATEWAY | RTF_STATIC | RTF_MPATH;
+	rtm.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_LABEL;
+	rtm.rtm_flags = RTF_UP | RTF_STATIC | RTF_MPATH | rtm_flags;
+
+	if (ifa)
+		rtm.rtm_addrs |= RTA_IFA;
 
 	iov[iovcnt].iov_base = &rtm;
 	iov[iovcnt++].iov_len = sizeof(rtm);
 
-	memset(&dst, 0, sizeof(dst));
-	dst.sin_family = AF_INET;
-	dst.sin_len = sizeof(struct sockaddr_in);
-
-	iov[iovcnt].iov_base = &dst;
-	iov[iovcnt++].iov_len = sizeof(dst);
-	rtm.rtm_msglen += sizeof(dst);
-	padlen = ROUNDUP(sizeof(dst)) - sizeof(dst);
+	iov[iovcnt].iov_base = dst;
+	iov[iovcnt++].iov_len = dst->sin_len;
+	rtm.rtm_msglen += dst->sin_len;
+	padlen = ROUNDUP(dst->sin_len) - dst->sin_len;
 	if (padlen > 0) {
 		iov[iovcnt].iov_base = &pad;
 		iov[iovcnt++].iov_len = padlen;
 		rtm.rtm_msglen += padlen;
 	}
 
-	memset(&gw, 0, sizeof(gw));
-	memcpy(&gw.sin_addr, &imsg->router, sizeof(gw.sin_addr));
-	gw.sin_family = AF_INET;
-	gw.sin_len = sizeof(struct sockaddr_in);
-	iov[iovcnt].iov_base = &gw;
-	iov[iovcnt++].iov_len = sizeof(gw);
-	rtm.rtm_msglen += sizeof(gw);
-	padlen = ROUNDUP(sizeof(gw)) - sizeof(gw);
+	iov[iovcnt].iov_base = gw;
+	iov[iovcnt++].iov_len = gw->sin_len;
+	rtm.rtm_msglen += gw->sin_len;
+	padlen = ROUNDUP(gw->sin_len) - gw->sin_len;
 	if (padlen > 0) {
 		iov[iovcnt].iov_base = &pad;
 		iov[iovcnt++].iov_len = padlen;
 		rtm.rtm_msglen += padlen;
 	}
 
-	memset(&mask, 0, sizeof(mask));
-	mask.sin_family = AF_INET;
-	mask.sin_len = sizeof(struct sockaddr_in);
-	iov[iovcnt].iov_base = &mask;
-	iov[iovcnt++].iov_len = sizeof(mask);
-	rtm.rtm_msglen += sizeof(mask);
-	padlen = ROUNDUP(sizeof(mask)) - sizeof(mask);
+	iov[iovcnt].iov_base = mask;
+	iov[iovcnt++].iov_len = mask->sin_len;
+	rtm.rtm_msglen += mask->sin_len;
+	padlen = ROUNDUP(mask->sin_len) - mask->sin_len;
 	if (padlen > 0) {
 		iov[iovcnt].iov_base = &pad;
 		iov[iovcnt++].iov_len = padlen;
 		rtm.rtm_msglen += padlen;
 	}
 
-	memset(&ifa, 0, sizeof(ifa));
-	memcpy(&ifa.sin_addr, &imsg->addr, sizeof(ifa.sin_addr));
-	ifa.sin_family = AF_INET;
-	ifa.sin_len = sizeof(struct sockaddr_in);
-	iov[iovcnt].iov_base = &ifa;
-	iov[iovcnt++].iov_len = sizeof(ifa);
-	rtm.rtm_msglen += sizeof(ifa);
-	padlen = ROUNDUP(sizeof(ifa)) - sizeof(ifa);
-	if (padlen > 0) {
-		iov[iovcnt].iov_base = &pad;
-		iov[iovcnt++].iov_len = padlen;
-		rtm.rtm_msglen += padlen;
+	if (ifa) {
+		iov[iovcnt].iov_base = ifa;
+		iov[iovcnt++].iov_len = ifa->sin_len;
+		rtm.rtm_msglen += ifa->sin_len;
+		padlen = ROUNDUP(ifa->sin_len) - ifa->sin_len;
+		if (padlen > 0) {
+			iov[iovcnt].iov_base = &pad;
+			iov[iovcnt++].iov_len = padlen;
+			rtm.rtm_msglen += padlen;
+		}
 	}
 
 	memset(&rl, 0, sizeof(rl));
@@ -1008,3 +1198,50 @@ read_lease_file(struct imsg_ifinfo *imsg_ifinfo)
 	read(fd, imsg_ifinfo->lease, sizeof(imsg_ifinfo->lease) - 1);
 	close(fd);
 }
+
+#ifndef SMALL
+void
+merge_config(struct dhcpleased_conf *conf, struct dhcpleased_conf *xconf)
+{
+	struct iface_conf	*iface_conf;
+
+	/* Remove & discard existing interfaces. */
+	while ((iface_conf = SIMPLEQ_FIRST(&conf->iface_list)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(&conf->iface_list, entry);
+		free(iface_conf->vc_id);
+		free(iface_conf->c_id);
+		free(iface_conf);
+	}
+
+	/* Add new interfaces. */
+	SIMPLEQ_CONCAT(&conf->iface_list, &xconf->iface_list);
+
+	free(xconf);
+}
+
+struct dhcpleased_conf *
+config_new_empty(void)
+{
+	struct dhcpleased_conf	*xconf;
+
+	xconf = calloc(1, sizeof(*xconf));
+	if (xconf == NULL)
+		fatal(NULL);
+
+	SIMPLEQ_INIT(&xconf->iface_list);
+
+	return (xconf);
+}
+
+void
+config_clear(struct dhcpleased_conf *conf)
+{
+	struct dhcpleased_conf	*xconf;
+
+	/* Merge current config with an empty config. */
+	xconf = config_new_empty();
+	merge_config(conf, xconf);
+
+	free(conf);
+}
+#endif /* SMALL */

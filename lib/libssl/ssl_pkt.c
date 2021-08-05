@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_pkt.c,v 1.43 2021/05/16 14:10:43 jsing Exp $ */
+/* $OpenBSD: ssl_pkt.c,v 1.48 2021/08/04 12:41:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -116,6 +116,7 @@
 #include <openssl/evp.h>
 
 #include "bytestring.h"
+#include "dtls_locl.h"
 #include "ssl_locl.h"
 
 static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
@@ -430,6 +431,16 @@ ssl3_get_record(SSL *s)
 
 	if (rr->length == 0) {
 		/*
+		 * Zero-length fragments are only permitted for application
+		 * data, as per RFC 5246 section 6.2.1.
+		 */
+		if (rr->type != SSL3_RT_APPLICATION_DATA) {
+			SSLerror(s, SSL_R_BAD_LENGTH);
+			al = SSL_AD_UNEXPECTED_MESSAGE;
+			goto fatal_err;
+		}
+
+		/*
 		 * CBC countermeasures for known IV weaknesses can legitimately
 		 * insert a single empty record, so we allow ourselves to read
 		 * once past a single empty record without forcing want_read.
@@ -542,7 +553,7 @@ do_ssl3_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 
 	/* If we have an alert to send, let's send it. */
 	if (S3I(s)->alert_dispatch) {
-		if ((ret = s->method->ssl_dispatch_alert(s)) <= 0)
+		if ((ret = ssl3_dispatch_alert(s)) <= 0)
 			return (ret);
 		/* If it went, fall through and send more stuff. */
 
@@ -1178,22 +1189,29 @@ ssl3_do_change_cipher_spec(SSL *s)
 	return (1);
 }
 
+static int
+ssl3_write_alert(SSL *s)
+{
+	if (SSL_is_dtls(s))
+		return do_dtls1_write(s, SSL3_RT_ALERT, S3I(s)->send_alert,
+		    sizeof(S3I(s)->send_alert));
+
+	return do_ssl3_write(s, SSL3_RT_ALERT, S3I(s)->send_alert,
+	    sizeof(S3I(s)->send_alert));
+}
+
 int
 ssl3_send_alert(SSL *s, int level, int desc)
 {
-	/* Map tls/ssl alert value to correct one */
-	desc = tls1_alert_code(desc);
-	if (desc < 0)
-		return -1;
 	/* If a fatal one, remove from cache */
-	if ((level == 2) && (s->session != NULL))
+	if (level == SSL3_AL_FATAL)
 		SSL_CTX_remove_session(s->ctx, s->session);
 
 	S3I(s)->alert_dispatch = 1;
 	S3I(s)->send_alert[0] = level;
 	S3I(s)->send_alert[1] = desc;
 	if (S3I(s)->wbuf.left == 0) /* data still being written out? */
-		return s->method->ssl_dispatch_alert(s);
+		return ssl3_dispatch_alert(s);
 
 	/* else data is still being written out, we will get written
 	 * some time in the future */
@@ -1207,7 +1225,7 @@ ssl3_dispatch_alert(SSL *s)
 	void (*cb)(const SSL *ssl, int type, int val) = NULL;
 
 	S3I(s)->alert_dispatch = 0;
-	i = do_ssl3_write(s, SSL3_RT_ALERT, &S3I(s)->send_alert[0], 2);
+	i = ssl3_write_alert(s);
 	if (i <= 0) {
 		S3I(s)->alert_dispatch = 1;
 	} else {

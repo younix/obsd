@@ -1,4 +1,4 @@
-/*	$OpenBSD: pci.h,v 1.5 2020/06/08 04:48:15 jsg Exp $	*/
+/*	$OpenBSD: pci.h,v 1.7 2021/07/07 02:38:36 jsg Exp $	*/
 /*
  * Copyright (c) 2015 Mark Kettenis
  *
@@ -15,8 +15,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef _LINUX_PCI_H
-#define _LINUX_PCI_H
+#ifndef _LINUX_PCI_H_
+#define _LINUX_PCI_H_
 
 #include <sys/types.h>
 /* sparc64 cpu.h needs time.h and siginfo.h (indirect via param.h) */
@@ -337,6 +337,12 @@ enum pcie_link_width {
 	PCIE_LNK_WIDTH_UNKNOWN	= 0xff
 };
 
+typedef unsigned int pci_ers_result_t;
+typedef unsigned int pci_channel_state_t;
+
+#define PCI_ERS_RESULT_DISCONNECT	0
+#define PCI_ERS_RESULT_RECOVERED	1
+
 enum pci_bus_speed pcie_get_speed_cap(struct pci_dev *);
 enum pcie_link_width pcie_get_width_cap(struct pci_dev *);
 int pci_resize_resource(struct pci_dev *, int, int);
@@ -395,7 +401,8 @@ pci_get_class(pcireg_t class, struct pci_dev *pdev)
 #define PCI_CLASS_DISPLAY_OTHER \
     (PCI_CLASS_DISPLAY | PCI_SUBCLASS_DISPLAY_MISC)
 
-#if defined(__amd64__) || defined(__arm64__) || defined(__i386__)
+#if defined(__amd64__) || defined(__arm64__) || \
+    defined(__i386__) || defined(__riscv64__)
 
 #define PCI_DMA_BIDIRECTIONAL	0
 
@@ -419,6 +426,6 @@ pci_dma_mapping_error(struct pci_dev *pdev, dma_addr_t dma_addr)
 #define pci_set_dma_mask(x, y)			0
 #define pci_set_consistent_dma_mask(x, y)	0
 
-#endif /* defined(__amd64__) || defined(__arm64__) || defined(__i386__) */
-
 #endif
+
+#endif /* _LINUX_PCI_H_ */

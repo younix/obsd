@@ -9,7 +9,6 @@
 /mips64r2.S/1.4/Sun Jun 11 03:35:30 2017//
 /process_machdep.c/1.18/Fri Sep  1 13:16:47 2017//
 /sys_machdep.c/1.11/Fri Dec 20 13:34:41 2019//
-/ipifuncs.c/1.22/Thu Dec 17 19:39:58 2020//
 /sendsig.c/1.34/Sat May  1 08:41:51 2021//
 /softintr.c/1.22/Sat May  1 08:41:51 2021//
 /cache_loongson2.c/1.8/Tue May 18 14:06:16 2021//
@@ -21,10 +20,11 @@
 /interrupt.c/1.74/Tue May 18 14:06:16 2021//
 /lcore_access.S/1.31/Tue May 18 14:06:16 2021//
 /mips64_machdep.c/1.37/Tue May 18 14:06:16 2021//
-/pmap.c/1.118/Tue May 18 14:06:16 2021//
 /tlbhandler.S/1.52/Tue May 18 14:06:16 2021//
 /trap.c/1.154/Tue May 18 14:06:16 2021//
 /vm_machdep.c/1.41/Tue May 18 14:06:16 2021//
-/cpu.c/1.79/Sun May 30 15:25:26 2021//
-/db_machdep.c/1.57/Tue Jun  1 14:03:31 2021//
+/cpu.c/1.80/Thu Aug  5 11:01:43 2021//
+/db_machdep.c/1.57/Tue Jun  1 14:33:07 2021//
+/ipifuncs.c/1.24/Thu Aug  5 11:01:43 2021//
+/pmap.c/1.119/Thu Aug  5 11:01:43 2021//
 D

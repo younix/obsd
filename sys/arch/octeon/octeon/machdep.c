@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.131 2021/05/16 15:12:38 deraadt Exp $ */
+/*	$OpenBSD: machdep.c,v 1.134 2021/07/24 08:21:13 visa Exp $ */
 
 /*
  * Copyright (c) 2009, 2010 Miodrag Vallat.
@@ -1296,8 +1296,8 @@ hw_cpu_boot_secondary(struct cpu_info *ci)
 
 	cpu_spinup_mask = (uint32_t)ci->ci_cpuid;
 
-	while (!cpuset_isset(&cpus_running, ci))
-		;
+	while (!CPU_IS_RUNNING(ci))
+		membar_sync();
 }
 
 void
@@ -1312,8 +1312,6 @@ hw_cpu_hatch(struct cpu_info *ci)
 
 	/*
 	 * Make sure we can access the extended address space.
-	 * Note that r10k and later do not allow XUSEG accesses
-	 * from kernel mode unless SR_UX is set.
 	 */
 	setsr(getsr() | SR_KX | SR_UX);
 
@@ -1332,10 +1330,15 @@ hw_cpu_hatch(struct cpu_info *ci)
 	Mips_SyncCache(ci);
 
 	(*md_startclock)(ci);
-	ncpus++;
-	cpuset_add(&cpus_running, ci);
+
 	octeon_intr_init();
 	mips64_ipi_init();
+
+	ci->ci_flags |= CPUF_RUNNING;
+	membar_sync();
+
+	ncpus++;
+
 	spl0();
 	(void)updateimask(0);
 

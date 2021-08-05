@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl3.h,v 1.53 2021/05/10 17:10:57 tb Exp $ */
+/* $OpenBSD: ssl3.h,v 1.55 2021/06/30 18:04:06 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -297,6 +297,7 @@ extern "C" {
 #define SSL3_AL_WARNING			1
 #define SSL3_AL_FATAL			2
 
+#ifndef LIBRESSL_INTERNAL
 #define SSL3_AD_CLOSE_NOTIFY		 0
 #define SSL3_AD_UNEXPECTED_MESSAGE	10	/* fatal */
 #define SSL3_AD_BAD_RECORD_MAC		20	/* fatal */
@@ -309,6 +310,7 @@ extern "C" {
 #define SSL3_AD_CERTIFICATE_EXPIRED	45
 #define SSL3_AD_CERTIFICATE_UNKNOWN	46
 #define SSL3_AD_ILLEGAL_PARAMETER	47	/* fatal */
+#endif
 
 #define TLS1_HB_REQUEST		1
 #define TLS1_HB_RESPONSE	2
@@ -354,21 +356,6 @@ typedef struct ssl3_buffer_st {
 #define TLS1_FLAGS_SKIP_CERT_VERIFY		0x0010
 #define TLS1_FLAGS_FREEZE_TRANSCRIPT		0x0020
 #define SSL3_FLAGS_CCS_OK			0x0080
-
-#ifdef LIBRESSL_INTERNAL
-
-struct ssl3_state_internal_st;
-
-typedef struct ssl3_state_st {
-	long flags;
-
-	unsigned char server_random[SSL3_RANDOM_SIZE];
-	unsigned char client_random[SSL3_RANDOM_SIZE];
-
-	struct ssl3_state_internal_st *internal;
-} SSL3_STATE;
-
-#endif
 
 /* SSLv3 */
 /*client */

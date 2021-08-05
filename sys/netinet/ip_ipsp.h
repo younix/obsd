@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.h,v 1.197 2021/05/04 09:28:04 mvs Exp $	*/
+/*	$OpenBSD: ip_ipsp.h,v 1.205 2021/07/27 17:13:03 mvs Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -62,7 +62,7 @@ union sockaddr_union {
 #define	AH_SHA2_256_ALEN	32
 #define	AH_SHA2_384_ALEN	48
 #define	AH_SHA2_512_ALEN	64
-#define	AH_ALEN_MAX		64 	/* Keep updated */
+#define	AH_ALEN_MAX		64	/* Keep updated */
 
 /* Reserved SPI numbers */
 #define	SPI_LOCAL_USE		0
@@ -113,8 +113,6 @@ struct sockaddr_encap {
 			u_int16_t	Sport;
 			u_int16_t	Dport;
 		} Sip6;
-
-		struct ipsec_policy	*PolicyHead;	/* SENT_IPSP */
 	} Sen;
 };
 
@@ -208,7 +206,6 @@ struct m_tag;
 #define	sen_ip6_sport		Sen.Sip6.Sport
 #define	sen_ip6_dport		Sen.Sip6.Dport
 #define	sen_ip6_direction	Sen.Sip6.Direction
-#define	sen_ipsp		Sen.PolicyHead
 
 /*
  * The "type" is really part of the address as far as the routing
@@ -219,8 +216,7 @@ struct m_tag;
  */
 
 #define	SENT_IP4	0x0001		/* data is two struct in_addr */
-#define	SENT_IPSP	0x0002		/* data as in IP4/6 plus SPI */
-#define	SENT_IP6	0x0004
+#define	SENT_IP6	0x0002
 
 #define	SENT_LEN	sizeof(struct sockaddr_encap)
 
@@ -230,13 +226,14 @@ struct ipsec_id {
 };
 
 struct ipsec_ids {
+	LIST_ENTRY(ipsec_ids)	id_gc_list;
 	RBT_ENTRY(ipsec_ids)	id_node_id;
 	RBT_ENTRY(ipsec_ids)	id_node_flow;
 	struct ipsec_id		*id_local;
 	struct ipsec_id		*id_remote;
 	u_int32_t		id_flow;
 	int			id_refcount;
-	struct timeout		id_timeout;
+	u_int			id_gc_ttl;
 };
 RBT_HEAD(ipsec_ids_flows, ipsec_ids);
 RBT_HEAD(ipsec_ids_tree, ipsec_ids);
@@ -262,7 +259,7 @@ struct ipsec_policy {
 	union sockaddr_union	ipo_dst;	/* Remote gateway -- if it's zeroed:
 						 * - on output, we try to
 						 * contact the remote host
-						 * directly (if needed).  
+						 * directly (if needed).
 						 * - on input, we accept on if
 						 * the inner source is the
 						 * same as the outer source
@@ -320,10 +317,10 @@ struct tdb {				/* tunnel descriptor block */
 	struct tdb	*tdb_inext;
 	struct tdb	*tdb_onext;
 
-	struct xformsw		*tdb_xform;		/* Transform to use */
-	struct enc_xform	*tdb_encalgxform;	/* Enc algorithm */
-	struct auth_hash	*tdb_authalgxform;	/* Auth algorithm */
-	struct comp_algo	*tdb_compalgxform;	/* Compression algo */
+	const struct xformsw	*tdb_xform;		/* Transform to use */
+	const struct enc_xform	*tdb_encalgxform;	/* Enc algorithm */
+	const struct auth_hash	*tdb_authalgxform;	/* Auth algorithm */
+	const struct comp_algo	*tdb_compalgxform;	/* Compression algo */
 
 #define	TDBF_UNIQUE		0x00001	/* This should not be used by others */
 #define	TDBF_TIMER		0x00002	/* Absolute expiration timer in use */
@@ -436,12 +433,13 @@ struct tdb_ident {
 };
 
 struct tdb_crypto {
-	u_int32_t		tc_spi;
 	union sockaddr_union	tc_dst;
-	u_int8_t		tc_proto;
+	u_int64_t		tc_rpl;
+	u_int32_t		tc_spi;
 	int			tc_protoff;
 	int			tc_skip;
 	u_int			tc_rdomain;
+	u_int8_t		tc_proto;
 };
 
 struct ipsecinit {
@@ -473,7 +471,8 @@ struct xformsw {
 	u_short	xf_flags;		/* flags (see below) */
 	char	*xf_name;		/* human-readable name */
 	int	(*xf_attach)(void);	/* called at config time */
-	int	(*xf_init)(struct tdb *, struct xformsw *, struct ipsecinit *);
+	int	(*xf_init)(struct tdb *, const struct xformsw *,
+		    struct ipsecinit *);
 	int	(*xf_zeroize)(struct tdb *); /* termination */
 	int	(*xf_input)(struct mbuf *, struct tdb *, int, int); /* input */
 	int	(*xf_output)(struct mbuf *, struct tdb *, struct mbuf **,
@@ -494,7 +493,7 @@ extern int ipsec_exp_bytes;		/* num of bytes/SA before it expires */
 extern int ipsec_soft_timeout;		/* seconds/SA before renegotiation */
 extern int ipsec_exp_timeout;		/* seconds/SA before it expires */
 extern int ipsec_soft_first_use;	/* seconds between 1st asso & renego */
-extern int ipsec_exp_first_use;		/* seconds between 1st asso & expire */	
+extern int ipsec_exp_first_use;		/* seconds between 1st asso & expire */
 
 /*
  * Names for IPsec sysctl objects
@@ -517,17 +516,6 @@ extern int ipsec_exp_first_use;		/* seconds between 1st asso & expire */
 extern char ipsec_def_enc[];
 extern char ipsec_def_auth[];
 extern char ipsec_def_comp[];
-
-extern struct enc_xform enc_xform_des;
-extern struct enc_xform enc_xform_3des;
-extern struct enc_xform enc_xform_blf;
-extern struct enc_xform enc_xform_cast5;
-
-extern struct auth_hash auth_hash_hmac_md5_96;
-extern struct auth_hash auth_hash_hmac_sha1_96;
-extern struct auth_hash auth_hash_hmac_ripemd_160_96;
-
-extern struct comp_algo comp_algo_deflate;
 
 extern TAILQ_HEAD(ipsec_policy_head, ipsec_policy) ipsec_policy_head;
 
@@ -570,14 +558,14 @@ int	tdb_walk(u_int, int (*)(struct tdb *, void *, int), void *);
 
 /* XF_IP4 */
 int	ipe4_attach(void);
-int	ipe4_init(struct tdb *, struct xformsw *, struct ipsecinit *);
+int	ipe4_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	ipe4_zeroize(struct tdb *);
 int	ipe4_input(struct mbuf *, struct tdb *, int, int);
 
 /* XF_AH */
-int 	ah_attach(void);
-int 	ah_init(struct tdb *, struct xformsw *, struct ipsecinit *);
-int 	ah_zeroize(struct tdb *);
+int	ah_attach(void);
+int	ah_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
+int	ah_zeroize(struct tdb *);
 int	ah_input(struct mbuf *, struct tdb *, int, int);
 int	ah_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
 int	ah_output(struct mbuf *, struct tdb *, struct mbuf **, int, int);
@@ -595,7 +583,7 @@ int	ah6_input(struct mbuf **, int *, int, int);
 
 /* XF_ESP */
 int	esp_attach(void);
-int	esp_init(struct tdb *, struct xformsw *, struct ipsecinit *);
+int	esp_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	esp_zeroize(struct tdb *);
 int	esp_input(struct mbuf *, struct tdb *, int, int);
 int	esp_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
@@ -608,12 +596,12 @@ int	esp4_input(struct mbuf **, int *, int, int);
 void	esp4_ctlinput(int, struct sockaddr *, u_int, void *);
 
 #ifdef INET6
-int 	esp6_input(struct mbuf **, int *, int, int);
+int	esp6_input(struct mbuf **, int *, int, int);
 #endif /* INET6 */
 
 /* XF_IPCOMP */
 int	ipcomp_attach(void);
-int	ipcomp_init(struct tdb *, struct xformsw *, struct ipsecinit *);
+int	ipcomp_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	ipcomp_zeroize(struct tdb *);
 int	ipcomp_input(struct mbuf *, struct tdb *, int, int);
 int	ipcomp_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
@@ -628,7 +616,7 @@ int	ipcomp6_input(struct mbuf **, int *, int, int);
 
 /* XF_TCPSIGNATURE */
 int	tcp_signature_tdb_attach(void);
-int	tcp_signature_tdb_init(struct tdb *, struct xformsw *,
+int	tcp_signature_tdb_init(struct tdb *, const struct xformsw *,
 	    struct ipsecinit *);
 int	tcp_signature_tdb_zeroize(struct tdb *);
 int	tcp_signature_tdb_input(struct mbuf *, struct tdb *, int, int);
@@ -636,7 +624,7 @@ int	tcp_signature_tdb_output(struct mbuf *, struct tdb *, struct mbuf **,
 	  int, int);
 
 /* Replay window */
-int	checkreplaywindow(struct tdb *, u_int32_t, u_int32_t *, int);
+int	checkreplaywindow(struct tdb *, u_int64_t, u_int32_t, u_int32_t *, int);
 
 /* Packet processing */
 int	ipsp_process_packet(struct mbuf *, struct tdb *, int, int);

@@ -153,6 +153,7 @@ void pqm_uninit(struct process_queue_manager *pqm)
 		if (pqn->q && pqn->q->gws)
 			amdgpu_amdkfd_remove_gws_from_process(pqm->process->kgd_process_info,
 				pqn->q->gws);
+		kfd_procfs_del_queue(pqn->q);
 		uninit_queue(pqn->q);
 		list_del(&pqn->process_queue_list);
 		kfree(pqn);
@@ -474,6 +475,15 @@ struct kernel_queue *pqm_get_kernel_queue(
 		return pqn->kq;
 
 	return NULL;
+}
+
+struct queue *pqm_get_user_queue(struct process_queue_manager *pqm,
+					unsigned int qid)
+{
+	struct process_queue_node *pqn;
+
+	pqn = get_queue_by_qid(pqm, qid);
+	return pqn ? pqn->q : NULL;
 }
 
 int pqm_get_wave_state(struct process_queue_manager *pqm,

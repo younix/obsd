@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_pkt.c,v 1.96 2021/05/16 13:56:30 jsing Exp $ */
+/* $OpenBSD: d1_pkt.c,v 1.105 2021/07/31 09:31:04 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -126,10 +126,6 @@
 #include "pqueue.h"
 #include "ssl_locl.h"
 
-static int	do_dtls1_write(SSL *s, int type, const unsigned char *buf,
-		    unsigned int len);
-
-
 /* mod 128 saturating subtract of two 64-bit values in big-endian order */
 static int
 satsub64be(const unsigned char *v1, const unsigned char *v2)
@@ -244,10 +240,10 @@ dtls1_buffer_record(SSL *s, record_pqueue *queue, unsigned char *priority)
 
 	return (1);
 
-err:
+ err:
 	ssl3_release_buffer(&rdata->rbuf);
 
-init_err:
+ init_err:
 	SSLerror(s, ERR_R_INTERNAL_ERROR);
 	free(rdata);
 	pitem_free(item);
@@ -274,34 +270,23 @@ dtls1_retrieve_buffered_record(SSL *s, record_pqueue *queue)
 }
 
 static int
-dtls1_process_buffered_records(SSL *s)
+dtls1_process_buffered_record(SSL *s)
 {
-	pitem *item;
+	/* Check if epoch is current. */
+	if (D1I(s)->unprocessed_rcds.epoch != D1I(s)->r_epoch)
+		return (0);
 
-	item = pqueue_peek(D1I(s)->unprocessed_rcds.q);
-	if (item) {
-		/* Check if epoch is current. */
-		if (D1I(s)->unprocessed_rcds.epoch != D1I(s)->r_epoch)
-			return (1);
-		/* Nothing to do. */
-
-		/* Process all the records. */
-		while (pqueue_peek(D1I(s)->unprocessed_rcds.q)) {
-			if (!dtls1_retrieve_buffered_record((s),
-			    &((D1I(s))->unprocessed_rcds)))
-				return (0);
-			if (!dtls1_process_record(s))
-				return (0);
-			if (dtls1_buffer_record(s, &(D1I(s)->processed_rcds),
-			    S3I(s)->rrec.seq_num) < 0)
-				return (-1);
-		}
+	/* Update epoch once all unprocessed records have been processed. */
+	if (pqueue_peek(D1I(s)->unprocessed_rcds.q) == NULL) {
+		D1I(s)->unprocessed_rcds.epoch = D1I(s)->r_epoch + 1;
+		return (0);
 	}
 
-    /* sync epoch numbers once all the unprocessed records
-     * have been processed */
-	D1I(s)->processed_rcds.epoch = D1I(s)->r_epoch;
-	D1I(s)->unprocessed_rcds.epoch = D1I(s)->r_epoch + 1;
+	/* Process one of the records. */
+	if (!dtls1_retrieve_buffered_record(s, &D1I(s)->unprocessed_rcds))
+		return (-1);
+	if (!dtls1_process_record(s))
+		return (-1);
 
 	return (1);
 }
@@ -323,14 +308,22 @@ dtls1_process_record(SSL *s)
 		if (alert_desc == 0)
 			goto err;
 
+		/*
+		 * DTLS should silently discard invalid records, including those
+		 * with a bad MAC, as per RFC 6347 section 4.1.2.1.
+		 */
+		if (alert_desc == SSL_AD_BAD_RECORD_MAC) {
+			out_len = 0;
+			goto done;
+		}
+
 		if (alert_desc == SSL_AD_RECORD_OVERFLOW)
 			SSLerror(s, SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
-		else if (alert_desc == SSL_AD_BAD_RECORD_MAC)
-			SSLerror(s, SSL_R_DECRYPTION_FAILED_OR_BAD_RECORD_MAC);
 
 		goto fatal_err;
 	}
 
+ done:
 	rr->data = out;
 	rr->length = out_len;
 	rr->off = 0;
@@ -345,7 +338,6 @@ dtls1_process_record(SSL *s)
 	return (0);
 }
 
-
 /* Call this to get a new input record.
  * It will return <= 0 if more data is needed, normally due to an error
  * or non-blocking IO.
@@ -358,26 +350,19 @@ dtls1_process_record(SSL *s)
 int
 dtls1_get_record(SSL *s)
 {
-	SSL3_RECORD_INTERNAL *rr;
+	SSL3_RECORD_INTERNAL *rr = &(S3I(s)->rrec);
 	unsigned char *p = NULL;
 	DTLS1_BITMAP *bitmap;
 	unsigned int is_next_epoch;
-	int n;
+	int ret, n;
 
-	rr = &(S3I(s)->rrec);
-
-	/* The epoch may have changed.  If so, process all the
-	 * pending records.  This is a non-blocking operation. */
-	if (dtls1_process_buffered_records(s) < 0)
-		return (-1);
-
-	/* if we're renegotiating, then there may be buffered records */
-	if (dtls1_retrieve_buffered_record((s), &((D1I(s))->processed_rcds)))
-		return 1;
+	/* See if there are pending records that can now be processed. */
+	if ((ret = dtls1_process_buffered_record(s)) != 0)
+		return (ret);
 
 	/* get something from the wire */
 	if (0) {
-again:
+ again:
 		/* dump this record on all retries */
 		rr->length = 0;
 		s->internal->packet_length = 0;
@@ -801,15 +786,13 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 			cb(s, SSL_CB_READ_ALERT, j);
 		}
 
-		if (alert_level == 1) /* warning */
-		{
+		if (alert_level == SSL3_AL_WARNING) {
 			S3I(s)->warn_alert = alert_descr;
 			if (alert_descr == SSL_AD_CLOSE_NOTIFY) {
 				s->internal->shutdown |= SSL_RECEIVED_SHUTDOWN;
 				return (0);
 			}
-		} else if (alert_level == 2) /* fatal */
-		{
+		} else if (alert_level == SSL3_AL_FATAL) {
 			s->internal->rwstate = SSL_NOTHING;
 			S3I(s)->fatal_alert = alert_descr;
 			SSLerror(s, SSL_AD_REASON_OFFSET + alert_descr);
@@ -835,15 +818,10 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 	}
 
 	if (rr->type == SSL3_RT_CHANGE_CIPHER_SPEC) {
-		struct ccs_header_st ccs_hdr;
-		unsigned int ccs_hdr_len = DTLS1_CCS_HEADER_LENGTH;
-
-		dtls1_get_ccs_header(rr->data, &ccs_hdr);
-
 		/* 'Change Cipher Spec' is just a single byte, so we know
 		 * exactly what the record payload has to look like */
 		/* XDTLS: check that epoch is consistent */
-		if ((rr->length != ccs_hdr_len) ||
+		if ((rr->length != DTLS1_CCS_HEADER_LENGTH) ||
 		    (rr->off != 0) || (rr->data[0] != SSL3_MT_CCS)) {
 			al = SSL_AD_DECODE_ERROR;
 			SSLerror(s, SSL_R_BAD_CHANGE_CIPHER_SPEC);
@@ -1073,7 +1051,7 @@ do_dtls1_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 
 	/* If we have an alert to send, let's send it */
 	if (S3I(s)->alert_dispatch) {
-		if ((ret = s->method->ssl_dispatch_alert(s)) <= 0)
+		if ((ret = ssl3_dispatch_alert(s)) <= 0)
 			return (ret);
 		/* If it went, fall through and send more stuff. */
 	}
@@ -1155,49 +1133,10 @@ dtls1_record_bitmap_update(SSL *s, DTLS1_BITMAP *bitmap,
 	}
 }
 
-int
-dtls1_dispatch_alert(SSL *s)
-{
-	int i, j;
-	void (*cb)(const SSL *ssl, int type, int val) = NULL;
-	unsigned char buf[DTLS1_AL_HEADER_LENGTH];
-	unsigned char *ptr = &buf[0];
-
-	S3I(s)->alert_dispatch = 0;
-
-	memset(buf, 0, sizeof(buf));
-	*ptr++ = S3I(s)->send_alert[0];
-	*ptr++ = S3I(s)->send_alert[1];
-
-	i = do_dtls1_write(s, SSL3_RT_ALERT, &buf[0], sizeof(buf));
-	if (i <= 0) {
-		S3I(s)->alert_dispatch = 1;
-		/* fprintf( stderr, "not done with alert\n" ); */
-	} else {
-		if (S3I(s)->send_alert[0] == SSL3_AL_FATAL)
-			(void)BIO_flush(s->wbio);
-
-		if (s->internal->msg_callback)
-			s->internal->msg_callback(1, s->version, SSL3_RT_ALERT,
-			    S3I(s)->send_alert, 2, s, s->internal->msg_callback_arg);
-
-		if (s->internal->info_callback != NULL)
-			cb = s->internal->info_callback;
-		else if (s->ctx->internal->info_callback != NULL)
-			cb = s->ctx->internal->info_callback;
-
-		if (cb != NULL) {
-			j = (S3I(s)->send_alert[0]<<8)|S3I(s)->send_alert[1];
-			cb(s, SSL_CB_WRITE_ALERT, j);
-		}
-	}
-	return (i);
-}
-
-
 static DTLS1_BITMAP *
 dtls1_get_bitmap(SSL *s, SSL3_RECORD_INTERNAL *rr, unsigned int *is_next_epoch)
 {
+	uint16_t next_epoch = D1I(s)->r_epoch + 1;
 
 	*is_next_epoch = 0;
 
@@ -1206,7 +1145,7 @@ dtls1_get_bitmap(SSL *s, SSL3_RECORD_INTERNAL *rr, unsigned int *is_next_epoch)
 		return &D1I(s)->bitmap;
 
 	/* Only HM and ALERT messages can be from the next epoch */
-	else if (rr->epoch == (unsigned long)(D1I(s)->r_epoch + 1) &&
+	else if (rr->epoch == next_epoch &&
 		(rr->type == SSL3_RT_HANDSHAKE || rr->type == SSL3_RT_ALERT)) {
 		*is_next_epoch = 1;
 		return &D1I(s)->next_bitmap;

@@ -14,7 +14,6 @@
 /xenreg.h/1.10/Wed Sep 14 17:48:28 2016//
 /xenstore.c/1.45/Sat Jan 11 21:30:00 2020//
 /xenvar.h/1.51/Fri Jul 21 20:00:47 2017//
-/hypervic.c/1.15/Mon Jun  1 06:23:27 2020//
 /viornd.c/1.4/Mon Jun  1 06:23:27 2020//
 /vmmci.c/1.8/Fri Dec 11 17:58:24 2020//
 /xen.c/1.97/Fri Dec 11 17:58:24 2020//
@@ -22,13 +21,14 @@
 /viomb.c/1.7/Thu Dec 17 19:39:59 2020//
 /hvs.c/1.33/Sat May  1 08:41:51 2021//
 /if_vio.c/1.19/Sat May  1 08:41:51 2021//
-/if_xnf.c/1.65/Sat May  1 08:41:51 2021//
 /vioblk.c/1.32/Sat May  1 08:41:51 2021//
 /vioscsi.c/1.26/Sat May  1 08:41:51 2021//
 /xbf.c/1.51/Sat May  1 08:41:51 2021//
 /hyperv.c/1.48/Tue May 18 14:06:17 2021//
-/if_hvn.c/1.46/Tue May 18 14:06:17 2021//
 /pvclock.c/1.7/Tue May 18 14:06:17 2021//
 /virtio.c/1.20/Tue May 18 14:06:17 2021//
 /vmt.c/1.23/Tue May 18 14:06:17 2021//
+/hypervic.c/1.16/Thu Aug  5 11:01:50 2021//
+/if_hvn.c/1.47/Thu Aug  5 11:01:50 2021//
+/if_xnf.c/1.66/Thu Aug  5 11:01:50 2021//
 D

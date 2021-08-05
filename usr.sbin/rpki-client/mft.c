@@ -1,4 +1,4 @@
-/*	$OpenBSD: mft.c,v 1.34 2021/05/11 11:32:51 claudio Exp $ */
+/*	$OpenBSD: mft.c,v 1.36 2021/07/13 18:39:39 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -259,9 +259,9 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 	ASN1_SEQUENCE_ANY	*seq;
 	const ASN1_TYPE		*t;
 	const ASN1_GENERALIZEDTIME *from, *until;
-	BIGNUM			*mft_seqnum = NULL;
 	long			 mft_version;
-	int			 i, rc = -1;
+	BIGNUM			*mft_seqnum = NULL;
+	int			 i = 0, rc = -1;
 
 	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
 		cryptowarnx("%s: RFC 6486 section 4.2: Manifest: "
@@ -269,8 +269,7 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		goto out;
 	}
 
-	/* The profile version is optional. */
-
+	/* Test if the optional profile version field is present. */
 	if (sk_ASN1_TYPE_num(seq) != 5 &&
 	    sk_ASN1_TYPE_num(seq) != 6) {
 		warnx("%s: RFC 6486 section 4.2: Manifest: "
@@ -279,25 +278,22 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		goto out;
 	}
 
-	/* Start with optional profile version. */
-
-	i = 0;
+	/* Parse the optional version field */
 	if (sk_ASN1_TYPE_num(seq) == 6) {
 		t = sk_ASN1_TYPE_value(seq, i++);
-		if (t->type != V_ASN1_INTEGER) {
-			warnx("%s: RFC 6486 section 4.2.1: version: "
-			    "want ASN.1 integer, have %s (NID %d)",
-			    p->fn, ASN1_tag2str(t->type), t->type);
-			goto out;
-		}
+		d = t->value.asn1_string->data;
+		dsz = t->value.asn1_string->length;
 
-		if (t->value.integer == NULL)
+		if (cms_econtent_version(p->fn, &d, dsz, &mft_version) == -1)
 			goto out;
 
-		mft_version = ASN1_INTEGER_get(t->value.integer);
-		if (mft_version != 0) {
-			warnx("%s: RFC 6486 section 4.2.1: version: "
-			    "want 0, have %ld", p->fn, mft_version);
+		switch (mft_version) {
+		case 0:
+			warnx("%s: incorrect encoding for version 0", p->fn);
+			goto out;
+		default:
+			warnx("%s: version %ld not supported (yet)", p->fn,
+			    mft_version);
 			goto out;
 		}
 	}

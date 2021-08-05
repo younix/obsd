@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwmreg.h,v 1.51 2021/06/01 13:21:08 stsp Exp $	*/
+/*	$OpenBSD: if_iwmreg.h,v 1.64 2021/07/09 11:24:55 stsp Exp $	*/
 
 /******************************************************************************
  *
@@ -824,19 +824,9 @@ enum msix_ivar_for_cause {
 #define IWM_UCODE_TLV_API_STA_TYPE		30
 #define IWM_UCODE_TLV_API_NAN2_VER2		31
 #define IWM_UCODE_TLV_API_ADAPTIVE_DWELL	32
-#define IWM_UCODE_TLV_API_NEW_BEACON_TEMPLATE	34
 #define IWM_UCODE_TLV_API_NEW_RX_STATS		35
-#define IWM_UCODE_TLV_API_WOWLAN_KEY_MATERIAL	36
 #define IWM_UCODE_TLV_API_QUOTA_LOW_LATENCY	38
-#define IWM_UCODE_TLV_API_DEPRECATE_TTAK	41
 #define IWM_UCODE_TLV_API_ADAPTIVE_DWELL_V2	42
-#define IWM_UCODE_TLV_API_NAN_NOTIF_V2		43
-#define IWM_UCODE_TLV_API_REDUCE_TX_POWER	45
-#define IWM_UCODE_TLV_API_SHORT_BEACON_NOTIF	46
-#define IWM_UCODE_TLV_API_REGULATORY_NVM_INFO   48
-#define IWM_UCODE_TLV_API_FTM_NEW_RANGE_REQ     49
-#define IWM_UCODE_TLV_API_FTM_RTT_ACCURACY      54
-#define IWM_UCODE_TLV_API_SAR_TABLE_VER         55
 #define IWM_UCODE_TLV_API_SCAN_EXT_CHAN_VER	58
 #define IWM_NUM_UCODE_TLV_API			128
 
@@ -935,10 +925,9 @@ enum msix_ivar_for_cause {
 #define IWM_UCODE_TLV_CAPA_SHORT_PM_TIMEOUTS		65
 #define IWM_UCODE_TLV_CAPA_BT_MPLUT_SUPPORT		67
 #define IWM_UCODE_TLV_CAPA_MULTI_QUEUE_RX_SUPPORT	68
-#define IWM_UCODE_TLV_CAPA_CSA_AND_TBTT_OFFLOAD		70
 #define IWM_UCODE_TLV_CAPA_BEACON_ANT_SELECTION		71
 #define IWM_UCODE_TLV_CAPA_BEACON_STORING		72
-#define IWM_UCODE_TLV_CAPA_LAR_SUPPORT_V2		73
+#define IWM_UCODE_TLV_CAPA_LAR_SUPPORT_V3		73
 #define IWM_UCODE_TLV_CAPA_CT_KILL_BY_FW		74
 #define IWM_UCODE_TLV_CAPA_TEMP_THS_REPORT_SUPPORT	75
 #define IWM_UCODE_TLV_CAPA_CTDP_SUPPORT			76
@@ -946,10 +935,6 @@ enum msix_ivar_for_cause {
 #define IWM_UCODE_TLV_CAPA_LMAC_UPLOAD			79
 #define IWM_UCODE_TLV_CAPA_EXTEND_SHARED_MEM_CFG	80
 #define IWM_UCODE_TLV_CAPA_LQM_SUPPORT			81
-#define IWM_UCODE_TLV_CAPA_TX_POWER_ACK			84
-#define IWM_UCODE_TLV_CAPA_D3_DEBUG			87
-#define IWM_UCODE_TLV_CAPA_LED_CMD_SUPPORT		88
-#define IWM_UCODE_TLV_CAPA_DBG_SUSPEND_RESUME_CMD_SUPP	92
 
 #define IWM_NUM_UCODE_TLV_CAPA 128
 
@@ -3106,7 +3091,6 @@ struct iwm_fw_channel_info {
 	uint8_t ctrl_pos;
 	uint8_t reserved;
 } __packed; /* CHANNEL_CONFIG_API_S_VER_2 */
-
 
 #define IWM_PHY_RX_CHAIN_DRIVER_FORCE_POS	(0)
 #define IWM_PHY_RX_CHAIN_DRIVER_FORCE_MSK \
@@ -6592,7 +6576,7 @@ struct iwm_mcc_update_resp_v1  {
 } __packed; /* LAR_UPDATE_MCC_CMD_RESP_S_VER_1 */
 
 /**
- * iwm_mcc_update_resp - response to MCC_UPDATE_CMD.
+ * iwm_mcc_update_resp_v2 - response to MCC_UPDATE_CMD.
  * Contains the new channel control profile map, if changed, and the new MCC
  * (mobile country code).
  * The new MCC may be different than what was requested in MCC_UPDATE_CMD.
@@ -6618,6 +6602,9 @@ struct iwm_mcc_update_resp_v2 {
 	uint32_t channels[0];
 } __packed; /* LAR_UPDATE_MCC_CMD_RESP_S_VER_2 */
 
+#define IWM_GEO_NO_INFO			0
+#define IWM_GEO_WMM_ETSI_5GHZ_INFO	(1 << 0)
+
 /**
  * iwm_mcc_update_resp_v3 - response to MCC_UPDATE_CMD.
  * Contains the new channel control profile map, if changed, and the new MCC
@@ -6628,7 +6615,7 @@ struct iwm_mcc_update_resp_v2 {
  * @cap: capabilities for all channels which matches the MCC
  * @source_id: the MCC source, see IWM_MCC_SOURCE_*
  * @time: time elapsed from the MCC test start (in 30 seconds TU)
- * @reserved: reserved.
+ * @geo_info: geographic specific profile information
  * @n_channels: number of channels in @channels_data (may be 14, 39, 50 or 51
  *		channels, depending on platform)
  * @channels: channel control data map, DWORD for each channel. Only the first

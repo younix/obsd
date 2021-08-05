@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.56 2020/09/23 19:18:18 martijn Exp $	*/
+/*	$OpenBSD: parse.y,v 1.58 2021/06/16 16:55:02 dv Exp $	*/
 
 /*
  * Copyright (c) 2007-2016 Reyk Floeter <reyk@openbsd.org>
@@ -49,7 +49,6 @@
 #include <pwd.h>
 #include <grp.h>
 
-#include "proc.h"
 #include "vmd.h"
 
 TAILQ_HEAD(files, file)		 files = TAILQ_HEAD_INITIALIZER(files);
@@ -326,7 +325,7 @@ vm		: VM string vm_instance		{
 					free($3);
 					YYERROR;
 				}
-				
+
 				free($2);
 				name = $3;
 				vmc.vmc_flags |= VMOP_CREATE_INSTANCE;
@@ -693,6 +692,9 @@ lladdr		: STRING			{
 			free($1);
 
 			memcpy($$, ea, ETHER_ADDR_LEN);
+		}
+		| /* empty */ {
+			memset($$, 0, ETHER_ADDR_LEN);
 		}
 		;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.317 2021/05/30 21:01:27 bluhm Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.319 2021/06/23 16:10:45 cheloha Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -312,8 +312,7 @@ route_attach(struct socket *so, int proto)
 	rop = pool_get(&rtpcb_pool, PR_WAITOK|PR_ZERO);
 	so->so_pcb = rop;
 	/* Init the timeout structure */
-	timeout_set_flags(&rop->rop_timeout, rtm_senddesync_timer, so,
-	    TIMEOUT_PROC);
+	timeout_set_proc(&rop->rop_timeout, rtm_senddesync_timer, so);
 	refcnt_init(&rop->rop_refcnt);
 
 	rop->rop_socket = so;
@@ -463,6 +462,15 @@ rtm_senddesync(struct socket *so)
 	struct mbuf	*desync_mbuf;
 
 	soassertlocked(so);
+
+	/*
+	 * Dying socket is disconnected by upper layer and there is
+	 * no reason to send packet. Also we shouldn't reschedule
+	 * timeout(9), otherwise timeout_del_barrier(9) can't help us.
+	 */
+	if ((so->so_state & SS_ISCONNECTED) == 0 ||
+	    (so->so_state & SS_CANTRCVMORE))
+		return;
 
 	/* If we are in a DESYNC state, try to send a RTM_DESYNC packet */
 	if ((rop->rop_flags & ROUTECB_FLAG_DESYNC) == 0)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.133 2021/05/28 16:33:36 visa Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.136 2021/07/24 08:21:13 visa Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -196,11 +196,12 @@ struct cpu_info {
 #define	CI_DDB_INDDB		4
 
 #ifdef DIAGNOSTIC
-	int	ci_mutex_level;
+	int		ci_mutex_level;
 #endif
 #ifdef GPROF
 	struct gmonparam *ci_gmon;
 #endif
+	char		ci_panicbuf[512];
 };
 
 #define	CPUF_PRIMARY	0x01		/* CPU is primary CPU */
@@ -224,9 +225,9 @@ extern void (*cpu_idle_cycle_func)(void);
 extern struct cpu_info *get_cpu_info(int);
 #define curcpu() getcurcpu()
 #define	CPU_IS_PRIMARY(ci)		((ci)->ci_flags & CPUF_PRIMARY)
+#define	CPU_IS_RUNNING(ci)		((ci)->ci_flags & CPUF_RUNNING)
 #define cpu_number()			(curcpu()->ci_cpuid)
 
-extern struct cpuset cpus_running;
 void cpu_unidle(struct cpu_info *);
 void cpu_boot_secondary_processors(void);
 #define cpu_boot_secondary(ci)          hw_cpu_boot_secondary(ci)
@@ -248,6 +249,7 @@ void	smp_rendezvous_cpus(unsigned long, void (*)(void *), void *arg);
 #define MAXCPUS				1
 #define curcpu()			(&cpu_info_primary)
 #define	CPU_IS_PRIMARY(ci)		1
+#define	CPU_IS_RUNNING(ci)		1
 #define cpu_number()			0UL
 #define cpu_unidle(ci)
 #define get_cpu_info(i)			(&cpu_info_primary)

@@ -1,4 +1,4 @@
-#	$OpenBSD: install.md,v 1.16 2021/05/30 18:57:22 kettenis Exp $
+#	$OpenBSD: install.md,v 1.21 2021/07/20 15:25:48 kettenis Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -33,21 +33,24 @@
 #
 
 NCPU=$(sysctl -n hw.ncpufound)
-NEWFSARGS_msdos="-F 16 -L boot"
 MOUNT_ARGS_msdos="-o-l"
 
 md_installboot() {
 	local _disk=/dev/$1 _mdec _plat
 
-	case $(sysctl -n hw.product) in
-	Pine64*(+))			_plat=pine64;;
-	*'Raspberry Pi'*)		_plat=rpi;;
+	case $(sysctl -n machdep.compatible) in
+	pine64,pine64*(+))	_plat=pine64;;
+	raspberrypi,*)		_plat=rpi;
 	esac
 
-	# Mount MSDOS partition, extract U-Boot and copy UEFI boot program
+	if ! installboot -r /mnt ${1}; then
+		echo "\nFailed to install bootblocks."
+		echo "You will not be able to boot OpenBSD from ${1}."
+		exit
+	fi
+
+	# Mount MSDOS partition to do some final tweaks
 	mount ${MOUNT_ARGS_msdos} ${_disk}i /mnt/mnt
-	mkdir -p /mnt/mnt/efi/boot
-	cp /mnt/usr/mdec/BOOTAA64.EFI /mnt/mnt/efi/boot/bootaa64.efi
 	echo bootaa64.efi > /mnt/mnt/efi/boot/startup.nsh
 
 	_mdec=/usr/mdec/$_plat
@@ -73,27 +76,36 @@ md_installboot() {
 }
 
 md_prep_fdisk() {
-	local _disk=$1 _d
+	local _disk=$1 _d _type=MBR
 
+	local bootpart=
 	local bootparttype="C"
 	local bootsectorstart="32768"
 	local bootsectorsize="32768"
 	local bootsectorend=$(($bootsectorstart + $bootsectorsize))
 	local bootfstype="msdos"
-	local newfs_args=${NEWFSARGS_msdos}
 
 	while :; do
 		_d=whole
-		if disk_has $_disk mbr; then
+		if disk_has $_disk gpt; then
+			[[ $_disk == $ROOTDISK ]] && bootpart="-b ${bootsectorsize}"
+			_type=GPT
+			fdisk $_disk
+		elif disk_has $_disk mbr; then
 			fdisk $_disk
 		else
 			echo "MBR has invalid signature; not showing it."
 		fi
-		ask "Use (W)hole disk or (E)dit the MBR?" "$_d"
+		ask "Use (W)hole disk or (E)dit the ${_type}?" $_d
 		case $resp in
 		[wW]*)
 			echo -n "Creating a ${bootfstype} partition and an OpenBSD partition for rest of $_disk..."
-			fdisk -e ${_disk} <<__EOT >/dev/null
+			if disk_has $_disk gpt apfsisc; then
+				fdisk -Ay ${bootpart} ${_disk} >/dev/null
+			elif disk_has $_disk gpt; then
+				fdisk -iy -g ${bootpart} ${_disk} >/dev/null
+			else
+				fdisk -e ${_disk} <<__EOT >/dev/null
 reinit
 e 0
 ${bootparttype}
@@ -109,9 +121,9 @@ ${bootsectorend}
 write
 quit
 __EOT
+			fi
 			echo "done."
-			disklabel $_disk 2>/dev/null | grep -q "^  i:" || disklabel -w -d $_disk
-			newfs -t ${bootfstype} ${newfs_args} ${_disk}i
+			installboot -p $_disk
 			return ;;
 		[eE]*)
 			if disk_has $_disk gpt; then

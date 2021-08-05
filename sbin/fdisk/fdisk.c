@@ -1,4 +1,4 @@
-/*	$OpenBSD: fdisk.c,v 1.107 2021/05/14 15:31:01 krw Exp $	*/
+/*	$OpenBSD: fdisk.c,v 1.129 2021/07/22 18:54:17 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -16,9 +16,10 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
+#include <sys/param.h>	/* DEV_BSIZE */
 #include <sys/disklabel.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
 #include <paths.h>
@@ -28,41 +29,32 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "disk.h"
 #include "part.h"
+#include "disk.h"
 #include "mbr.h"
 #include "misc.h"
 #include "cmd.h"
 #include "user.h"
 #include "gpt.h"
 
-#define _PATH_MBR _PATH_BOOTDIR "mbr"
-static unsigned char builtin_mbr[] = {
+#define	_PATH_MBR		_PATH_BOOTDIR "mbr"
+static unsigned char		builtin_mbr[] = {
 #include "mbrcode.h"
 };
 
-uint32_t b_arg;
-int	y_flag;
+int			A_flag, y_flag;
+
+void			parse_bootprt(const char *);
+void			get_default_mbr(const char *, struct mbr *);
 
 static void
 usage(void)
 {
-	extern char * __progname;
+	extern char		* __progname;
 
 	fprintf(stderr, "usage: %s "
-	    "[-egvy] [-i|-u] [-b #] [-c # -h # -s #] "
-	    "[-f mbrfile] [-l # ] disk\n"
-	    "\t-b: specify special boot partition block count; requires -i\n"
-	    "\t-chs: specify disk geometry; all three must be specified\n"
-	    "\t-e: interactively edit MBR or GPT\n"
-	    "\t-f: specify non-standard MBR template\n"
-	    "\t-g: initialize disk with GPT; requires -i\n"
-	    "\t-i: initialize disk with MBR unless -g is also specified\n"
-	    "\t-l: specify LBA block count; cannot be used with -chs\n"
-	    "\t-u: update MBR code; preserve partition table\n"
-	    "\t-v: print the MBR, the Primary GPT and the Secondary GPT\n"
-	    "\t-y: do not ask questions\n"
-	    "`disk' may be of the forms: sd0 or /dev/rsd0c.\n",
+	    "[-evy] [-i [-g] | -u | -A ] [-b blocks[@offset[:type]]]\n"
+	    "\t[-l blocks | -c cylinders -h heads -s sectors] [-f mbrfile] disk\n",
 	    __progname);
 	exit(1);
 }
@@ -70,77 +62,72 @@ usage(void)
 int
 main(int argc, char *argv[])
 {
-	ssize_t len;
-	int ch, fd, efi, error;
-	int e_flag = 0, g_flag = 0, i_flag = 0, u_flag = 0;
-	int verbosity = TERSE;
-	int c_arg = 0, h_arg = 0, s_arg = 0;
-	uint32_t l_arg = 0;
-	char *query;
+	struct mbr		 mbr;
 #ifdef HAS_MBR
-	char *mbrfile = _PATH_MBR;
+	const char		*mbrfile = _PATH_MBR;
 #else
-	char *mbrfile = NULL;
+	const char		*mbrfile = NULL;
 #endif
-	struct dos_mbr dos_mbr;
-	struct mbr mbr;
+	int			 ch, error;
+	int			 e_flag = 0, g_flag = 0, i_flag = 0, u_flag = 0;
+	int			 verbosity = TERSE;
+	int			 oflags = O_RDONLY;
+	char			*query;
 
-	while ((ch = getopt(argc, argv, "iegpuvf:c:h:s:l:b:y")) != -1) {
+	while ((ch = getopt(argc, argv, "Aiegpuvf:c:h:s:l:b:y")) != -1) {
 		const char *errstr;
 
 		switch(ch) {
+		case 'A':
+			A_flag = 1;
+			oflags = O_RDWR;
+			break;
 		case 'i':
 			i_flag = 1;
+			oflags = O_RDWR;
 			break;
 		case 'u':
 			u_flag = 1;
+			oflags = O_RDWR;
 			break;
 		case 'e':
 			e_flag = 1;
+			oflags = O_RDWR;
 			break;
 		case 'f':
 			mbrfile = optarg;
 			break;
 		case 'c':
-			c_arg = strtonum(optarg, 1, 262144, &errstr);
+			disk.dk_cylinders = strtonum(optarg, 1, 262144, &errstr);
 			if (errstr)
 				errx(1, "Cylinder argument %s [1..262144].",
 				    errstr);
-			disk.cylinders = c_arg;
-			disk.size = c_arg * h_arg * s_arg;
+			disk.dk_size = 0;
 			break;
 		case 'h':
-			h_arg = strtonum(optarg, 1, 256, &errstr);
+			disk.dk_heads = strtonum(optarg, 1, 256, &errstr);
 			if (errstr)
 				errx(1, "Head argument %s [1..256].", errstr);
-			disk.heads = h_arg;
-			disk.size = c_arg * h_arg * s_arg;
+			disk.dk_size = 0;
 			break;
 		case 's':
-			s_arg = strtonum(optarg, 1, 63, &errstr);
+			disk.dk_sectors = strtonum(optarg, 1, 63, &errstr);
 			if (errstr)
 				errx(1, "Sector argument %s [1..63].", errstr);
-			disk.sectors = s_arg;
-			disk.size = c_arg * h_arg * s_arg;
+			disk.dk_size = 0;
 			break;
 		case 'g':
 			g_flag = 1;
 			break;
 		case 'b':
-			b_arg = strtonum(optarg, 64, UINT32_MAX, &errstr);
-			if (errstr)
-				errx(1, "Block argument %s [64..%u].", errstr,
-				    UINT32_MAX);
+			parse_bootprt(optarg);
 			break;
 		case 'l':
-			l_arg = strtonum(optarg, 64, UINT32_MAX, &errstr);
+			disk.dk_size = strtonum(optarg, BLOCKALIGNMENT, UINT32_MAX, &errstr);
 			if (errstr)
-				errx(1, "Block argument %s [64..%u].", errstr,
-				    UINT32_MAX);
-			disk.cylinders = l_arg / 64;
-			disk.heads = 1;
-			disk.sectors = 64;
-			disk.size = l_arg;
+				errx(1, "Block argument %s [%u..%u].", errstr,
+				    BLOCKALIGNMENT, UINT32_MAX);
+			disk.dk_cylinders = disk.dk_heads = disk.dk_sectors = 0;
 			break;
 		case 'y':
 			y_flag = 1;
@@ -155,38 +142,122 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	/* Argument checking */
 	if (argc != 1 || (i_flag && u_flag) ||
-	    (i_flag == 0 && (b_arg || g_flag)) ||
-	    ((c_arg | h_arg | s_arg) && !(c_arg && h_arg && s_arg)) ||
-	    ((c_arg | h_arg | s_arg) && l_arg))
+	    (i_flag == 0 && g_flag))
 		usage();
 
-	disk.name = argv[0];
-	DISK_open(i_flag || u_flag || e_flag);
+	if ((disk.dk_cylinders || disk.dk_heads || disk.dk_sectors) &&
+	    (disk.dk_cylinders * disk.dk_heads * disk.dk_sectors == 0))
+		usage();
 
-	/* "proc exec" for man page display */
-	if (pledge("stdio rpath wpath disklabel proc exec", NULL) == -1)
-		err(1, "pledge");
-
-	error = MBR_read(0, &dos_mbr);
-	if (error)
-		errx(1, "Can't read sector 0!");
-	MBR_parse(&dos_mbr, 0, 0, &mbr);
-
-	/* Get the GPT if present. Either primary or secondary is ok. */
-	efi = MBR_protective_mbr(&mbr);
-	if (efi != -1)
-		GPT_read(ANYGPT);
-
-	if (!(i_flag || u_flag || e_flag)) {
+	DISK_open(argv[0], oflags);
+	if (oflags == O_RDONLY) {
 		if (pledge("stdio", NULL) == -1)
 			err(1, "pledge");
 		USER_print_disk(verbosity);
 		goto done;
 	}
 
-	/* Create initial/default MBR. */
+	/* "proc exec" for man page display */
+	if (pledge("stdio rpath wpath disklabel proc exec", NULL) == -1)
+		err(1, "pledge");
+
+	get_default_mbr(mbrfile, &initial_mbr);
+
+	query = NULL;
+	if (A_flag) {
+		if (GPT_read(ANYGPT))
+			errx(1, "-A requires a valid GPT");
+		else {
+			GPT_init(GPONLY);
+			query = "Do you wish to write new GPT?";
+		}
+	} else if (i_flag) {
+		if (g_flag) {
+			GPT_init(GHANDGP);
+			query = "Do you wish to write new GPT?";
+		} else {
+			MBR_init(&initial_mbr);
+			query = "Do you wish to write new MBR and "
+			    "partition table?";
+		}
+	} else if (u_flag) {
+		error = MBR_read(0, 0, &mbr);
+		if (error)
+			errx(1, "Can't read MBR!");
+		memcpy(initial_mbr.mbr_prt, mbr.mbr_prt,
+		    sizeof(initial_mbr.mbr_prt));
+		query = "Do you wish to write new MBR?";
+	}
+	if (query && ask_yn(query))
+		Xwrite(NULL, &initial_mbr);
+
+	if (e_flag)
+		USER_edit(0, 0);
+
+done:
+	close(disk.dk_fd);
+
+	return 0;
+}
+
+void
+parse_bootprt(const char *arg)
+{
+	const char		*errstr;
+	char			*poffset, *ptype;
+	uint32_t		 blockcount, blockoffset;
+	uint8_t			 partitiontype;
+
+	blockoffset = BLOCKALIGNMENT;
+	partitiontype = DOSPTYP_EFISYS;
+	ptype = NULL;
+
+	/* First number: # of 512-byte blocks in boot partition. */
+	poffset = strchr(arg, '@');
+	if (poffset != NULL)
+		*poffset++ = '\0';
+	if (poffset != NULL) {
+		ptype = strchr(poffset, ':');
+		if (ptype != NULL)
+			*ptype++ = '\0';
+	}
+
+	blockcount = strtonum(arg, BLOCKALIGNMENT, UINT32_MAX, &errstr);
+	if (errstr)
+		errx(1, "Block argument %s [%u..%u].", errstr, BLOCKALIGNMENT,
+		    UINT32_MAX);
+
+	if (poffset == NULL)
+		goto done;
+
+	/* Second number: # of 512-byte blocks to offset partition start. */
+	blockoffset = strtonum(poffset, BLOCKALIGNMENT, UINT32_MAX, &errstr);
+	if (errstr)
+		errx(1, "Block offset argument %s [%u..%u].", errstr,
+		    BLOCKALIGNMENT, UINT32_MAX);
+
+	if (ptype == NULL)
+		goto done;
+
+	if (strlen(ptype) != 2 || !(isxdigit(*ptype) && isxdigit(*(ptype + 1))))
+		errx(1, "Block type is not 2 digit hex value");
+
+	partitiontype = strtol(ptype, NULL, 16);
+
+ done:
+	disk.dk_bootprt.prt_ns = blockcount;
+	disk.dk_bootprt.prt_bs = blockoffset;
+	disk.dk_bootprt.prt_id = partitiontype;
+}
+
+void
+get_default_mbr(const char *mbrfile, struct mbr *mbr)
+{
+	struct dos_mbr		dos_mbr;
+	ssize_t			len;
+	int			fd;
+
 	if (mbrfile == NULL) {
 		memcpy(&dos_mbr, builtin_mbr, sizeof(dos_mbr));
 	} else {
@@ -205,33 +276,6 @@ main(int argc, char *argv[])
 				    mbrfile);
 		}
 	}
-	MBR_parse(&dos_mbr, 0, 0, &initial_mbr);
 
-	query = NULL;
-	if (i_flag) {
-		reinited = 1;
-		if (g_flag) {
-			MBR_init_GPT(&initial_mbr);
-			GPT_init();
-			query = "Do you wish to write new GPT?";
-		} else {
-			memset(&gh, 0, sizeof(gh));
-			MBR_init(&initial_mbr);
-			query = "Do you wish to write new MBR and "
-			    "partition table?";
-		}
-	} else if (u_flag) {
-		memcpy(initial_mbr.part, mbr.part, sizeof(initial_mbr.part));
-		query = "Do you wish to write new MBR?";
-	}
-	if (query && ask_yn(query))
-		Xwrite(NULL, &initial_mbr);
-
-	if (e_flag)
-		USER_edit(0, 0);
-
-done:
-	close(disk.fd);
-
-	return (0);
+	MBR_parse(&dos_mbr, 0, 0, mbr);
 }

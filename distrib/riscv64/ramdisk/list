@@ -1,4 +1,4 @@
-#	$OpenBSD: list,v 1.1 2021/04/27 23:57:38 drahn Exp $
+#	$OpenBSD: list,v 1.3 2021/07/18 15:18:49 deraadt Exp $
 
 SRCDIRS distrib/special
 
@@ -26,7 +26,7 @@ LINK	instbin					bin/sleep
 LINK	instbin					bin/stty
 LINK	instbin					bin/sync
 LINK	instbin					sbin/bioctl
-LINK	instbin					sbin/dhclient
+LINK	instbin					sbin/dhcpleased
 LINK	instbin					sbin/disklabel
 LINK	instbin					sbin/dmesg
 LINK	instbin					sbin/fdisk
@@ -47,6 +47,7 @@ LINK	instbin					sbin/newfs
 LINK	instbin					sbin/newfs_msdos
 LINK	instbin					sbin/ping sbin/ping6
 LINK	instbin					sbin/reboot sbin/halt
+LINK	instbin					sbin/resolvd
 LINK	instbin					sbin/route
 LINK	instbin					sbin/slaacd
 LINK	instbin					sbin/sysctl
@@ -82,7 +83,6 @@ COPY	${CURDIR}/../../miniroot/services	etc/services
 TERMCAP	vt100,vt220,dumb			usr/share/misc/termcap
 
 SYMLINK	/tmp/i/fstab.shadow			etc/fstab
-SYMLINK	/tmp/i/resolv.conf.shadow		etc/resolv.conf
 SYMLINK	/tmp/i/hosts				etc/hosts
 
 # and the installation tools

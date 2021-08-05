@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.68 2020/05/31 06:23:57 dlg Exp $ */
+/*	$OpenBSD: cpu.h,v 1.70 2021/07/06 09:34:06 kettenis Exp $ */
 /*
  * Copyright (c) 1996 Nivas Madhur
  * Copyright (c) 1992, 1993
@@ -177,6 +177,7 @@ struct cpu_info {
 #ifdef GPROF
 	struct gmonparam *ci_gmon;
 #endif
+	char		 ci_panicbuf[512];
 };
 
 extern cpuid_t master_cpu;
@@ -201,6 +202,7 @@ curcpu(void)
 }
 
 #define	CPU_IS_PRIMARY(ci)	((ci)->ci_flags & CIF_PRIMARY)
+#define	CPU_IS_RUNNING(ci)	((ci)->ci_flags & CIF_ALIVE)
 
 void	cpu_boot_secondary_processors(void);
 __dead void cpu_emergency_disable(void);
@@ -213,6 +215,7 @@ void	m88k_broadcast_ipi(int);
 #define	curcpu()	(&m88k_cpus[0])
 #define	cpu_unidle(ci)	do { /* nothing */ } while (0)
 #define	CPU_IS_PRIMARY(ci)	1
+#define	CPU_IS_RUNNING(ci)	1
 
 #endif	/* MULTIPROCESSOR */
 

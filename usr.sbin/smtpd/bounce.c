@@ -1,4 +1,4 @@
-/*	$OpenBSD: bounce.c,v 1.84 2021/05/26 18:08:55 eric Exp $	*/
+/*	$OpenBSD: bounce.c,v 1.86 2021/07/28 19:39:50 benno Exp $	*/
 
 /*
  * Copyright (c) 2009 Gilles Chehade <gilles@poolp.org>
@@ -18,23 +18,11 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
-#include <sys/queue.h>
-#include <sys/tree.h>
-#include <sys/socket.h>
-
 #include <errno.h>
-#include <event.h>
-#include <imsg.h>
 #include <inttypes.h>
-#include <pwd.h>
-#include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <unistd.h>
-#include <limits.h>
 
 #include "smtpd.h"
 #include "log.h"
@@ -90,11 +78,13 @@ SPLAY_PROTOTYPE(bounce_message_tree, bounce_message, sp_entry,
     bounce_message_cmp);
 
 static void bounce_drain(void);
-static void bounce_send(struct bounce_session *, const char *, ...);
+static void bounce_send(struct bounce_session *, const char *, ...)
+	__attribute__((__format__ (printf, 2, 3)));
 static int  bounce_next_message(struct bounce_session *);
 static int  bounce_next(struct bounce_session *);
 static void bounce_delivery(struct bounce_message *, int, const char *);
-static void bounce_status(struct bounce_session *, const char *, ...);
+static void bounce_status(struct bounce_session *, const char *, ...)
+	__attribute__((__format__ (printf, 2, 3)));
 static void bounce_io(struct io *, int, void *);
 static void bounce_timeout(int, short, void *);
 static void bounce_free(struct bounce_session *);

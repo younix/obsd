@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.93 2020/06/14 20:29:13 naddy Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.95 2021/07/06 09:34:06 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2000-2004 Michael Shalayeff
@@ -114,6 +114,8 @@ struct cpu_info {
 #ifdef GPROF
 	struct gmonparam *ci_gmon;
 #endif
+
+	char		ci_panicbuf[512];
 } __attribute__((__aligned__(64)));
 
 #define		CPUF_RUNNING	0x0001		/* CPU is running. */
@@ -142,6 +144,7 @@ curcpu(void)
 
 #define CPU_INFO_UNIT(ci)	((ci)->ci_dev ? (ci)->ci_dev->dv_unit : 0)
 #define CPU_IS_PRIMARY(ci)	((ci)->ci_cpuid == 0)
+#define CPU_IS_RUNNING(ci)	((ci)->ci_flags & CPUF_RUNNING)
 #define	CPU_INFO_ITERATOR	int
 #define CPU_INFO_FOREACH(cii, ci) \
 	for (cii = 0, ci = &cpu_info[0]; cii < ncpus; cii++, ci++)

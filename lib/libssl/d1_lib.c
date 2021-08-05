@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_lib.c,v 1.54 2021/05/16 13:56:30 jsing Exp $ */
+/* $OpenBSD: d1_lib.c,v 1.58 2021/07/21 08:42:14 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -88,8 +88,6 @@ dtls1_new(SSL *s)
 
 	if ((s->d1->internal->unprocessed_rcds.q = pqueue_new()) == NULL)
 		goto err;
-	if ((s->d1->internal->processed_rcds.q = pqueue_new()) == NULL)
-		goto err;
 	if ((s->d1->internal->buffered_messages = pqueue_new()) == NULL)
 		goto err;
 	if ((s->d1->sent_messages = pqueue_new()) == NULL)
@@ -100,7 +98,7 @@ dtls1_new(SSL *s)
 	if (s->server)
 		s->d1->internal->cookie_len = sizeof(D1I(s)->cookie);
 
-	s->method->internal->ssl_clear(s);
+	s->method->ssl_clear(s);
 	return (1);
 
  err:
@@ -143,7 +141,6 @@ static void
 dtls1_clear_queues(SSL *s)
 {
 	dtls1_drain_records(D1I(s)->unprocessed_rcds.q);
-	dtls1_drain_records(D1I(s)->processed_rcds.q);
 	dtls1_drain_fragments(D1I(s)->buffered_messages);
 	dtls1_drain_fragments(s->d1->sent_messages);
 	dtls1_drain_records(D1I(s)->buffered_app_data.q);
@@ -160,7 +157,6 @@ dtls1_free(SSL *s)
 	dtls1_clear_queues(s);
 
 	pqueue_free(D1I(s)->unprocessed_rcds.q);
-	pqueue_free(D1I(s)->processed_rcds.q);
 	pqueue_free(D1I(s)->buffered_messages);
 	pqueue_free(s->d1->sent_messages);
 	pqueue_free(D1I(s)->buffered_app_data.q);
@@ -176,7 +172,6 @@ dtls1_clear(SSL *s)
 {
 	struct dtls1_state_internal_st *internal;
 	pqueue unprocessed_rcds;
-	pqueue processed_rcds;
 	pqueue buffered_messages;
 	pqueue sent_messages;
 	pqueue buffered_app_data;
@@ -184,7 +179,6 @@ dtls1_clear(SSL *s)
 
 	if (s->d1) {
 		unprocessed_rcds = D1I(s)->unprocessed_rcds.q;
-		processed_rcds = D1I(s)->processed_rcds.q;
 		buffered_messages = D1I(s)->buffered_messages;
 		sent_messages = s->d1->sent_messages;
 		buffered_app_data = D1I(s)->buffered_app_data.q;
@@ -197,6 +191,11 @@ dtls1_clear(SSL *s)
 		memset(s->d1, 0, sizeof(*s->d1));
 		s->d1->internal = internal;
 
+		D1I(s)->r_epoch =
+		    tls12_record_layer_initial_epoch(s->internal->rl);
+
+		D1I(s)->unprocessed_rcds.epoch = D1I(s)->r_epoch + 1;
+
 		if (s->server) {
 			D1I(s)->cookie_len = sizeof(D1I(s)->cookie);
 		}
@@ -206,7 +205,6 @@ dtls1_clear(SSL *s)
 		}
 
 		D1I(s)->unprocessed_rcds.q = unprocessed_rcds;
-		D1I(s)->processed_rcds.q = processed_rcds;
 		D1I(s)->buffered_messages = buffered_messages;
 		s->d1->sent_messages = sent_messages;
 		D1I(s)->buffered_app_data.q = buffered_app_data;

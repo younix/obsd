@@ -1,4 +1,4 @@
-/*	$OpenBSD: slaacd.c,v 1.60 2021/05/01 11:53:24 florian Exp $	*/
+/*	$OpenBSD: slaacd.c,v 1.63 2021/07/27 08:15:11 florian Exp $	*/
 
 /*
  * Copyright (c) 2017 Florian Obser <florian@openbsd.org>
@@ -75,9 +75,7 @@ void	delete_address(struct imsg_configure_address *);
 void	configure_gateway(struct imsg_configure_dfr *, uint8_t);
 void	add_gateway(struct imsg_configure_dfr *);
 void	delete_gateway(struct imsg_configure_dfr *);
-#ifndef	SMALL
 void	send_rdns_proposal(struct imsg_propose_rdns *);
-#endif	/* SMALL */
 int	get_soiikey(uint8_t *);
 
 static int	main_imsg_send_ipc_sockets(struct imsgbuf *, struct imsgbuf *);
@@ -129,11 +127,11 @@ main(int argc, char *argv[])
 	char			*saved_argv0;
 	int			 pipe_main2frontend[2];
 	int			 pipe_main2engine[2];
-	int			 frontend_routesock, rtfilter;
+	int			 frontend_routesock, rtfilter, lockfd;
 	int			 rtable_any = RTABLE_ANY;
 	char			*csock = _PATH_SLAACD_SOCKET;
-#ifndef SMALL
 	struct imsg_propose_rdns rdns;
+#ifndef SMALL
 	int			 control_fd;
 #endif /* SMALL */
 
@@ -179,6 +177,10 @@ main(int argc, char *argv[])
 	/* Check for root privileges. */
 	if (geteuid())
 		errx(1, "need root privileges");
+
+	lockfd = open(_PATH_LOCKFILE, O_CREAT|O_RDWR|O_EXLOCK|O_NONBLOCK, 0600);
+	if (lockfd == -1)
+		errx(1, "already running");
 
 	/* Check for assigned daemon user */
 	if (getpwnam(SLAACD_USER) == NULL)
@@ -278,13 +280,11 @@ main(int argc, char *argv[])
 
 	main_imsg_compose_frontend(IMSG_STARTUP, -1, NULL, 0);
 
-#ifndef SMALL
 	/* we are taking over, clear all previos slaac proposals */
 	memset(&rdns, 0, sizeof(rdns));
 	rdns.if_index = 0;
 	rdns.rdns_count = 0;
 	send_rdns_proposal(&rdns);
-#endif /* SMALL */
 
 	event_dispatch();
 
@@ -467,9 +467,7 @@ main_dispatch_engine(int fd, short event, void *bula)
 	struct imsg			 imsg;
 	struct imsg_configure_address	 address;
 	struct imsg_configure_dfr	 dfr;
-#ifndef	SMALL
 	struct imsg_propose_rdns	 rdns;
-#endif	/* SMALL */
 	ssize_t				 n;
 	int				 shut = 0;
 
@@ -527,7 +525,6 @@ main_dispatch_engine(int fd, short event, void *bula)
 			memcpy(&dfr, imsg.data, sizeof(dfr));
 			delete_gateway(&dfr);
 			break;
-#ifndef	SMALL
 		case IMSG_PROPOSE_RDNS:
 			if (IMSG_DATA_SIZE(imsg) != sizeof(rdns))
 				fatalx("%s: IMSG_PROPOSE_RDNS wrong "
@@ -540,7 +537,6 @@ main_dispatch_engine(int fd, short event, void *bula)
 				    rdns.rdns_count);
 			send_rdns_proposal(&rdns);
 			break;
-#endif	/* SMALL */
 		default:
 			log_debug("%s: error handling imsg %d", __func__,
 			    imsg.hdr.type);
@@ -664,7 +660,7 @@ configure_interface(struct imsg_configure_address *address)
 	log_debug("%s: %s", __func__, if_name);
 
 	if (ioctl(ioctl_sock, SIOCAIFADDR_IN6, &in6_addreq) == -1)
-		fatal("SIOCAIFADDR_IN6");
+		log_warn("SIOCAIFADDR_IN6");
 
 	if (address->mtu) {
 		struct ifreq	 ifr;
@@ -807,7 +803,6 @@ delete_gateway(struct imsg_configure_dfr *dfr)
 	configure_gateway(dfr, RTM_DELETE);
 }
 
-#ifndef	SMALL
 void
 send_rdns_proposal(struct imsg_propose_rdns *rdns)
 {
@@ -851,6 +846,7 @@ send_rdns_proposal(struct imsg_propose_rdns *rdns)
 		log_warn("failed to send route message");
 }
 
+#ifndef	SMALL
 const char*
 sin6_to_str(struct sockaddr_in6 *sin6)
 {

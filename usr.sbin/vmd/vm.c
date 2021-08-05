@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm.c,v 1.62 2021/04/05 18:09:48 dv Exp $	*/
+/*	$OpenBSD: vm.c,v 1.64 2021/07/16 16:21:22 dv Exp $	*/
 
 /*
  * Copyright (c) 2015 Mike Larkin <mlarkin@openbsd.org>
@@ -52,18 +52,17 @@
 #include <unistd.h>
 #include <util.h>
 
-#include "vmd.h"
-#include "vmm.h"
-#include "loadfile.h"
-#include "pci.h"
-#include "virtio.h"
-#include "proc.h"
+#include "atomicio.h"
+#include "fw_cfg.h"
 #include "i8253.h"
 #include "i8259.h"
-#include "ns8250.h"
+#include "loadfile.h"
 #include "mc146818.h"
-#include "fw_cfg.h"
-#include "atomicio.h"
+#include "ns8250.h"
+#include "pci.h"
+#include "virtio.h"
+#include "vmd.h"
+#include "vmm.h"
 
 io_fn_t ioports_map[MAX_PORTS];
 
@@ -1711,9 +1710,6 @@ vcpu_exit(struct vm_run_params *vrp)
 		log_debug("%s: unknown exit reason 0x%x",
 		    __progname, vrp->vrp_exit_reason);
 	}
-
-	/* Process any pending traffic */
-	vionet_process_rx(vrp->vrp_vm_id);
 
 	vrp->vrp_continue = 1;
 

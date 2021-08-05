@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmparam.h,v 1.3 2021/05/12 01:20:52 jsg Exp $	*/
+/*	$OpenBSD: vmparam.h,v 1.5 2021/07/02 10:42:22 kettenis Exp $	*/
 
 /*-
  * Copyright (c) 1990 The Regents of the University of California.
@@ -53,7 +53,7 @@
 #define	DFLDSIZ		((paddr_t)128*1024*1024)	/* initial data size limit */
 #endif
 #ifndef MAXDSIZ
-#define	MAXDSIZ		((paddr_t)1*1024*1024*1024)	/* max data size */
+#define	MAXDSIZ		((paddr_t)16*1024*1024*1024)	/* max data size */
 #endif
 #ifndef BRKSIZ
 #define	BRKSIZ		((paddr_t)1*1024*1024*1024)	/* heap gap size */
@@ -184,7 +184,6 @@ extern paddr_t dmap_phys_base;
 extern paddr_t dmap_phys_max;
 extern vaddr_t dmap_virt_max;
 extern vaddr_t vm_max_kernel_address;
-extern vaddr_t init_pt_va;
 #endif
 
 /* virtual sizes (bytes) for various kernel submaps */

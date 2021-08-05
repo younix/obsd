@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.29 2020/12/30 06:06:30 gkoehler Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.31 2021/07/06 09:34:07 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -102,6 +102,7 @@ struct cpu_info {
 #define	CI_DDB_ENTERDDB		3
 #define	CI_DDB_INDDB		4
 #endif
+	char		ci_panicbuf[512];
 };
 
 #define CPUF_PRIMARY 		(1 << 0)
@@ -129,6 +130,7 @@ curcpu(void)
 
 #define MAXCPUS			1
 #define CPU_IS_PRIMARY(ci)	1
+#define CPU_IS_RUNNING(ci)	1
 #define cpu_number()		0
 
 #define CPU_INFO_UNIT(ci)	0
@@ -142,6 +144,7 @@ curcpu(void)
 
 #define MAXCPUS			48
 #define CPU_IS_PRIMARY(ci)	((ci) == cpu_info_primary)
+#define CPU_IS_RUNNING(ci)	((ci)->ci_flags & CPUF_RUNNING)
 #define cpu_number()		(curcpu()->ci_cpuid)
 
 #define CPU_INFO_UNIT(ci)	((ci)->ci_dev ? (ci)->ci_dev->dv_unit : 0)

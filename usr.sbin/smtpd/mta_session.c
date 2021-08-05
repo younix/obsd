@@ -1,4 +1,4 @@
-/*	$OpenBSD: mta_session.c,v 1.142 2021/05/26 18:08:55 eric Exp $	*/
+/*	$OpenBSD: mta_session.c,v 1.144 2021/07/28 19:39:50 benno Exp $	*/
 
 /*
  * Copyright (c) 2008 Pierre-Yves Ritschard <pyr@openbsd.org>
@@ -19,35 +19,18 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/types.h>
-#include <sys/queue.h>
-#include <sys/tree.h>
-#include <sys/socket.h>
 #include <sys/stat.h>
-#include <sys/uio.h>
 
-#include <arpa/inet.h>
 #include <ctype.h>
 #include <errno.h>
-#include <event.h>
-#include <imsg.h>
 #include <inttypes.h>
-#include <netdb.h>
-#include <openssl/ssl.h>
-#include <pwd.h>
-#include <resolv.h>
-#include <limits.h>
-#include <signal.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
 #include <tls.h>
 #include <unistd.h>
 
 #include "smtpd.h"
 #include "log.h"
-#include "ssl.h"
 
 #define MAX_TRYBEFOREDISABLE	10
 
@@ -148,8 +131,10 @@ static void mta_on_timeout(struct runq *, void *);
 static void mta_connect(struct mta_session *);
 static void mta_enter_state(struct mta_session *, int);
 static void mta_flush_task(struct mta_session *, int, const char *, size_t, int);
-static void mta_error(struct mta_session *, const char *, ...);
-static void mta_send(struct mta_session *, char *, ...);
+static void mta_error(struct mta_session *, const char *, ...)
+    __attribute__((__format__ (printf, 2, 3)));
+static void mta_send(struct mta_session *, char *, ...)
+    __attribute__((__format__ (printf, 2, 3)));
 static ssize_t mta_queue_data(struct mta_session *);
 static void mta_response(struct mta_session *, char *);
 static const char * mta_strstate(int);

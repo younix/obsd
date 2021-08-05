@@ -1,4 +1,4 @@
-/*	$OpenBSD: pipex.c,v 1.133 2021/05/15 08:07:20 yasuoka Exp $	*/
+/*	$OpenBSD: pipex.c,v 1.135 2021/07/27 09:29:09 mvs Exp $	*/
 
 /*-
  * Copyright (c) 2009 Internet Initiative Japan Inc.
@@ -39,6 +39,7 @@
 #include <sys/timeout.h>
 #include <sys/kernel.h>
 #include <sys/pool.h>
+#include <sys/percpu.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -262,6 +263,7 @@ pipex_init_session(struct pipex_session **rsession,
 
 	/* prepare a new session */
 	session = pool_get(&pipex_session_pool, PR_WAITOK | PR_ZERO);
+	mtx_init(&session->pxs_mtx, IPL_SOFTNET);
 	session->state = PIPEX_STATE_INITIAL;
 	session->protocol = req->pr_protocol;
 	session->session_id = req->pr_session_id;
@@ -272,6 +274,8 @@ pipex_init_session(struct pipex_session **rsession,
 	session->ppp_id = req->pr_ppp_id;
 
 	session->ip_forward = 1;
+
+	session->stat_counters = counters_alloc(pxc_ncounters);
 
 	session->ip_address.sin_family = AF_INET;
 	session->ip_address.sin_len = sizeof(struct sockaddr_in);
@@ -361,6 +365,7 @@ pipex_rele_session(struct pipex_session *session)
 {
 	if (session->mppe_recv.old_session_keys)
 		pool_put(&mppe_key_pool, session->mppe_recv.old_session_keys);
+	counters_free(session->stat_counters, pxc_ncounters);
 	pool_put(&pipex_session_pool, session);
 }
 
@@ -466,10 +471,28 @@ pipex_notify_close_session(struct pipex_session *session)
 {
 	NET_ASSERT_LOCKED();
 	session->state = PIPEX_STATE_CLOSE_WAIT;
-	session->stat.idle_time = 0;
+	session->idle_time = 0;
 	LIST_INSERT_HEAD(&pipex_close_wait_list, session, state_list);
 
 	return (0);
+}
+
+void
+pipex_export_session_stats(struct pipex_session *session,
+    struct pipex_statistics *stats)
+{
+	uint64_t counters[pxc_ncounters];
+
+	memset(stats, 0, sizeof(*stats));
+
+	counters_read(session->stat_counters, counters, pxc_ncounters);
+	stats->ipackets = counters[pxc_ipackets];
+	stats->ierrors = counters[pxc_ierrors];
+	stats->ibytes = counters[pxc_ibytes];
+	stats->opackets = counters[pxc_opackets];
+	stats->oerrors = counters[pxc_oerrors];
+	stats->obytes = counters[pxc_obytes];
+	stats->idle_time = session->idle_time;
 }
 
 Static int
@@ -501,7 +524,7 @@ pipex_get_stat(struct pipex_session_stat_req *req, void *ownersc)
 		return (EINVAL);
 	if (session->ownersc != ownersc)
 		return (EINVAL);
-	req->psr_stat = session->stat;
+	pipex_export_session_stats(session, &req->psr_stat);
 
 	return (0);
 }
@@ -619,8 +642,8 @@ pipex_timer(void *ignored_arg)
 			if (session->timeout_sec == 0)
 				continue;
 
-			session->stat.idle_time++;
-			if (session->stat.idle_time < session->timeout_sec)
+			session->idle_time++;
+			if (session->idle_time < session->timeout_sec)
 				continue;
 
 			pipex_notify_close_session(session);
@@ -629,8 +652,8 @@ pipex_timer(void *ignored_arg)
 		case PIPEX_STATE_CLOSE_WAIT:
 		case PIPEX_STATE_CLOSE_WAIT2:
 			/* Waiting PIPEXDSESSION from userland */
-			session->stat.idle_time++;
-			if (session->stat.idle_time < PIPEX_CLOSE_TIMEOUT)
+			session->idle_time++;
+			if (session->idle_time < PIPEX_CLOSE_TIMEOUT)
 				continue;
 			/* Release the sessions when timeout */
 			pipex_unlink_session(session);
@@ -669,7 +692,7 @@ pipex_ip_output(struct mbuf *m0, struct pipex_session *session)
 				goto dropped;
 			if (is_idle == 0)
 				/* update expire time */
-				session->stat.idle_time = 0;
+				session->idle_time = 0;
 		}
 
 		/* adjust tcpmss */
@@ -694,7 +717,8 @@ pipex_ip_output(struct mbuf *m0, struct pipex_session *session)
 				continue;
 			m = m_copym(m0, 0, M_COPYALL, M_NOWAIT);
 			if (m == NULL) {
-				session_tmp->stat.oerrors++;
+				counters_inc(session->stat_counters,
+				    pxc_oerrors);
 				continue;
 			}
 			pipex_ppp_output(m, session_tmp, PPP_IP);
@@ -706,7 +730,7 @@ pipex_ip_output(struct mbuf *m0, struct pipex_session *session)
 drop:
 	m_freem(m0);
 dropped:
-	session->stat.oerrors++;
+	counters_inc(session->stat_counters, pxc_oerrors);
 }
 
 Static void
@@ -760,7 +784,7 @@ pipex_ppp_output(struct mbuf *m0, struct pipex_session *session, int proto)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.oerrors++;
+	counters_inc(session->stat_counters, pxc_oerrors);
 }
 
 Static void
@@ -848,7 +872,7 @@ pipex_ppp_input(struct mbuf *m0, struct pipex_session *session, int decrypted)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 }
 
 Static void
@@ -887,7 +911,7 @@ pipex_ip_input(struct mbuf *m0, struct pipex_session *session)
 			goto drop;
 		if (is_idle == 0)
 			/* update expire time */
-			session->stat.idle_time = 0;
+			session->idle_time = 0;
 	}
 
 	/* adjust tcpmss */
@@ -912,8 +936,7 @@ pipex_ip_input(struct mbuf *m0, struct pipex_session *session)
 #endif
 
 	counters_pkt(ifp->if_counters, ifc_ipackets, ifc_ibytes, len);
-	session->stat.ipackets++;
-	session->stat.ibytes += len;
+	counters_pkt(session->stat_counters, pxc_ipackets, pxc_ibytes, len);
 	ipv4_input(ifp, m0);
 
 	if_put(ifp);
@@ -921,7 +944,7 @@ pipex_ip_input(struct mbuf *m0, struct pipex_session *session)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 }
 
 #ifdef INET6
@@ -961,8 +984,7 @@ pipex_ip6_input(struct mbuf *m0, struct pipex_session *session)
 #endif
 
 	counters_pkt(ifp->if_counters, ifc_ipackets, ifc_ibytes, len);
-	session->stat.ipackets++;
-	session->stat.ibytes += len;
+	counters_pkt(session->stat_counters, pxc_ipackets, pxc_ibytes, len);
 	ipv6_input(ifp, m0);
 
 	if_put(ifp);
@@ -970,7 +992,7 @@ pipex_ip6_input(struct mbuf *m0, struct pipex_session *session)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 }
 #endif
 
@@ -1030,7 +1052,7 @@ pipex_common_input(struct pipex_session *session, struct mbuf *m0, int hlen,
 
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 	return (NULL);
 
 not_ours:
@@ -1130,7 +1152,7 @@ pipex_pppoe_input(struct mbuf *m0, struct pipex_session *session)
 	    == NULL)
 		return (NULL);
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 	return (NULL);
 }
 
@@ -1152,7 +1174,7 @@ pipex_pppoe_output(struct mbuf *m0, struct pipex_session *session)
 	if (m0 == NULL) {
 		PIPEX_DBG((NULL, LOG_ERR,
 		    "<%s> cannot prepend header.", __func__));
-		session->stat.oerrors++;
+		counters_inc(session->stat_counters, pxc_oerrors);
 		return;
 	}
 	padlen = ETHERMIN - m0->m_pkthdr.len;
@@ -1173,11 +1195,11 @@ pipex_pppoe_output(struct mbuf *m0, struct pipex_session *session)
 	ifp = if_get(session->proto.pppoe.over_ifidx);
 	if (ifp != NULL) {
 		ifp->if_output(ifp, m0, &session->peer.sa, NULL);
-		session->stat.opackets++;
-		session->stat.obytes += len;
+		counters_pkt(session->stat_counters, pxc_opackets,
+		    pxc_obytes, len);
 	} else {
 		m_freem(m0);
-		session->stat.oerrors++;
+		counters_inc(session->stat_counters, pxc_oerrors);
 	}
 	if_put(ifp);
 }
@@ -1261,13 +1283,13 @@ pipex_pptp_output(struct mbuf *m0, struct pipex_session *session,
 	ip_send(m0);
 	if (len > 0) {	/* network layer only */
 		/* countup statistics */
-		session->stat.opackets++;
-		session->stat.obytes += len;
+		counters_pkt(session->stat_counters, pxc_opackets,
+		    pxc_obytes, len);
 	}
 
 	return;
 drop:
-	session->stat.oerrors++;
+	counters_inc(session->stat_counters, pxc_oerrors);
 }
 
 struct pipex_session *
@@ -1472,7 +1494,7 @@ out_seq:
 	/* FALLTHROUGH */
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 
 	return (NULL);
 }
@@ -1737,14 +1759,14 @@ pipex_l2tp_output(struct mbuf *m0, struct pipex_session *session)
 
 	if (datalen > 0) {	/* network layer only */
 		/* countup statistics */
-		session->stat.opackets++;
-		session->stat.obytes += datalen;
+		counters_pkt(session->stat_counters, pxc_opackets,
+		    pxc_obytes, datalen);
 	}
 
 	return;
 drop:
 	m_freem(m0);
-	session->stat.oerrors++;
+	counters_inc(session->stat_counters, pxc_oerrors);
 }
 
 struct pipex_session *
@@ -1912,7 +1934,7 @@ out_seq:
 	/* FALLTHROUGH */
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 
 	return (NULL);
 }
@@ -2078,6 +2100,7 @@ pipex_mppe_init(struct pipex_mppe *mppe, int stateless, int keylenbits,
     u_char *master_key, int has_oldkey)
 {
 	memset(mppe, 0, sizeof(struct pipex_mppe));
+	mtx_init(&mppe->pxm_mtx, IPL_SOFTNET);
 	if (stateless)
 		mppe->stateless = 1;
 	if (has_oldkey)
@@ -2217,11 +2240,14 @@ pipex_mppe_input(struct mbuf *m0, struct pipex_session *session)
 	coher_cnt &= PIPEX_COHERENCY_CNT_MASK;
 	pktloss = 0;
 
+	mtx_enter(&mppe->pxm_mtx);
+
 	PIPEX_MPPE_DBG((session, LOG_DEBUG, "in coher_cnt=%03x %s%s",
 	    mppe->coher_cnt, (flushed) ? "[flushed]" : "",
 	    (encrypt) ? "[encrypt]" : ""));
 
 	if (encrypt == 0) {
+		mtx_leave(&mppe->pxm_mtx);
 		pipex_session_log(session, LOG_DEBUG,
 		    "Received unexpected MPPE packet.(no ecrypt)");
 		goto drop;
@@ -2253,6 +2279,7 @@ pipex_mppe_input(struct mbuf *m0, struct pipex_session *session)
 			pipex_session_log(session, LOG_DEBUG,
 			    "Workaround the out-of-sequence PPP framing problem: "
 			    "%d => %d", mppe->coher_cnt, coher_cnt);
+			mtx_leave(&mppe->pxm_mtx);
 			goto drop;
 		}
 		rewind = 1;
@@ -2284,10 +2311,19 @@ pipex_mppe_input(struct mbuf *m0, struct pipex_session *session)
 			coher_cnt &= PIPEX_COHERENCY_CNT_MASK;
 			mppe->coher_cnt = coher_cnt;
 		} else if (mppe->coher_cnt != coher_cnt) {
+			int ccp_id;
+
+			mtx_leave(&mppe->pxm_mtx);
+
 			/* Send CCP ResetReq */
 			PIPEX_DBG((session, LOG_DEBUG, "CCP SendResetReq"));
-			pipex_ccp_output(session, CCP_RESETREQ,
-			    session->ccp_id++);
+
+			mtx_enter(&session->pxs_mtx);
+			ccp_id = session->ccp_id;
+			session->ccp_id++;
+			mtx_leave(&session->pxs_mtx);
+
+			pipex_ccp_output(session, CCP_RESETREQ, ccp_id);
 			goto drop;
 		}
 		if ((coher_cnt & 0xff) == 0xff) {
@@ -2315,6 +2351,9 @@ pipex_mppe_input(struct mbuf *m0, struct pipex_session *session)
 		mppe->coher_cnt++;
 		mppe->coher_cnt &= PIPEX_COHERENCY_CNT_MASK;
 	}
+
+	mtx_leave(&mppe->pxm_mtx);
+
 	if (m0->m_pkthdr.len < PIPEX_PPPMINLEN)
 		goto drop;
 
@@ -2323,7 +2362,7 @@ pipex_mppe_input(struct mbuf *m0, struct pipex_session *session)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 }
 
 Static void
@@ -2365,6 +2404,8 @@ pipex_mppe_output(struct mbuf *m0, struct pipex_session *session,
 	/* check coherency counter */
 	flushed = 0;
 	encrypt = 1;
+
+	mtx_enter(&mppe->pxm_mtx);
 
 	if (mppe->stateless != 0) {
 		flushed = 1;
@@ -2408,11 +2449,13 @@ pipex_mppe_output(struct mbuf *m0, struct pipex_session *session,
 		pipex_mppe_crypt(mppe, len, cp, cp);
 	}
 
+	mtx_leave(&mppe->pxm_mtx);
+
 	pipex_ppp_output(m0, session, PPP_COMP);
 
 	return;
 drop:
-	session->stat.oerrors++;
+	counters_inc(session->stat_counters, pxc_oerrors);
 }
 
 Static void
@@ -2434,7 +2477,9 @@ pipex_ccp_input(struct mbuf *m0, struct pipex_session *session)
 	switch (code) {
 	case CCP_RESETREQ:
 		PIPEX_DBG((session, LOG_DEBUG, "CCP RecvResetReq"));
+		mtx_enter(&session->mppe_send.pxm_mtx);
 		session->mppe_send.resetreq = 1;
+		mtx_leave(&session->mppe_send.pxm_mtx);
 #ifndef PIPEX_NO_CCP_RESETACK
 		PIPEX_DBG((session, LOG_DEBUG, "CCP SendResetAck"));
 		pipex_ccp_output(session, CCP_RESETACK, id);
@@ -2453,7 +2498,7 @@ pipex_ccp_input(struct mbuf *m0, struct pipex_session *session)
 	return;
 drop:
 	m_freem(m0);
-	session->stat.ierrors++;
+	counters_inc(session->stat_counters, pxc_ierrors);
 }
 
 Static int
@@ -2464,7 +2509,7 @@ pipex_ccp_output(struct pipex_session *session, int code, int id)
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m == NULL) {
-		session->stat.oerrors++;
+		counters_inc(session->stat_counters, pxc_oerrors);
 		return (1);
 	}
 	m->m_pkthdr.len = m->m_len = 4;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nvme.c,v 1.99 2021/05/31 04:48:35 dlg Exp $ */
+/*	$OpenBSD: nvme.c,v 1.101 2021/07/08 22:43:59 dlg Exp $ */
 
 /*
  * Copyright (c) 2014 David Gwynne <dlg@openbsd.org>
@@ -629,7 +629,7 @@ nvme_scsi_io(struct scsi_xfer *xs, int dir)
 		bus_dmamap_sync(sc->sc_dmat,
 		    NVME_DMA_MAP(sc->sc_ccb_prpls),
 		    ccb->ccb_prpl_off,
-		    sizeof(*ccb->ccb_prpl) * dmap->dm_nsegs - 1,
+		    sizeof(*ccb->ccb_prpl) * (dmap->dm_nsegs - 1),
 		    BUS_DMASYNC_PREWRITE);
 	}
 
@@ -691,7 +691,7 @@ nvme_scsi_io_done(struct nvme_softc *sc, struct nvme_ccb *ccb,
 		bus_dmamap_sync(sc->sc_dmat,
 		    NVME_DMA_MAP(sc->sc_ccb_prpls),
 		    ccb->ccb_prpl_off,
-		    sizeof(*ccb->ccb_prpl) * dmap->dm_nsegs - 1,
+		    sizeof(*ccb->ccb_prpl) * (dmap->dm_nsegs - 1),
 		    BUS_DMASYNC_POSTWRITE);
 	}
 
@@ -1503,7 +1503,6 @@ nvme_hibernate_admin_cmd(struct nvme_softc *sc, struct nvme_sqe *sqe,
 	bus_dmamap_sync(sc->sc_dmat, NVME_DMA_MAP(q->q_sq_dmamem),
 	    sizeof(*sqe) * tail, sizeof(*sqe), BUS_DMASYNC_PREWRITE);
 
-	nvme_write4(sc, q->q_sqtdbl, tail);
 	sc->sc_ops->op_sq_leave_locked(sc, q, /* XXX ccb */ NULL);
 
 	/* wait for completion */

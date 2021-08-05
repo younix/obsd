@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_both.c,v 1.31 2021/05/16 13:56:30 jsing Exp $ */
+/* $OpenBSD: ssl_both.c,v 1.33 2021/07/01 17:53:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -433,7 +433,7 @@ ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 
 		do {
 			while (s->internal->init_num < 4) {
-				i = s->method->internal->ssl_read_bytes(s,
+				i = s->method->ssl_read_bytes(s,
 				    SSL3_RT_HANDSHAKE, &p[s->internal->init_num],
 				    4 - s->internal->init_num, 0);
 				if (i <= 0) {
@@ -500,7 +500,7 @@ ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 	p = s->internal->init_msg;
 	n = S3I(s)->hs.tls12.message_size - s->internal->init_num;
 	while (n > 0) {
-		i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+		i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 		    &p[s->internal->init_num], n, 0);
 		if (i <= 0) {
 			s->internal->rwstate = SSL_READING;
@@ -556,7 +556,7 @@ ssl_cert_type(X509 *x, EVP_PKEY *pkey)
 		ret = SSL_PKEY_GOST01;
 	}
 
-err:
+ err:
 	if (!pkey)
 		EVP_PKEY_free(pk);
 	return (ret);
@@ -638,7 +638,7 @@ ssl3_setup_init_buffer(SSL *s)
 	s->internal->init_buf = buf;
 	return (1);
 
-err:
+ err:
 	BUF_MEM_free(buf);
 	return (0);
 }
@@ -678,7 +678,7 @@ ssl3_setup_read_buffer(SSL *s)
 	s->internal->packet = S3I(s)->rbuf.buf;
 	return 1;
 
-err:
+ err:
 	SSLerror(s, ERR_R_MALLOC_FAILURE);
 	return 0;
 }
@@ -711,7 +711,7 @@ ssl3_setup_write_buffer(SSL *s)
 
 	return 1;
 
-err:
+ err:
 	SSLerror(s, ERR_R_MALLOC_FAILURE);
 	return 0;
 }

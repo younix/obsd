@@ -35,8 +35,6 @@
 /SSL_CTX_set_timeout.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_CTX_set_tlsext_servername_callback.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_tlsext_status_cb.3/1.7/Wed Jun 12 09:36:30 2019//
-/SSL_CTX_set_tlsext_ticket_key_cb.3/1.5/Wed Jun 12 09:36:30 2019//
-/SSL_CTX_set_tlsext_use_srtp.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_tmp_dh_callback.3/1.8/Mon Mar 30 10:28:59 2020//
 /SSL_CTX_set_tmp_rsa_callback.3/1.8/Tue Mar 27 17:35:50 2018//
 /SSL_SESSION_free.3/1.7/Wed Jun 12 09:36:30 2019//
@@ -51,14 +49,12 @@
 /SSL_SESSION_set1_id_context.3/1.4/Sat Mar 24 00:55:37 2018//
 /SSL_accept.3/1.6/Sat Jun  8 15:25:43 2019//
 /SSL_alert_type_string.3/1.5/Tue Mar 27 17:35:50 2018//
-/SSL_clear.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_connect.3/1.6/Tue Mar 27 17:35:50 2018//
 /SSL_copy_session_id.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_do_handshake.3/1.6/Tue Mar 27 17:35:50 2018//
 /SSL_dup.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_dup_CA_list.3/1.6/Wed Jun 12 09:36:30 2019//
 /SSL_export_keying_material.3/1.3/Wed Jun 12 09:36:30 2019//
-/SSL_free.3/1.5/Mon Mar 30 10:28:59 2020//
 /SSL_get_SSL_CTX.3/1.4/Tue Mar 27 17:35:50 2018//
 /SSL_get_certificate.3/1.5/Wed Jun 12 09:36:30 2019//
 /SSL_get_client_CA_list.3/1.5/Tue Mar 27 17:35:50 2018//
@@ -87,7 +83,6 @@
 /SSL_set_fd.3/1.5/Tue Mar 27 17:35:50 2018//
 /SSL_set_max_send_fragment.3/1.5/Wed Jun 12 09:36:30 2019//
 /SSL_set_session.3/1.4/Tue Mar 27 17:35:50 2018//
-/SSL_set_shutdown.3/1.5/Mon Mar 30 10:28:59 2020//
 /SSL_set_tmp_ecdh.3/1.5/Fri Mar 23 14:28:16 2018//
 /SSL_set_verify_result.3/1.5/Sun Mar 29 17:05:02 2020//
 /SSL_shutdown.3/1.5/Tue Mar 27 17:35:50 2018//
@@ -96,11 +91,8 @@
 /d2i_SSL_SESSION.3/1.7/Sat Jun  8 15:25:43 2019//
 /SSL_read.3/1.7/Mon Jun  1 06:23:15 2020//
 /SSL_CTX_set_mode.3/1.7/Sat May  1 08:41:50 2021//
-/SSL_CTX_set_verify.3/1.8/Sat May  1 08:41:50 2021//
 /SSL_SESSION_new.3/1.8/Sat May  1 08:41:50 2021//
 /SSL_get_ciphers.3/1.11/Sat May  1 08:41:50 2021//
-/SSL_get_peer_certificate.3/1.5/Sat May  1 08:41:50 2021//
-/SSL_get_verify_result.3/1.5/Sat May  1 08:41:50 2021//
 /SSL_read_early_data.3/1.2/Sat May  1 08:41:50 2021//
 /SSL_set_SSL_CTX.3/1.3/Sat May  1 08:41:50 2021//
 /SSL_set_bio.3/1.6/Sat May  1 08:41:50 2021//
@@ -111,7 +103,6 @@
 /SSL_CTX_new.3/1.16/Tue May 18 14:06:16 2021//
 /SSL_CTX_set_min_proto_version.3/1.5/Tue May 18 14:06:16 2021//
 /SSL_CTX_set_msg_callback.3/1.5/Tue May 18 14:06:16 2021//
-/SSL_CTX_set_options.3/1.13/Tue May 18 14:06:16 2021//
 /SSL_CTX_set_ssl_version.3/1.5/Tue May 18 14:06:16 2021//
 /SSL_CTX_use_certificate.3/1.16/Tue May 18 14:06:16 2021//
 /SSL_SESSION_get0_cipher.3/1.1/Tue May 18 14:06:16 2021//
@@ -119,4 +110,13 @@
 /SSL_get_shared_ciphers.3/1.5/Tue May 18 14:06:16 2021//
 /SSL_get_version.3/1.9/Tue May 18 14:06:16 2021//
 /SSL_set1_host.3/1.4/Tue May 18 14:06:16 2021//
+/SSL_CTX_set_options.3/1.15/Thu Aug  5 11:01:24 2021//
+/SSL_CTX_set_tlsext_ticket_key_cb.3/1.6/Thu Aug  5 11:01:24 2021//
+/SSL_CTX_set_tlsext_use_srtp.3/1.6/Thu Aug  5 11:01:24 2021//
+/SSL_CTX_set_verify.3/1.9/Thu Aug  5 11:01:24 2021//
+/SSL_clear.3/1.5/Thu Aug  5 11:01:24 2021//
+/SSL_free.3/1.6/Thu Aug  5 11:01:24 2021//
+/SSL_get_peer_certificate.3/1.6/Thu Aug  5 11:01:24 2021//
+/SSL_get_verify_result.3/1.6/Thu Aug  5 11:01:24 2021//
+/SSL_set_shutdown.3/1.6/Thu Aug  5 11:01:24 2021//
 D

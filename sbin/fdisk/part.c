@@ -1,4 +1,4 @@
-/*	$OpenBSD: part.c,v 1.80 2021/05/15 19:44:15 krw Exp $	*/
+/*	$OpenBSD: part.c,v 1.102 2021/07/22 13:30:40 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -26,16 +26,17 @@
 #include <string.h>
 #include <uuid.h>
 
+#include "part.h"
 #include "disk.h"
 #include "misc.h"
-#include "part.h"
 
-int	PRT_check_chs(struct prt *partn);
+int			 check_chs(const struct prt *);
+const char		*ascii_id(const int);
 
 static const struct part_type {
-	int	type;
-	char	sname[14];
-	char	guid[37];
+	int	pt_type;
+	char	pt_sname[14];
+	char	pt_guid[UUID_STR_LEN + 1];
 } part_types[] = {
 	{ 0x00, "unused      ", "00000000-0000-0000-0000-000000000000" },
 	{ 0x01, "FAT12       ", "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
@@ -114,6 +115,11 @@ static const struct part_type {
 	{ 0xA9, "NetBSD      ", "516e7cb4-6ecf-11d6-8ff8-00022d09712b" },
 	{ 0xAB, "MacOS X boot", "426f6f74-0000-11aa-aa11-00306543ecac" },
 	{ 0xAF, "MacOS X HFS+", "48465300-0000-11aa-aa11-00306543ecac" },
+	{ 0xB0, "APFS        ", "7c3457ef-0000-11aa-aa11-00306543ecac" },
+	{ 0xB1, "APFS ISC    ", "69646961-6700-11aa-aa11-00306543ecac" },
+	{ 0xB2, "APFS Recovry", "52637672-7900-11aa-aa11-00306543ecac" },
+	{ 0xB3, "HiFive FSBL ", "5b193300-fc78-40cd-8002-e86c45580b47" },
+	{ 0xB4, "HiFive BBL  ", "2e54b353-1271-4842-806f-e436d6af6985" },
 	{ 0xB7, "BSDI filesy*"},   /* BSDI BSD/386 filesystem */
 	{ 0xB8, "BSDI swap   "},   /* BSDI BSD/386 swap */
 	{ 0xBF, "Solaris     ", "6a85cf4d-1dd2-11b2-99a6-080020736631" },
@@ -136,157 +142,186 @@ static const struct part_type {
 	{ 0xFF, "Xenix BBT   "},   /* Xenix Bad Block Table */
 };
 
+static const struct protected_guid {
+	char	pg_guid[UUID_STR_LEN + 1];
+} protected_guid[] = {
+	{ "7c3457ef-0000-11aa-aa11-00306543ecac" },	/* APFS		*/
+	{ "69646961-6700-11aa-aa11-00306543ecac" },	/* APFS ISC	*/
+	{ "52637672-7900-11aa-aa11-00306543ecac" },	/* APFS Recovry */
+	{ "5b193300-fc78-40cd-8002-e86c45580b47" },	/* HiFive FSBL	*/
+	{ "2e54b353-1271-4842-806f-e436d6af6985" },	/* HiFive BBL	*/
+};
+
+#ifndef nitems
+#define	nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
+#endif
+
+int
+PRT_protected_guid(const struct uuid *uuid)
+{
+	char			*str = NULL;
+	int			 rslt = 0;
+	unsigned int		 i;
+	uint32_t		 status;
+
+	uuid_to_string(uuid, &str, &status);
+	if (status != uuid_s_ok) {
+		rslt = -1;
+		goto done;
+	}
+
+	for(i = 0; i < nitems(protected_guid); i++) {
+		if (strncmp(str, protected_guid[i].pg_guid, UUID_STR_LEN) == 0) {
+			rslt = -1;
+			break;
+		}
+	}
+
+ done:
+	free(str);
+	return rslt;
+}
+
 void
 PRT_printall(void)
 {
-	int i, idrows;
+	int			i, idrows;
 
-	idrows = ((sizeof(part_types)/sizeof(struct part_type))+3)/4;
+	idrows = (nitems(part_types) + 3) / 4;
 
 	printf("Choose from the following Partition id values:\n");
 	for (i = 0; i < idrows; i++) {
 		printf("%02X %s   %02X %s   %02X %s",
-		    part_types[i].type, part_types[i].sname,
-		    part_types[i+idrows].type, part_types[i+idrows].sname,
-		    part_types[i+idrows*2].type, part_types[i+idrows*2].sname);
+		    part_types[i].pt_type, part_types[i].pt_sname,
+		    part_types[i+idrows].pt_type, part_types[i+idrows].pt_sname,
+		    part_types[i+idrows*2].pt_type, part_types[i+idrows*2].pt_sname);
 		if ((i+idrows*3) < (sizeof(part_types)/sizeof(struct part_type))) {
 			printf("   %02X %s\n",
-			    part_types[i+idrows*3].type,
-			    part_types[i+idrows*3].sname);
+			    part_types[i+idrows*3].pt_type,
+			    part_types[i+idrows*3].pt_sname);
 		} else
 			printf( "\n" );
 	}
 }
 
 const char *
-PRT_ascii_id(int id)
+ascii_id(const int id)
 {
-	static char unknown[] = "<Unknown ID>";
-	int i;
+	static char		unknown[] = "<Unknown ID>";
+	int			i;
 
-	for (i = 0; i < sizeof(part_types)/sizeof(struct part_type); i++) {
-		if (part_types[i].type == id)
-			return (part_types[i].sname);
+	for (i = 0; i < nitems(part_types); i++) {
+		if (part_types[i].pt_type == id)
+			return part_types[i].pt_sname;
 	}
 
-	return (unknown);
+	return unknown;
 }
 
 void
-PRT_parse(struct dos_partition *prt, off_t offset, off_t reloff,
-    struct prt *partn)
+PRT_parse(const struct dos_partition *dp, const uint64_t lba_self,
+    const uint64_t lba_firstembr, struct prt *prt)
 {
-	off_t off;
-	uint32_t t;
+	off_t			off;
+	uint32_t		t;
 
-	partn->flag = prt->dp_flag;
-	partn->shead = prt->dp_shd;
+	prt->prt_flag = dp->dp_flag;
+	prt->prt_shead = dp->dp_shd;
 
-	partn->ssect = (prt->dp_ssect) & 0x3F;
-	partn->scyl = ((prt->dp_ssect << 2) & 0xFF00) | prt->dp_scyl;
+	prt->prt_ssect = (dp->dp_ssect) & 0x3F;
+	prt->prt_scyl = ((dp->dp_ssect << 2) & 0xFF00) | dp->dp_scyl;
 
-	partn->id = prt->dp_typ;
-	partn->ehead = prt->dp_ehd;
-	partn->esect = (prt->dp_esect) & 0x3F;
-	partn->ecyl = ((prt->dp_esect << 2) & 0xFF00) | prt->dp_ecyl;
+	prt->prt_id = dp->dp_typ;
+	prt->prt_ehead = dp->dp_ehd;
+	prt->prt_esect = (dp->dp_esect) & 0x3F;
+	prt->prt_ecyl = ((dp->dp_esect << 2) & 0xFF00) | dp->dp_ecyl;
 
-	if ((partn->id == DOSPTYP_EXTEND) || (partn->id == DOSPTYP_EXTENDL))
-		off = reloff;
+	if ((prt->prt_id == DOSPTYP_EXTEND) || (prt->prt_id == DOSPTYP_EXTENDL))
+		off = lba_firstembr;
 	else
-		off = offset;
+		off = lba_self;
 
 #if 0 /* XXX */
-	partn->bs = letoh32(prt->dp_start) + off;
-	partn->ns = letoh32(prt->dp_size);
-	if (partn->id == DOSPTYP_EFI && partn == UINT32_MAX)
-		partn->ns = DL_GETDSIZE(&dl) - partn->bs;
+	prt->prt_bs = letoh32(dp->dp_start) + off;
+	prt->prt_ns = letoh32(dp->dp_size);
+	if (prt->prt_id == DOSPTYP_EFI && partn == UINT32_MAX)
+		prt->prt_ns = DL_GETDSIZE(&dl) - prt->prt_bs;
 #else
-	memcpy(&t, &prt->dp_start, sizeof(uint32_t));
-	partn->bs = letoh32(t) + off;
-	memcpy(&t, &prt->dp_size, sizeof(uint32_t));
-	partn->ns = letoh32(t);
-	if (partn->id == DOSPTYP_EFI && partn->ns == UINT32_MAX)
-		partn->ns = DL_GETDSIZE(&dl) - partn->bs;
+	memcpy(&t, &dp->dp_start, sizeof(uint32_t));
+	prt->prt_bs = letoh32(t) + off;
+	memcpy(&t, &dp->dp_size, sizeof(uint32_t));
+	prt->prt_ns = letoh32(t);
+	if (prt->prt_id == DOSPTYP_EFI && prt->prt_ns == UINT32_MAX)
+		prt->prt_ns = DL_GETDSIZE(&dl) - prt->prt_bs;
 #endif
 
-	PRT_fix_CHS(partn);
+	PRT_fix_CHS(prt);
 }
 
 int
-PRT_check_chs(struct prt *partn)
+check_chs(const struct prt *prt)
 {
-	if ( (partn->shead > 255) ||
-		(partn->ssect >63) ||
-		(partn->scyl > 1023) ||
-		(partn->ehead >255) ||
-		(partn->esect >63) ||
-		(partn->ecyl > 1023) )
+	if ( (prt->prt_shead > 255) ||
+		(prt->prt_ssect >63) ||
+		(prt->prt_scyl > 1023) ||
+		(prt->prt_ehead >255) ||
+		(prt->prt_esect >63) ||
+		(prt->prt_ecyl > 1023) )
 	{
-		return (0);
+		return -1;
 	}
-	return (1);
+	return 0;
 }
 
 void
-PRT_make(struct prt *partn, off_t offset, off_t reloff,
-    struct dos_partition *prt)
+PRT_make(const struct prt *prt, const uint64_t lba_self, const uint64_t lba_firstembr,
+    struct dos_partition *dp)
 {
-	off_t off;
-	uint32_t ecsave, scsave;
-	uint64_t t;
+	uint64_t		off, t;
+	uint32_t		ecyl, scyl;
 
-	/* Save (and restore below) cylinder info we may fiddle with. */
-	scsave = partn->scyl;
-	ecsave = partn->ecyl;
+	scyl = (prt->prt_scyl > 1023) ? 1023 : prt->prt_scyl;
+	ecyl = (prt->prt_ecyl > 1023) ? 1023 : prt->prt_ecyl;
 
-	if ((partn->scyl > 1023) || (partn->ecyl > 1023)) {
-		partn->scyl = (partn->scyl > 1023)? 1023: partn->scyl;
-		partn->ecyl = (partn->ecyl > 1023)? 1023: partn->ecyl;
-	}
-	if ((partn->id == DOSPTYP_EXTEND) || (partn->id == DOSPTYP_EXTENDL))
-		off = reloff;
+	if ((prt->prt_id == DOSPTYP_EXTEND) || (prt->prt_id == DOSPTYP_EXTENDL))
+		off = lba_firstembr;
 	else
-		off = offset;
+		off = lba_self;
 
-	if (PRT_check_chs(partn)) {
-		prt->dp_shd = partn->shead & 0xFF;
-		prt->dp_ssect = (partn->ssect & 0x3F) |
-		    ((partn->scyl & 0x300) >> 2);
-		prt->dp_scyl = partn->scyl & 0xFF;
-		prt->dp_ehd = partn->ehead & 0xFF;
-		prt->dp_esect = (partn->esect & 0x3F) |
-		    ((partn->ecyl & 0x300) >> 2);
-		prt->dp_ecyl = partn->ecyl & 0xFF;
+	if (check_chs(prt) == 0) {
+		dp->dp_shd = prt->prt_shead & 0xFF;
+		dp->dp_ssect = (prt->prt_ssect & 0x3F) | ((scyl & 0x300) >> 2);
+		dp->dp_scyl = scyl & 0xFF;
+		dp->dp_ehd = prt->prt_ehead & 0xFF;
+		dp->dp_esect = (prt->prt_esect & 0x3F) | ((ecyl & 0x300) >> 2);
+		dp->dp_ecyl = ecyl & 0xFF;
 	} else {
-		memset(prt, 0xFF, sizeof(*prt));
+		memset(dp, 0xFF, sizeof(*dp));
 	}
 
-	prt->dp_flag = partn->flag & 0xFF;
-	prt->dp_typ = partn->id & 0xFF;
+	dp->dp_flag = prt->prt_flag & 0xFF;
+	dp->dp_typ = prt->prt_id & 0xFF;
 
-	t = htole64(partn->bs - off);
-	memcpy(&prt->dp_start, &t, sizeof(uint32_t));
-	if (partn->id == DOSPTYP_EFI && (partn->bs + partn->ns) >
+	t = htole64(prt->prt_bs - off);
+	memcpy(&dp->dp_start, &t, sizeof(uint32_t));
+	if (prt->prt_id == DOSPTYP_EFI && (prt->prt_bs + prt->prt_ns) >
 	    DL_GETDSIZE(&dl))
 		t = htole64(UINT32_MAX);
 	else
-		t = htole64(partn->ns);
-	memcpy(&prt->dp_size, &t, sizeof(uint32_t));
-
-	partn->scyl = scsave;
-	partn->ecyl = ecsave;
+		t = htole64(prt->prt_ns);
+	memcpy(&dp->dp_size, &t, sizeof(uint32_t));
 }
 
 void
-PRT_print(int num, struct prt *partn, char *units)
+PRT_print(const int num, const struct prt *prt, const char *units)
 {
-	const int secsize = unit_types[SECTORS].conversion;
-	double size;
-	int i;
+	const int		secsize = unit_types[SECTORS].ut_conversion;
+	double			size;
+	int			i;
 
 	i = unit_lookup(units);
 
-	if (partn == NULL) {
+	if (prt == NULL) {
 		printf("            Starting         Ending    "
 		    "     LBA Info:\n");
 		printf(" #: id      C   H   S -      C   H   S "
@@ -294,100 +329,94 @@ PRT_print(int num, struct prt *partn, char *units)
 		printf("---------------------------------------"
 		    "----------------------------------------\n");
 	} else {
-		size = ((double)partn->ns * secsize) / unit_types[i].conversion;
+		size = ((double)prt->prt_ns * secsize) / unit_types[i].ut_conversion;
 		printf("%c%1d: %.2X %6u %3u %3u - %6u %3u %3u "
 		    "[%12llu:%12.0f%s] %s\n",
-		    (partn->flag == DOSACTIVE)?'*':' ',
-		    num, partn->id,
-		    partn->scyl, partn->shead, partn->ssect,
-		    partn->ecyl, partn->ehead, partn->esect,
-		    partn->bs, size,
-		    unit_types[i].abbr,
-		    PRT_ascii_id(partn->id));
+		    (prt->prt_flag == DOSACTIVE)?'*':' ',
+		    num, prt->prt_id,
+		    prt->prt_scyl, prt->prt_shead, prt->prt_ssect,
+		    prt->prt_ecyl, prt->prt_ehead, prt->prt_esect,
+		    prt->prt_bs, size,
+		    unit_types[i].ut_abbr,
+		    ascii_id(prt->prt_id));
 	}
 }
 
 void
-PRT_fix_BN(struct prt *part, int pn)
+PRT_fix_BN(struct prt *prt, const int pn)
 {
-	uint32_t spt, tpc, spc;
-	uint32_t start = 0;
-	uint32_t end = 0;
+	uint32_t		spt, tpc, spc;
+	uint32_t		start = 0;
+	uint32_t		end = 0;
 
-	/* Zero out entry if not used */
-	if (part->id == DOSPTYP_UNUSED) {
-		memset(part, 0, sizeof(*part));
+	if (prt->prt_id == DOSPTYP_UNUSED) {
+		memset(prt, 0, sizeof(*prt));
 		return;
 	}
 
-	/* Disk geometry. */
-	spt = disk.sectors;
-	tpc = disk.heads;
+	spt = disk.dk_sectors;
+	tpc = disk.dk_heads;
 	spc = spt * tpc;
 
-	start += part->scyl * spc;
-	start += part->shead * spt;
-	start += part->ssect - 1;
+	start += prt->prt_scyl * spc;
+	start += prt->prt_shead * spt;
+	start += prt->prt_ssect - 1;
 
-	end += part->ecyl * spc;
-	end += part->ehead * spt;
-	end += part->esect - 1;
+	end += prt->prt_ecyl * spc;
+	end += prt->prt_ehead * spt;
+	end += prt->prt_esect - 1;
 
 	/* XXX - Should handle this... */
 	if (start > end)
 		warnx("Start of partition #%d after end!", pn);
 
-	part->bs = start;
-	part->ns = (end - start) + 1;
+	prt->prt_bs = start;
+	prt->prt_ns = (end - start) + 1;
 }
 
 void
-PRT_fix_CHS(struct prt *part)
+PRT_fix_CHS(struct prt *prt)
 {
-	uint32_t spt, tpc, spc;
-	uint32_t start, end, size;
-	uint32_t cyl, head, sect;
+	uint32_t		spt, tpc, spc;
+	uint32_t		start, end, size;
+	uint32_t		cyl, head, sect;
 
-	/* Zero out entry if not used */
-	if (part->id == DOSPTYP_UNUSED || part->ns == 0) {
-		memset(part, 0, sizeof(*part));
+	if (prt->prt_id == DOSPTYP_UNUSED || prt->prt_ns == 0) {
+		memset(prt, 0, sizeof(*prt));
 		return;
 	}
 
-	/* Disk geometry. */
-	spt = disk.sectors;
-	tpc = disk.heads;
+	spt = disk.dk_sectors;
+	tpc = disk.dk_heads;
 	spc = spt * tpc;
 
-	start = part->bs;
-	size = part->ns;
+	start = prt->prt_bs;
+	size = prt->prt_ns;
 	end = (start + size) - 1;
 
-	/* Figure out starting CHS values */
 	cyl = (start / spc); start -= (cyl * spc);
 	head = (start / spt); start -= (head * spt);
 	sect = (start + 1);
 
-	part->scyl = cyl;
-	part->shead = head;
-	part->ssect = sect;
+	prt->prt_scyl = cyl;
+	prt->prt_shead = head;
+	prt->prt_ssect = sect;
 
-	/* Figure out ending CHS values */
 	cyl = (end / spc); end -= (cyl * spc);
 	head = (end / spt); end -= (head * spt);
 	sect = (end + 1);
 
-	part->ecyl = cyl;
-	part->ehead = head;
-	part->esect = sect;
+	prt->prt_ecyl = cyl;
+	prt->prt_ehead = head;
+	prt->prt_esect = sect;
 }
 
 char *
-PRT_uuid_to_typename(struct uuid *uuid)
+PRT_uuid_to_typename(const struct uuid *uuid)
 {
-	static char partition_type[37];	/* Room for a GUID if needed. */
-	char *uuidstr = NULL;
-	int i, entries, status;
+	static char		 partition_type[UUID_STR_LEN + 1];
+	char			*uuidstr = NULL;
+	int			 i, entries, status;
 
 	memset(partition_type, 0, sizeof(partition_type));
 
@@ -395,16 +424,16 @@ PRT_uuid_to_typename(struct uuid *uuid)
 	if (status != uuid_s_ok)
 		goto done;
 
-	entries = sizeof(part_types) / sizeof(struct part_type);
+	entries = nitems(part_types);
 
 	for (i = 0; i < entries; i++) {
-		if (memcmp(part_types[i].guid, uuidstr,
-		    sizeof(part_types[i].guid)) == 0)
+		if (memcmp(part_types[i].pt_guid, uuidstr,
+		    sizeof(part_types[i].pt_guid)) == 0)
 			break;
 	}
 
 	if (i < entries)
-		strlcpy(partition_type, part_types[i].sname,
+		strlcpy(partition_type, part_types[i].pt_sname,
 		    sizeof(partition_type));
 	else
 		strlcpy(partition_type, uuidstr, sizeof(partition_type));
@@ -412,14 +441,14 @@ PRT_uuid_to_typename(struct uuid *uuid)
 done:
 	free(uuidstr);
 
-	return (partition_type);
+	return partition_type;
 }
 
 int
-PRT_uuid_to_type(struct uuid *uuid)
+PRT_uuid_to_type(const struct uuid *uuid)
 {
-	char *uuidstr;
-	int entries, i, status, type;
+	char			*uuidstr;
+	int			 i, status, type;
 
 	type = 0;
 
@@ -427,38 +456,37 @@ PRT_uuid_to_type(struct uuid *uuid)
 	if (status != uuid_s_ok)
 		goto done;
 
-	entries = sizeof(part_types) / sizeof(struct part_type);
-	for (i = 0; i < entries; i++) {
-		if (memcmp(part_types[i].guid, uuidstr,
-		    sizeof(part_types[i].guid)) == 0) {
-			type = part_types[i].type;
+	for (i = 0; i < nitems(part_types); i++) {
+		if (memcmp(part_types[i].pt_guid, uuidstr,
+		    sizeof(part_types[i].pt_guid)) == 0) {
+			type = part_types[i].pt_type;
 			break;
 		}
 	}
 
 done:
 	free(uuidstr);
-	return (type);
+	return type;
 }
 
 struct uuid *
-PRT_type_to_uuid(int type)
+PRT_type_to_uuid(const int type)
 {
-	static struct uuid guid;
-	int i, entries, status = uuid_s_ok;
+	static struct uuid	guid;
+	int			i, entries, status = uuid_s_ok;
 
 	memset(&guid, 0, sizeof(guid));
 
-	entries = sizeof(part_types) / sizeof(struct part_type);
+	entries = nitems(part_types);
 
 	for (i = 0; i < entries; i++) {
-		if (part_types[i].type == type)
+		if (part_types[i].pt_type == type)
 			break;
 	}
 	if (i < entries)
-		uuid_from_string(part_types[i].guid, &guid, &status);
+		uuid_from_string(part_types[i].pt_guid, &guid, &status);
 	if (i == entries || status != uuid_s_ok)
-		uuid_from_string(part_types[0].guid, &guid, &status);
+		uuid_from_string(part_types[0].pt_guid, &guid, &status);
 
-	return (&guid);
+	return &guid;
 }

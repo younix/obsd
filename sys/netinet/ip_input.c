@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.360 2021/05/15 08:07:20 yasuoka Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.363 2021/06/21 22:09:14 jca Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -244,37 +244,36 @@ ipv4_input(struct ifnet *ifp, struct mbuf *m)
 	KASSERT(nxt == IPPROTO_DONE);
 }
 
-int
-ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
+struct mbuf *
+ipv4_check(struct ifnet *ifp, struct mbuf *m)
 {
-	struct mbuf	*m = *mp;
-	struct rtentry	*rt = NULL;
-	struct ip	*ip;
+	struct ip *ip;
 	int hlen, len;
-	in_addr_t pfrdr = 0;
 
-	KASSERT(*offp == 0);
-
-	ipstat_inc(ips_total);
-	if (m->m_len < sizeof (struct ip) &&
-	    (m = *mp = m_pullup(m, sizeof (struct ip))) == NULL) {
-		ipstat_inc(ips_toosmall);
-		goto bad;
+	if (m->m_len < sizeof(*ip)) {
+		m = m_pullup(m, sizeof(*ip));
+		if (m == NULL) {
+			ipstat_inc(ips_toosmall);
+			return (NULL);
+		}
 	}
+
 	ip = mtod(m, struct ip *);
 	if (ip->ip_v != IPVERSION) {
 		ipstat_inc(ips_badvers);
 		goto bad;
 	}
+
 	hlen = ip->ip_hl << 2;
-	if (hlen < sizeof(struct ip)) {	/* minimum header length */
+	if (hlen < sizeof(*ip)) {	/* minimum header length */
 		ipstat_inc(ips_badhlen);
 		goto bad;
 	}
 	if (hlen > m->m_len) {
-		if ((m = *mp = m_pullup(m, hlen)) == NULL) {
+		m = m_pullup(m, hlen);
+		if (m == NULL) {
 			ipstat_inc(ips_badhlen);
-			goto bad;
+			return (NULL);
 		}
 		ip = mtod(m, struct ip *);
 	}
@@ -288,8 +287,8 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 		}
 	}
 
-	if ((m->m_pkthdr.csum_flags & M_IPV4_CSUM_IN_OK) == 0) {
-		if (m->m_pkthdr.csum_flags & M_IPV4_CSUM_IN_BAD) {
+	if (!ISSET(m->m_pkthdr.csum_flags, M_IPV4_CSUM_IN_OK)) {
+		if (ISSET(m->m_pkthdr.csum_flags, M_IPV4_CSUM_IN_BAD)) {
 			ipstat_inc(ips_badsum);
 			goto bad;
 		}
@@ -299,6 +298,8 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 			ipstat_inc(ips_badsum);
 			goto bad;
 		}
+
+		SET(m->m_pkthdr.csum_flags, M_IPV4_CSUM_IN_OK);
 	}
 
 	/* Retrieve the packet length. */
@@ -330,6 +331,30 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 			m_adj(m, len - m->m_pkthdr.len);
 	}
 
+	return (m);
+bad:
+	m_freem(m);
+	return (NULL);
+}
+
+int
+ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
+{
+	struct mbuf	*m;
+	struct rtentry	*rt = NULL;
+	struct ip	*ip;
+	int hlen;
+	in_addr_t pfrdr = 0;
+
+	KASSERT(*offp == 0);
+
+	ipstat_inc(ips_total);
+	m = *mp = ipv4_check(ifp, *mp);
+	if (m == NULL)
+		goto bad;
+
+	ip = mtod(m, struct ip *);
+
 #if NCARP > 0
 	if (carp_lsdrop(ifp, m, AF_INET, &ip->ip_src.s_addr,
 	    &ip->ip_dst.s_addr, (ip->ip_p == IPPROTO_ICMP ? 0 : 1)))
@@ -348,9 +373,10 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 		goto bad;
 
 	ip = mtod(m, struct ip *);
-	hlen = ip->ip_hl << 2;
 	pfrdr = (pfrdr != ip->ip_dst.s_addr);
 #endif
+
+	hlen = ip->ip_hl << 2;
 
 	/*
 	 * Process options and, if not destined for us,

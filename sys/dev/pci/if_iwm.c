@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwm.c,v 1.327 2021/06/01 13:21:08 stsp Exp $	*/
+/*	$OpenBSD: if_iwm.c,v 1.357 2021/07/20 16:00:47 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -3334,7 +3334,8 @@ iwm_mac_ctxt_task(void *arg)
 	struct iwm_node *in = (void *)ic->ic_bss;
 	int err, s = splnet();
 
-	if (sc->sc_flags & IWM_FLAG_SHUTDOWN) {
+	if ((sc->sc_flags & IWM_FLAG_SHUTDOWN) ||
+	    ic->ic_state != IEEE80211_S_RUN) {
 		refcnt_rele_wake(&sc->task_refs);
 		splx(s);
 		return;
@@ -3353,7 +3354,8 @@ iwm_updateprot(struct ieee80211com *ic)
 {
 	struct iwm_softc *sc = ic->ic_softc;
 
-	if (ic->ic_state == IEEE80211_S_RUN)
+	if (ic->ic_state == IEEE80211_S_RUN &&
+	    !task_pending(&sc->newstate_task))
 		iwm_add_task(sc, systq, &sc->mac_ctxt_task);
 }
 
@@ -3362,7 +3364,8 @@ iwm_updateslot(struct ieee80211com *ic)
 {
 	struct iwm_softc *sc = ic->ic_softc;
 
-	if (ic->ic_state == IEEE80211_S_RUN)
+	if (ic->ic_state == IEEE80211_S_RUN &&
+	    !task_pending(&sc->newstate_task))
 		iwm_add_task(sc, systq, &sc->mac_ctxt_task);
 }
 
@@ -3371,7 +3374,8 @@ iwm_updateedca(struct ieee80211com *ic)
 {
 	struct iwm_softc *sc = ic->ic_softc;
 
-	if (ic->ic_state == IEEE80211_S_RUN)
+	if (ic->ic_state == IEEE80211_S_RUN &&
+	    !task_pending(&sc->newstate_task))
 		iwm_add_task(sc, systq, &sc->mac_ctxt_task);
 }
 
@@ -4987,7 +4991,6 @@ iwm_rx_reorder(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 
 	type = wh->i_fc[0] & IEEE80211_FC0_TYPE_MASK;
 	subtype = wh->i_fc[0] & IEEE80211_FC0_SUBTYPE_MASK;
-	ni = ieee80211_find_rxnode(ic, wh);
 
 	/*
 	 * We are only interested in Block Ack requests and unicast QoS data.
@@ -5029,6 +5032,7 @@ iwm_rx_reorder(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 		buffer->valid = 1;
 	}
 
+	ni = ieee80211_find_rxnode(ic, wh);
 	if (type == IEEE80211_FC0_TYPE_CTL &&
 	    subtype == IEEE80211_FC0_SUBTYPE_BAR) {
 		iwm_release_frames(sc, ni, rxba, buffer, nssn, ml);
@@ -5069,6 +5073,7 @@ iwm_rx_reorder(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 		if (iwm_is_sn_less(buffer->head_sn, nssn, buffer->buf_size) &&
 		   (!is_amsdu || last_subframe))
 			buffer->head_sn = nssn;
+		ieee80211_release_node(ic, ni);
 		return 0;
 	}
 
@@ -5083,6 +5088,7 @@ iwm_rx_reorder(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 	if (!buffer->num_stored && sn == buffer->head_sn) {
 		if (!is_amsdu || last_subframe)
 			buffer->head_sn = (buffer->head_sn + 1) & 0xfff;
+		ieee80211_release_node(ic, ni);
 		return 0;
 	}
 
@@ -5138,10 +5144,12 @@ iwm_rx_reorder(struct iwm_softc *sc, struct mbuf *m, int chanidx,
 	if (!is_amsdu || last_subframe)
 		iwm_release_frames(sc, ni, rxba, buffer, nssn, ml);
 
+	ieee80211_release_node(ic, ni);
 	return 1;
 
 drop:
 	m_freem(m);
+	ieee80211_release_node(ic, ni);
 	return 1;
 }
 
@@ -5567,7 +5575,7 @@ iwm_rx_tx_cmd(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 		return;
 	if (qid < IWM_FIRST_AGG_TX_QUEUE && tx_resp->frame_count > 1)
 		return;
-	if (qid >= IWM_FIRST_AGG_TX_QUEUE && sizeof(*tx_resp) + sizeof(ssn) +
+	if (sizeof(*tx_resp) + sizeof(ssn) +
 	    tx_resp->frame_count * sizeof(tx_resp->status) > len)
 		return;
 
@@ -5575,26 +5583,21 @@ iwm_rx_tx_cmd(struct iwm_softc *sc, struct iwm_rx_packet *pkt,
 	if (txd->m == NULL)
 		return;
 
+	memcpy(&ssn, &tx_resp->status + tx_resp->frame_count, sizeof(ssn));
+	ssn = le32toh(ssn) & 0xfff;
 	if (qid >= IWM_FIRST_AGG_TX_QUEUE) {
 		int status;
-		memcpy(&ssn, &tx_resp->status + tx_resp->frame_count, sizeof(ssn));
-		ssn = le32toh(ssn) & 0xfff;
 		status = le16toh(tx_resp->status.status) & IWM_TX_STATUS_MSK;
 		iwm_ampdu_tx_done(sc, cmd_hdr, txd->in, ring,
 		    le32toh(tx_resp->initial_rate), tx_resp->frame_count,
 		    tx_resp->failure_frame, ssn, status, &tx_resp->status);
 	} else {
-		iwm_rx_tx_cmd_single(sc, pkt, txd->in, txd->txmcs, txd->txrate);
-		iwm_txd_done(sc, txd);
-		ring->queued--;
-
 		/*
-		 * XXX Sometimes we miss Tx completion interrupts.
-		 * We cannot check Tx success/failure for affected frames;
-		 * just free the associated mbuf and release the associated
-		 * node reference.
+		 * Even though this is not an agg queue, we must only free
+		 * frames before the firmware's starting sequence number.
 		 */
-		iwm_txq_advance(sc, ring, idx);
+		iwm_rx_tx_cmd_single(sc, pkt, txd->in, txd->txmcs, txd->txrate);
+		iwm_txq_advance(sc, ring, IWM_AGG_SSN_TO_TXQ_IDX(ssn));
 		iwm_clear_oactive(sc, ring);
 	}
 }
@@ -7218,7 +7221,7 @@ iwm_fill_probe_req(struct iwm_softc *sc, struct iwm_scan_probe_req *preq)
 	/* Tell firmware where the MAC header and SSID IE are. */
 	preq->mac_header.offset = 0;
 	preq->mac_header.len = htole16(frm - (uint8_t *)wh);
-	remain -= (frm - (uint8_t *)wh);
+	remain -= frm - (uint8_t *)wh;
 
 	/* Fill in 2GHz IEs and tell firmware where they are. */
 	rs = &ic->ic_sup_rates[IEEE80211_MODE_11G];
@@ -7872,10 +7875,8 @@ iwm_mac_ctxt_cmd_common(struct iwm_softc *sc, struct iwm_node *in,
 		case IEEE80211_HTPROT_NONMEMBER:
 		case IEEE80211_HTPROT_NONHT_MIXED:
 			cmd->protection_flags |=
-			    htole32(IWM_MAC_PROT_FLG_HT_PROT);
-			if (ic->ic_protmode == IEEE80211_PROT_CTSONLY)
-				cmd->protection_flags |=
-				    htole32(IWM_MAC_PROT_FLG_SELF_CTS_EN);
+			    htole32(IWM_MAC_PROT_FLG_HT_PROT |
+			    IWM_MAC_PROT_FLG_FAT_PROT);
 			break;
 		case IEEE80211_HTPROT_20MHZ:
 			if (ic->ic_htcaps & IEEE80211_HTCAP_CBW20_40) {
@@ -7883,9 +7884,6 @@ iwm_mac_ctxt_cmd_common(struct iwm_softc *sc, struct iwm_node *in,
 				cmd->protection_flags |=
 				    htole32(IWM_MAC_PROT_FLG_HT_PROT |
 				    IWM_MAC_PROT_FLG_FAT_PROT);
-				if (ic->ic_protmode == IEEE80211_PROT_CTSONLY)
-					cmd->protection_flags |= htole32(
-					    IWM_MAC_PROT_FLG_SELF_CTS_EN);
 			}
 			break;
 		default:
@@ -9194,12 +9192,14 @@ iwm_send_update_mcc_cmd(struct iwm_softc *sc, const char *alpha2)
 	struct iwm_host_cmd hcmd = {
 		.id = IWM_MCC_UPDATE_CMD,
 		.flags = IWM_CMD_WANT_RESP,
+		.resp_pkt_len = IWM_CMD_RESP_MAX,
 		.data = { &mcc_cmd },
 	};
 	struct iwm_rx_packet *pkt;
-	struct iwm_mcc_update_resp_v3 *resp;
 	size_t resp_len;
 	int err;
+	int resp_v3 = isset(sc->sc_enabled_capa,
+	    IWM_UCODE_TLV_CAPA_LAR_SUPPORT_V3);
 
 	if (sc->sc_device_family == IWM_DEVICE_FAMILY_8000 &&
 	    !sc->sc_nvm.lar_enabled) {
@@ -9214,8 +9214,11 @@ iwm_send_update_mcc_cmd(struct iwm_softc *sc, const char *alpha2)
 	else
 		mcc_cmd.source_id = IWM_MCC_SOURCE_OLD_FW;
 
-	hcmd.len[0] = sizeof(struct iwm_mcc_update_cmd);
-	hcmd.resp_pkt_len = IWM_CMD_RESP_MAX;
+	if (resp_v3) { /* same size as resp_v2 */
+		hcmd.len[0] = sizeof(struct iwm_mcc_update_cmd);
+	} else {
+		hcmd.len[0] = sizeof(struct iwm_mcc_update_cmd_v1);
+	}
 
 	err = iwm_send_cmd(sc, &hcmd);
 	if (err)
@@ -9227,19 +9230,35 @@ iwm_send_update_mcc_cmd(struct iwm_softc *sc, const char *alpha2)
 		goto out;
 	}
 
-	resp_len = iwm_rx_packet_payload_len(pkt);
-	if (resp_len < sizeof(*resp)) {
-		err = EIO;
-		goto out;
-	}
+	if (resp_v3) {
+		struct iwm_mcc_update_resp_v3 *resp;
+		resp_len = iwm_rx_packet_payload_len(pkt);
+		if (resp_len < sizeof(*resp)) {
+			err = EIO;
+			goto out;
+		}
 
-	resp = (void *)pkt->data;
-	if (resp_len != sizeof(*resp) +
-	    resp->n_channels * sizeof(resp->channels[0])) {
-		err = EIO;
-		goto out;
-	}
+		resp = (void *)pkt->data;
+		if (resp_len != sizeof(*resp) +
+		    resp->n_channels * sizeof(resp->channels[0])) {
+			err = EIO;
+			goto out;
+		}
+	} else {
+		struct iwm_mcc_update_resp_v1 *resp_v1;
+		resp_len = iwm_rx_packet_payload_len(pkt);
+		if (resp_len < sizeof(*resp_v1)) {
+			err = EIO;
+			goto out;
+		}
 
+		resp_v1 = (void *)pkt->data;
+		if (resp_len != sizeof(*resp_v1) +
+		    resp_v1->n_channels * sizeof(resp_v1->channels[0])) {
+			err = EIO;
+			goto out;
+		}
+	}
 out:
 	iwm_free_resp(sc, &hcmd);
 	return err;
@@ -9758,8 +9777,10 @@ iwm_init(struct ifnet *ifp)
 		    SEC_TO_NSEC(1));
 		if (generation != sc->sc_generation)
 			return ENXIO;
-		if (err)
+		if (err) {
+			iwm_stop(ifp);
 			return err;
+		}
 	} while (ic->ic_state != IEEE80211_S_SCAN);
 
 	return 0;
@@ -11085,7 +11106,11 @@ iwm_attach(struct device *parent, struct device *self, void *aux)
 		break;
 	case PCI_PRODUCT_INTEL_WL_7265_1:
 	case PCI_PRODUCT_INTEL_WL_7265_2:
-		sc->sc_fwname = "iwm-7265D-29";
+		if ((sc->sc_hw_rev & IWM_CSR_HW_REV_TYPE_MSK) ==
+		    IWM_CSR_HW_REV_TYPE_7265D)
+			sc->sc_fwname = "iwm-7265D-29";
+		else
+			sc->sc_fwname = "iwm-7265-17";
 		sc->host_interrupt_operation_mode = 0;
 		sc->sc_device_family = IWM_DEVICE_FAMILY_7000;
 		sc->sc_fwdmasegsz = IWM_FWDMASEGSZ;

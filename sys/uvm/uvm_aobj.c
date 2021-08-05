@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_aobj.c,v 1.96 2021/05/20 08:03:35 mpi Exp $	*/
+/*	$OpenBSD: uvm_aobj.c,v 1.99 2021/06/28 11:19:01 mpi Exp $	*/
 /*	$NetBSD: uvm_aobj.c,v 1.39 2001/02/18 21:19:08 chs Exp $	*/
 
 /*
@@ -143,7 +143,7 @@ struct pool uvm_aobj_pool;
 
 static struct uao_swhash_elt	*uao_find_swhash_elt(struct uvm_aobj *, int,
 				     boolean_t);
-static int			 uao_find_swslot(struct uvm_aobj *, int);
+static int			 uao_find_swslot(struct uvm_object *, int);
 static boolean_t		 uao_flush(struct uvm_object *, voff_t,
 				     voff_t, int);
 static void			 uao_free(struct uvm_aobj *);
@@ -242,8 +242,11 @@ uao_find_swhash_elt(struct uvm_aobj *aobj, int pageidx, boolean_t create)
  * uao_find_swslot: find the swap slot number for an aobj/pageidx
  */
 inline static int
-uao_find_swslot(struct uvm_aobj *aobj, int pageidx)
+uao_find_swslot(struct uvm_object *uobj, int pageidx)
 {
+	struct uvm_aobj *aobj = (struct uvm_aobj *)uobj;
+
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 
 	/*
 	 * if noswap flag is set, then we never return a slot
@@ -284,6 +287,7 @@ uao_set_swslot(struct uvm_object *uobj, int pageidx, int slot)
 	int oldslot;
 
 	KERNEL_ASSERT_LOCKED();
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 
 	/*
 	 * if noswap flag is set, then we can't set a slot
@@ -353,6 +357,7 @@ uao_free(struct uvm_aobj *aobj)
 {
 	struct uvm_object *uobj = &aobj->u_obj;
 
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 	uao_dropswap_range(uobj, 0, 0);
 
 	if (UAO_USES_SWHASH(aobj)) {
@@ -736,7 +741,7 @@ uao_create(vsize_t size, int flags)
 	/*
 	 * Initialise UVM object.
 	 */
-	uvm_objinit(&aobj->u_obj, &aobj_pager, refs);
+	uvm_obj_init(&aobj->u_obj, &aobj_pager, refs);
 
 	/*
  	 * now that aobj is ready, add it to the global list
@@ -774,19 +779,11 @@ uao_init(void)
 void
 uao_reference(struct uvm_object *uobj)
 {
-	KERNEL_ASSERT_LOCKED();
-	uao_reference_locked(uobj);
-}
-
-void
-uao_reference_locked(struct uvm_object *uobj)
-{
-
 	/* Kernel object is persistent. */
 	if (UVM_OBJ_IS_KERN_OBJECT(uobj))
 		return;
 
-	uobj->uo_refs++;
+	atomic_inc_int(&uobj->uo_refs);
 }
 
 
@@ -796,34 +793,19 @@ uao_reference_locked(struct uvm_object *uobj)
 void
 uao_detach(struct uvm_object *uobj)
 {
-	KERNEL_ASSERT_LOCKED();
-	uao_detach_locked(uobj);
-}
-
-
-/*
- * uao_detach_locked: drop a reference to an aobj
- *
- * => aobj may freed upon return.
- */
-void
-uao_detach_locked(struct uvm_object *uobj)
-{
 	struct uvm_aobj *aobj = (struct uvm_aobj *)uobj;
 	struct vm_page *pg;
 
 	/*
 	 * Detaching from kernel_object is a NOP.
 	 */
-	if (UVM_OBJ_IS_KERN_OBJECT(uobj)) {
+	if (UVM_OBJ_IS_KERN_OBJECT(uobj))
 		return;
-	}
 
 	/*
 	 * Drop the reference.  If it was the last one, destroy the object.
 	 */
-	uobj->uo_refs--;
-	if (uobj->uo_refs) {
+	if (atomic_dec_int_nv(&uobj->uo_refs) > 0) {
 		return;
 	}
 
@@ -881,6 +863,7 @@ uao_flush(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 	struct vm_page *pp;
 	voff_t curoff;
 
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 	KERNEL_ASSERT_LOCKED();
 
 	if (flags & PGO_ALLPAGES) {
@@ -1007,6 +990,7 @@ uao_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
 	int lcv, gotpages, maxpages, swslot, rv, pageidx;
 	boolean_t done;
 
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 	KERNEL_ASSERT_LOCKED();
 
 	/*
@@ -1036,7 +1020,7 @@ uao_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
  			 * if page is new, attempt to allocate the page,
 			 * zero-fill'd.
  			 */
-			if (ptmp == NULL && uao_find_swslot(aobj,
+			if (ptmp == NULL && uao_find_swslot(uobj,
 			    current_offset >> PAGE_SHIFT) == 0) {
 				ptmp = uvm_pagealloc(uobj, current_offset,
 				    NULL, UVM_PGA_ZERO);
@@ -1175,7 +1159,7 @@ uao_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
  		 * we have a "fake/busy/clean" page that we just allocated.  
  		 * do the needed "i/o", either reading from swap or zeroing.
  		 */
-		swslot = uao_find_swslot(aobj, pageidx);
+		swslot = uao_find_swslot(uobj, pageidx);
 
 		/* just zero the page if there's nothing in swap.  */
 		if (swslot == 0) {
@@ -1241,6 +1225,8 @@ uao_dropswap(struct uvm_object *uobj, int pageidx)
 {
 	int slot;
 
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
+
 	slot = uao_set_swslot(uobj, pageidx, 0);
 	if (slot) {
 		uvm_swap_free(slot, 1);
@@ -1256,68 +1242,54 @@ uao_dropswap(struct uvm_object *uobj, int pageidx)
 boolean_t
 uao_swap_off(int startslot, int endslot)
 {
-	struct uvm_aobj *aobj, *nextaobj, *prevaobj = NULL;
+	struct uvm_aobj *aobj;
 
 	/*
-	 * Walk the list of all anonymous UVM objects.
+	 * Walk the list of all anonymous UVM objects.  Grab the first.
 	 */
 	mtx_enter(&uao_list_lock);
+	if ((aobj = LIST_FIRST(&uao_list)) == NULL) {
+		mtx_leave(&uao_list_lock);
+		return FALSE;
+	}
+	uao_reference(&aobj->u_obj);
 
-	for (aobj = LIST_FIRST(&uao_list);
-	     aobj != NULL;
-	     aobj = nextaobj) {
+	do {
+		struct uvm_aobj *nextaobj;
 		boolean_t rv;
 
 		/*
-		 * add a ref to the aobj so it doesn't disappear
-		 * while we're working.
+		 * Prefetch the next object and immediately hold a reference
+		 * on it, so neither the current nor the next entry could
+		 * disappear while we are iterating.
 		 */
-		uao_reference_locked(&aobj->u_obj);
-
-		/*
-		 * now it's safe to unlock the uao list.
-		 * note that lock interleaving is alright with IPL_NONE mutexes.
-		 */
+		if ((nextaobj = LIST_NEXT(aobj, u_list)) != NULL) {
+			uao_reference(&nextaobj->u_obj);
+		}
 		mtx_leave(&uao_list_lock);
 
-		if (prevaobj) {
-			uao_detach_locked(&prevaobj->u_obj);
-			prevaobj = NULL;
-		}
-
 		/*
-		 * page in any pages in the swslot range.
-		 * if there's an error, abort and return the error.
+		 * Page in all pages in the swap slot range.
 		 */
 		rv = uao_pagein(aobj, startslot, endslot);
+
+		/* Drop the reference of the current object. */
+		uao_detach(&aobj->u_obj);
 		if (rv) {
-			uao_detach_locked(&aobj->u_obj);
+			if (nextaobj) {
+				uao_detach(&nextaobj->u_obj);
+			}
 			return rv;
 		}
 
-		/*
-		 * we're done with this aobj.
-		 * relock the list and drop our ref on the aobj.
-		 */
+		aobj = nextaobj;
 		mtx_enter(&uao_list_lock);
-		nextaobj = LIST_NEXT(aobj, u_list);
-		/*
-		 * prevaobj means that we have an object that we need
-		 * to drop a reference for. We can't just drop it now with
-		 * the list locked since that could cause lock recursion in
-		 * the case where we reduce the refcount to 0. It will be
-		 * released the next time we drop the list lock.
-		 */
-		prevaobj = aobj;
-	}
+	} while (aobj);
 
 	/*
 	 * done with traversal, unlock the list
 	 */
 	mtx_leave(&uao_list_lock);
-	if (prevaobj) {
-		uao_detach_locked(&prevaobj->u_obj);
-	}
 	return FALSE;
 }
 
@@ -1456,6 +1428,7 @@ uao_dropswap_range(struct uvm_object *uobj, voff_t start, voff_t end)
 	struct uvm_aobj *aobj = (struct uvm_aobj *)uobj;
 	int swpgonlydelta = 0;
 
+	KASSERT(UVM_OBJ_IS_AOBJ(uobj));
 	/* KASSERT(mutex_owned(uobj->vmobjlock)); */
 
 	if (end == 0) {

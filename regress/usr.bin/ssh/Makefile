@@ -1,6 +1,9 @@
-#	$OpenBSD: Makefile,v 1.110 2020/12/22 06:03:36 djm Exp $
+#	$OpenBSD: Makefile,v 1.116 2021/08/04 21:28:00 djm Exp $
 
-.ifndef SKIP_UNIT
+OPENSSL?=	yes
+
+# Unit tests require OpenSSL.
+.if !defined(SKIP_UNIT) && ${OPENSSL:L} == yes
 SUBDIR=		unittests
 .endif
 SUBDIR+=	misc
@@ -8,10 +11,15 @@ SUBDIR+=	misc
 REGRESS_SETUP_ONCE=misc	# For sk-dummy.so
 
 REGRESS_FAIL_EARLY?=	yes
+
+# Key conversion operations are not supported when built w/out OpenSSL.
+.if ${OPENSSL:L} != no
 REGRESS_TARGETS=	t1 t2 t3 t4 t5 t6 t7 t8 t9 t10 t11 t12
+.endif
 
 LTESTS= 	connect \
 		proxy-connect \
+		sshfp-connect \
 		connect-privsep \
 		connect-uri \
 		proto-version \
@@ -35,10 +43,14 @@ LTESTS= 	connect \
 		agent-subprocess \
 		keyscan \
 		keygen-change \
+		keygen-comment \
 		keygen-convert \
+		keygen-knownhosts \
 		keygen-moduli \
+		keygen-sshfp \
 		key-options \
 		scp \
+		scp3 \
 		scp-uri \
 		sftp \
 		sftp-chroot \
@@ -75,7 +87,6 @@ LTESTS= 	connect \
 		multipubkey \
 		limit-keytype \
 		hostkey-agent \
-		keygen-knownhosts \
 		hostkey-rotate \
 		principals-command \
 		cert-file \
@@ -84,7 +95,6 @@ LTESTS= 	connect \
 		allow-deny-users \
 		authinfo \
 		sshsig \
-		keygen-comment \
 		knownhosts-command
 
 INTEROP_TESTS=	putty-transfer putty-ciphers putty-kex conch-ciphers
@@ -104,7 +114,7 @@ CLEANFILES+=	*.core actual agent-key.* authorized_keys_${USERNAME} \
 		host.ssh-dss host.ssh-ed25519 host.ssh-rsa \
 		host_* host_ca_key* host_krl_* host_revoked_* key.* \
 		key.dsa-* key.ecdsa-* key.ed25519-512 key.ed25519-512.pub \
-		key.rsa-* keys-command-args kh.* known_hosts \
+		key.rsa-* keys-command-args kh.* known_hosts askpass \
 		known_hosts-cert known_hosts.* krl-* ls.copy modpipe \
 		netcat pidfile putty.rsa2 ready regress.log remote_pid \
 		revoked-* rsa rsa-agent rsa-agent.pub rsa.pub rsa_ssh2_cr.prv \

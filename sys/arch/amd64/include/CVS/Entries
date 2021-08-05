@@ -42,7 +42,6 @@
 /pctr.h/1.7/Mon Aug 26 12:41:47 2019//
 /pic.h/1.7/Tue Dec 16 21:20:23 2014//
 /pio.h/1.5/Sat Apr 25 21:31:24 2015//
-/pmap.h/1.77/Fri Jan 24 05:27:32 2020//
 /proc.h/1.10/Tue Jun  5 06:39:11 2018//
 /profile.h/1.4/Wed Aug 22 17:19:35 2012//
 /psl.h/1.5/Mon Jul  9 19:20:29 2018//
@@ -59,7 +58,6 @@
 /tss.h/1.4/Wed Mar 23 16:54:34 2011//
 /vga_post.h/1.2/Wed Mar 23 16:54:34 2011//
 /vmparam.h/1.22/Thu Jan  3 18:59:27 2019//
-/cpu.h/1.137/Sat Jun  6 11:21:49 2020//
 /intr.h/1.32/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.2/Fri Dec 11 17:58:22 2020//
 /cpufunc.h/1.36/Thu Dec 17 19:39:58 2020//
@@ -74,5 +72,7 @@
 /cpuvar.h/1.11/Tue May 18 14:06:16 2021//
 /smbiosvar.h/1.13/Tue May 18 14:06:16 2021//
 /specialreg.h/1.90/Tue May 18 14:06:16 2021//
-/vmmvar.h/1.72/Sun May 30 15:25:26 2021//
+/cpu.h/1.140/Thu Aug  5 11:01:41 2021//
+/pmap.h/1.78/Thu Aug  5 11:01:41 2021//
+/vmmvar.h/1.72/Tue Jun  1 14:33:07 2021//
 D

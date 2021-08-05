@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.173 2020/09/01 01:53:34 gnezdo Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.179 2021/07/27 17:13:03 mvs Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -85,9 +85,14 @@
 void ipsec_common_ctlinput(u_int, int, struct sockaddr *, void *, int);
 
 #ifdef ENCDEBUG
-#define DPRINTF(x)	if (encdebug) printf x
+#define DPRINTF(fmt, args...)						\
+	do {								\
+		if (encdebug)						\
+			printf("%s: " fmt "\n", __func__, ## args);	\
+	} while (0)
 #else
-#define DPRINTF(x)
+#define DPRINTF(fmt, args...)						\
+	do { } while (0)
 #endif
 
 /* sysctl variables */
@@ -199,20 +204,20 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 	IPSEC_ISTAT(esps_input, ahs_input, ipcomps_input);
 
 	if (m == NULL) {
-		DPRINTF(("%s: NULL packet received\n", __func__));
+		DPRINTF("NULL packet received");
 		IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
 		return EINVAL;
 	}
 
 	if ((sproto == IPPROTO_IPCOMP) && (m->m_flags & M_COMP)) {
-		DPRINTF(("%s: repeated decompression\n", __func__));
+		DPRINTF("repeated decompression");
 		ipcompstat_inc(ipcomps_pdrops);
 		error = EINVAL;
 		goto drop;
 	}
 
 	if (m->m_pkthdr.len - skip < 2 * sizeof(u_int32_t)) {
-		DPRINTF(("%s: packet too small\n", __func__));
+		DPRINTF("packet too small");
 		IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
 		error = EINVAL;
 		goto drop;
@@ -266,7 +271,7 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 #endif /* INET6 */
 
 	default:
-		DPRINTF(("%s: unsupported protocol family %d\n", __func__, af));
+		DPRINTF("unsupported protocol family %d", af);
 		IPSEC_ISTAT(esps_nopf, ahs_nopf, ipcomps_nopf);
 		error = EPFNOSUPPORT;
 		goto drop;
@@ -275,45 +280,44 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 	tdbp = gettdb(rtable_l2(m->m_pkthdr.ph_rtableid),
 	    spi, &dst_address, sproto);
 	if (tdbp == NULL) {
-		DPRINTF(("%s: could not find SA for packet to %s, spi %08x\n",
-		    __func__,
-		    ipsp_address(&dst_address, buf, sizeof(buf)), ntohl(spi)));
+		DPRINTF("could not find SA for packet to %s, spi %08x",
+		    ipsp_address(&dst_address, buf, sizeof(buf)), ntohl(spi));
 		IPSEC_ISTAT(esps_notdb, ahs_notdb, ipcomps_notdb);
 		error = ENOENT;
 		goto drop;
 	}
 
 	if (tdbp->tdb_flags & TDBF_INVALID) {
-		DPRINTF(("%s: attempted to use invalid SA %s/%08x/%u\n",
-		    __func__, ipsp_address(&dst_address, buf,
-		    sizeof(buf)), ntohl(spi), tdbp->tdb_sproto));
+		DPRINTF("attempted to use invalid SA %s/%08x/%u",
+		    ipsp_address(&dst_address, buf, sizeof(buf)),
+		    ntohl(spi), tdbp->tdb_sproto);
 		IPSEC_ISTAT(esps_invalid, ahs_invalid, ipcomps_invalid);
 		error = EINVAL;
 		goto drop;
 	}
 
 	if (udpencap && !(tdbp->tdb_flags & TDBF_UDPENCAP)) {
-		DPRINTF(("%s: attempted to use non-udpencap SA %s/%08x/%u\n",
-		    __func__, ipsp_address(&dst_address, buf,
-		    sizeof(buf)), ntohl(spi), tdbp->tdb_sproto));
+		DPRINTF("attempted to use non-udpencap SA %s/%08x/%u",
+		    ipsp_address(&dst_address, buf, sizeof(buf)),
+		    ntohl(spi), tdbp->tdb_sproto);
 		espstat_inc(esps_udpinval);
 		error = EINVAL;
 		goto drop;
 	}
 
 	if (!udpencap && (tdbp->tdb_flags & TDBF_UDPENCAP)) {
-		DPRINTF(("%s: attempted to use udpencap SA %s/%08x/%u\n",
-		    __func__, ipsp_address(&dst_address, buf,
-		    sizeof(buf)), ntohl(spi), tdbp->tdb_sproto));
+		DPRINTF("attempted to use udpencap SA %s/%08x/%u",
+		    ipsp_address(&dst_address, buf, sizeof(buf)),
+		    ntohl(spi), tdbp->tdb_sproto);
 		espstat_inc(esps_udpneeded);
 		error = EINVAL;
 		goto drop;
 	}
 
 	if (tdbp->tdb_xform == NULL) {
-		DPRINTF(("%s: attempted to use uninitialized SA %s/%08x/%u\n",
-		    __func__, ipsp_address(&dst_address, buf,
-		    sizeof(buf)), ntohl(spi), tdbp->tdb_sproto));
+		DPRINTF("attempted to use uninitialized SA %s/%08x/%u",
+		    ipsp_address(&dst_address, buf, sizeof(buf)),
+		    ntohl(spi), tdbp->tdb_sproto);
 		IPSEC_ISTAT(esps_noxform, ahs_noxform, ipcomps_noxform);
 		error = ENXIO;
 		goto drop;
@@ -322,10 +326,10 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 	if (sproto != IPPROTO_IPCOMP) {
 		if ((encif = enc_getif(tdbp->tdb_rdomain_post,
 		    tdbp->tdb_tap)) == NULL) {
-			DPRINTF(("%s: no enc%u interface for SA %s/%08x/%u\n",
-			    __func__,
-			    tdbp->tdb_tap, ipsp_address(&dst_address, buf,
-			    sizeof(buf)), ntohl(spi), tdbp->tdb_sproto));
+			DPRINTF("no enc%u interface for SA %s/%08x/%u",
+			    tdbp->tdb_tap,
+			    ipsp_address(&dst_address, buf, sizeof(buf)),
+			    ntohl(spi), tdbp->tdb_sproto);
 			IPSEC_ISTAT(esps_pdrops, ahs_pdrops, ipcomps_pdrops);
 			error = EACCES;
 			goto drop;
@@ -376,19 +380,19 @@ ipsec_input_cb(struct cryptop *crp)
 	struct tdb *tdb = NULL;
 	int clen, error;
 
+	NET_ASSERT_LOCKED();
+
 	if (m == NULL) {
-		DPRINTF(("%s: bogus returned buffer from crypto\n", __func__));
+		DPRINTF("bogus returned buffer from crypto");
 		ipsecstat_inc(ipsec_crypto);
-		goto droponly;
+		goto drop;
 	}
 
-
-	NET_LOCK();
 	tdb = gettdb(tc->tc_rdomain, tc->tc_spi, &tc->tc_dst, tc->tc_proto);
 	if (tdb == NULL) {
-		DPRINTF(("%s: TDB is expired while in crypto", __func__));
+		DPRINTF("TDB is expired while in crypto");
 		ipsecstat_inc(ipsec_notdb);
-		goto baddone;
+		goto drop;
 	}
 
 	/* Check for crypto errors */
@@ -397,13 +401,16 @@ ipsec_input_cb(struct cryptop *crp)
 			/* Reset the session ID */
 			if (tdb->tdb_cryptoid != 0)
 				tdb->tdb_cryptoid = crp->crp_sid;
-			NET_UNLOCK();
-			crypto_dispatch(crp);
+			error = crypto_dispatch(crp);
+			if (error) {
+				DPRINTF("crypto dispatch error %d", error);
+				goto drop;
+			}
 			return;
 		}
-		DPRINTF(("%s: crypto error %d\n", __func__, crp->crp_etype));
+		DPRINTF("crypto error %d", crp->crp_etype);
 		ipsecstat_inc(ipsec_noxform);
-		goto baddone;
+		goto drop;
 	}
 
 	/* Length of data after processing */
@@ -427,16 +434,13 @@ ipsec_input_cb(struct cryptop *crp)
 		    __func__, tdb->tdb_sproto);
 	}
 
-	NET_UNLOCK();
 	if (error) {
 		ipsecstat_inc(ipsec_idrops);
 		tdb->tdb_idrops++;
 	}
 	return;
 
- baddone:
-	NET_UNLOCK();
- droponly:
+ drop:
 	ipsecstat_inc(ipsec_idrops);
 	if (tdb != NULL)
 		tdb->tdb_idrops++;
@@ -486,9 +490,9 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 	/* Fix IPv4 header */
 	if (af == AF_INET) {
 		if ((m->m_len < skip) && ((m = m_pullup(m, skip)) == NULL)) {
-			DPRINTF(("%s: processing failed for SA %s/%08x\n",
-			    __func__, ipsp_address(&tdbp->tdb_dst,
-			    buf, sizeof(buf)), ntohl(tdbp->tdb_spi)));
+			DPRINTF("processing failed for SA %s/%08x",
+			    ipsp_address(&tdbp->tdb_dst, buf, sizeof(buf)),
+			    ntohl(tdbp->tdb_spi));
 			IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
 			return -1;
 		}
@@ -535,10 +539,9 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 		if (m->m_len < sizeof(struct ip6_hdr) &&
 		    (m = m_pullup(m, sizeof(struct ip6_hdr))) == NULL) {
 
-			DPRINTF(("%s: processing failed for SA %s/%08x\n",
-			    __func__, ipsp_address(&tdbp->tdb_dst,
-			    buf, sizeof(buf)), ntohl(tdbp->tdb_spi)));
-
+			DPRINTF("processing failed for SA %s/%08x",
+			    ipsp_address(&tdbp->tdb_dst, buf, sizeof(buf)),
+			    ntohl(tdbp->tdb_spi));
 			IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
 			return -1;
 		}
@@ -638,7 +641,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 		    sizeof(struct tdb_ident), M_NOWAIT);
 		if (mtag == NULL) {
 			m_freem(m);
-			DPRINTF(("%s: failed to get tag\n", __func__));
+			DPRINTF("failed to get tag");
 			IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
 			return -1;
 		}
@@ -996,9 +999,8 @@ ipsec_common_ctlinput(u_int rdomain, int cmd, struct sockaddr *sa,
 			tdbp->tdb_mtu = mtu;
 			tdbp->tdb_mtutimeout = gettime() +
 			    ip_mtudisc_timeout;
-			DPRINTF(("%s: spi %08x mtu %d adjust %ld\n", __func__,
-			    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu,
-			    adjust));
+			DPRINTF("spi %08x mtu %d adjust %ld",
+			    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu, adjust);
 		}
 	}
 }
@@ -1051,10 +1053,9 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 				tdbp->tdb_mtu = mtu - adjust;
 				tdbp->tdb_mtutimeout = gettime() +
 				    ip_mtudisc_timeout;
-				DPRINTF(("%s: spi %08x mtu %d adjust %ld\n",
-				    __func__,
+				DPRINTF("spi %08x mtu %d adjust %ld",
 				    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu,
-				    adjust));
+				    adjust);
 			}
 		}
 	}
@@ -1087,7 +1088,7 @@ ah6_input(struct mbuf **mp, int *offp, int proto, int af)
 		return rip6_input(mp, offp, proto, af);
 
 	if (*offp < sizeof(struct ip6_hdr)) {
-		DPRINTF(("%s: bad offset\n", __func__));
+		DPRINTF("bad offset");
 		ahstat_inc(ahs_hdrops);
 		m_freemp(mp);
 		return IPPROTO_DONE;
@@ -1117,7 +1118,7 @@ ah6_input(struct mbuf **mp, int *offp, int proto, int af)
 
 		/* Malformed packet check */
 		if (protoff + l != *offp) {
-			DPRINTF(("%s: bad packet header chain\n", __func__));
+			DPRINTF("bad packet header chain");
 			ahstat_inc(ahs_hdrops);
 			m_freemp(mp);
 			return IPPROTO_DONE;
@@ -1144,7 +1145,7 @@ esp6_input(struct mbuf **mp, int *offp, int proto, int af)
 		return rip6_input(mp, offp, proto, af);
 
 	if (*offp < sizeof(struct ip6_hdr)) {
-		DPRINTF(("%s: bad offset\n", __func__));
+		DPRINTF("bad offset");
 		espstat_inc(esps_hdrops);
 		m_freemp(mp);
 		return IPPROTO_DONE;
@@ -1174,7 +1175,7 @@ esp6_input(struct mbuf **mp, int *offp, int proto, int af)
 
 		/* Malformed packet check */
 		if (protoff + l != *offp) {
-			DPRINTF(("%s: bad packet header chain\n", __func__));
+			DPRINTF("bad packet header chain");
 			espstat_inc(esps_hdrops);
 			m_freemp(mp);
 			return IPPROTO_DONE;
@@ -1202,7 +1203,7 @@ ipcomp6_input(struct mbuf **mp, int *offp, int proto, int af)
 		return rip6_input(mp, offp, proto, af);
 
 	if (*offp < sizeof(struct ip6_hdr)) {
-		DPRINTF(("%s: bad offset\n", __func__));
+		DPRINTF("bad offset");
 		ipcompstat_inc(ipcomps_hdrops);
 		m_freemp(mp);
 		return IPPROTO_DONE;
@@ -1231,7 +1232,7 @@ ipcomp6_input(struct mbuf **mp, int *offp, int proto, int af)
 
 		/* Malformed packet check */
 		if (protoff + l != *offp) {
-			DPRINTF(("%s: bad packet header chain\n", __func__));
+			DPRINTF("bad packet header chain");
 			ipcompstat_inc(ipcomps_hdrops);
 			m_freemp(mp);
 			return IPPROTO_DONE;

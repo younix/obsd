@@ -1,4 +1,4 @@
-/*	$OpenBSD: roa.c,v 1.19 2021/05/11 11:32:51 claudio Exp $ */
+/*	$OpenBSD: roa.c,v 1.23 2021/08/01 22:29:49 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -49,6 +49,7 @@ roa_parse_addr(const ASN1_OCTET_STRING *os, enum afi afi, struct parse *p)
 	int			 rc = 0;
 	const ASN1_TYPE		*t;
 	const ASN1_INTEGER	*maxlength = NULL;
+	long			 maxlen;
 	struct ip_addr		 addr;
 	struct roa_ip		*res;
 
@@ -81,11 +82,6 @@ roa_parse_addr(const ASN1_OCTET_STRING *os, enum afi afi, struct parse *p)
 		goto out;
 	}
 
-	/*
-	 * RFC 6482, section 3.3 doesn't ever actually state that the
-	 * maximum length can't be negative, but it needs to be >=0.
-	 */
-
 	if (sk_ASN1_TYPE_num(seq) == 2) {
 		t = sk_ASN1_TYPE_value(seq, 1);
 		if (t->type != V_ASN1_INTEGER) {
@@ -94,21 +90,23 @@ roa_parse_addr(const ASN1_OCTET_STRING *os, enum afi afi, struct parse *p)
 			    p->fn, ASN1_tag2str(t->type), t->type);
 			goto out;
 		}
+
 		maxlength = t->value.integer;
-
-		/*
-		 * It's safe to use ASN1_INTEGER_get() here
-		 * because we're not going to have more than signed 32
-		 * bit maximum of length.
-		 */
-
-		if (ASN1_INTEGER_get(maxlength) < 0) {
+		maxlen = ASN1_INTEGER_get(maxlength);
+		if (maxlen < 0) {
 			warnx("%s: RFC 6482 section 3.2: maxLength: "
-			    "want positive integer, have %ld",
-			    p->fn, ASN1_INTEGER_get(maxlength));
+			    "want positive integer, have %ld", p->fn, maxlen);
 			goto out;
 		}
-		/* FIXME: maximum check. */
+		if (addr.prefixlen > maxlen) {
+			warnx("%s: prefixlen (%d) larger than maxLength (%ld)",
+			    p->fn, addr.prefixlen, maxlen);
+			goto out;
+		}
+		if (maxlen > ((afi == AFI_IPV4) ? 32 : 128)) {
+			warnx("%s: maxLength (%ld) too large", p->fn, maxlen);
+			goto out;
+		}
 	}
 
 	p->res->ips = recallocarray(p->res->ips, p->res->ipsz, p->res->ipsz + 1,
@@ -119,8 +117,7 @@ roa_parse_addr(const ASN1_OCTET_STRING *os, enum afi afi, struct parse *p)
 
 	res->addr = addr;
 	res->afi = afi;
-	res->maxlength = (maxlength == NULL) ? addr.prefixlen :
-	    ASN1_INTEGER_get(maxlength);
+	res->maxlength = (maxlength == NULL) ? addr.prefixlen : maxlen;
 	ip_roa_compose_ranges(res);
 
 	rc = 1;
@@ -249,6 +246,7 @@ roa_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 	ASN1_SEQUENCE_ANY	*seq;
 	int			 i = 0, rc = 0, sz;
 	const ASN1_TYPE		*t;
+	long			 roa_version;
 
 	/* RFC 6482, section 3. */
 
@@ -265,26 +263,22 @@ roa_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		goto out;
 	}
 
-	/* RFC 6482, section 3.1. */
-
+	/* Parse the optional version field */
 	if (sz == 3) {
 		t = sk_ASN1_TYPE_value(seq, i++);
+		d = t->value.asn1_string->data;
+		dsz = t->value.asn1_string->length;
 
-		/*
-		 * This check with ASN1_INTEGER_get() is fine since
-		 * we're looking for a value of zero anyway, so any
-		 * overflowing number will be definition be wrong.
-		 */
-
-		if (t->type != V_ASN1_INTEGER) {
-			warnx("%s: RFC 6482 section 3.1: version: "
-			    "want ASN.1 integer, have %s (NID %d)",
-			    p->fn, ASN1_tag2str(t->type), t->type);
+		if (cms_econtent_version(p->fn, &d, dsz, &roa_version) == -1)
 			goto out;
-		} else if (ASN1_INTEGER_get(t->value.integer) != 0) {
-			warnx("%s: RFC 6482 section 3.1: version: "
-			    "want version 0, have %ld",
-			    p->fn, ASN1_INTEGER_get(t->value.integer));
+
+		switch (roa_version) {
+		case 0:
+			warnx("%s: incorrect encoding for version 0", p->fn);
+			goto out;
+		default:
+			warnx("%s: version %ld not supported (yet)", p->fn,
+			    roa_version);
 			goto out;
 		}
 	}

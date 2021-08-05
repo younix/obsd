@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.573 2021/05/07 03:09:38 djm Exp $ */
+/* $OpenBSD: sshd.c,v 1.578 2021/07/19 02:21:50 dtucker Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1087,6 +1087,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	pid_t pid;
+	sigset_t nsigset, osigset;
 
 	/* setup fd set for accept */
 	fdset = NULL;
@@ -1101,10 +1102,31 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 		startup_pipes[i] = -1;
 
 	/*
+	 * Prepare signal mask that we use to block signals that might set
+	 * received_sigterm or received_sighup, so that we are guaranteed
+	 * to immediately wake up the pselect if a signal is received after
+	 * the flag is checked.
+	 */
+	sigemptyset(&nsigset);
+	sigaddset(&nsigset, SIGHUP);
+	sigaddset(&nsigset, SIGCHLD);
+	sigaddset(&nsigset, SIGTERM);
+	sigaddset(&nsigset, SIGQUIT);
+
+	/*
 	 * Stay listening for connections until the system crashes or
 	 * the daemon is killed with a signal.
 	 */
 	for (;;) {
+		sigprocmask(SIG_BLOCK, &nsigset, &osigset);
+		if (received_sigterm) {
+			logit("Received signal %d; terminating.",
+			    (int) received_sigterm);
+			close_listen_socks();
+			if (options.pid_file != NULL)
+				unlink(options.pid_file);
+			exit(received_sigterm == SIGTERM ? 0 : 255);
+		}
 		if (ostartups != startups) {
 			setproctitle("%s [listener] %d of %d-%d startups",
 			    listener_proctitle, startups,
@@ -1117,8 +1139,10 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				close_listen_socks();
 				lameduck = 1;
 			}
-			if (listening <= 0)
+			if (listening <= 0) {
+				sigprocmask(SIG_SETMASK, &osigset, NULL);
 				sighup_restart();
+			}
 		}
 		free(fdset);
 		fdset = xcalloc(howmany(maxfd + 1, NFDBITS),
@@ -1130,18 +1154,11 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 			if (startup_pipes[i] != -1)
 				FD_SET(startup_pipes[i], fdset);
 
-		/* Wait in select until there is a connection. */
-		ret = select(maxfd+1, fdset, NULL, NULL, NULL);
+		/* Wait until a connection arrives or a child exits. */
+		ret = pselect(maxfd+1, fdset, NULL, NULL, NULL, &osigset);
 		if (ret == -1 && errno != EINTR)
-			error("select: %.100s", strerror(errno));
-		if (received_sigterm) {
-			logit("Received signal %d; terminating.",
-			    (int) received_sigterm);
-			close_listen_socks();
-			if (options.pid_file != NULL)
-				unlink(options.pid_file);
-			exit(received_sigterm == SIGTERM ? 0 : 255);
-		}
+			error("pselect: %.100s", strerror(errno));
+		sigprocmask(SIG_SETMASK, &osigset, NULL);
 		if (ret == -1)
 			continue;
 
@@ -1618,15 +1635,13 @@ main(int ac, char **av)
 	parse_server_config(&options, rexeced_flag ? "rexec" : config_file_name,
 	    cfg, &includes, NULL);
 
+#ifdef WITH_OPENSSL
 	if (options.moduli_file != NULL)
 		dh_set_moduli_file(options.moduli_file);
+#endif
 
 	/* Fill in default values for those options not explicitly set. */
 	fill_default_server_options(&options);
-
-	/* challenge-response is implemented via keyboard interactive */
-	if (options.challenge_response_authentication)
-		options.kbd_interactive_authentication = 1;
 
 	/* Check that options are sensible */
 	if (options.authorized_keys_command_user == NULL &&
@@ -1792,7 +1807,7 @@ main(int ac, char **av)
 		/* Find matching private key */
 		for (j = 0; j < options.num_host_key_files; j++) {
 			if (sshkey_equal_public(key,
-			    sensitive_data.host_keys[j])) {
+			    sensitive_data.host_pubkeys[j])) {
 				sensitive_data.host_certificates[j] = key;
 				break;
 			}

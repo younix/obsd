@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_both.c,v 1.72 2021/05/16 14:10:43 jsing Exp $ */
+/* $OpenBSD: d1_both.c,v 1.77 2021/07/19 08:42:24 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -396,7 +396,7 @@ dtls1_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok)
 	msg_hdr = &D1I(s)->r_msg_hdr;
 	memset(msg_hdr, 0, sizeof(struct hm_header_st));
 
-again:
+ again:
 	i = dtls1_get_message_fragment(s, st1, stn, max, ok);
 	if (i == DTLS1_HM_BAD_FRAGMENT ||
 	    i == DTLS1_HM_FRAGMENT_RETRY)  /* bad fragment received */
@@ -600,7 +600,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 		unsigned char devnull [256];
 
 		while (frag_len) {
-			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    devnull, frag_len > sizeof(devnull) ?
 			    sizeof(devnull) : frag_len, 0);
 			if (i <= 0)
@@ -612,7 +612,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 	}
 
 	/* read the body of the fragment (header has already been read */
-	i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+	i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 	    frag->fragment + msg_hdr->frag_off, frag_len, 0);
 	if (i <= 0 || (unsigned long)i != frag_len)
 		goto err;
@@ -644,7 +644,7 @@ dtls1_reassemble_fragment(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 	return DTLS1_HM_FRAGMENT_RETRY;
 
-err:
+ err:
 	if (item == NULL && frag != NULL)
 		dtls1_hm_fragment_free(frag);
 	*ok = 0;
@@ -690,7 +690,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 		unsigned char devnull [256];
 
 		while (frag_len) {
-			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    devnull, frag_len > sizeof(devnull) ?
 			    sizeof(devnull) : frag_len, 0);
 			if (i <= 0)
@@ -712,7 +712,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 		if (frag_len) {
 			/* read the body of the fragment (header has already been read */
-			i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+			i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 			    frag->fragment, frag_len, 0);
 			if (i <= 0 || (unsigned long)i != frag_len)
 				goto err;
@@ -731,7 +731,7 @@ dtls1_process_out_of_seq_message(SSL *s, struct hm_header_st* msg_hdr, int *ok)
 
 	return DTLS1_HM_FRAGMENT_RETRY;
 
-err:
+ err:
 	if (item == NULL && frag != NULL)
 		dtls1_hm_fragment_free(frag);
 	*ok = 0;
@@ -747,7 +747,7 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 	int i, al;
 	struct hm_header_st msg_hdr;
 
-again:
+ again:
 	/* see if we have the required fragment already */
 	if ((frag_len = dtls1_retrieve_buffered_fragment(s, max, ok)) || *ok) {
 		if (*ok)
@@ -756,7 +756,7 @@ again:
 	}
 
 	/* read handshake message header */
-	i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE, wire,
+	i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE, wire,
 	    DTLS1_HM_HEADER_LENGTH, 0);
 	if (i <= 0) 	/* nbio, or an error */
 	{
@@ -825,7 +825,7 @@ again:
 	if (frag_len > 0) {
 		unsigned char *p = (unsigned char *)s->internal->init_buf->data + DTLS1_HM_HEADER_LENGTH;
 
-		i = s->method->internal->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
+		i = s->method->ssl_read_bytes(s, SSL3_RT_HANDSHAKE,
 		    &p[frag_off], frag_len, 0);
 		/* XDTLS:  fix this--message fragments cannot span multiple packets */
 		if (i <= 0) {
@@ -841,8 +841,8 @@ again:
 	 * handshake to fail
 	 */
 	if (i != (int)frag_len) {
-		al = SSL3_AD_ILLEGAL_PARAMETER;
-		SSLerror(s, SSL3_AD_ILLEGAL_PARAMETER);
+		al = SSL_AD_ILLEGAL_PARAMETER;
+		SSLerror(s, SSL_R_SSLV3_ALERT_ILLEGAL_PARAMETER);
 		goto fatal_err;
 	}
 
@@ -1201,12 +1201,4 @@ dtls1_get_message_header(unsigned char *data, struct hm_header_st *msg_hdr)
 	msg_hdr->frag_len = frag_len;
 
 	return 1;
-}
-
-void
-dtls1_get_ccs_header(unsigned char *data, struct ccs_header_st *ccs_hdr)
-{
-	memset(ccs_hdr, 0, sizeof(struct ccs_header_st));
-
-	ccs_hdr->type = *(data++);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhcpleased.h,v 1.4 2021/04/10 17:22:34 florian Exp $	*/
+/*	$OpenBSD: dhcpleased.h,v 1.10 2021/08/01 09:07:03 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -18,21 +18,32 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#define	_PATH_LOCKFILE		"/dev/dhcpleased.lock"
+#define	_PATH_CONF_FILE		"/etc/dhcpleased.conf"
 #define	_PATH_DHCPLEASED_SOCKET	"/dev/dhcpleased.sock"
 #define	DHCPLEASED_USER		"_dhcp"
 #define	DHCPLEASED_RTA_LABEL	"dhcpleased"
 #define	SERVER_PORT		67
 #define	CLIENT_PORT		68
 #define	_PATH_LEASE		"/var/db/dhcpleased/"
-#define	LEASE_PREFIX		"version: 1\nip: "
-#define	LEASE_SIZE		sizeof(LEASE_PREFIX"xxx.xxx.xxx.xxx\n")
+#define	LEASE_VERSION		"version: 2"
+#define	LEASE_IP_PREFIX		"ip: "
+#define	LEASE_NEXTSERVER_PREFIX	"next-server: "
+#define	LEASE_BOOTFILE_PREFIX	"filename: "
+#define	LEASE_HOSTNAME_PREFIX	"host-name: "
+#define	LEASE_DOMAIN_PREFIX	"domain-name: "
+#define	LEASE_SIZE		4096
 /* MAXDNAME from arpa/namesr.h */
 #define	DHCPLEASED_MAX_DNSSL	1025
 #define	MAX_RDNS_COUNT		8 /* max nameserver in a RTM_PROPOSAL */
 
+/* A 1500 bytes packet can hold less than 300 classless static routes */
+#define	MAX_DHCP_ROUTES		256
+
 #define	DHCP_COOKIE		{99, 130, 83, 99}
 
 /* Possible values for hardware type (htype) field. */
+#define	HTYPE_NONE		0
 #define	HTYPE_ETHER		1
 #define	HTYPE_IPSEC_TUNNEL	31
 
@@ -168,13 +179,25 @@ struct imsgev {
 	short		 events;
 };
 
+struct dhcp_route {
+	struct in_addr		 dst;
+	struct in_addr		 mask;
+	struct in_addr		 gw;
+};
+
 enum imsg_type {
 	IMSG_NONE,
 #ifndef	SMALL
 	IMSG_CTL_LOG_VERBOSE,
 	IMSG_CTL_SHOW_INTERFACE_INFO,
 	IMSG_CTL_SEND_REQUEST,
+	IMSG_CTL_RELOAD,
 	IMSG_CTL_END,
+	IMSG_RECONF_CONF,
+	IMSG_RECONF_IFACE,
+	IMSG_RECONF_VC_ID,
+	IMSG_RECONF_C_ID,
+	IMSG_RECONF_END,
 #endif	/* SMALL */
 	IMSG_SEND_DISCOVER,
 	IMSG_SEND_REQUEST,
@@ -194,6 +217,7 @@ enum imsg_type {
 	IMSG_PROPOSE_RDNS,
 	IMSG_WITHDRAW_RDNS,
 	IMSG_REPROPOSE_RDNS,
+	IMSG_REQUEST_REBOOT,
 };
 
 #ifndef	SMALL
@@ -207,11 +231,25 @@ struct ctl_engine_info {
 	struct in_addr		dhcp_server; /* for unicast */
 	struct in_addr		requested_ip;
 	struct in_addr		mask;
-	struct in_addr		router;
+	struct dhcp_route	routes[MAX_DHCP_ROUTES];
+	int			routes_len;
 	struct in_addr		nameservers[MAX_RDNS_COUNT];
 	uint32_t		lease_time;
 	uint32_t		renewal_time;
 	uint32_t		rebinding_time;
+};
+
+struct iface_conf {
+	SIMPLEQ_ENTRY(iface_conf)	 entry;
+	char				 name[IF_NAMESIZE];
+	uint8_t				*vc_id;
+	int				 vc_id_len;
+	uint8_t				*c_id;
+	int				 c_id_len;
+};
+
+struct dhcpleased_conf {
+	SIMPLEQ_HEAD(iface_conf_head, iface_conf)	iface_list;
 };
 
 #endif	/* SMALL */
@@ -254,11 +292,26 @@ struct imsg_req_request {
 };
 
 /* dhcpleased.c */
-void		imsg_event_add(struct imsgev *);
-int		imsg_compose_event(struct imsgev *, uint16_t, uint32_t, pid_t,
-		    int, void *, uint16_t);
+void			 imsg_event_add(struct imsgev *);
+int			 imsg_compose_event(struct imsgev *, uint16_t, uint32_t,
+			     pid_t, int, void *, uint16_t);
 #ifndef	SMALL
+void			 config_clear(struct dhcpleased_conf *);
+struct dhcpleased_conf	*config_new_empty(void);
+void			 merge_config(struct dhcpleased_conf *, struct
+			     dhcpleased_conf *);
 const char	*sin_to_str(struct sockaddr_in *);
+
+/* frontend.c */
+struct iface_conf	*find_iface_conf(struct iface_conf_head *, char *);
+
+/* printconf.c */
+void	print_config(struct dhcpleased_conf *);
+
+/* parse.y */
+struct dhcpleased_conf	*parse_config(char *);
+int			 cmdline_symset(char *);
 #else
 #define	sin_to_str(x...)	""
 #endif	/* SMALL */
+

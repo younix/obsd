@@ -1,4 +1,4 @@
-#	$OpenBSD: install.md,v 1.1 2021/04/27 23:57:38 drahn Exp $
+#	$OpenBSD: install.md,v 1.3 2021/08/02 21:46:39 kettenis Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.

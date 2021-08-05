@@ -19,23 +19,25 @@ D/dcn20////
 D/dcn21////
 D/dsc////
 D/hdcp////
-/dc.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_bios_types.h/1.2/Fri Dec 11 17:58:22 2020//
 /dc_ddc_types.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_dmub_srv.c/1.1/Fri Dec 11 17:58:22 2020//
-/dc_dmub_srv.h/1.1/Fri Dec 11 17:58:22 2020//
-/dc_dp_types.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_dsc.h/1.1/Fri Dec 11 17:58:22 2020//
-/dc_helper.c/1.2/Fri Dec 11 17:58:22 2020//
-/dc_hw_types.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_link.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_stream.h/1.2/Fri Dec 11 17:58:22 2020//
-/dc_types.h/1.2/Fri Dec 11 17:58:22 2020//
-/dm_cp_psp.h/1.1/Fri Dec 11 17:58:23 2020//
 /dm_event_log.h/1.1/Fri Dec 11 17:58:23 2020//
-/dm_helpers.h/1.2/Fri Dec 11 17:58:23 2020//
-/dm_pp_smu.h/1.2/Fri Dec 11 17:58:23 2020//
-/dm_services.h/1.2/Fri Dec 11 17:58:23 2020//
 /dm_services_types.h/1.2/Fri Dec 11 17:58:23 2020//
-/irq_types.h/1.2/Fri Dec 11 17:58:23 2020//
-/os_types.h/1.2/Fri Dec 11 17:58:23 2020//
+/dc.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_bios_types.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_dmub_srv.c/1.2/Thu Aug  5 11:01:47 2021//
+/dc_dmub_srv.h/1.2/Thu Aug  5 11:01:47 2021//
+/dc_dp_types.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_dsc.h/1.2/Thu Aug  5 11:01:47 2021//
+/dc_helper.c/1.3/Thu Aug  5 11:01:47 2021//
+/dc_hw_types.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_link.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_stream.h/1.3/Thu Aug  5 11:01:47 2021//
+/dc_types.h/1.3/Thu Aug  5 11:01:47 2021//
+/dm_cp_psp.h/1.2/Thu Aug  5 11:01:47 2021//
+/dm_helpers.h/1.3/Thu Aug  5 11:01:47 2021//
+/dm_pp_smu.h/1.3/Thu Aug  5 11:01:47 2021//
+/dm_services.h/1.3/Thu Aug  5 11:01:47 2021//
+/irq_types.h/1.3/Thu Aug  5 11:01:47 2021//
+/os_types.h/1.3/Thu Aug  5 11:01:47 2021//
+D/dce60////
+D/dcn30////

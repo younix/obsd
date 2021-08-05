@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.c,v 1.206 2021/02/22 11:42:50 nicm Exp $ */
+/* $OpenBSD: tmux.c,v 1.208 2021/07/06 08:26:00 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -211,16 +211,22 @@ make_label(const char *label, char **cause)
 	free(paths);
 
 	xasprintf(&base, "%s/tmux-%ld", path, (long)uid);
-	if (mkdir(base, S_IRWXU) != 0 && errno != EEXIST)
+	if (mkdir(base, S_IRWXU) != 0 && errno != EEXIST) {
+		xasprintf(cause, "couldn't create directory %s (%s)", base,
+		    strerror(errno));
 		goto fail;
-	if (lstat(base, &sb) != 0)
+	}
+	if (lstat(base, &sb) != 0) {
+		xasprintf(cause, "couldn't read directory %s (%s)", base,
+		    strerror(errno));
 		goto fail;
+	}
 	if (!S_ISDIR(sb.st_mode)) {
-		errno = ENOTDIR;
+		xasprintf(cause, "%s is not a directory", base);
 		goto fail;
 	}
 	if (sb.st_uid != uid || (sb.st_mode & S_IRWXO) != 0) {
-		errno = EACCES;
+		xasprintf(cause, "directory %s has unsafe permissions", base);
 		goto fail;
 	}
 	xasprintf(&path, "%s/%s", base, label);
@@ -228,7 +234,6 @@ make_label(const char *label, char **cause)
 	return (path);
 
 fail:
-	xasprintf(cause, "error creating %s (%s)", base, strerror(errno));
 	free(base);
 	return (NULL);
 }
@@ -338,7 +343,7 @@ main(int argc, char **argv)
 	char					*path = NULL, *label = NULL;
 	char					*cause, **var;
 	const char				*s, *cwd;
-	int					 opt, keys, feat = 0;
+	int					 opt, keys, feat = 0, fflag = 0;
 	uint64_t				 flags = 0;
 	const struct options_table_entry	*oe;
 	u_int					 i;
@@ -383,10 +388,15 @@ main(int argc, char **argv)
 				flags |= CLIENT_CONTROL;
 			break;
 		case 'f':
-			for (i = 0; i < cfg_nfiles; i++)
-				free(cfg_files[i]);
-			free(cfg_files);
-			expand_paths(optarg, &cfg_files, &cfg_nfiles, 0);
+			if (!fflag) {
+				fflag = 1;
+				for (i = 0; i < cfg_nfiles; i++)
+					free(cfg_files[i]);
+				cfg_nfiles = 0;
+			}
+			cfg_files = xreallocarray(cfg_files, cfg_nfiles + 1,
+			    sizeof *cfg_files);
+			cfg_files[cfg_nfiles++] = xstrdup(optarg);
 			cfg_quiet = 0;
 			break;
  		case 'V':

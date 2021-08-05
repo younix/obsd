@@ -1,4 +1,4 @@
-/*	$OpenBSD: misc.h,v 1.34 2021/05/07 22:15:13 krw Exp $	*/
+/*	$OpenBSD: misc.h,v 1.39 2021/07/12 22:18:54 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -20,24 +20,19 @@
 #define _MISC_H
 
 struct unit_type {
-	char	*abbr;
-	int64_t	 conversion;
-	char	*lname;
+	char		*ut_abbr;
+	int64_t		 ut_conversion;
+	char		*ut_lname;
 };
-extern struct unit_type unit_types[];
-#define SECTORS	1	/* units are bytes/sectors/kbytes/mbytes/gbytes */
+extern struct unit_type		unit_types[];
+#define	SECTORS		1
 
 /* Prototypes */
-int unit_lookup(char *);
-int string_from_line(char *, size_t);
-void ask_cmd(char **, char **);
-int ask_num(const char *, int, int, int);
-int ask_pid(int, struct uuid *);
-char *ask_string(const char *, const char *);
-int ask_yn(const char *);
-uint64_t getuint64(char *, uint64_t, uint64_t, uint64_t);
-uint32_t crc32(const u_char *, const uint32_t);
-char *utf16le_to_string(uint16_t *);
-uint16_t *string_to_utf16le(char *);
+int		 unit_lookup(const char *);
+int		 string_from_line(char *, const size_t);
+int		 ask_yn(const char *);
+uint64_t	 getuint64(const char *, uint64_t, const uint64_t, const uint64_t);
+char		*utf16le_to_string(const uint16_t *);
+uint16_t	*string_to_utf16le(const char *);
 
-#endif /* _MISC_H */
+#endif /* _MISC_H  */

@@ -5,9 +5,6 @@
 /maskbits.h/1.3/Fri Nov  3 06:54:06 2017//
 /omkbdmap.c/1.3/Fri Nov  3 06:54:06 2017//
 /omkbdmap.h/1.1/Wed May 22 11:35:02 2013//
-/omrasops.c/1.16/Mon May 25 09:55:48 2020//
-/omrasops.h/1.5/Fri Nov  3 06:54:06 2017//
-/omrasops1.c/1.3/Mon Mar 20 19:37:54 2017//
 /sio.c/1.6/Sun Jun  4 13:48:13 2017//
 /siovar.h/1.3/Sun Jun  4 13:48:13 2017//
 /spc.c/1.11/Wed Feb  5 16:29:29 2020//
@@ -19,4 +16,7 @@
 /mb89352var.h/1.8/Tue May 18 14:06:16 2021//
 /sioreg.h/1.2/Tue May 18 14:06:16 2021//
 /siotty.c/1.25/Tue May 18 14:06:16 2021//
+/omrasops.c/1.17/Thu Aug  5 11:01:43 2021//
+/omrasops.h/1.6/Thu Aug  5 11:01:43 2021//
+/omrasops1.c/1.4/Thu Aug  5 11:01:43 2021//
 D

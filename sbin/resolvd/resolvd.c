@@ -1,4 +1,4 @@
-/*	$OpenBSD: resolvd.c,v 1.12 2021/05/10 15:06:34 deraadt Exp $	*/
+/*	$OpenBSD: resolvd.c,v 1.16 2021/07/21 03:53:50 kn Exp $	*/
 /*
  * Copyright (c) 2021 Florian Obser <florian@openbsd.org>
  * Copyright (c) 2021 Theo de Raadt <deraadt@openbsd.org>
@@ -42,12 +42,10 @@
 
 #define	ROUTE_SOCKET_BUF_SIZE	16384
 #define	ASR_MAXNS		10
-#ifndef SMALL
+#define	_PATH_LOCKFILE		"/dev/resolvd.lock"
 #define	_PATH_UNWIND_SOCKET	"/dev/unwind.sock"
-#endif
 #define	_PATH_RESCONF		"/etc/resolv.conf"
 #define	_PATH_RESCONF_NEW	"/etc/resolv.conf.new"
-#define _PATH_LOCKFILE		"/var/run/resolvd.lock"
 
 #ifndef nitems
 #define	nitems(_a) (sizeof((_a)) / sizeof((_a)[0]))
@@ -152,7 +150,10 @@ const struct loggers *logger = &conslogger;
 enum {
 	KQ_ROUTE,
 	KQ_RESOLVE_CONF,
+#ifndef SMALL
 	KQ_UNWIND,
+#endif
+	KQ_TOTAL
 };
 
 int
@@ -161,7 +162,7 @@ main(int argc, char *argv[])
 	struct timespec		 one = {1, 0};
 	int			 kq, ch, debug = 0, routesock;
 	int			 rtfilter, nready, lockfd;
-	struct kevent		 kev[3];
+	struct kevent		 kev[KQ_TOTAL];
 #ifndef SMALL
 	int			 unwindsock = -1;
 #endif
@@ -192,7 +193,7 @@ main(int argc, char *argv[])
 
 	lockfd = open(_PATH_LOCKFILE, O_CREAT|O_RDWR|O_EXLOCK|O_NONBLOCK, 0600);
 	if (lockfd == -1)
-		errx(1, "already running, " _PATH_LOCKFILE);
+		errx(1, "already running");
 
 	if (!debug)
 		daemon(0, 0);
@@ -270,7 +271,7 @@ main(int argc, char *argv[])
 			newkevent = 0;
 		}
 
-		nready = kevent(kq, NULL, 0, kev, nitems(kev), NULL);
+		nready = kevent(kq, NULL, 0, kev, KQ_TOTAL, NULL);
 		if (nready == -1) {
 			if (errno == EINTR)
 				continue;

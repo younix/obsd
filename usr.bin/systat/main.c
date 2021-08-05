@@ -1,4 +1,4 @@
-/* $OpenBSD: main.c,v 1.73 2021/01/30 08:44:42 martijn Exp $	 */
+/* $OpenBSD: main.c,v 1.76 2021/07/12 15:09:20 beck Exp $	 */
 /*
  * Copyright (c) 2001, 2007 Can Erkin Acar
  * Copyright (c) 2001 Daniel Hartmeier
@@ -284,8 +284,7 @@ cmd_compat(const char *buf)
 	const char *s;
 
 	if (strcasecmp(buf, "help") == 0) {
-		show_help();
-		need_update = 1;
+		message_toggle(MESSAGE_HELP);
 		return;
 	}
 	if (strcasecmp(buf, "quit") == 0 || strcasecmp(buf, "q") == 0) {
@@ -304,8 +303,7 @@ cmd_compat(const char *buf)
 		return;
 	}
 	if (strncasecmp(buf, "order", 5) == 0) {
-		show_order();
-		need_update = 1;
+		message_toggle(MESSAGE_ORDER);
 		return;
 	}
 	if (strncasecmp(buf, "human", 5) == 0) {
@@ -334,7 +332,7 @@ cmd_delay(const char *buf)
 	if (errstr != NULL)
 		error("s: \"%s\": delay value is %s", buf, errstr);
 	else {
-		udelay = (useconds_t)(del * 1000000);
+		refresh_delay(del);
 		gotsig_alarm = 1;
 		naptime = del;
 	}
@@ -358,12 +356,10 @@ keyboard_callback(int ch)
 	case '?':
 		/* FALLTHROUGH */
 	case 'h':
-		show_help();
-		need_update = 1;
+		message_toggle(MESSAGE_HELP);
 		break;
 	case CTRL_G:
-		show_view();
-		need_update = 1;
+		message_toggle(MESSAGE_VIEW);
 		break;
 	case 'l':
 		command_set(&cm_count, NULL);
@@ -561,11 +557,8 @@ main(int argc, char *argv[])
 			errx(1, "\"%s\": delay value is %s", argv[1], errstr);
 	}
 
-	udelay = (useconds_t)(delay * 1000000.0);
-	if (udelay < 1)
-		udelay = 1;
-
-	naptime = (double)udelay / 1000000.0;
+	refresh_delay(delay);
+	naptime = delay;
 
 	gethostname(hostname, sizeof (hostname));
 	gethz();
@@ -586,7 +579,7 @@ main(int argc, char *argv[])
 	setup_term(maxlines);
 
 	if (unveil("/", "r") == -1)
-		err(1, "unveil");
+		err(1, "unveil /");
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 

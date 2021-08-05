@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_mvpp.c,v 1.44 2020/12/12 11:48:52 jan Exp $	*/
+/*	$OpenBSD: if_mvpp.c,v 1.48 2021/07/07 21:21:48 patrick Exp $	*/
 /*
  * Copyright (c) 2008, 2019 Mark Kettenis <kettenis@openbsd.org>
  * Copyright (c) 2017, 2020 Patrick Wildt <patrick@blueri.se>
@@ -125,7 +125,6 @@ struct mvpp2_tx_queue {
 	struct mvpp2_buf	*buf;
 	struct mvpp2_tx_desc	*descs;
 	int			prod;
-	int			cnt;
 	int			cons;
 
 	uint32_t		done_pkts_coal;
@@ -194,7 +193,6 @@ struct mvpp2_port {
 	struct mii_data		sc_mii;
 #define sc_media	sc_mii.mii_media
 	struct mii_bus		*sc_mdio;
-	char			sc_cur_lladdr[ETHER_ADDR_LEN];
 
 	enum {
 		PHY_MODE_XAUI,
@@ -299,7 +297,6 @@ void	mvpp2_rx_refill(struct mvpp2_port *);
 void	mvpp2_up(struct mvpp2_port *);
 void	mvpp2_down(struct mvpp2_port *);
 void	mvpp2_iff(struct mvpp2_port *);
-int	mvpp2_encap(struct mvpp2_port *, struct mbuf *, int *);
 
 void	mvpp2_aggr_txq_hw_init(struct mvpp2_softc *, struct mvpp2_tx_queue *);
 void	mvpp2_txq_hw_init(struct mvpp2_port *, struct mvpp2_tx_queue *);
@@ -419,6 +416,7 @@ int	mvpp2_prs_mac_da_range_find(struct mvpp2_softc *, int, const uint8_t *,
 int	mvpp2_prs_mac_range_equals(struct mvpp2_prs_entry *, const uint8_t *,
 	    uint8_t *);
 int	mvpp2_prs_mac_da_accept(struct mvpp2_port *, const uint8_t *, int);
+void	mvpp2_prs_mac_del_all(struct mvpp2_port *);
 int	mvpp2_prs_tag_mode_set(struct mvpp2_softc *, int, int);
 int	mvpp2_prs_def_flow(struct mvpp2_port *);
 void	mvpp2_cls_flow_write(struct mvpp2_softc *, struct mvpp2_cls_flow_entry *);
@@ -1354,7 +1352,9 @@ mvpp2_port_attach(struct device *parent, struct device *self, void *aux)
 
 	phy_mode = malloc(len, M_TEMP, M_WAITOK);
 	OF_getprop(sc->sc_node, "phy-mode", phy_mode, len);
-	if (!strncmp(phy_mode, "10gbase-kr", strlen("10gbase-kr")))
+	if (!strncmp(phy_mode, "10gbase-r", strlen("10gbase-r")))
+		sc->sc_phy_mode = PHY_MODE_10GBASER;
+	else if (!strncmp(phy_mode, "10gbase-kr", strlen("10gbase-kr")))
 		sc->sc_phy_mode = PHY_MODE_10GBASER;
 	else if (!strncmp(phy_mode, "2500base-x", strlen("2500base-x")))
 		sc->sc_phy_mode = PHY_MODE_2500BASEX;
@@ -1690,13 +1690,33 @@ mvpp2_xpcs_write(struct mvpp2_port *sc, bus_addr_t addr, uint32_t data)
 	    data);
 }
 
+static inline int
+mvpp2_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m)
+{
+	int error;
+
+	error = bus_dmamap_load_mbuf(dmat, map, m, BUS_DMA_NOWAIT);
+	if (error != EFBIG)
+		return (error);
+
+	error = m_defrag(m, M_DONTWAIT);
+	if (error != 0)
+		return (error);
+
+	return bus_dmamap_load_mbuf(dmat, map, m, BUS_DMA_NOWAIT);
+}
+
 void
 mvpp2_start(struct ifnet *ifp)
 {
 	struct mvpp2_port *sc = ifp->if_softc;
 	struct mvpp2_tx_queue *txq = &sc->sc->sc_aggr_txqs[0];
+	struct mvpp2_tx_desc *txd;
 	struct mbuf *m;
-	int error, idx;
+	bus_dmamap_t map;
+	uint32_t command;
+	int i, current, first, last;
+	int free, prod, used;
 
 	if (!(ifp->if_flags & IFF_RUNNING))
 		return;
@@ -1707,99 +1727,82 @@ mvpp2_start(struct ifnet *ifp)
 	if (!sc->sc_link)
 		return;
 
-	idx = txq->prod;
-	while (txq->cnt < MVPP2_AGGR_TXQ_SIZE) {
+	used = 0;
+	prod = txq->prod;
+	free = txq->cons;
+	if (free <= prod)
+		free += MVPP2_AGGR_TXQ_SIZE;
+	free -= prod;
+
+	for (;;) {
+		if (free <= MVPP2_NTXSEGS) {
+			ifq_set_oactive(&ifp->if_snd);
+			break;
+		}
+
 		m = ifq_dequeue(&ifp->if_snd);
 		if (m == NULL)
 			break;
 
-		error = mvpp2_encap(sc, m, &idx);
-		if (error == ENOBUFS) {
-			m_freem(m); /* give up: drop it */
-			ifq_set_oactive(&ifp->if_snd);
-			break;
-		}
-		if (error == EFBIG) {
-			m_freem(m); /* give up: drop it */
+		first = last = current = prod;
+		map = txq->buf[current].mb_map;
+
+		if (mvpp2_load_mbuf(sc->sc_dmat, map, m) != 0) {
 			ifp->if_oerrors++;
+			m_freem(m);
 			continue;
 		}
+
+		bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
+		    BUS_DMASYNC_PREWRITE);
+
+		command = MVPP2_TXD_L4_CSUM_NOT |
+		    MVPP2_TXD_IP_CSUM_DISABLE;
+		for (i = 0; i < map->dm_nsegs; i++) {
+			txd = &txq->descs[current];
+			memset(txd, 0, sizeof(*txd));
+			txd->buf_phys_addr_hw_cmd2 =
+			    map->dm_segs[i].ds_addr & ~0x1f;
+			txd->packet_offset =
+			    map->dm_segs[i].ds_addr & 0x1f;
+			txd->data_size = map->dm_segs[i].ds_len;
+			txd->phys_txq = sc->sc_txqs[0].id;
+			txd->command = command |
+			    MVPP2_TXD_PADDING_DISABLE;
+			if (i == 0)
+				txd->command |= MVPP2_TXD_F_DESC;
+			if (i == (map->dm_nsegs - 1))
+				txd->command |= MVPP2_TXD_L_DESC;
+
+			bus_dmamap_sync(sc->sc_dmat, MVPP2_DMA_MAP(txq->ring),
+			    current * sizeof(*txd), sizeof(*txd),
+			    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
+
+			last = current;
+			current = (current + 1) % MVPP2_AGGR_TXQ_SIZE;
+			KASSERT(current != txq->cons);
+		}
+
+		KASSERT(txq->buf[last].mb_m == NULL);
+		txq->buf[first].mb_map = txq->buf[last].mb_map;
+		txq->buf[last].mb_map = map;
+		txq->buf[last].mb_m = m;
 
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m, BPF_DIRECTION_OUT);
 #endif
+
+		free -= map->dm_nsegs;
+		used += map->dm_nsegs;
+		prod = current;
 	}
 
-	if (txq->prod != idx) {
-		txq->prod = idx;
+	if (used)
+		mvpp2_write(sc->sc, MVPP2_AGGR_TXQ_UPDATE_REG, used);
 
-		/* Set a timeout in case the chip goes out to lunch. */
-		ifp->if_timer = 5;
-	}
-}
-
-int
-mvpp2_encap(struct mvpp2_port *sc, struct mbuf *m, int *idx)
-{
-	struct mvpp2_tx_queue *txq = &sc->sc->sc_aggr_txqs[0];
-	struct mvpp2_tx_desc *txd;
-	bus_dmamap_t map;
-	uint32_t command;
-	int i, current, first, last;
-
-	first = last = current = *idx;
-	map = txq->buf[current].mb_map;
-
-	if (bus_dmamap_load_mbuf(sc->sc_dmat, map, m, BUS_DMA_NOWAIT))
-		return ENOBUFS;
-
-	if (map->dm_nsegs > (MVPP2_AGGR_TXQ_SIZE - txq->cnt - 2)) {
-		bus_dmamap_unload(sc->sc_dmat, map);
-		return ENOBUFS;
-	}
-
-	bus_dmamap_sync(sc->sc_dmat, map, 0, map->dm_mapsize,
-	    BUS_DMASYNC_PREWRITE);
-
-	command = MVPP2_TXD_L4_CSUM_NOT |
-	    MVPP2_TXD_IP_CSUM_DISABLE;
-	for (i = 0; i < map->dm_nsegs; i++) {
-		txd = &txq->descs[current];
-		memset(txd, 0, sizeof(*txd));
-		txd->buf_phys_addr_hw_cmd2 =
-		    map->dm_segs[i].ds_addr & ~0x1f;
-		txd->packet_offset =
-		    map->dm_segs[i].ds_addr & 0x1f;
-		txd->data_size = map->dm_segs[i].ds_len;
-		txd->phys_txq = sc->sc_txqs[0].id;
-		txd->command = command |
-		    MVPP2_TXD_PADDING_DISABLE;
-		if (i == 0)
-			txd->command |= MVPP2_TXD_F_DESC;
-		if (i == (map->dm_nsegs - 1))
-			txd->command |= MVPP2_TXD_L_DESC;
-
-		bus_dmamap_sync(sc->sc_dmat, MVPP2_DMA_MAP(txq->ring),
-		    current * sizeof(*txd), sizeof(*txd),
-		    BUS_DMASYNC_PREREAD | BUS_DMASYNC_PREWRITE);
-
-		last = current;
-		current = (current + 1) % MVPP2_AGGR_TXQ_SIZE;
-		KASSERT(current != txq->cons);
-	}
-
-	KASSERT(txq->buf[last].mb_m == NULL);
-	txq->buf[first].mb_map = txq->buf[last].mb_map;
-	txq->buf[last].mb_map = map;
-	txq->buf[last].mb_m = m;
-
-	txq->cnt += map->dm_nsegs;
-	*idx = current;
-
-	mvpp2_write(sc->sc, MVPP2_AGGR_TXQ_UPDATE_REG, map->dm_nsegs);
-
-	return 0;
+	if (txq->prod != prod)
+		txq->prod = prod;
 }
 
 int
@@ -2118,6 +2121,7 @@ mvpp2_txq_proc(struct mvpp2_port *sc, struct mvpp2_tx_queue *txq)
 	struct mvpp2_buf *txb;
 	int i, idx, nsent;
 
+	/* XXX: this is a percpu register! */
 	nsent = (mvpp2_read(sc->sc, MVPP2_TXQ_SENT_REG(txq->id)) &
 	    MVPP2_TRANSMITTED_COUNT_MASK) >>
 	    MVPP2_TRANSMITTED_COUNT_OFFSET;
@@ -2136,12 +2140,8 @@ mvpp2_txq_proc(struct mvpp2_port *sc, struct mvpp2_tx_queue *txq)
 			txb->mb_m = NULL;
 		}
 
-		aggr_txq->cnt--;
 		aggr_txq->cons = (aggr_txq->cons + 1) % MVPP2_AGGR_TXQ_SIZE;
 	}
-
-	if (aggr_txq->cnt == 0)
-		ifp->if_timer = 0;
 
 	if (ifq_is_oactive(&ifp->if_snd))
 		ifq_restart(&ifp->if_snd);
@@ -2239,8 +2239,7 @@ mvpp2_rx_refill(struct mvpp2_port *sc)
 	KASSERT(pool < sc->sc->sc_npools);
 	bm = &sc->sc->sc_bm_pools[pool];
 
-	while (bm->free_cons != bm->free_prod) {
-		KASSERT(bm->freelist[bm->free_cons] != -1);
+	while (bm->freelist[bm->free_cons] != -1) {
 		virt = bm->freelist[bm->free_cons];
 		KASSERT(((virt >> 16) & 0xffff) == pool);
 		KASSERT((virt & 0xffff) < MVPP2_BM_SIZE);
@@ -2277,10 +2276,9 @@ mvpp2_up(struct mvpp2_port *sc)
 		sfp_enable(sc->sc_sfp);
 		rw_exit(&mvpp2_sff_lock);
 	}
-	
-	memcpy(sc->sc_cur_lladdr, sc->sc_lladdr, ETHER_ADDR_LEN);
+
 	mvpp2_prs_mac_da_accept(sc, etherbroadcastaddr, 1);
-	mvpp2_prs_mac_da_accept(sc, sc->sc_cur_lladdr, 1);
+	mvpp2_prs_mac_da_accept(sc, sc->sc_lladdr, 1);
 	mvpp2_prs_tag_mode_set(sc->sc, sc->sc_id, MVPP2_TAG_TYPE_MH);
 	mvpp2_prs_def_flow(sc);
 
@@ -2359,7 +2357,7 @@ mvpp2_txq_hw_init(struct mvpp2_port *sc, struct mvpp2_tx_queue *txq)
 	uint32_t reg;
 	int i;
 
-	txq->prod = txq->cons = txq->cnt = 0;
+	txq->prod = txq->cons = 0;
 //	txq->last_desc = txq->size - 1;
 
 	txq->ring = mvpp2_dmamem_alloc(sc->sc,
@@ -2877,7 +2875,6 @@ mvpp2_down(struct mvpp2_port *sc)
 
 	ifp->if_flags &= ~IFF_RUNNING;
 	ifq_clr_oactive(&ifp->if_snd);
-	ifp->if_timer = 0;
 
 	mvpp2_egress_disable(sc);
 	mvpp2_ingress_disable(sc);
@@ -2901,8 +2898,6 @@ mvpp2_down(struct mvpp2_port *sc)
 
 	for (i = 0; i < sc->sc_nrxq; i++)
 		mvpp2_rxq_hw_deinit(sc, &sc->sc_rxqs[i]);
-
-	mvpp2_prs_mac_da_accept(sc, sc->sc_cur_lladdr, 0);
 
 	if (sc->sc_sfp) {
 		rw_enter(&mvpp2_sff_lock, RW_WRITE);
@@ -3060,12 +3055,40 @@ mvpp2_rxq_short_pool_set(struct mvpp2_port *port, int lrxq, int pool)
 void
 mvpp2_iff(struct mvpp2_port *sc)
 {
-	/* FIXME: multicast handling */
+	struct arpcom *ac = &sc->sc_ac;
+	struct ifnet *ifp = &sc->sc_ac.ac_if;
+	struct ether_multi *enm;
+	struct ether_multistep step;
 
-	if (memcmp(sc->sc_cur_lladdr, sc->sc_lladdr, ETHER_ADDR_LEN) != 0) {
-		mvpp2_prs_mac_da_accept(sc, sc->sc_cur_lladdr, 0);
-		memcpy(sc->sc_cur_lladdr, sc->sc_lladdr, ETHER_ADDR_LEN);
-		mvpp2_prs_mac_da_accept(sc, sc->sc_cur_lladdr, 1);
+	ifp->if_flags &= ~IFF_ALLMULTI;
+
+	/* Removes all but broadcast and (new) lladdr */
+	mvpp2_prs_mac_del_all(sc);
+
+	if (ifp->if_flags & IFF_PROMISC) {
+		mvpp2_prs_mac_promisc_set(sc->sc, sc->sc_id,
+		    MVPP2_PRS_L2_UNI_CAST, 1);
+		mvpp2_prs_mac_promisc_set(sc->sc, sc->sc_id,
+		    MVPP2_PRS_L2_MULTI_CAST, 1);
+		return;
+	}
+
+	mvpp2_prs_mac_promisc_set(sc->sc, sc->sc_id,
+	    MVPP2_PRS_L2_UNI_CAST, 0);
+	mvpp2_prs_mac_promisc_set(sc->sc, sc->sc_id,
+	    MVPP2_PRS_L2_MULTI_CAST, 0);
+
+	if (ac->ac_multirangecnt > 0 ||
+	    ac->ac_multicnt > MVPP2_PRS_MAC_MC_FILT_MAX) {
+		ifp->if_flags |= IFF_ALLMULTI;
+		mvpp2_prs_mac_promisc_set(sc->sc, sc->sc_id,
+		    MVPP2_PRS_L2_MULTI_CAST, 1);
+	} else {
+		ETHER_FIRST_MULTI(step, ac, enm);
+		while (enm != NULL) {
+			mvpp2_prs_mac_da_accept(sc, enm->enm_addrlo, 1);
+			ETHER_NEXT_MULTI(step, enm);
+		}
 	}
 }
 
@@ -4345,7 +4368,7 @@ mvpp2_prs_mac_da_range_find(struct mvpp2_softc *sc, int pmap, const uint8_t *da,
 	struct mvpp2_prs_entry pe;
 	int tid;
 
-	for (tid = MVPP2_PE_FIRST_FREE_TID; tid <= MVPP2_PE_LAST_FREE_TID;
+	for (tid = MVPP2_PE_MAC_RANGE_START; tid <= MVPP2_PE_MAC_RANGE_END;
 	    tid++) {
 		uint32_t entry_pmap;
 
@@ -4381,8 +4404,8 @@ mvpp2_prs_mac_da_accept(struct mvpp2_port *port, const uint8_t *da, int add)
 		if (!add)
 			return 0;
 
-		tid = mvpp2_prs_tcam_first_free(sc, MVPP2_PE_FIRST_FREE_TID,
-		    MVPP2_PE_LAST_FREE_TID);
+		tid = mvpp2_prs_tcam_first_free(sc, MVPP2_PE_MAC_RANGE_START,
+		    MVPP2_PE_MAC_RANGE_END);
 		if (tid < 0)
 			return tid;
 
@@ -4430,6 +4453,40 @@ mvpp2_prs_mac_da_accept(struct mvpp2_port *port, const uint8_t *da, int add)
 	mvpp2_prs_hw_write(sc, &pe);
 
 	return 0;
+}
+
+void
+mvpp2_prs_mac_del_all(struct mvpp2_port *port)
+{
+	struct mvpp2_softc *sc = port->sc;
+	struct mvpp2_prs_entry pe;
+	uint32_t pmap;
+	int index, tid;
+
+	for (tid = MVPP2_PE_MAC_RANGE_START; tid <= MVPP2_PE_MAC_RANGE_END;
+	    tid++) {
+		uint8_t da[ETHER_ADDR_LEN], da_mask[ETHER_ADDR_LEN];
+
+		if (!sc->sc_prs_shadow[tid].valid ||
+		    (sc->sc_prs_shadow[tid].lu != MVPP2_PRS_LU_MAC) ||
+		    (sc->sc_prs_shadow[tid].udf != MVPP2_PRS_UDF_MAC_DEF))
+			continue;
+
+		mvpp2_prs_hw_read(sc, &pe, tid);
+		pmap = mvpp2_prs_tcam_port_map_get(&pe);
+
+		if (!(pmap & (1 << port->sc_id)))
+			continue;
+
+		for (index = 0; index < ETHER_ADDR_LEN; index++)
+			mvpp2_prs_tcam_data_byte_get(&pe, index, &da[index],
+			    &da_mask[index]);
+
+		if (ETHER_IS_BROADCAST(da) || ETHER_IS_EQ(da, port->sc_lladdr))
+			continue;
+
+		mvpp2_prs_mac_da_accept(port, da, 0);
+	}
 }
 
 int

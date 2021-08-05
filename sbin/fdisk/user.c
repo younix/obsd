@@ -1,4 +1,4 @@
-/*	$OpenBSD: user.c,v 1.55 2021/05/15 15:20:17 krw Exp $	*/
+/*	$OpenBSD: user.c,v 1.67 2021/07/21 12:22:54 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -33,8 +33,7 @@
 #include "gpt.h"
 #include "disk.h"
 
-/* Our command table */
-struct cmd cmd_table[] = {
+const struct cmd		cmd_table[] = {
 	{"help",   1, Xhelp,   "Command help list"},
 	{"manual", 1, Xmanual, "Show entire OpenBSD man page for fdisk"},
 	{"reinit", 1, Xreinit, "Re-initialize loaded MBR (to defaults)"},
@@ -54,64 +53,53 @@ struct cmd cmd_table[] = {
 };
 
 
-int modified;
+int			modified;
+
+void			ask_cmd(char **, char **);
 
 void
-USER_edit(off_t offset, off_t reloff)
+USER_edit(const uint64_t lba_self, const uint64_t lba_firstembr)
 {
-	static int editlevel;
-	struct dos_mbr dos_mbr;
-	struct mbr mbr;
-	char *cmd, *args;
-	int i, st, efi, error;
+	struct mbr		 mbr;
+	char			*cmd, *args;
+	int			 i, st, error;
+	static int		 editlevel;
 
 	/* One level deeper */
 	editlevel += 1;
 
-	/* Read MBR & partition */
-	error = MBR_read(offset, &dos_mbr);
+	error = MBR_read(lba_self, lba_firstembr, &mbr);
 	if (error == -1)
 		goto done;
 
-	/* Parse the sucker */
-	MBR_parse(&dos_mbr, offset, reloff, &mbr);
-
-	if (editlevel == 1) {
-		memset(&gh, 0, sizeof(gh));
-		memset(&gp, 0, sizeof(gp));
-		efi = MBR_protective_mbr(&mbr);
-		if (efi != -1)
-			GPT_read(ANYGPT);
-	}
+	if (editlevel == 1)
+		GPT_read(ANYGPT);
 
 	printf("Enter 'help' for information\n");
 
-	/* Edit cycle */
 again:
 	do {
-		printf("%s%s: %d> ", disk.name, modified ? "*" : "", editlevel);
+		printf("%s%s: %d> ", disk.dk_name, modified ? "*" : "", editlevel);
 		fflush(stdout);
 		ask_cmd(&cmd, &args);
 
 		if (cmd[0] == '\0')
 			continue;
-		for (i = 0; cmd_table[i].cmd != NULL; i++)
-			if (strstr(cmd_table[i].cmd, cmd) == cmd_table[i].cmd)
+		for (i = 0; cmd_table[i].cmd_name != NULL; i++)
+			if (strstr(cmd_table[i].cmd_name, cmd) == cmd_table[i].cmd_name)
 				break;
 
 		/* Quick hack to put in '?' == 'help' */
 		if (!strcmp(cmd, "?"))
 			i = 0;
 
-		/* Check for valid command */
-		if ((cmd_table[i].cmd == NULL) || (letoh64(gh.gh_sig) ==
-		    GPTSIGNATURE && cmd_table[i].gpt == 0)) {
+		if ((cmd_table[i].cmd_name == NULL) || (letoh64(gh.gh_sig) ==
+		    GPTSIGNATURE && cmd_table[i].cmd_gpt == 0)) {
 			printf("Invalid command '%s'.  Try 'help'.\n", cmd);
 			continue;
 		}
 
-		/* Call function */
-		st = cmd_table[i].fcn(args, &mbr);
+		st = cmd_table[i].cmd_fcn(args, &mbr);
 
 		/* Update status */
 		if (st == CMD_EXIT)
@@ -124,7 +112,6 @@ again:
 			modified = 1;
 	} while (1);
 
-	/* Write out MBR */
 	if (modified) {
 		if (st == CMD_SAVE) {
 			if (Xwrite(NULL, &mbr) == CMD_CONT)
@@ -134,41 +121,32 @@ again:
 	}
 
 done:
-	/* One level less */
 	editlevel -= 1;
 }
 
 void
-USER_print_disk(int verbosity)
+USER_print_disk(const int verbosity)
 {
-	off_t offset, firstoff;
-	int i, efi, error;
-	struct dos_mbr dos_mbr;
-	struct mbr mbr;
+	struct mbr		mbr;
+	uint64_t		lba_self, lba_firstembr;
+	int			i, error;
 
-	offset = firstoff = 0;
+	lba_self = lba_firstembr = 0;
 
 	do {
-		error = MBR_read(offset, &dos_mbr);
+		error = MBR_read(lba_self, lba_firstembr, &mbr);
 		if (error == -1)
 			break;
-		MBR_parse(&dos_mbr, offset, firstoff, &mbr);
-		if (offset == 0) {
-			efi = MBR_protective_mbr(&mbr);
-			if (efi == -1) {
-				/* No valid 0xEE partition means no GPT. */
+		if (lba_self == 0) {
+			if (GPT_read(ANYGPT)) {
 				if (verbosity == VERBOSE) {
 					printf("Primary GPT:\nNot Found\n");
 					printf("\nSecondary GPT:\nNot Found\n");
 				}
 			} else if (verbosity == TERSE) {
-				/* Should already have read one of Primary/Secondary GPT. */
-				if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
-					GPT_print("s", verbosity);
-					return;
-				}
+				GPT_print("s", verbosity);
+				return;
 			} else {
-				/*. Read & print both primary and secondary GPT. */
 				printf("Primary GPT:\n");
 				GPT_read(PRIMARYGPT);
 				if (letoh64(gh.gh_sig) == GPTSIGNATURE)
@@ -188,13 +166,31 @@ USER_print_disk(int verbosity)
 
 		MBR_print(&mbr, NULL);
 
-		/* Print out extended partitions too */
-		for (offset = i = 0; i < 4; i++)
-			if (mbr.part[i].id == DOSPTYP_EXTEND ||
-			    mbr.part[i].id == DOSPTYP_EXTENDL) {
-				offset = (off_t)mbr.part[i].bs;
-				if (firstoff == 0)
-					firstoff = offset;
+		for (lba_self = i = 0; i < 4; i++)
+			if (mbr.mbr_prt[i].prt_id == DOSPTYP_EXTEND ||
+			    mbr.mbr_prt[i].prt_id == DOSPTYP_EXTENDL) {
+				lba_self = mbr.mbr_prt[i].prt_bs;
+				if (lba_firstembr == 0)
+					lba_firstembr = lba_self;
 			}
-	} while (offset);
+	} while (lba_self);
+}
+
+void
+ask_cmd(char **cmd, char **arg)
+{
+	static char		lbuf[100];
+	size_t			cmdstart, cmdend, argstart;
+
+	if (string_from_line(lbuf, sizeof(lbuf)))
+		errx(1, "eof");
+
+	cmdstart = strspn(lbuf, " \t");
+	cmdend = cmdstart + strcspn(&lbuf[cmdstart], " \t");
+	argstart = cmdend + strspn(&lbuf[cmdend], " \t");
+
+	/* *cmd and *arg may be set to point at final NUL! */
+	*cmd = &lbuf[cmdstart];
+	lbuf[cmdend] = '\0';
+	*arg = &lbuf[argstart];
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: socketvar.h,v 1.97 2021/05/21 10:59:02 mvs Exp $	*/
+/*	$OpenBSD: socketvar.h,v 1.100 2021/07/26 05:51:13 mpi Exp $	*/
 /*	$NetBSD: socketvar.h,v 1.18 1996/02/09 18:25:38 christos Exp $	*/
 
 /*-
@@ -147,7 +147,6 @@ struct socket {
 #define	SS_ISDISCONNECTED	0x800	/* socket disconnected from peer */
 
 #define	SS_PRIV			0x080	/* privileged for broadcast, raw... */
-#define	SS_ASYNC		0x200	/* async i/o notify */
 #define	SS_CONNECTOUT		0x1000	/* connect, not accept, at this end */
 #define	SS_ISSENDING		0x2000	/* hint for lower layer */
 #define	SS_DNS			0x4000	/* created using SOCK_DNS socket(2) */
@@ -224,7 +223,7 @@ soreadable(struct socket *so)
     ((so)->so_state & SS_CANTSENDMORE) || (so)->so_error)
 
 /* adjust counters in sb reflecting allocation of m */
-#define	sballoc(sb, m) do {						\
+#define	sballoc(so, sb, m) do {						\
 	(sb)->sb_cc += (m)->m_len;					\
 	if ((m)->m_type != MT_CONTROL && (m)->m_type != MT_SONAME)	\
 		(sb)->sb_datacc += (m)->m_len;				\
@@ -234,7 +233,7 @@ soreadable(struct socket *so)
 } while (/* CONSTCOND */ 0)
 
 /* adjust counters in sb reflecting freeing of m */
-#define	sbfree(sb, m) do {						\
+#define	sbfree(so, sb, m) do {						\
 	(sb)->sb_cc -= (m)->m_len;					\
 	if ((m)->m_type != MT_CONTROL && (m)->m_type != MT_SONAME)	\
 		(sb)->sb_datacc -= (m)->m_len;				\
@@ -288,13 +287,13 @@ int	sbappendaddr(struct socket *, struct sockbuf *,
 int	sbappendcontrol(struct socket *, struct sockbuf *, struct mbuf *,
 	    struct mbuf *);
 void	sbappendrecord(struct socket *, struct sockbuf *, struct mbuf *);
-void	sbcompress(struct sockbuf *, struct mbuf *, struct mbuf *);
+void	sbcompress(struct socket *, struct sockbuf *, struct mbuf *,
+	    struct mbuf *);
 struct mbuf *
 	sbcreatecontrol(const void *, size_t, int, int);
 void	sbdrop(struct socket *, struct sockbuf *, int);
-void	sbdroprecord(struct sockbuf *);
+void	sbdroprecord(struct socket *, struct sockbuf *);
 void	sbflush(struct socket *, struct sockbuf *);
-void	sbinsertoob(struct sockbuf *, struct mbuf *);
 void	sbrelease(struct socket *, struct sockbuf *);
 int	sbcheckreserve(u_long, u_long);
 int	sbchecklowmem(void);
@@ -350,12 +349,12 @@ void	sblastrecordchk(struct sockbuf *, const char *);
 
 void	sblastmbufchk(struct sockbuf *, const char *);
 #define	SBLASTMBUFCHK(sb, where)	sblastmbufchk((sb), (where))
-void	sbcheck(struct sockbuf *);
-#define	SBCHECK(sb)			sbcheck(sb)
+void	sbcheck(struct socket *, struct sockbuf *);
+#define	SBCHECK(so, sb)			sbcheck((so), (sb))
 #else
 #define	SBLASTRECORDCHK(sb, where)	/* nothing */
 #define	SBLASTMBUFCHK(sb, where)	/* nothing */
-#define	SBCHECK(sb)			/* nothing */
+#define	SBCHECK(so, sb)			/* nothing */
 #endif /* SOCKBUF_DEBUG */
 
 #endif /* _KERNEL */

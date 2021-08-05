@@ -31,7 +31,6 @@
 /via8231reg.h/1.4/Wed Oct 26 21:38:28 2005//
 /via82c586.c/1.11/Thu Jun 26 05:42:11 2008//
 /via82c586reg.h/1.5/Fri Jun  8 03:18:04 2001//
-/glxsb.c/1.36/Mon Jun  1 06:23:24 2020//
 /pchb.c/1.92/Mon Jun  1 06:23:24 2020//
 /pci_machdep.h/1.32/Fri Dec 11 17:58:22 2020//
 /vga_post.c/1.10/Sat May  1 08:41:51 2021//
@@ -40,4 +39,5 @@
 /ichpcib.c/1.30/Tue May 18 14:06:16 2021//
 /pci_intr_fixup.c/1.63/Tue May 18 14:06:16 2021//
 /pci_machdep.c/1.87/Tue May 18 14:06:16 2021//
+/glxsb.c/1.37/Thu Aug  5 11:01:43 2021//
 D

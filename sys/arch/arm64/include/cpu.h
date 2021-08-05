@@ -1,4 +1,4 @@
-/* $OpenBSD: cpu.h,v 1.20 2021/05/15 11:30:27 kettenis Exp $ */
+/* $OpenBSD: cpu.h,v 1.22 2021/07/06 09:34:06 kettenis Exp $ */
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
  *
@@ -135,6 +135,8 @@ struct cpu_info {
 #ifdef GPROF
 	struct gmonparam	*ci_gmon;
 #endif
+
+	char			ci_panicbuf[512];
 };
 
 #define CPUF_PRIMARY 		(1<<0)
@@ -159,6 +161,7 @@ extern struct cpu_info *cpu_info_list;
 #ifndef MULTIPROCESSOR
 #define cpu_number()	0
 #define CPU_IS_PRIMARY(ci)	1
+#define CPU_IS_RUNNING(ci)	1
 #define CPU_INFO_ITERATOR	int
 #define CPU_INFO_FOREACH(cii, ci) \
 	for (cii = 0, ci = curcpu(); ci != NULL; ci = NULL)
@@ -168,6 +171,7 @@ extern struct cpu_info *cpu_info_list;
 #else
 #define cpu_number()		(curcpu()->ci_cpuid)
 #define CPU_IS_PRIMARY(ci)	((ci) == &cpu_info_primary)
+#define CPU_IS_RUNNING(ci)	((ci)->ci_flags & CPUF_RUNNING)
 #define CPU_INFO_ITERATOR		int
 #define CPU_INFO_FOREACH(cii, ci)	for (cii = 0, ci = cpu_info_list; \
 					    ci != NULL; ci = ci->ci_next)

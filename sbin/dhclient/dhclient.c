@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhclient.c,v 1.722 2021/05/02 19:16:48 krw Exp $	*/
+/*	$OpenBSD: dhclient.c,v 1.724 2021/07/27 18:35:30 krw Exp $	*/
 
 /*
  * Copyright 2004 Henning Brauer <henning@openbsd.org>
@@ -173,6 +173,7 @@ struct client_lease *packet_to_lease(struct interface_info *,
 void go_daemon(void);
 int rdaemon(int);
 int take_charge(struct interface_info *, int, char *);
+int autoconf(struct interface_info *);
 struct client_lease *get_recorded_lease(struct interface_info *);
 
 #define ROUNDUP(a)	\
@@ -720,7 +721,11 @@ main(int argc, char *argv[])
 		fatal("path_lease_db");
 
 	routefd = get_routefd(ifi->rdomain);
-	fd = take_charge(ifi, routefd, path_lease_db);
+	fd = take_charge(ifi, routefd, path_lease_db);	/* Kill other dhclients. */
+	if (autoconf(ifi)) {
+		/* dhcpleased has been notified to request a new lease. */
+		return 0;
+	}
 	if (fd != -1)
 		read_lease_db(&ifi->lease_db);
 
@@ -2334,9 +2339,9 @@ fork_privchld(struct interface_info *ifi, int fd, int fd2)
 		fatal("socket(AF_ROUTE, SOCK_RAW)");
 
 	if (unveil(_PATH_RESCONF, "wc") == -1)
-		fatal("unveil");
+		fatal("unveil %s", _PATH_RESCONF);
 	if (unveil("/etc/resolv.conf.tail", "r") == -1)
-		fatal("unveil");
+		fatal("unveil /etc/resolve.conf.tail");
 	if (unveil(NULL, NULL) == -1)
 		fatal("unveil");
 
@@ -2507,6 +2512,26 @@ cleanup:
 	free_client_lease(newlease);
 
 	return NULL;
+}
+
+int
+autoconf(struct interface_info *ifi)
+{
+	struct ifreq            ifr;
+	int			ioctlfd;
+
+	if ((ioctlfd = socket(AF_INET, SOCK_DGRAM, 0)) == -1)
+		fatal("socket(AF_INET, SOCK_DGRAM)");
+
+	memset(&ifr, 0, sizeof(ifr));
+	strlcpy(ifr.ifr_name, ifi->name, sizeof(ifr.ifr_name));
+
+	if (ioctl(ioctlfd, SIOCGIFXFLAGS, (caddr_t)&ifr) < 0)
+		fatal("SIOGIFXFLAGS");
+
+	close(ioctlfd);
+
+	return ifr.ifr_flags & IFXF_AUTOCONF4;
 }
 
 int

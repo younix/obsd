@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcidump.c,v 1.64 2021/05/30 02:24:43 jsg Exp $	*/
+/*	$OpenBSD: pcidump.c,v 1.66 2021/07/16 09:14:17 jsg Exp $	*/
 
 /*
  * Copyright (c) 2006, 2007 David Gwynne <loki@animata.net>
@@ -110,7 +110,9 @@ const char *pci_capnames[] = {
 	"PCI Express",
 	"Extended Message Signalled Interrupts (MSI-X)",
 	"SATA",
-	"PCI Advanced Features"
+	"PCI Advanced Features",
+	"Enhanced Allocation",
+	"Flattening Portal Bridge",
 };
 
 const char *pci_enhanced_capnames[] = {
@@ -146,6 +148,23 @@ const char *pci_enhanced_capnames[] = {
 	"Downstream Port Containment",
 	"L1 PM",
 	"Precision Time Measurement",
+	"PCI Express over M-PHY",
+	"FRS Queueing",
+	"Readiness Time Reporting",
+	"Designated Vendor-Specific",
+	"VF Resizable BAR",
+	"Data Link Feature ",
+	"Physical Layer 16.0 GT/s",
+	"Lane Margining at the Receiver",
+	"Hierarchy ID",
+	"Native PCIe Enclosure Management",
+	"Physical Layer 32.0 GT/s",
+	"Alternate Protocol",
+	"System Firmware Intermediary",
+	"Shadow Functions",
+	"Data Object Exchange",
+	"Device 3",
+	"Integrity and Data Encryption",
 };
 
 int
@@ -191,7 +210,7 @@ main(int argc, char *argv[])
 	}
 
 	if (unveil("/dev", "r") == -1)
-		err(1, "unveil");
+		err(1, "unveil /dev");
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 

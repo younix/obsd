@@ -20,7 +20,6 @@
 /eqn_term.c/1.15/Thu Dec 13 05:13:15 2018//
 /html.h/1.70/Sat Apr 18 20:28:46 2020//
 /libman.h/1.61/Mon Dec 31 10:03:38 2018//
-/libmandoc.h/1.64/Fri Apr  3 11:34:19 2020//
 /libmdoc.h/1.88/Mon Dec 31 04:55:42 2018//
 /main.h/1.25/Sun Mar  3 13:01:47 2019//
 /makewhatis.8/1.14/Wed May 17 22:26:52 2017//
@@ -28,7 +27,6 @@
 /man.cgi.8/1.22/Sun May 20 21:48:23 2018//
 /man.conf.5/1.8/Mon Feb 10 14:42:03 2020//
 /man.h/1.59/Thu Aug 23 19:32:03 2018//
-/man_term.c/1.188/Fri Mar 13 00:31:05 2020//
 /mandoc_aux.c/1.9/Wed Feb  7 20:04:33 2018//
 /mandoc_aux.h/1.9/Mon Jun 12 18:55:42 2017//
 /mandoc_ohash.c/1.2/Mon Oct 19 18:58:20 2015//
@@ -43,7 +41,6 @@
 /mdoc.h/1.71/Sun Dec 30 00:48:47 2018//
 /mdoc_argv.c/1.76/Thu Jul 11 16:56:52 2019//
 /mdoc_macro.c/1.191/Sun Jan 19 17:59:01 2020//
-/mdoc_man.c/1.134/Thu Feb 27 01:25:57 2020//
 /mdoc_markdown.c/1.35/Fri Apr  3 11:34:19 2020//
 /mdoc_state.c/1.16/Sun Jan 19 17:59:01 2020//
 /mdoc_term.c/1.279/Mon Apr  6 09:55:49 2020//
@@ -53,7 +50,6 @@
 /out.h/1.25/Fri Apr  3 11:34:19 2020//
 /preconv.c/1.9/Thu Dec 13 11:55:14 2018//
 /predefs.in/1.4/Fri Nov 28 19:25:03 2014//
-/read.c/1.190/Fri Apr 24 11:58:02 2020//
 /roff.h/1.56/Wed Apr  8 11:54:14 2020//
 /roff_html.c/1.20/Tue Apr 30 15:52:42 2019//
 /roff_int.h/1.17/Fri Apr 24 11:58:02 2020//
@@ -72,10 +68,7 @@
 /man.1/1.39/Fri Dec 11 17:58:24 2020//
 /manconf.h/1.9/Fri Dec 11 17:58:24 2020//
 /man_macro.c/1.107/Thu Dec 17 19:39:59 2020//
-/mandoc.h/1.211/Thu Dec 17 19:39:59 2020//
-/mandoc_msg.c/1.10/Thu Dec 17 19:39:59 2020//
 /manpath.c/1.30/Thu Dec 17 19:39:59 2020//
-/roff.c/1.248/Thu Dec 17 19:39:59 2020//
 /roff_term.c/1.21/Thu Dec 17 19:39:59 2020//
 /tbl_layout.c/1.36/Thu Dec 17 19:39:59 2020//
 /term.c/1.142/Thu Dec 17 19:39:59 2020//
@@ -85,17 +78,24 @@
 /man_html.c/1.132/Sat May  1 08:41:52 2021//
 /man_validate.c/1.125/Sat May  1 08:41:52 2021//
 /mandoc.c/1.86/Sat May  1 08:41:52 2021//
-/mdoc_validate.c/1.303/Sat May  1 08:41:52 2021//
 /tbl_term.c/1.62/Sat May  1 08:41:52 2021//
 /arch.c/1.14/Tue May 18 14:06:17 2021//
 /cgi.c/1.113/Tue May 18 14:06:17 2021//
-/main.c/1.256/Tue May 18 14:06:17 2021//
-/mandoc.1/1.174/Tue May 18 14:06:17 2021//
 /mandoc.css/1.35/Tue May 18 14:06:17 2021//
 /mdoc_html.c/1.217/Tue May 18 14:06:17 2021//
 /tbl_html.c/1.30/Tue May 18 14:06:17 2021//
 /term_tag.c/1.6/Tue May 18 14:06:17 2021//
 /term_tag.h/1.4/Tue May 18 14:06:17 2021//
-/html.c/1.144/Sun May 30 15:25:27 2021//
-/tbl_data.c/1.42/Sun May 30 15:25:27 2021//
+/html.c/1.144/Tue Jun  1 14:33:07 2021//
+/libmandoc.h/1.65/Thu Aug  5 11:01:53 2021//
+/main.c/1.257/Thu Aug  5 11:01:53 2021//
+/man_term.c/1.189/Thu Aug  5 11:01:53 2021//
+/mandoc.1/1.178/Thu Aug  5 11:01:53 2021//
+/mandoc.h/1.214/Thu Aug  5 11:01:53 2021//
+/mandoc_msg.c/1.13/Thu Aug  5 11:01:53 2021//
+/mdoc_man.c/1.135/Thu Aug  5 11:01:53 2021//
+/mdoc_validate.c/1.304/Thu Aug  5 11:01:53 2021//
+/read.c/1.191/Thu Aug  5 11:01:53 2021//
+/roff.c/1.249/Thu Aug  5 11:01:53 2021//
+/tbl_data.c/1.42/Tue Jun  1 14:33:07 2021//
 D

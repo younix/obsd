@@ -1,4 +1,4 @@
-/*	$OpenBSD: part.h,v 1.22 2021/05/07 22:15:13 krw Exp $	*/
+/*	$OpenBSD: part.h,v 1.29 2021/07/18 21:40:13 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -20,26 +20,27 @@
 #define _PART_H
 
 struct prt {
-	uint64_t bs;
-	uint64_t ns;
-	uint32_t shead, scyl, ssect;
-	uint32_t ehead, ecyl, esect;
-	unsigned char flag;
-	unsigned char id;
+	uint64_t	prt_bs;
+	uint64_t	prt_ns;
+	uint32_t	prt_shead, prt_scyl, prt_ssect;
+	uint32_t	prt_ehead, prt_ecyl, prt_esect;
+	unsigned char	prt_flag;
+	unsigned char	prt_id;
 };
 
-void	PRT_printall(void);
-const char *PRT_ascii_id(int);
-void PRT_parse(struct dos_partition *, off_t, off_t,
-    struct prt *);
-void PRT_make(struct prt *, off_t, off_t, struct dos_partition *);
-void PRT_print(int, struct prt *, char *);
-char *PRT_uuid_to_typename(struct uuid *);
-int PRT_uuid_to_type(struct uuid *);
-struct uuid *PRT_type_to_uuid(int);
+void		 PRT_printall(void);
+void		 PRT_parse(const struct dos_partition *, const uint64_t,
+    const uint64_t, struct prt *);
+void		 PRT_make(const struct prt *,const uint64_t, const uint64_t,
+    struct dos_partition *);
+void		 PRT_print(const int, const struct prt *, const char *);
+char		*PRT_uuid_to_typename(const struct uuid *);
+int		 PRT_uuid_to_type(const struct uuid *);
+struct uuid	*PRT_type_to_uuid(const int);
+int		 PRT_protected_guid(const struct uuid *);
 
 /* This does CHS -> bs/ns */
-void PRT_fix_BN(struct prt *, int);
+void PRT_fix_BN(struct prt *, const int);
 
 /* This does bs/ns -> CHS */
 void PRT_fix_CHS(struct prt *);

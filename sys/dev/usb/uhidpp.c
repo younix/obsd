@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhidpp.c,v 1.14 2021/05/11 16:40:57 anton Exp $	*/
+/*	$OpenBSD: uhidpp.c,v 1.16 2021/07/28 09:56:54 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>
@@ -247,6 +247,8 @@ struct uhidpp_notification *uhidpp_claim_notification(struct uhidpp_softc *);
 int uhidpp_consume_notification(struct uhidpp_softc *, struct uhidpp_report *);
 int uhidpp_is_notification(struct uhidpp_softc *, struct uhidpp_report *);
 
+static int uhidpp_has_sensors(struct uhidpp_softc *);
+
 int hidpp_get_protocol_version(struct uhidpp_softc  *, uint8_t, uint8_t *,
     uint8_t *);
 
@@ -399,10 +401,6 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 	if (error)
 		printf(" error %d", error);
 
-	strlcpy(sc->sc_sensdev.xname, sc->sc_hdev.sc_dev.dv_xname,
-	    sizeof(sc->sc_sensdev.xname));
-	sensordev_install(&sc->sc_sensdev);
-
 out:
 	mtx_leave(&sc->sc_mtx);
 	printf("\n");
@@ -421,7 +419,7 @@ uhidpp_detach(struct device *self, int flags)
 
 	KASSERT(sc->sc_resp_state == UHIDPP_RESP_NONE);
 
-	if (sc->sc_sensdev.xname[0] != '\0')
+	if (uhidpp_has_sensors(sc))
 		sensordev_deinstall(&sc->sc_sensdev);
 
 	for (i = 0; i < UHIDPP_NDEVICES; i++) {
@@ -607,6 +605,16 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 
 	dev->d_connected = 1;
 
+	/*
+	 * Delay installation of sensors until a device with battery support is
+	 * connected. Allows sensorsd(8) to pick up hotplugged devices.
+	 */
+	if (!uhidpp_has_sensors(sc)) {
+		strlcpy(sc->sc_sensdev.xname, sc->sc_hdev.sc_dev.dv_xname,
+		    sizeof(sc->sc_sensdev.xname));
+		sensordev_install(&sc->sc_sensdev);
+	}
+
 	sens = &dev->d_battery.b_sens[0];
 	strlcpy(sens->desc, "battery level", sizeof(sens->desc));
 	sens->type = SENSOR_PERCENT;
@@ -614,7 +622,7 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 	sensor_attach(&sc->sc_sensdev, sens);
 
 	sens = &dev->d_battery.b_sens[1];
-	strlcpy(sens->desc, "battery levels", sizeof(sens->desc));
+	strlcpy(sens->desc, "number of battery levels", sizeof(sens->desc));
 	sens->type = SENSOR_INTEGER;
 	sens->value = dev->d_battery.b_nlevels;
 	sensor_attach(&sc->sc_sensdev, sens);
@@ -812,6 +820,12 @@ uhidpp_is_notification(struct uhidpp_softc *sc, struct uhidpp_report *rep)
 		return 0;
 
 	return 1;
+}
+
+static int
+uhidpp_has_sensors(struct uhidpp_softc *sc)
+{
+	return sc->sc_sensdev.xname[0] != '\0';
 }
 
 int

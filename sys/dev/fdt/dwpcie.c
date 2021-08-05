@@ -1,4 +1,4 @@
-/*	$OpenBSD: dwpcie.c,v 1.29 2021/05/17 17:25:13 kettenis Exp $	*/
+/*	$OpenBSD: dwpcie.c,v 1.35 2021/06/25 18:55:26 kettenis Exp $	*/
 /*
  * Copyright (c) 2018 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -62,6 +62,7 @@
 #define  IATU_VIEWPORT_INDEX0		0
 #define  IATU_VIEWPORT_INDEX1		1
 #define  IATU_VIEWPORT_INDEX2		2
+#define  IATU_VIEWPORT_INDEX3		3
 #define IATU_OFFSET_VIEWPORT	0x904
 #define IATU_OFFSET_UNROLL(x)	(0x200 * (x))
 #define IATU_REGION_CTRL_1	0x000
@@ -182,16 +183,14 @@ struct dwpcie_softc {
 	struct device		sc_dev;
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
-	bus_space_handle_t	sc_cfg0_ioh;
-	bus_space_handle_t	sc_cfg1_ioh;
 	bus_dma_tag_t		sc_dmat;
 
 	bus_addr_t		sc_ctrl_base;
 	bus_size_t		sc_ctrl_size;
-	bus_addr_t		sc_cfg0_base;
-	bus_size_t		sc_cfg0_size;
-	bus_addr_t		sc_cfg1_base;
-	bus_size_t		sc_cfg1_size;
+
+	bus_addr_t		sc_conf_base;
+	bus_size_t		sc_conf_size;
+	bus_space_handle_t	sc_conf_ioh;
 
 	bus_addr_t		sc_glue_base;
 	bus_size_t		sc_glue_size;
@@ -203,6 +202,9 @@ struct dwpcie_softc {
 	bus_addr_t		sc_mem_base;
 	bus_addr_t		sc_mem_bus_addr;
 	bus_size_t		sc_mem_size;
+	bus_addr_t		sc_pmem_base;
+	bus_addr_t		sc_pmem_bus_addr;
+	bus_size_t		sc_pmem_size;
 
 	int			sc_node;
 	int			sc_acells;
@@ -250,7 +252,8 @@ dwpcie_match(struct device *parent, void *match, void *aux)
 	return (OF_is_compatible(faa->fa_node, "amlogic,g12a-pcie") ||
 	    OF_is_compatible(faa->fa_node, "marvell,armada8k-pcie") ||
 	    OF_is_compatible(faa->fa_node, "fsl,imx8mm-pcie") ||
-	    OF_is_compatible(faa->fa_node, "fsl,imx8mq-pcie"));
+	    OF_is_compatible(faa->fa_node, "fsl,imx8mq-pcie") ||
+	    OF_is_compatible(faa->fa_node, "sifive,fu740-pcie"));
 }
 
 void	dwpcie_attach_deferred(struct device *);
@@ -269,6 +272,8 @@ int	dwpcie_g12a_link_up(struct dwpcie_softc *);
 
 int	dwpcie_imx8mq_init(struct dwpcie_softc *);
 int	dwpcie_imx8mq_intr(void *);
+
+int	dwpcie_fu740_init(struct dwpcie_softc *);
 
 void	dwpcie_attach_hook(struct device *, struct device *,
 	    struct pcibus_attach_args *);
@@ -318,10 +323,8 @@ dwpcie_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	sc->sc_cfg0_base = faa->fa_reg[config].addr;
-	sc->sc_cfg0_size = faa->fa_reg[config].size / 2;
-	sc->sc_cfg0_base = faa->fa_reg[config].addr + sc->sc_cfg0_size;
-	sc->sc_cfg1_size = sc->sc_cfg0_size;
+	sc->sc_conf_base = faa->fa_reg[config].addr;
+	sc->sc_conf_size = faa->fa_reg[config].size;
 
 	if (OF_is_compatible(faa->fa_node, "amlogic,g12a-pcie")) {
 		glue = OF_getindex(faa->fa_node, "cfg", "reg-names");
@@ -392,18 +395,8 @@ dwpcie_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	if (bus_space_map(sc->sc_iot, sc->sc_cfg0_base,
-	    sc->sc_cfg1_size, 0, &sc->sc_cfg0_ioh)) {
-		bus_space_unmap(sc->sc_iot, sc->sc_ioh, sc->sc_ctrl_size);
-		free(sc->sc_ranges, M_TEMP, sc->sc_nranges *
-		    sizeof(struct dwpcie_range));
-		printf(": can't map config registers\n");
-		return;
-	}
-
-	if (bus_space_map(sc->sc_iot, sc->sc_cfg1_base,
-	    sc->sc_cfg1_size, 0, &sc->sc_cfg1_ioh)) {
-		bus_space_unmap(sc->sc_iot, sc->sc_cfg0_ioh, sc->sc_cfg0_size);
+	if (bus_space_map(sc->sc_iot, sc->sc_conf_base,
+	    sc->sc_conf_size, 0, &sc->sc_conf_ioh)) {
 		bus_space_unmap(sc->sc_iot, sc->sc_ioh, sc->sc_ctrl_size);
 		free(sc->sc_ranges, M_TEMP, sc->sc_nranges *
 		    sizeof(struct dwpcie_range));
@@ -428,6 +421,7 @@ dwpcie_attach_deferred(struct device *self)
 	struct pcibus_attach_args pba;
 	bus_addr_t iobase, iolimit;
 	bus_addr_t membase, memlimit;
+	bus_addr_t pmembase, pmemlimit;
 	uint32_t bus_range[2];
 	pcireg_t bir, blr, csr;
 	int i, error = 0;
@@ -439,9 +433,10 @@ dwpcie_attach_deferred(struct device *self)
 	if (OF_is_compatible(sc->sc_node, "fsl,imx8mm-pcie") ||
 	    OF_is_compatible(sc->sc_node, "fsl,imx8mq-pcie"))
 		error = dwpcie_imx8mq_init(sc);
+	if (OF_is_compatible(sc->sc_node, "sifive,fu740-pcie"))
+		error = dwpcie_fu740_init(sc);
 	if (error != 0) {
-		bus_space_unmap(sc->sc_iot, sc->sc_cfg1_ioh, sc->sc_cfg1_size);
-		bus_space_unmap(sc->sc_iot, sc->sc_cfg0_ioh, sc->sc_cfg0_size);
+		bus_space_unmap(sc->sc_iot, sc->sc_conf_ioh, sc->sc_conf_size);
 		bus_space_unmap(sc->sc_iot, sc->sc_ioh, sc->sc_ctrl_size);
 		free(sc->sc_ranges, M_TEMP, sc->sc_nranges *
 		    sizeof(struct dwpcie_range));
@@ -456,7 +451,6 @@ dwpcie_attach_deferred(struct device *self)
 	}
 
 	/* Set up address translation for I/O space. */
-	sc->sc_io_bus_addr = sc->sc_mem_bus_addr = -1;
 	for (i = 0; i < sc->sc_nranges; i++) {
 		if ((sc->sc_ranges[i].flags & 0x03000000) == 0x01000000 &&
 		    sc->sc_ranges[i].size > 0) {
@@ -470,15 +464,37 @@ dwpcie_attach_deferred(struct device *self)
 			sc->sc_mem_bus_addr = sc->sc_ranges[i].pci_base;
 			sc->sc_mem_size = sc->sc_ranges[i].size;
 		}
+		if ((sc->sc_ranges[i].flags & 0x03000000) == 0x03000000 &&
+		    sc->sc_ranges[i].size > 0) {
+			sc->sc_pmem_base = sc->sc_ranges[i].phys_base;
+			sc->sc_pmem_bus_addr = sc->sc_ranges[i].pci_base;
+			sc->sc_pmem_size = sc->sc_ranges[i].size;
+		}
 	}
+	if (sc->sc_mem_size == 0) {
+		printf("%s: no memory mapped I/O window\n",
+		    sc->sc_dev.dv_xname);
+		return;
+	}
+
+	/*
+	 * Disable prefetchable memory mapped I/O window if we don't
+	 * have enough viewports to enable it.
+	 */
+	if (sc->sc_num_viewport < 4)
+		sc->sc_pmem_size = 0;
 
 	dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX0,
 	    IATU_REGION_CTRL_1_TYPE_MEM, sc->sc_mem_base,
 	    sc->sc_mem_bus_addr, sc->sc_mem_size);
-	if (sc->sc_num_viewport > 2)
+	if (sc->sc_num_viewport > 2 && sc->sc_io_size > 0)
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX2,
 		    IATU_REGION_CTRL_1_TYPE_IO, sc->sc_io_base,
 		    sc->sc_io_bus_addr, sc->sc_io_size);
+	if (sc->sc_num_viewport > 3 && sc->sc_pmem_size > 0)
+		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX3,
+		    IATU_REGION_CTRL_1_TYPE_MEM, sc->sc_pmem_base,
+		    sc->sc_pmem_bus_addr, sc->sc_pmem_size);
 
 	/* Enable modification of read-only bits. */
 	HSET4(sc, MISC_CONTROL_1, MISC_CONTROL_1_DBI_RO_WR_EN);
@@ -491,6 +507,10 @@ dwpcie_attach_deferred(struct device *self)
 	/* Clear BAR as U-Boot seems to leave garbage in it. */
 	HWRITE4(sc, PCI_MAPREG_START, PCI_MAPREG_MEM_TYPE_64BIT);
 	HWRITE4(sc, PCI_MAPREG_START + 4, 0);
+
+	/* Enable 32-bit I/O addressing. */
+	HSET4(sc, PPB_REG_IOSTATUS,
+	    PPB_IO_32BIT | (PPB_IO_32BIT << PPB_IOLIMIT_SHIFT));
 
 	/* Make sure read-only bits are write-protected. */
 	HCLR4(sc, MISC_CONTROL_1, MISC_CONTROL_1_DBI_RO_WR_EN);
@@ -510,16 +530,6 @@ dwpcie_attach_deferred(struct device *self)
 	bir |= (bus_range[1] << 16);
 	HWRITE4(sc, PPB_REG_BUSINFO, bir);
 
-	/* Initialize I/O window. */
-	iobase = sc->sc_io_bus_addr;
-	iolimit = iobase + sc->sc_io_size - 1;
-	blr = iolimit & PPB_IO_MASK;
-	blr |= (iobase >> PPB_IO_SHIFT);
-	HWRITE4(sc, PPB_REG_IOSTATUS, blr);
-	blr = (iobase & 0xffff0000) >> 16;
-	blr |= iolimit & 0xffff0000;
-	HWRITE4(sc, PPB_REG_IO_HI, blr);
-
 	/* Initialize memory mapped I/O window. */
 	membase = sc->sc_mem_bus_addr;
 	memlimit = membase + sc->sc_mem_size - 1;
@@ -527,16 +537,39 @@ dwpcie_attach_deferred(struct device *self)
 	blr |= (membase >> PPB_MEM_SHIFT);
 	HWRITE4(sc, PPB_REG_MEM, blr);
 
-	/* Reset prefetchable memory mapped I/O window. */
-	HWRITE4(sc, PPB_REG_PREFMEM, 0x0000ffff);
-	HWRITE4(sc, PPB_REG_PREFBASE_HI32, 0);
-	HWRITE4(sc, PPB_REG_PREFLIM_HI32, 0);
+	/* Initialize I/O window. */
+	if (sc->sc_io_size > 0) {
+		iobase = sc->sc_io_bus_addr;
+		iolimit = iobase + sc->sc_io_size - 1;
+		blr = iolimit & PPB_IO_MASK;
+		blr |= (iobase >> PPB_IO_SHIFT);
+		HWRITE4(sc, PPB_REG_IOSTATUS, blr);
+		blr = (iobase & 0xffff0000) >> 16;
+		blr |= iolimit & 0xffff0000;
+		HWRITE4(sc, PPB_REG_IO_HI, blr);
+	} else {
+		HWRITE4(sc, PPB_REG_IOSTATUS, 0x000000ff);
+		HWRITE4(sc, PPB_REG_IO_HI, 0x0000ffff);
+	}
 
-	csr = PCI_COMMAND_MASTER_ENABLE;
-	if (iolimit > iobase)
+	/* Initialize prefetchable memory mapped I/O window. */
+	if (sc->sc_pmem_size > 0) {
+		pmembase = sc->sc_pmem_bus_addr;
+		pmemlimit = pmembase + sc->sc_pmem_size - 1;
+		blr = pmemlimit & PPB_MEM_MASK;
+		blr |= (pmembase >> PPB_MEM_SHIFT);
+		HWRITE4(sc, PPB_REG_PREFMEM, blr);
+		HWRITE4(sc, PPB_REG_PREFBASE_HI32, pmembase >> 32);
+		HWRITE4(sc, PPB_REG_PREFLIM_HI32, pmemlimit >> 32);
+	} else {
+		HWRITE4(sc, PPB_REG_PREFMEM, 0x0000ffff);
+		HWRITE4(sc, PPB_REG_PREFBASE_HI32, 0);
+		HWRITE4(sc, PPB_REG_PREFLIM_HI32, 0);
+	}
+
+	csr = PCI_COMMAND_MASTER_ENABLE | PCI_COMMAND_MEM_ENABLE;
+	if (sc->sc_io_size > 0)
 		csr |= PCI_COMMAND_IO_ENABLE;
-	if (memlimit > membase)
-		csr |= PCI_COMMAND_MEM_ENABLE;
 	HWRITE4(sc, PCI_COMMAND_STATUS_REG, csr);
 
 	memcpy(&sc->sc_bus_iot, sc->sc_iot, sizeof(sc->sc_bus_iot));
@@ -1012,6 +1045,14 @@ dwpcie_imx8mq_intr(void *arg)
 	return 0;
 }
 
+int
+dwpcie_fu740_init(struct dwpcie_softc *sc)
+{
+	sc->sc_num_viewport = 8;
+
+	return 0;
+}
+
 void
 dwpcie_atu_config(struct dwpcie_softc *sc, int index, int type,
     uint64_t cpu_addr, uint64_t pci_addr, uint64_t size)
@@ -1110,18 +1151,20 @@ dwpcie_conf_read(void *v, pcitag_t tag, int reg)
 	if (bus == sc->sc_bus + 1) {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_CFG0,
-		    sc->sc_cfg0_base, tag, sc->sc_cfg0_size);
-		ret = bus_space_read_4(sc->sc_iot, sc->sc_cfg0_ioh, reg);
+		    sc->sc_conf_base, tag, sc->sc_conf_size);
 	} else {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_CFG1,
-		    sc->sc_cfg1_base, tag, sc->sc_cfg1_size);
-		ret = bus_space_read_4(sc->sc_iot, sc->sc_cfg1_ioh, reg);
+		    sc->sc_conf_base, tag, sc->sc_conf_size);
 	}
-	if (sc->sc_num_viewport <= 2)
+
+	ret = bus_space_read_4(sc->sc_iot, sc->sc_conf_ioh, reg);
+
+	if (sc->sc_num_viewport <= 2 && sc->sc_io_size > 0) {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_IO, sc->sc_io_base,
 		    sc->sc_io_bus_addr, sc->sc_io_size);
+	}
 
 	return ret;
 }
@@ -1142,18 +1185,20 @@ dwpcie_conf_write(void *v, pcitag_t tag, int reg, pcireg_t data)
 	if (bus == sc->sc_bus + 1) {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_CFG0,
-		    sc->sc_cfg0_base, tag, sc->sc_cfg0_size);
-		bus_space_write_4(sc->sc_iot, sc->sc_cfg0_ioh, reg, data);
+		    sc->sc_conf_base, tag, sc->sc_conf_size);
 	} else {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_CFG1,
-		    sc->sc_cfg1_base, tag, sc->sc_cfg1_size);
-		bus_space_write_4(sc->sc_iot, sc->sc_cfg1_ioh, reg, data);
+		    sc->sc_conf_base, tag, sc->sc_conf_size);
 	}
-	if (sc->sc_num_viewport <= 2)
+
+	bus_space_write_4(sc->sc_iot, sc->sc_conf_ioh, reg, data);
+
+	if (sc->sc_num_viewport <= 2 && sc->sc_io_size > 0) {
 		dwpcie_atu_config(sc, IATU_VIEWPORT_INDEX1,
 		    IATU_REGION_CTRL_1_TYPE_IO, sc->sc_io_base,
 		    sc->sc_io_bus_addr, sc->sc_io_size);
+	}
 }
 
 int
@@ -1161,9 +1206,15 @@ dwpcie_probe_device_hook(void *v, struct pci_attach_args *pa)
 {
 	struct dwpcie_softc *sc = v;
 	uint16_t rid;
+	int i;
 
 	rid = pci_requester_id(pa->pa_pc, pa->pa_tag);
 	pa->pa_dmat = iommu_device_map_pci(sc->sc_node, rid, pa->pa_dmat);
+
+	for (i = 0; i < sc->sc_nranges; i++) {
+		iommu_reserve_region_pci(sc->sc_node, rid,
+		    sc->sc_ranges[i].pci_base, sc->sc_ranges[i].size);
+	}
 
 	return 0;
 }
@@ -1306,7 +1357,7 @@ dwpcie_bs_iomap(bus_space_tag_t t, bus_addr_t addr, bus_size_t size,
 			    addr - pci_start + phys_start, size, flags, bshp);
 		}
 	}
-	
+
 	return ENXIO;
 }
 
@@ -1322,12 +1373,12 @@ dwpcie_bs_memmap(bus_space_tag_t t, bus_addr_t addr, bus_size_t size,
 		uint64_t pci_end = pci_start + sc->sc_ranges[i].size;
 		uint64_t phys_start = sc->sc_ranges[i].phys_base;
 
-		if ((sc->sc_ranges[i].flags & 0x03000000) == 0x02000000 &&
+		if ((sc->sc_ranges[i].flags & 0x02000000) == 0x02000000 &&
 		    addr >= pci_start && addr + size <= pci_end) {
 			return bus_space_map(sc->sc_iot,
 			    addr - pci_start + phys_start, size, flags, bshp);
 		}
 	}
-	
+
 	return ENXIO;
 }

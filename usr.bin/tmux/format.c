@@ -1,4 +1,4 @@
-/* $OpenBSD: format.c,v 1.283 2021/04/12 06:50:25 nicm Exp $ */
+/* $OpenBSD: format.c,v 1.288 2021/07/13 22:09:29 nicm Exp $ */
 
 /*
  * Copyright (c) 2011 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -103,7 +103,7 @@ format_job_cmp(struct format_job *fj1, struct format_job *fj2)
 #define FORMAT_CHARACTER 0x10000
 
 /* Limit on recursion. */
-#define FORMAT_LOOP_LIMIT 10
+#define FORMAT_LOOP_LIMIT 100
 
 /* Format expand flags. */
 #define FORMAT_EXPAND_TIME 0x1
@@ -371,9 +371,6 @@ format_job_get(struct format_expand_state *es, const char *cmd)
 		fj->client = ft->client;
 		fj->tag = ft->tag;
 		fj->cmd = xstrdup(cmd);
-		fj->expanded = NULL;
-
-		xasprintf(&fj->out, "<'%s' not ready>", fj->cmd);
 
 		RB_INSERT(format_job_tree, jobs, fj);
 	}
@@ -402,11 +399,14 @@ format_job_get(struct format_expand_state *es, const char *cmd)
 		}
 		fj->last = t;
 		fj->updated = 0;
-	}
+	} else if (fj->job != NULL && (t - fj->last) > 1 && fj->out == NULL)
+		xasprintf(&fj->out, "<'%s' not ready>", fj->cmd);
 	free(expanded);
 
 	if (ft->flags & FORMAT_STATUS)
 		fj->status = 1;
+	if (fj->out == NULL)
+		return (xstrdup(""));
 	return (format_expand1(&next, fj->out));
 }
 
@@ -3991,7 +3991,7 @@ format_replace_expression(struct format_modifier *mexp,
 		result = (mleft < mright);
 		break;
 	case LESS_THAN_EQUAL:
-		result = (mleft > mright);
+		result = (mleft <= mright);
 		break;
 	}
 	if (use_fp)
@@ -4199,7 +4199,7 @@ format_replace(struct format_expand_state *es, const char *key, size_t keylen,
 			value = xstrdup("0");
 		} else {
 			format_log(es, "search '%s' pane %%%u", new, wp->id);
-			value = format_search(fm, wp, new);
+			value = format_search(search, wp, new);
 		}
 		free(new);
 	} else if (cmp != NULL) {
@@ -4441,8 +4441,10 @@ format_expand1(struct format_expand_state *es, const char *fmt)
 	if (fmt == NULL || *fmt == '\0')
 		return (xstrdup(""));
 
-	if (es->loop == FORMAT_LOOP_LIMIT)
+	if (es->loop == FORMAT_LOOP_LIMIT) {
+		format_log(es, "reached loop limit (%u)", FORMAT_LOOP_LIMIT);
 		return (xstrdup(""));
+	}
 	es->loop++;
 
 	format_log(es, "expanding format: %s", fmt);
@@ -4807,7 +4809,8 @@ format_grid_word(struct grid *gd, u_int x, u_int y)
 		grid_get_cell(gd, x, y, &gc);
 		if (gc.flags & GRID_FLAG_PADDING)
 			break;
-		if (utf8_cstrhas(ws, &gc.data)) {
+		if (utf8_cstrhas(ws, &gc.data) ||
+		    (gc.data.size == 1 && *gc.data.data == ' ')) {
 			found = 1;
 			break;
 		}
@@ -4844,7 +4847,8 @@ format_grid_word(struct grid *gd, u_int x, u_int y)
 		grid_get_cell(gd, x, y, &gc);
 		if (gc.flags & GRID_FLAG_PADDING)
 			break;
-		if (utf8_cstrhas(ws, &gc.data))
+		if (utf8_cstrhas(ws, &gc.data) ||
+		    (gc.data.size == 1 && *gc.data.data == ' '))
 			break;
 
 		ud = xreallocarray(ud, size + 2, sizeof *ud);

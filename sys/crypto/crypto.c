@@ -1,4 +1,4 @@
-/*	$OpenBSD: crypto.c,v 1.82 2020/03/30 17:48:39 krw Exp $	*/
+/*	$OpenBSD: crypto.c,v 1.85 2021/07/26 21:27:56 bluhm Exp $	*/
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -27,16 +27,23 @@
 
 #include <crypto/cryptodev.h>
 
-void crypto_init(void);
+/*
+ * Locks used to protect struct members in this file:
+ *	A	allocated during driver attach, no hotplug, no detach
+ *	I	immutable after creation
+ *	K	kernel lock
+ */
 
-struct cryptocap *crypto_drivers = NULL;
-int crypto_drivers_num = 0;
+struct cryptocap *crypto_drivers;	/* [A] array allocated by driver
+					   [K] driver data and session count */
+int crypto_drivers_num = 0;		/* [A] attached drivers array size */
 
-struct pool cryptop_pool;
-struct pool cryptodesc_pool;
+struct pool cryptop_pool;		/* [I] set of crypto descriptors */
 
-struct taskq *crypto_taskq;
-struct taskq *crypto_taskq_mpsafe;
+struct taskq *crypto_taskq;		/* [I] run crypto_invoke() and callback
+					       with kernel lock */
+struct taskq *crypto_taskq_mpsafe;	/* [I] run crypto_invoke()
+					       without kernel lock */
 
 /*
  * Create a new session.
@@ -51,6 +58,8 @@ crypto_newsession(u_int64_t *sid, struct cryptoini *cri, int hard)
 
 	if (crypto_drivers == NULL)
 		return EINVAL;
+
+	KERNEL_ASSERT_LOCKED();
 
 	s = splvm();
 
@@ -186,6 +195,8 @@ crypto_freesession(u_int64_t sid)
 	if (hid >= crypto_drivers_num)
 		return ENOENT;
 
+	KERNEL_ASSERT_LOCKED();
+
 	s = splvm();
 
 	if (crypto_drivers[hid].cc_sessions)
@@ -215,6 +226,9 @@ crypto_get_driverid(u_int8_t flags)
 {
 	struct cryptocap *newdrv;
 	int i, s;
+
+	/* called from attach routines */
+	KERNEL_ASSERT_LOCKED();
 	
 	s = splvm();
 
@@ -241,39 +255,33 @@ crypto_get_driverid(u_int8_t flags)
 	}
 
 	/* Out of entries, allocate some more. */
-	if (i == crypto_drivers_num) {
-		if (crypto_drivers_num >= CRYPTO_DRIVERS_MAX) {
-			splx(s);
-			return -1;
-		}
-
-		newdrv = mallocarray(crypto_drivers_num,
-		    2 * sizeof(struct cryptocap), M_CRYPTO_DATA, M_NOWAIT);
-		if (newdrv == NULL) {
-			splx(s);
-			return -1;
-		}
-
-		memcpy(newdrv, crypto_drivers,
-		    crypto_drivers_num * sizeof(struct cryptocap));
-		bzero(&newdrv[crypto_drivers_num],
-		    crypto_drivers_num * sizeof(struct cryptocap));
-
-		newdrv[i].cc_sessions = 1; /* Mark */
-		newdrv[i].cc_flags = flags;
-
-		free(crypto_drivers, M_CRYPTO_DATA,
-		    crypto_drivers_num * sizeof(struct cryptocap));
-
-		crypto_drivers_num *= 2;
-		crypto_drivers = newdrv;
+	if (crypto_drivers_num >= CRYPTO_DRIVERS_MAX) {
 		splx(s);
-		return i;
+		return -1;
 	}
 
-	/* Shouldn't really get here... */
+	newdrv = mallocarray(crypto_drivers_num,
+	    2 * sizeof(struct cryptocap), M_CRYPTO_DATA, M_NOWAIT);
+	if (newdrv == NULL) {
+		splx(s);
+		return -1;
+	}
+
+	memcpy(newdrv, crypto_drivers,
+	    crypto_drivers_num * sizeof(struct cryptocap));
+	bzero(&newdrv[crypto_drivers_num],
+	    crypto_drivers_num * sizeof(struct cryptocap));
+
+	newdrv[i].cc_sessions = 1; /* Mark */
+	newdrv[i].cc_flags = flags;
+
+	free(crypto_drivers, M_CRYPTO_DATA,
+	    crypto_drivers_num * sizeof(struct cryptocap));
+
+	crypto_drivers_num *= 2;
+	crypto_drivers = newdrv;
 	splx(s);
-	return -1;
+	return i;
 }
 
 /*
@@ -287,11 +295,13 @@ crypto_register(u_int32_t driverid, int *alg,
 {
 	int s, i;
 
-
 	if (driverid >= crypto_drivers_num || alg == NULL ||
 	    crypto_drivers == NULL)
 		return EINVAL;
 	
+	/* called from attach routines */
+	KERNEL_ASSERT_LOCKED();
+
 	s = splvm();
 
 	for (i = 0; i <= CRYPTO_ALGORITHM_MAX; i++) {
@@ -326,6 +336,9 @@ crypto_unregister(u_int32_t driverid, int alg)
 {
 	int i = CRYPTO_ALGORITHM_MAX + 1, s;
 	u_int32_t ses;
+
+	/* may be called from detach routines, but not used */
+	KERNEL_ASSERT_LOCKED();
 
 	s = splvm();
 
@@ -374,26 +387,35 @@ crypto_unregister(u_int32_t driverid, int alg)
 int
 crypto_dispatch(struct cryptop *crp)
 {
-	struct taskq *tq = crypto_taskq;
-	int s;
+	int error = 0, lock = 1, s;
 	u_int32_t hid;
 
 	s = splvm();
 	hid = (crp->crp_sid >> 32) & 0xffffffff;
 	if (hid < crypto_drivers_num) {
 		if (crypto_drivers[hid].cc_flags & CRYPTOCAP_F_MPSAFE)
-			tq = crypto_taskq_mpsafe;
+			lock = 0;
 	}
 	splx(s);
 
-	if (tq && !(crp->crp_flags & CRYPTO_F_NOQUEUE)) {
+	/* XXXSMP crypto_invoke() is not MP safe */
+	lock = 1;
+
+	if (crp->crp_flags & CRYPTO_F_NOQUEUE) {
+		if (lock)
+			KERNEL_LOCK();
+		error = crypto_invoke(crp);
+		if (lock)
+			KERNEL_UNLOCK();
+	} else {
+		struct taskq *tq;
+
+		tq = lock ? crypto_taskq : crypto_taskq_mpsafe;
 		task_set(&crp->crp_task, (void (*))crypto_invoke, crp);
 		task_add(tq, &crp->crp_task);
-	} else {
-		crypto_invoke(crp);
 	}
 
-	return 0;
+	return error;
 }
 
 /*
@@ -410,6 +432,8 @@ crypto_invoke(struct cryptop *crp)
 	/* Sanity checks. */
 	if (crp == NULL || crp->crp_callback == NULL)
 		return EINVAL;
+
+	KERNEL_ASSERT_LOCKED();
 
 	s = splvm();
 	if (crp->crp_ndesc < 1 || crypto_drivers == NULL) {
@@ -522,11 +546,16 @@ void
 crypto_done(struct cryptop *crp)
 {
 	crp->crp_flags |= CRYPTO_F_DONE;
+
 	if (crp->crp_flags & CRYPTO_F_NOQUEUE) {
 		/* not from the crypto queue, wakeup the userland process */
 		crp->crp_callback(crp);
 	} else {
+		struct taskq *tq;
+
+		tq = (crp->crp_flags & CRYPTO_F_MPSAFE) ?
+		    crypto_taskq_mpsafe : crypto_taskq;
 		task_set(&crp->crp_task, (void (*))crp->crp_callback, crp);
-		task_add(crypto_taskq, &crp->crp_task);
+		task_add(tq, &crp->crp_task);
 	}
 }

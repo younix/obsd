@@ -1,5 +1,4 @@
 /COPYRIGHT/1.1/Fri Feb  7 09:58:52 2020//
-/host.1/1.1/Fri Feb  7 09:58:52 2020//
 /nslookup.1/1.1/Fri Feb  7 09:58:52 2020//
 D/lib////
 /Makefile/1.4/Thu Dec 17 19:39:59 2020//
@@ -9,3 +8,4 @@ D/lib////
 /host.c/1.17/Sat May  1 08:41:52 2021//
 /nslookup.c/1.13/Sat May  1 08:41:52 2021//
 /dig.1/1.5/Tue May 18 14:06:17 2021//
+/host.1/1.2/Thu Aug  5 11:01:52 2021//

@@ -1,4 +1,4 @@
-#	$OpenBSD: sshsig.sh,v 1.4 2020/03/13 03:18:45 djm Exp $
+#	$OpenBSD: sshsig.sh,v 1.6 2021/07/23 03:54:55 djm Exp $
 #	Placed in the Public Domain.
 
 tid="sshsig"
@@ -12,12 +12,13 @@ sig_namespace="test-$$"
 sig_principal="user-$$@example.com"
 
 # Make a "wrong key"
-${SSHKEYGEN} -t ed25519 -f $OBJ/wrong-key -C "wrong trousers, Grommit" -N '' \
+${SSHKEYGEN} -q -t ed25519 -f $OBJ/wrong-key \
+	-C "wrong trousers, Grommit" -N '' \
 	|| fatal "couldn't generate key"
 WRONG=$OBJ/wrong-key.pub
 
 # Make a CA key.
-${SSHKEYGEN} -t ed25519 -f $OBJ/sigca-key -C "CA" -N '' \
+${SSHKEYGEN} -q -t ed25519 -f $OBJ/sigca-key -C "CA" -N '' \
 	|| fatal "couldn't generate key"
 CA_PRIV=$OBJ/sigca-key
 CA_PUB=$OBJ/sigca-key.pub
@@ -106,6 +107,34 @@ for t in $SIGNKEYS; do
 		< $DATA >/dev/null 2>&1 && \
 		fail "accepted signature for $t key with excluded namespace"
 
+	( printf "$sig_principal " ;
+	  printf "valid-after=\"19800101\",valid-before=\"19900101\" " ;
+	  cat $pubkey) > $OBJ/allowed_signers
+
+	# key lifespan valid
+	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
+		-I $sig_principal -f $OBJ/allowed_signers \
+		-Overify-time=19850101 \
+		< $DATA >/dev/null 2>&1 || \
+		fail "failed signature for $t key with valid expiry interval"
+	# key not yet valid
+	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
+		-I $sig_principal -f $OBJ/allowed_signers \
+		-Overify-time=19790101 \
+		< $DATA >/dev/null 2>&1 && \
+		fail "failed signature for $t not-yet-valid key"
+	# key expired
+	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
+		-I $sig_principal -f $OBJ/allowed_signers \
+		-Overify-time=19910101 \
+		< $DATA >/dev/null 2>&1 && \
+		fail "failed signature for $t with expired key"
+	# NB. assumes we're not running this test in the 1980s
+	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
+		-I $sig_principal -f $OBJ/allowed_signers \
+		< $DATA >/dev/null 2>&1 && \
+		fail "failed signature for $t with expired key"
+
 	# public key in revoked keys file
 	cat $pubkey > $OBJ/revoked_keys
 	(printf "$sig_principal namespaces=\"whatever\" " ;
@@ -116,7 +145,7 @@ for t in $SIGNKEYS; do
 		< $DATA >/dev/null 2>&1 && \
 		fail "accepted signature for $t key, but key is in revoked_keys"
 
-	# public key not revoked, but other are present in revoked_keysfile
+	# public key not revoked, but others are present in revoked_keysfile
 	cat $WRONG > $OBJ/revoked_keys
 	(printf "$sig_principal " ; cat $pubkey) > $OBJ/allowed_signers
 	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
@@ -168,7 +197,7 @@ for t in $SIGNKEYS; do
 		fail "failed signature for $t cert"
 
 	# signing key listed as cert-authority
-	(printf "$sig_principal cert-authority" ;
+	(printf "$sig_principal cert-authority " ;
 	 cat $pubkey) > $OBJ/allowed_signers
 	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
 		-I $sig_principal -f $OBJ/allowed_signers \
@@ -183,7 +212,7 @@ for t in $SIGNKEYS; do
 		fail "accepted signature for $t cert with CA not marked"
 
 	# mismatch between cert principal and file
-	(printf "josef.k@example.com cert-authority" ;
+	(printf "josef.k@example.com cert-authority " ;
 	 cat $CA_PUB) > $OBJ/allowed_signers
 	${SSHKEYGEN} -vvv -Y verify -s $sigfile -n $sig_namespace \
 		-I $sig_principal -f $OBJ/allowed_signers \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.1 2021/05/04 16:38:06 kettenis Exp $	*/
+/*	$OpenBSD: clock.c,v 1.3 2021/07/24 22:41:09 jca Exp $	*/
 
 /*
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -28,7 +28,7 @@
 
 #include <riscv64/dev/riscv_cpu_intc.h>
 
-extern uint32_t tb_freq;	/* machdep.c */
+extern uint64_t tb_freq;	/* machdep.c */
 
 uint64_t tick_increment;
 uint64_t statmin;
@@ -47,6 +47,7 @@ static struct timecounter tb_timecounter = {
 	.tc_name = "tb",
 	.tc_quality = 0,
 	.tc_priv = NULL,
+	.tc_user = TC_TB,
 };
 
 void	cpu_startclock(void);

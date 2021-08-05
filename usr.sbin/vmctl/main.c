@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.65 2021/05/12 20:13:00 dv Exp $	*/
+/*	$OpenBSD: main.c,v 1.68 2021/07/12 15:09:22 beck Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -95,14 +95,9 @@ __dead void
 usage(void)
 {
 	extern char	*__progname;
-	int		 i;
 
-	fprintf(stderr, "usage:\t%s [-v] command [arg ...]\n",
-	    __progname);
-	for (i = 0; ctl_commands[i].name != NULL; i++) {
-		fprintf(stderr, "\t%s %s %s\n", __progname,
-		    ctl_commands[i].name, ctl_commands[i].usage);
-	}
+	fprintf(stderr, "usage:\t%s [-v] command [arg ...]\n", __progname);
+
 	exit(1);
 }
 
@@ -202,7 +197,7 @@ vmmaction(struct parse_result *res)
 
 	if (ctl_sock == -1) {
 		if (unveil(SOCKET_NAME, "r") == -1)
-			err(1, "unveil");
+			err(1, "unveil %s", SOCKET_NAME);
 		if ((ctl_sock = socket(AF_UNIX,
 		    SOCK_STREAM|SOCK_CLOEXEC, 0)) == -1)
 			err(1, "socket");
@@ -1028,7 +1023,7 @@ ctl_openconsole(const char *name)
 {
 	closefrom(STDERR_FILENO + 1);
 	if (unveil(VMCTL_CU, "x") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s", VMCTL_CU);
 	execl(VMCTL_CU, VMCTL_CU, "-r", "-l", name, "-s", "115200",
 	    (char *)NULL);
 	err(1, "failed to open the console");

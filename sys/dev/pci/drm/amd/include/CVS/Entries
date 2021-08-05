@@ -4,7 +4,6 @@
 /atom-names.h/1.1/Tue May 21 22:40:09 2019//
 /atom-types.h/1.1/Tue May 21 22:40:09 2019//
 /atomfirmwareid.h/1.1/Tue May 21 22:40:09 2019//
-/cgs_common.h/1.1/Tue May 21 22:40:09 2019//
 /displayobject.h/1.1/Tue May 21 22:40:09 2019//
 /dm_pp_interface.h/1.1/Tue May 21 22:40:09 2019//
 /pptable.h/1.1/Tue May 21 22:40:09 2019//
@@ -13,22 +12,24 @@
 D/asic_reg////
 D/ivsrcid////
 /amd_acpi.h/1.2/Fri Dec 11 17:58:23 2020//
-/amd_shared.h/1.2/Fri Dec 11 17:58:23 2020//
 /arct_ip_offset.h/1.1/Fri Dec 11 17:58:23 2020//
 /atombios.h/1.2/Fri Dec 11 17:58:23 2020//
-/atomfirmware.h/1.2/Fri Dec 11 17:58:23 2020//
 /cik_structs.h/1.2/Fri Dec 11 17:58:23 2020//
 /discovery.h/1.1/Fri Dec 11 17:58:23 2020//
-/kgd_kfd_interface.h/1.2/Fri Dec 11 17:58:23 2020//
-/kgd_pp_interface.h/1.2/Fri Dec 11 17:58:23 2020//
-/navi10_enum.h/1.1/Fri Dec 11 17:58:23 2020//
 /navi10_ip_offset.h/1.1/Fri Dec 11 17:58:23 2020//
 /navi12_ip_offset.h/1.1/Fri Dec 11 17:58:23 2020//
 /navi14_ip_offset.h/1.1/Fri Dec 11 17:58:23 2020//
 /renoir_ip_offset.h/1.1/Fri Dec 11 17:58:23 2020//
 /soc15_hw_ip.h/1.2/Fri Dec 11 17:58:23 2020//
-/soc15_ih_clientid.h/1.2/Fri Dec 11 17:58:23 2020//
 /v10_structs.h/1.1/Fri Dec 11 17:58:23 2020//
 /v9_structs.h/1.2/Fri Dec 11 17:58:23 2020//
 /vega10_enum.h/1.2/Fri Dec 11 17:58:23 2020//
 /vi_structs.h/1.2/Fri Dec 11 17:58:23 2020//
+/amd_shared.h/1.3/Thu Aug  5 11:01:47 2021//
+/atomfirmware.h/1.3/Thu Aug  5 11:01:47 2021//
+/cgs_common.h/1.2/Thu Aug  5 11:01:47 2021//
+/kgd_kfd_interface.h/1.3/Thu Aug  5 11:01:47 2021//
+/kgd_pp_interface.h/1.3/Thu Aug  5 11:01:47 2021//
+/navi10_enum.h/1.2/Thu Aug  5 11:01:47 2021//
+/sienna_cichlid_ip_offset.h/1.1/Wed Jul  7 02:38:28 2021//
+/soc15_ih_clientid.h/1.3/Thu Aug  5 11:01:47 2021//

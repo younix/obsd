@@ -1,4 +1,4 @@
-#	$OpenBSD: dot.profile,v 1.44 2019/04/27 22:08:58 kn Exp $
+#	$OpenBSD: dot.profile,v 1.46 2021/07/21 03:53:50 kn Exp $
 #	$NetBSD: dot.profile,v 1.1 1995/12/18 22:54:43 pk Exp $
 #
 # Copyright (c) 2009 Kenneth R. Westerback
@@ -54,8 +54,14 @@ if [[ -z $DONEPROFILE ]]; then
 	# Create a fake rc that just returns 1 and throws us back.
 	echo ! : >/etc/rc
 
-	# Start IPv6 stateless address autoconfiguration daemon.
-	[[ -x /sbin/slaacd ]] && /sbin/slaacd
+	# Create working directories with proper permissions in /tmp.
+	mkdir -m u=rwx,go=rx -p /tmp/{ai,i}
+
+	# Start autoconfiguration daemons.
+	# Hide legit "already running" errors when reentering the installer.
+	[[ -x /sbin/resolvd ]] && /sbin/resolvd 2>/dev/null
+	[[ -x /sbin/dhcpleased ]] && /sbin/dhcpleased 2>/dev/null
+	[[ -x /sbin/slaacd ]] && /sbin/slaacd 2>/dev/null
 
 	# Set up some sane tty defaults.
 	echo 'erase ^?, werase ^W, kill ^U, intr ^C, status ^T'
@@ -65,10 +71,6 @@ if [[ -z $DONEPROFILE ]]; then
 
 Welcome to the $OBSD installation program.
 __EOT
-
-	# Create working directories with proper permissions in /tmp.
-	mkdir -m u=rwx,go=rx -p /tmp/{ai,i}
-
 	# try unattended install
 	/autoinstall -x
 

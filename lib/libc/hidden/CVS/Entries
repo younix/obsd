@@ -21,7 +21,6 @@
 /langinfo.h/1.2/Tue Sep  5 03:16:13 2017//
 /link_elf.h/1.1/Sun Jun  2 01:03:01 2019//
 /locale.h/1.2/Tue Sep  5 03:16:13 2017//
-/login_cap.h/1.1/Sun Sep 13 19:58:50 2015//
 /math.h/1.1/Tue Oct 27 05:54:49 2015//
 /md5.h/1.2/Sun Sep 13 08:59:03 2015//
 /ndbm.h/1.1/Sat Sep 12 15:20:52 2015//
@@ -65,3 +64,4 @@ D/rpcsvc////
 D/sys////
 /time.h/1.7/Fri Dec 11 17:58:18 2020//
 /dlfcn.h/1.4/Sat May  1 08:41:50 2021//
+/login_cap.h/1.2/Thu Aug  5 11:01:21 2021//

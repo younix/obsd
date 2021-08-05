@@ -12,7 +12,6 @@
 /bfdt.texi/1.2/Sun Jun 19 22:35:43 2016//
 /bfdwin.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /cache.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
-/chew.c/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /coffcode.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /core.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /doc.str/1.1.1.1/Sun Apr 24 20:14:44 2011//
@@ -33,4 +32,5 @@
 /section.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /syms.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
 /targets.texi/1.1.1.1/Sun Apr 24 20:14:44 2011//
+/chew.c/1.2/Thu Aug  5 11:01:03 2021//
 D

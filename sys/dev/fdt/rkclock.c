@@ -1,4 +1,4 @@
-/*	$OpenBSD: rkclock.c,v 1.55 2021/04/07 16:35:02 kettenis Exp $	*/
+/*	$OpenBSD: rkclock.c,v 1.58 2021/07/28 13:39:39 patrick Exp $	*/
 /*
  * Copyright (c) 2017, 2018 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -243,6 +243,7 @@ void	rk3328_reset(void *, uint32_t *, int);
 void	rk3399_init(struct rkclock_softc *);
 uint32_t rk3399_get_frequency(void *, uint32_t *);
 int	rk3399_set_frequency(void *, uint32_t *, uint32_t);
+int	rk3399_set_parent(void *, uint32_t *, uint32_t *);
 void	rk3399_enable(void *, uint32_t *, int);
 void	rk3399_reset(void *, uint32_t *, int);
 
@@ -285,7 +286,7 @@ struct rkclock_compat rkclock_compat[] = {
 	{
 		"rockchip,rk3399-cru", 1, rk3399_init,
 		rk3399_enable, rk3399_get_frequency,
-		rk3399_set_frequency, NULL,
+		rk3399_set_frequency, rk3399_set_parent,
 		rk3399_reset
 	},
 	{
@@ -2194,6 +2195,29 @@ struct rkclock rk3399_clocks[] = {
 		{ RK3399_PLL_CPLL, RK3399_PLL_GPLL, RK3399_PLL_NPLL }
 	},
 	{
+		RK3399_CLK_UPHY0_TCPDCORE, RK3399_CRU_CLKSEL_CON(64),
+		SEL(7, 6), DIV(4, 0),
+		{ RK3399_XIN24M, RK3399_CLK_32K, RK3399_PLL_CPLL,
+		  RK3399_PLL_GPLL }
+	},
+	{
+		RK3399_CLK_UPHY1_TCPDCORE, RK3399_CRU_CLKSEL_CON(65),
+		SEL(7, 6), DIV(4, 0),
+		{ RK3399_XIN24M, RK3399_CLK_32K, RK3399_PLL_CPLL,
+		  RK3399_PLL_GPLL }
+	},
+	{
+		RK3399_CLK_PCIEPHY_REF, RK3399_CRU_CLKSEL_CON(18),
+		SEL(10, 10), 0,
+		{ RK3399_XIN24M, RK3399_CLK_PCIEPHY_REF100M },
+		SET_PARENT
+	},
+	{
+		RK3399_CLK_PCIEPHY_REF100M, RK3399_CRU_CLKSEL_CON(18),
+		0, DIV(15, 11),
+		{ RK3399_PLL_NPLL }
+	},
+	{
 		RK3399_DCLK_VOP0, RK3399_CRU_CLKSEL_CON(49),
 		SEL(11, 11), 0,
 		{ RK3399_DCLK_VOP0_DIV, RK3399_DCLK_VOP0_FRAC },
@@ -2756,17 +2780,50 @@ rk3399_set_frequency(void *cookie, uint32_t *cells, uint32_t freq)
 	return rkclock_set_frequency(sc, idx, freq);
 }
 
+
+int
+rk3399_set_parent(void *cookie, uint32_t *cells, uint32_t *pcells)
+{
+	struct rkclock_softc *sc = cookie;
+
+	if (pcells[0] != sc->sc_phandle)
+		return -1;
+
+	return rkclock_set_parent(sc, cells[0], pcells[1]);
+}
+
 void
 rk3399_enable(void *cookie, uint32_t *cells, int on)
 {
+	struct rkclock_softc *sc = cookie;
 	uint32_t idx = cells[0];
 
 	/*
-	 * All clocks are enabled by default, so there is nothing for
-	 * us to do until we start disabling clocks.
+	 * All clocks are enabled upon hardware reset, but on some boards the
+	 * firmware will disable some of them.  Handle those here.
 	 */
-	if (!on)
+	if (!on) {
 		printf("%s: 0x%08x\n", __func__, idx);
+		return;
+	}
+
+	switch (idx) {
+	case RK3399_ACLK_GMAC:
+		HWRITE4(sc, RK3399_CRU_CLKGATE_CON(32), (1 << 0) << 16);
+		break;
+	case RK3399_PCLK_GMAC:
+		HWRITE4(sc, RK3399_CRU_CLKGATE_CON(32), (1 << 2) << 16);
+		break;
+	case RK3399_CLK_MAC:
+		HWRITE4(sc, RK3399_CRU_CLKGATE_CON(5), (1 << 5) << 16);
+		break;
+	case RK3399_CLK_MAC_RX:
+		HWRITE4(sc, RK3399_CRU_CLKGATE_CON(5), (1 << 8) << 16);
+		break;
+	case RK3399_CLK_MAC_TX:
+		HWRITE4(sc, RK3399_CRU_CLKGATE_CON(5), (1 << 9) << 16);
+		break;
+	}
 }
 
 void

@@ -1,4 +1,4 @@
-/* $OpenBSD: options-table.c,v 1.140 2021/03/11 06:41:04 nicm Exp $ */
+/* $OpenBSD: options-table.c,v 1.147 2021/08/04 08:07:19 nicm Exp $ */
 
 /*
  * Copyright (c) 2011 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -74,6 +74,9 @@ static const char *options_table_remain_on_exit_list[] = {
 };
 static const char *options_table_detach_on_destroy_list[] = {
 	"off", "on", "no-detached", NULL
+};
+static const char *options_table_extended_keys_list[] = {
+	"off", "on", "always", NULL
 };
 
 /* Status line format. */
@@ -231,7 +234,7 @@ const struct options_table_entry options_table[] = {
 	{ .name = "default-terminal",
 	  .type = OPTIONS_TABLE_STRING,
 	  .scope = OPTIONS_TABLE_SERVER,
-	  .default_str = "screen",
+	  .default_str = TMUX_TERM,
 	  .text = "Default for the 'TERM' environment variable."
 	},
 
@@ -267,8 +270,9 @@ const struct options_table_entry options_table[] = {
 	},
 
 	{ .name = "extended-keys",
-	  .type = OPTIONS_TABLE_FLAG,
+	  .type = OPTIONS_TABLE_CHOICE,
 	  .scope = OPTIONS_TABLE_SERVER,
+	  .choices = options_table_extended_keys_list,
 	  .default_num = 0,
 	  .text = "Whether to request extended key sequences from terminals "
 	          "that support it."
@@ -296,6 +300,15 @@ const struct options_table_entry options_table[] = {
 	  .maximum = INT_MAX,
 	  .default_num = 1000,
 	  .text = "Maximum number of server messages to keep."
+	},
+
+	{ .name = "prompt-history-limit",
+	  .type = OPTIONS_TABLE_NUMBER,
+	  .scope = OPTIONS_TABLE_SERVER,
+	  .minimum = 0,
+	  .maximum = INT_MAX,
+	  .default_num = 100,
+	  .text = "Maximum number of commands to keep in history."
 	},
 
 	{ .name = "set-clipboard",
@@ -355,7 +368,7 @@ const struct options_table_entry options_table[] = {
 	  .maximum = INT_MAX,
 	  .default_num = 1,
 	  .unit = "milliseconds",
-	  .text = "Maximum time between input to assume it pasting rather "
+	  .text = "Maximum time between input to assume it is pasting rather "
 		  "than typing."
 	},
 
@@ -602,7 +615,7 @@ const struct options_table_entry options_table[] = {
 	  .text = "Formats for the status lines. "
 		  "Each array member is the format for one status line. "
 		  "The default status line is made up of several components "
-		  "which may be configured individually with other option such "
+		  "which may be configured individually with other options such "
 		  "as 'status-left'."
 	},
 
@@ -742,7 +755,11 @@ const struct options_table_entry options_table[] = {
 	{ .name = "word-separators",
 	  .type = OPTIONS_TABLE_STRING,
 	  .scope = OPTIONS_TABLE_SESSION,
-	  .default_str = " ",
+	  /*
+	   * The set of non-alphanumeric printable ASCII characters minus the
+	   * underscore.
+	   */
+	  .default_str = "!\"#$%&'()*+,-./:;<=>?@[\\]^`{|}~",
 	  .text = "Characters considered to separate words."
 	},
 
@@ -935,7 +952,8 @@ const struct options_table_entry options_table[] = {
 	  .scope = OPTIONS_TABLE_WINDOW,
 	  .choices = options_table_pane_lines_list,
 	  .default_num = PANE_LINES_SINGLE,
-	  .text = "Type of the pane type lines."
+	  .text = "Type of characters used to draw pane border lines. Some of "
+	          "these are only supported on terminals with UTF-8 support."
 	},
 
 	{ .name = "pane-border-status",
@@ -1127,6 +1145,7 @@ const struct options_table_entry options_table[] = {
 	OPTIONS_TABLE_HOOK("alert-activity", ""),
 	OPTIONS_TABLE_HOOK("alert-bell", ""),
 	OPTIONS_TABLE_HOOK("alert-silence", ""),
+	OPTIONS_TABLE_HOOK("client-active", ""),
 	OPTIONS_TABLE_HOOK("client-attached", ""),
 	OPTIONS_TABLE_HOOK("client-detached", ""),
 	OPTIONS_TABLE_HOOK("client-resized", ""),
@@ -1143,10 +1162,10 @@ const struct options_table_entry options_table[] = {
 	OPTIONS_TABLE_HOOK("session-renamed", ""),
 	OPTIONS_TABLE_HOOK("session-window-changed", ""),
 	OPTIONS_TABLE_WINDOW_HOOK("window-layout-changed", ""),
-	OPTIONS_TABLE_WINDOW_HOOK("window-linked", ""),
+	OPTIONS_TABLE_HOOK("window-linked", ""),
 	OPTIONS_TABLE_WINDOW_HOOK("window-pane-changed", ""),
 	OPTIONS_TABLE_WINDOW_HOOK("window-renamed", ""),
-	OPTIONS_TABLE_WINDOW_HOOK("window-unlinked", ""),
+	OPTIONS_TABLE_HOOK("window-unlinked", ""),
 
 	{ .name = NULL }
 };

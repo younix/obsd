@@ -1,4 +1,4 @@
-/*	$OpenBSD: ldapd.c,v 1.27 2021/01/27 22:12:28 rob Exp $ */
+/*	$OpenBSD: ldapd.c,v 1.29 2021/07/14 13:33:57 kn Exp $ */
 
 /*
  * Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
@@ -183,7 +183,6 @@ main(int argc, char *argv[])
 
 	log_setverbose(verbose);
 	stats.started_at = time(0);
-	tls_init();
 
 	if (parse_config(conffile) != 0)
 		exit(2);
@@ -237,15 +236,15 @@ main(int argc, char *argv[])
 	    ldapd_needfd);
 
 	if (unveil(_PATH_NOLOGIN, "r") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s", _PATH_NOLOGIN);
 	if (unveil(_PATH_LOGIN_CONF, "r") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s", _PATH_LOGIN_CONF);
 	if (unveil(_PATH_LOGIN_CONF ".db", "r") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s.db", _PATH_LOGIN_CONF);
 	if (unveil(_PATH_AUTHPROGDIR, "x") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s", _PATH_AUTHPROGDIR);
 	if (unveil(datadir, "rw") == -1)
-		err(1, "unveil");
+		err(1, "unveil %s", datadir);
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 

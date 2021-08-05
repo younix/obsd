@@ -1,4 +1,4 @@
-/* $OpenBSD: dtls_locl.h,v 1.1 2021/05/16 13:56:30 jsing Exp $ */
+/* $OpenBSD: dtls_locl.h,v 1.4 2021/07/26 03:17:38 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -93,11 +93,6 @@ struct hm_header_st {
 	struct dtls1_retransmit_state saved_retransmit_state;
 };
 
-struct ccs_header_st {
-	unsigned char type;
-	unsigned short seq;
-};
-
 struct dtls1_timeout_st {
 	/* Number of read timeouts so far */
 	unsigned int read_timeouts;
@@ -156,9 +151,8 @@ typedef struct dtls1_state_internal_st {
 
 	unsigned short handshake_read_seq;
 
-	/* Received handshake records (processed and unprocessed) */
+	/* Received handshake records (unprocessed) */
 	record_pqueue unprocessed_rcds;
-	record_pqueue processed_rcds;
 
 	/* Buffered handshake messages */
 	struct _pqueue *buffered_messages;
@@ -213,6 +207,9 @@ void dtls1_set_message_header_int(SSL *s, unsigned char mt,
     unsigned long len, unsigned short seq_num, unsigned long frag_off,
     unsigned long frag_len);
 
+int do_dtls1_write(SSL *s, int type, const unsigned char *buf,
+    unsigned int len);
+
 int dtls1_write_app_data_bytes(SSL *s, int type, const void *buf, int len);
 int dtls1_write_bytes(SSL *s, int type, const void *buf, int len);
 
@@ -225,7 +222,6 @@ int dtls1_retransmit_buffered_messages(SSL *s);
 void dtls1_clear_record_buffer(SSL *s);
 int dtls1_get_message_header(unsigned char *data,
     struct hm_header_st *msg_hdr);
-void dtls1_get_ccs_header(unsigned char *data, struct ccs_header_st *ccs_hdr);
 void dtls1_reset_read_seq_numbers(SSL *s);
 struct timeval* dtls1_get_timeout(SSL *s, struct timeval* timeleft);
 int dtls1_check_timeout_num(SSL *s);
@@ -244,7 +240,6 @@ long dtls1_ctrl(SSL *s, int cmd, long larg, void *parg);
 
 long dtls1_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok);
 int dtls1_get_record(SSL *s);
-int dtls1_dispatch_alert(SSL *s);
 
 __END_HIDDEN_DECLS
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwmvar.h,v 1.63 2021/06/01 13:21:08 stsp Exp $	*/
+/*	$OpenBSD: if_iwmvar.h,v 1.69 2021/07/08 17:14:08 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014 genua mbh <info@genua.de>

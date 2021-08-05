@@ -1,4 +1,4 @@
-/* $OpenBSD: engine.c,v 1.27 2021/02/06 06:19:28 tb Exp $	 */
+/* $OpenBSD: engine.c,v 1.29 2021/07/02 15:34:16 millert Exp $	 */
 /*
  * Copyright (c) 2001, 2007 Can Erkin Acar <canacar@openbsd.org>
  *
@@ -27,6 +27,7 @@
 #include <string.h>
 #include <term.h>
 #include <unistd.h>
+#include <math.h>
 #include <err.h>
 
 /* XXX These are defined in term.h and conflict with our variable names */
@@ -50,7 +51,9 @@ struct view_ent {
 	TAILQ_ENTRY(view_ent) entries;
 };
 
-useconds_t udelay = 5000000;
+static struct timespec ts_delay = { 5, 0 };
+static struct itimerval it_delay = { { 0, 0 }, { 5, 0 } };
+
 int dispstart = 0;
 int humanreadable = 0;
 int interactive = 1;
@@ -91,6 +94,8 @@ char cmdbuf[MAX_LINE_BUF];
 int cmd_len = -1;
 struct command *curr_cmd = NULL;
 char *curr_message = NULL;
+enum message_mode message_mode = MESSAGE_NONE;
+int message_cont = 1;
 
 void print_cmdline(void);
 
@@ -1145,14 +1150,26 @@ command_set(struct command *cmd, const char *init)
 	return prev;
 }
 
+void
+message_toggle(enum message_mode mode)
+{
+	message_mode = message_mode != mode ? mode : MESSAGE_NONE;
+	need_update = 1;
+	message_cont = 1;
+}
+
 const char *
-message_set(const char *msg) {
-	char *prev = curr_message;
-	if (msg)
+message_set(const char *msg)
+{
+	free(curr_message);
+
+	if (msg) {
 		curr_message = strdup(msg);
-	else
+		message_cont = 0;
+	} else {
 		curr_message = NULL;
-	free(prev);
+		message_cont = 1;
+	}
 	return NULL;
 }
 
@@ -1341,7 +1358,7 @@ engine_loop(int countmax)
 			read_view();
 			need_sort = 1;
 			gotsig_alarm = 0;
-			ualarm(udelay, 0);
+			setitimer(ITIMER_REAL, &it_delay, NULL);
 		}
 
 		if (need_sort) {
@@ -1352,7 +1369,7 @@ engine_loop(int countmax)
 			/* XXX if sort took too long */
 			if (gotsig_alarm) {
 				gotsig_alarm = 0;
-				ualarm(udelay, 0);
+				setitimer(ITIMER_REAL, &it_delay, NULL);
 			}
 		}
 
@@ -1361,6 +1378,22 @@ engine_loop(int countmax)
 			if (!averageonly ||
 			    (averageonly && count == countmax - 1))
 				disp_update();
+			if (message_cont) {
+				switch (message_mode) {
+				case MESSAGE_NONE:
+					message_set(NULL);
+					break;
+				case MESSAGE_HELP:
+					show_help();
+					break;
+				case MESSAGE_VIEW:
+					show_view();
+					break;
+				case MESSAGE_ORDER:
+					show_order();
+					break;
+				}
+			}
 			end_page();
 			need_update = 0;
 			if (countmax && ++count >= countmax)
@@ -1378,7 +1411,7 @@ engine_loop(int countmax)
 		if (interactive && need_update == 0)
 			keyboard();
 		else if (interactive == 0)
-			usleep(udelay);
+			nanosleep(&ts_delay, NULL);
 	}
 
 	if (rawmode == 0)
@@ -1426,4 +1459,17 @@ check_termcap(void)
 		return(1);
 
 	return(0);
+}
+
+void
+refresh_delay(double delay)
+{
+	double secs, frac;
+
+	frac = modf(delay, &secs);
+	ts_delay.tv_sec = secs;
+	ts_delay.tv_nsec = frac * 1000000000.0;
+	if (!timespecisset(&ts_delay))
+		ts_delay.tv_nsec = 1000000000;
+	TIMESPEC_TO_TIMEVAL(&it_delay.it_value, &ts_delay);
 }

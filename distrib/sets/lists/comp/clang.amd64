@@ -1,6 +1,8 @@
 ./usr/bin/lldb
 ./usr/bin/lldb-server
 ./usr/bin/llvm-config
+./usr/bin/llvm-objcopy
+./usr/bin/llvm-objdump
 ./usr/include/c++
 ./usr/include/c++/v1
 ./usr/include/c++/v1/__bit_reference
@@ -1836,8 +1838,8 @@
 ./usr/lib/clang/11.1.0/include/avxintrin.h
 ./usr/lib/clang/11.1.0/include/bmi2intrin.h
 ./usr/lib/clang/11.1.0/include/bmiintrin.h
-./usr/lib/clang/11.1.0/include/cetintrin.h
 ./usr/lib/clang/11.1.0/include/cet.h
+./usr/lib/clang/11.1.0/include/cetintrin.h
 ./usr/lib/clang/11.1.0/include/cldemoteintrin.h
 ./usr/lib/clang/11.1.0/include/clflushoptintrin.h
 ./usr/lib/clang/11.1.0/include/clwbintrin.h
@@ -1907,3 +1909,5 @@
 ./usr/share/man/man1/ld.lld.1
 ./usr/share/man/man1/lldb.1
 ./usr/share/man/man1/llvm-config.1
+./usr/share/man/man1/llvm-objcopy.1
+./usr/share/man/man1/llvm-objdump.1

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.1118 2021/06/01 09:57:11 dlg Exp $ */
+/*	$OpenBSD: pf.c,v 1.1122 2021/07/07 18:38:25 sashan Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -99,6 +99,8 @@
 
 #if NPFSYNC > 0
 #include <net/if_pfsync.h>
+#else
+struct pfsync_deferral;
 #endif /* NPFSYNC > 0 */
 
 #ifdef DDB
@@ -194,7 +196,8 @@ void			 pf_rule_to_actions(struct pf_rule *,
 			    struct pf_rule_actions *);
 int			 pf_test_rule(struct pf_pdesc *, struct pf_rule **,
 			    struct pf_state **, struct pf_rule **,
-			    struct pf_ruleset **, u_short *);
+			    struct pf_ruleset **, u_short *,
+			    struct pfsync_deferral **);
 static __inline int	 pf_create_state(struct pf_pdesc *, struct pf_rule *,
 			    struct pf_rule *, struct pf_rule *,
 			    struct pf_state_key **, struct pf_state_key **,
@@ -259,6 +262,7 @@ void			 pf_state_key_link_inpcb(struct pf_state_key *,
 void			 pf_state_key_unlink_inpcb(struct pf_state_key *);
 void			 pf_inpcb_unlink_state_key(struct inpcb *);
 void			 pf_pktenqueue_delayed(void *);
+int32_t			 pf_state_expires(const struct pf_state *, uint8_t);
 
 #if NPFLOG > 0
 void			 pf_log_matches(struct pf_pdesc *, struct pf_rule *,
@@ -308,7 +312,7 @@ static __inline void pf_set_protostate(struct pf_state *, int, u_int8_t);
 struct pf_src_tree tree_src_tracking;
 
 struct pf_state_tree_id tree_id;
-struct pf_state_queue state_list;
+struct pf_state_list pf_state_list = PF_STATE_LIST_INITIALIZER(pf_state_list);
 
 RB_GENERATE(pf_src_tree, pf_src_node, entry, pf_src_compare);
 RB_GENERATE(pf_state_tree, pf_state_key, entry, pf_state_compare_key);
@@ -438,6 +442,37 @@ int
 pf_check_threshold(struct pf_threshold *threshold)
 {
 	return (threshold->count > threshold->limit);
+}
+
+void
+pf_state_list_insert(struct pf_state_list *pfs, struct pf_state *st)
+{
+	/*
+	 * we can always put states on the end of the list.
+	 *
+	 * things reading the list should take a read lock, then
+	 * the mutex, get the head and tail pointers, release the
+	 * mutex, and then they can iterate between the head and tail.
+	 */
+
+	pf_state_ref(st); /* get a ref for the list */
+
+	mtx_enter(&pfs->pfs_mtx);
+	TAILQ_INSERT_TAIL(&pfs->pfs_list, st, entry_list);
+	mtx_leave(&pfs->pfs_mtx);
+}
+
+void
+pf_state_list_remove(struct pf_state_list *pfs, struct pf_state *st)
+{
+	/* states can only be removed when the write lock is held */
+	rw_assert_wrlock(&pfs->pfs_rwl);
+
+	mtx_enter(&pfs->pfs_mtx);
+	TAILQ_REMOVE(&pfs->pfs_list, st, entry_list);
+	mtx_leave(&pfs->pfs_mtx);
+
+	pf_state_unref(st); /* list no longer references the state */
 }
 
 int
@@ -986,7 +1021,7 @@ pf_state_insert(struct pfi_kif *kif, struct pf_state_key **skw,
 		PF_STATE_EXIT_WRITE();
 		return (-1);
 	}
-	TAILQ_INSERT_TAIL(&state_list, s, entry_list);
+	pf_state_list_insert(&pf_state_list, s);
 	pf_status.fcounters[FCNT_STATE_INSERT]++;
 	pf_status.states++;
 	pfi_kif_ref(kif, PFI_KIF_REF_STATE);
@@ -1183,7 +1218,7 @@ pf_state_export(struct pfsync_state *sp, struct pf_state *st)
 	sp->rt = st->rt;
 	sp->rt_addr = st->rt_addr;
 	sp->creation = htonl(getuptime() - st->creation);
-	expire = pf_state_expires(st);
+	expire = pf_state_expires(st, st->timeout);
 	if (expire <= getuptime())
 		sp->expire = htonl(0);
 	else
@@ -1247,16 +1282,14 @@ pf_purge_expired_rules(void)
 void
 pf_purge_timeout(void *unused)
 {
-	task_add(net_tq(0), &pf_purge_task);
+	/* XXX move to systqmp to avoid KERNEL_LOCK */
+	task_add(systq, &pf_purge_task);
 }
 
 void
 pf_purge(void *xnloops)
 {
 	int *nloops = xnloops;
-
-	KERNEL_LOCK();
-	NET_LOCK();
 
 	/*
 	 * process a fraction of the state table every second
@@ -1267,6 +1300,8 @@ pf_purge(void *xnloops)
 	 */
 	pf_purge_expired_states(1 + (pf_status.states
 	    / pf_default_rule.timeout[PFTM_INTERVAL]));
+
+	NET_LOCK();
 
 	PF_LOCK();
 	/* purge other expired types every PFTM_INTERVAL seconds */
@@ -1284,29 +1319,43 @@ pf_purge(void *xnloops)
 		*nloops = 0;
 	}
 	NET_UNLOCK();
-	KERNEL_UNLOCK();
 
 	timeout_add_sec(&pf_purge_to, 1);
 }
 
 int32_t
-pf_state_expires(const struct pf_state *state)
+pf_state_expires(const struct pf_state *state, uint8_t stimeout)
 {
 	u_int32_t	timeout;
 	u_int32_t	start;
 	u_int32_t	end;
 	u_int32_t	states;
 
+	/*
+	 * pf_state_expires is used by the state purge task to
+	 * decide if a state is a candidate for cleanup, and by the
+	 * pfsync state export code to populate an expiry time.
+	 *
+	 * this function may be called by the state purge task while
+	 * the state is being modified. avoid inconsistent reads of
+	 * state->timeout by having the caller do the read (and any
+	 * chacks it needs to do on the same variable) and then pass
+	 * their view of the timeout in here for this function to use.
+	 * the only consequnce of using a stale timeout value is
+	 * that the state won't be a candidate for purging until the
+	 * next pass of the purge task.
+	 */
+
 	/* handle all PFTM_* > PFTM_MAX here */
-	if (state->timeout == PFTM_PURGE)
+	if (stimeout == PFTM_PURGE)
 		return (0);
 
-	KASSERT(state->timeout != PFTM_UNLINKED);
-	KASSERT(state->timeout < PFTM_MAX);
+	KASSERT(stimeout != PFTM_UNLINKED);
+	KASSERT(stimeout < PFTM_MAX);
 
-	timeout = state->rule.ptr->timeout[state->timeout];
+	timeout = state->rule.ptr->timeout[stimeout];
 	if (!timeout)
-		timeout = pf_default_rule.timeout[state->timeout];
+		timeout = pf_default_rule.timeout[stimeout];
 
 	start = state->rule.ptr->timeout[PFTM_ADAPTIVE_START];
 	if (start) {
@@ -1447,7 +1496,7 @@ pf_free_state(struct pf_state *cur)
 	}
 	pf_normalize_tcp_cleanup(cur);
 	pfi_kif_unref(cur->kif, PFI_KIF_REF_STATE);
-	TAILQ_REMOVE(&state_list, cur, entry_list);
+	pf_state_list_remove(&pf_state_list, cur);
 	if (cur->tag)
 		pf_tag_unref(cur->tag);
 	pf_state_unref(cur);
@@ -1458,53 +1507,82 @@ pf_free_state(struct pf_state *cur)
 void
 pf_purge_expired_states(u_int32_t maxcheck)
 {
+	/*
+	 * this task/thread/context/whatever is the only thing that
+	 * removes states from the pf_state_list, so the cur reference
+	 * it holds between calls is guaranteed to still be in the
+	 * list.
+	 */
 	static struct pf_state	*cur = NULL;
-	struct pf_state		*next;
-	SLIST_HEAD(pf_state_gcl, pf_state) gcl;
+
+	struct pf_state		*head, *tail;
+	struct pf_state		*st;
+	SLIST_HEAD(pf_state_gcl, pf_state) gcl = SLIST_HEAD_INITIALIZER(gcl);
+	time_t			 now;
 
 	PF_ASSERT_UNLOCKED();
-	SLIST_INIT(&gcl);
+ 
+	rw_enter_read(&pf_state_list.pfs_rwl);
 
-	PF_STATE_ENTER_READ();
-	while (maxcheck--) {
-		/* wrap to start of list when we hit the end */
-		if (cur == NULL) {
-			cur = pf_state_ref(TAILQ_FIRST(&state_list));
-			if (cur == NULL)
-				break;	/* list empty */
+	mtx_enter(&pf_state_list.pfs_mtx);
+	head = TAILQ_FIRST(&pf_state_list.pfs_list);
+	tail = TAILQ_LAST(&pf_state_list.pfs_list, pf_state_queue);
+	mtx_leave(&pf_state_list.pfs_mtx);
+
+	if (head == NULL) {
+		/* the list is empty */
+		rw_exit_read(&pf_state_list.pfs_rwl);
+		return;
+	}
+
+	/* (re)start at the front of the list */
+	if (cur == NULL)
+		cur = head;
+
+	now = getuptime();
+
+	do {
+		uint8_t stimeout = cur->timeout;
+
+		if ((stimeout == PFTM_UNLINKED) ||
+		    (pf_state_expires(cur, stimeout) <= now)) {
+			st = pf_state_ref(cur);
+			SLIST_INSERT_HEAD(&gcl, st, gc_list);
 		}
 
-		/* get next state, as cur may get deleted */
-		next = TAILQ_NEXT(cur, entry_list);
-
-		if ((cur->timeout == PFTM_UNLINKED) ||
-		    (pf_state_expires(cur) <= getuptime()))
-			SLIST_INSERT_HEAD(&gcl, cur, gc_list);
-		else
-			pf_state_unref(cur);
-
-		cur = pf_state_ref(next);
-
-		if (cur == NULL)
+		/* don't iterate past the end of our view of the list */
+		if (cur == tail) {
+			cur = NULL;
 			break;
-	}
-	PF_STATE_EXIT_READ();
+		}
+ 
+		cur = TAILQ_NEXT(cur, entry_list);
+	} while (maxcheck--);
 
+	rw_exit_read(&pf_state_list.pfs_rwl);
+
+	if (SLIST_EMPTY(&gcl))
+		return;
+
+	NET_LOCK();
+	rw_enter_write(&pf_state_list.pfs_rwl);
 	PF_LOCK();
 	PF_STATE_ENTER_WRITE();
-	while ((next = SLIST_FIRST(&gcl)) != NULL) {
-		SLIST_REMOVE_HEAD(&gcl, gc_list);
-		if (next->timeout == PFTM_UNLINKED)
-			pf_free_state(next);
-		else {
-			pf_remove_state(next);
-			pf_free_state(next);
-		}
-
-		pf_state_unref(next);
+	SLIST_FOREACH(st, &gcl, gc_list) {
+		if (st->timeout != PFTM_UNLINKED)
+			pf_remove_state(st);
+ 
+		pf_free_state(st);
 	}
 	PF_STATE_EXIT_WRITE();
 	PF_UNLOCK();
+	rw_exit_write(&pf_state_list.pfs_rwl);
+	NET_UNLOCK();
+
+	while ((st = SLIST_FIRST(&gcl)) != NULL) {
+		SLIST_REMOVE_HEAD(&gcl, gc_list);
+		pf_state_unref(st);
+	}
 }
 
 int
@@ -3733,7 +3811,8 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_ruleset *ruleset)
 
 int
 pf_test_rule(struct pf_pdesc *pd, struct pf_rule **rm, struct pf_state **sm,
-    struct pf_rule **am, struct pf_ruleset **rsm, u_short *reason)
+    struct pf_rule **am, struct pf_ruleset **rsm, u_short *reason,
+    struct pfsync_deferral **pdeferral)
 {
 	struct pf_rule		*r = NULL;
 	struct pf_rule		*a = NULL;
@@ -3966,7 +4045,7 @@ pf_test_rule(struct pf_pdesc *pd, struct pf_rule **rm, struct pf_state **sm,
 		 * firewall has to know about it to allow
 		 * replies through it.
 		 */
-		if (pfsync_defer(*sm, pd->m))
+		if (pfsync_defer(*sm, pd->m, pdeferral))
 			return (PF_DEFER);
 	}
 #endif	/* NPFSYNC > 0 */
@@ -6815,6 +6894,7 @@ pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 	int			 dir = (fwdir == PF_FWD) ? PF_OUT : fwdir;
 	u_int32_t		 qid, pqid = 0;
 	int			 have_pf_lock = 0;
+	struct pfsync_deferral	*deferral = NULL;
 
 	if (!pf_status.running)
 		return (PF_PASS);
@@ -6917,7 +6997,8 @@ pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 		 */
 		PF_LOCK();
 		have_pf_lock = 1;
-		action = pf_test_rule(&pd, &r, &s, &a, &ruleset, &reason);
+		action = pf_test_rule(&pd, &r, &s, &a, &ruleset, &reason,
+		    &deferral);
 		s = pf_state_ref(s);
 		if (action != PF_PASS)
 			REASON_SET(&reason, PFRES_FRAG);
@@ -6949,7 +7030,7 @@ pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 			PF_LOCK();
 			have_pf_lock = 1;
 			action = pf_test_rule(&pd, &r, &s, &a, &ruleset,
-			    &reason);
+			    &reason, &deferral);
 			s = pf_state_ref(s);
 		}
 		break;
@@ -6981,7 +7062,7 @@ pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 			PF_LOCK();
 			have_pf_lock = 1;
 			action = pf_test_rule(&pd, &r, &s, &a, &ruleset,
-			    &reason);
+			    &reason, &deferral);
 			s = pf_state_ref(s);
 		}
 		break;
@@ -7057,7 +7138,7 @@ pf_test(sa_family_t af, int fwdir, struct ifnet *ifp, struct mbuf **m0)
 			PF_LOCK();
 			have_pf_lock = 1;
 			action = pf_test_rule(&pd, &r, &s, &a, &ruleset,
-			    &reason);
+			    &reason, &deferral);
 			s = pf_state_ref(s);
 		}
 
@@ -7193,6 +7274,14 @@ done:
 		m_freem(pd.m);
 		/* FALLTHROUGH */
 	case PF_DEFER:
+#if NPFSYNC > 0
+		/*
+		 * We no longer hold PF_LOCK() here, so we can dispatch
+		 * deferral if we are asked to do so.
+		 */
+		if (deferral != NULL)
+			pfsync_undefer(deferral, 0);
+#endif	/* NPFSYNC > 0 */
 		pd.m = NULL;
 		action = PF_PASS;
 		break;
