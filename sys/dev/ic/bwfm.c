@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfm.c,v 1.84 2021/04/22 22:14:30 patrick Exp $ */
+/* $OpenBSD: bwfm.c,v 1.88 2021/08/19 14:13:39 patrick Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -1959,7 +1959,7 @@ bwfm_connect(struct bwfm_softc *sc)
 	bwfm_fwvar_var_set_int(sc, "auth", BWFM_AUTH_OPEN);
 	bwfm_fwvar_var_set_int(sc, "mfp", BWFM_MFP_NONE);
 
-	if (ic->ic_des_esslen && ic->ic_des_esslen < BWFM_MAX_SSID_LEN) {
+	if (ic->ic_des_esslen && ic->ic_des_esslen <= BWFM_MAX_SSID_LEN) {
 		params = malloc(sizeof(*params), M_TEMP, M_WAITOK | M_ZERO);
 		memcpy(params->ssid.ssid, ic->ic_des_essid, ic->ic_des_esslen);
 		params->ssid.len = htole32(ic->ic_des_esslen);
@@ -2064,7 +2064,7 @@ bwfm_scan(struct bwfm_softc *sc)
 	struct bwfm_ssid *ssid;
 
 	if (ic->ic_flags & IEEE80211_F_ASCAN &&
-	    ic->ic_des_esslen && ic->ic_des_esslen < BWFM_MAX_SSID_LEN)
+	    ic->ic_des_esslen && ic->ic_des_esslen <= BWFM_MAX_SSID_LEN)
 		nssid = 1;
 
 	chan_size = roundup(nchan * sizeof(uint16_t), sizeof(uint32_t));
@@ -2088,7 +2088,7 @@ bwfm_scan(struct bwfm_softc *sc)
 	params->sync_id = htole16(0x1234);
 
 	if (ic->ic_flags & IEEE80211_F_ASCAN &&
-	    ic->ic_des_esslen && ic->ic_des_esslen < BWFM_MAX_SSID_LEN) {
+	    ic->ic_des_esslen && ic->ic_des_esslen <= BWFM_MAX_SSID_LEN) {
 		params->scan_params.scan_type = BWFM_SCANTYPE_ACTIVE;
 		ssid->len = htole32(ic->ic_des_esslen);
 		memcpy(ssid->ssid, ic->ic_des_essid, ic->ic_des_esslen);
@@ -2464,21 +2464,21 @@ bwfm_rx_event_cb(struct bwfm_softc *sc, struct mbuf *m)
 		if (ntohl(e->msg.status) == BWFM_E_STATUS_SUCCESS &&
 		    ic->ic_state == IEEE80211_S_ASSOC)
 			ieee80211_new_state(ic, IEEE80211_S_RUN, -1);
-		else
+		else if (ntohl(e->msg.status) != BWFM_E_STATUS_UNSOLICITED)
 			ieee80211_begin_scan(ifp);
 		break;
 	case BWFM_E_DEAUTH:
 	case BWFM_E_DISASSOC:
-		if (ic->ic_state != IEEE80211_S_INIT)
-			ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+		if (ic->ic_state > IEEE80211_S_SCAN)
+			ieee80211_begin_scan(ifp);
 		break;
 	case BWFM_E_LINK:
 		if (ntohl(e->msg.status) == BWFM_E_STATUS_SUCCESS &&
 		    ntohl(e->msg.reason) == 0)
 			break;
 		/* Link status has changed */
-		if (ic->ic_state != IEEE80211_S_INIT)
-			ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+		if (ic->ic_state > IEEE80211_S_SCAN)
+			ieee80211_begin_scan(ifp);
 		break;
 #ifndef IEEE80211_STA_ONLY
 	case BWFM_E_AUTH_IND:
@@ -2785,7 +2785,7 @@ bwfm_newstate(struct ieee80211com *ic, enum ieee80211_state nstate, int arg)
 			return 0;
 		}
 		ieee80211_set_link_state(ic, LINK_STATE_DOWN);
-		ieee80211_node_cleanup(ic, ic->ic_bss);
+		ieee80211_free_allnodes(ic, 1);
 		ic->ic_state = nstate;
 		splx(s);
 		return 0;

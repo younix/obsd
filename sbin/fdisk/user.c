@@ -1,4 +1,4 @@
-/*	$OpenBSD: user.c,v 1.67 2021/07/21 12:22:54 krw Exp $	*/
+/*	$OpenBSD: user.c,v 1.76 2021/08/25 23:47:36 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -20,10 +20,8 @@
 #include <sys/disklabel.h>
 
 #include <err.h>
-#include <fcntl.h>
 #include <stdio.h>
 #include <string.h>
-#include <unistd.h>
 
 #include "part.h"
 #include "mbr.h"
@@ -32,6 +30,13 @@
 #include "user.h"
 #include "gpt.h"
 #include "disk.h"
+
+struct cmd {
+	char	*cmd_name;
+	int	 cmd_gpt;
+	int	(*cmd_fcn)(char *, struct mbr *);
+	char	*cmd_help;
+};
 
 const struct cmd		cmd_table[] = {
 	{"help",   1, Xhelp,   "Command help list"},
@@ -49,27 +54,24 @@ const struct cmd		cmd_table[] = {
 	{"exit",   1, Xexit,   "Exit edit of current MBR, without saving changes"},
 	{"quit",   1, Xquit,   "Quit edit of current MBR, saving current changes"},
 	{"abort",  1, Xabort,  "Abort program without saving current changes"},
-	{NULL,     0, NULL,    NULL}
 };
 
 
 int			modified;
 
-void			ask_cmd(char **, char **);
+int			ask_cmd(const int, char **);
 
 void
 USER_edit(const uint64_t lba_self, const uint64_t lba_firstembr)
 {
 	struct mbr		 mbr;
-	char			*cmd, *args;
-	int			 i, st, error;
+	char			*args;
+	int			 i, st;
 	static int		 editlevel;
 
-	/* One level deeper */
 	editlevel += 1;
 
-	error = MBR_read(lba_self, lba_firstembr, &mbr);
-	if (error == -1)
+	if (MBR_read(lba_self, lba_firstembr, &mbr))
 		goto done;
 
 	if (editlevel == 1)
@@ -79,29 +81,15 @@ USER_edit(const uint64_t lba_self, const uint64_t lba_firstembr)
 
 again:
 	do {
-		printf("%s%s: %d> ", disk.dk_name, modified ? "*" : "", editlevel);
-		fflush(stdout);
-		ask_cmd(&cmd, &args);
+		if (letoh64(gh.gh_sig) == GPTSIGNATURE && editlevel > 1)
+			goto done;	/* 'reinit gpt'. Unwind recursion! */
 
-		if (cmd[0] == '\0')
+		i = ask_cmd(editlevel, &args);
+		if (i == -1)
 			continue;
-		for (i = 0; cmd_table[i].cmd_name != NULL; i++)
-			if (strstr(cmd_table[i].cmd_name, cmd) == cmd_table[i].cmd_name)
-				break;
 
-		/* Quick hack to put in '?' == 'help' */
-		if (!strcmp(cmd, "?"))
-			i = 0;
+		st = cmd_table[i].cmd_fcn(args ? args : "", &mbr);
 
-		if ((cmd_table[i].cmd_name == NULL) || (letoh64(gh.gh_sig) ==
-		    GPTSIGNATURE && cmd_table[i].cmd_gpt == 0)) {
-			printf("Invalid command '%s'.  Try 'help'.\n", cmd);
-			continue;
-		}
-
-		st = cmd_table[i].cmd_fcn(args, &mbr);
-
-		/* Update status */
 		if (st == CMD_EXIT)
 			break;
 		if (st == CMD_SAVE)
@@ -129,13 +117,12 @@ USER_print_disk(const int verbosity)
 {
 	struct mbr		mbr;
 	uint64_t		lba_self, lba_firstembr;
-	int			i, error;
+	int			i;
 
 	lba_self = lba_firstembr = 0;
 
 	do {
-		error = MBR_read(lba_self, lba_firstembr, &mbr);
-		if (error == -1)
+		if (MBR_read(lba_self, lba_firstembr, &mbr))
 			break;
 		if (lba_self == 0) {
 			if (GPT_read(ANYGPT)) {
@@ -177,20 +164,59 @@ USER_print_disk(const int verbosity)
 }
 
 void
-ask_cmd(char **cmd, char **arg)
+USER_help(void)
 {
-	static char		lbuf[100];
-	size_t			cmdstart, cmdend, argstart;
+	char			 help[80];
+	char			*mbrstr;
+	int			 i;
 
-	if (string_from_line(lbuf, sizeof(lbuf)))
-		errx(1, "eof");
+	for (i = 0; i < nitems(cmd_table); i++) {
+		strlcpy(help, cmd_table[i].cmd_help, sizeof(help));
+		if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
+			if (cmd_table[i].cmd_gpt == 0)
+				continue;
+			mbrstr = strstr(help, "MBR");
+			if (mbrstr)
+				memcpy(mbrstr, "GPT", 3);
+		}
+		printf("\t%s\t\t%s\n", cmd_table[i].cmd_name, help);
+	}
+}
 
-	cmdstart = strspn(lbuf, " \t");
-	cmdend = cmdstart + strcspn(&lbuf[cmdstart], " \t");
-	argstart = cmdend + strspn(&lbuf[cmdend], " \t");
+int
+ask_cmd(const int editlevel, char **arg)
+{
+	static char		 lbuf[100];
+	char			*cmd;
+	unsigned int		 i, gpt;
 
-	/* *cmd and *arg may be set to point at final NUL! */
-	*cmd = &lbuf[cmdstart];
-	lbuf[cmdend] = '\0';
-	*arg = &lbuf[argstart];
+	printf("%s%s: %d> ", disk.dk_name, modified ? "*" : "", editlevel);
+	fflush(stdout);
+	string_from_line(lbuf, sizeof(lbuf), TRIMMED);
+
+	*arg = lbuf;
+	cmd = strsep(arg, WHITESPACE);
+
+	if (*arg != NULL)
+		*arg += strspn(*arg, WHITESPACE);
+
+	if (strlen(cmd) == 0)
+		return -1;
+	if (strcmp(cmd, "?") == 0)
+		cmd = "help";
+
+	gpt = letoh64(gh.gh_sig) == GPTSIGNATURE;
+	for (i = 0; i < nitems(cmd_table); i++) {
+		if (gpt && cmd_table[i].cmd_gpt == 0)
+			continue;
+		if (strstr(cmd_table[i].cmd_name, cmd) == cmd_table[i].cmd_name)
+			return i;
+	}
+
+	printf("Invalid command '%s", cmd);
+	if (*arg && strlen(*arg) > 0)
+		printf(" %s", *arg);
+	printf("'. Try 'help'.\n");
+
+	return -1;
 }

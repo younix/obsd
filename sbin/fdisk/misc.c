@@ -1,4 +1,4 @@
-/*	$OpenBSD: misc.c,v 1.78 2021/07/17 14:16:34 krw Exp $	*/
+/*	$OpenBSD: misc.c,v 1.81 2021/08/24 12:34:04 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -22,11 +22,9 @@
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <uuid.h>
 
 #include "part.h"
 #include "disk.h"
@@ -61,23 +59,32 @@ unit_lookup(const char *units)
 	return i;
 }
 
-int
-string_from_line(char *buf, const size_t buflen)
+void
+string_from_line(char *buf, const size_t buflen, const int trim)
 {
 	static char		*line;
 	static size_t		 sz;
 	ssize_t			 len;
+	unsigned int		 i;
 
 	len = getline(&line, &sz, stdin);
 	if (len == -1)
-		return -1;
+		errx(1, "eof");
 
-	if (line[len - 1] == '\n')
-		line[len - 1] = '\0';
-
-	strlcpy(buf, line, buflen);
-
-	return 0;
+	switch (trim) {
+	case UNTRIMMED:
+		line[strcspn(line, "\n")] = '\0';
+		strlcpy(buf, line, buflen);
+		break;
+	case TRIMMED:
+		for (i = strlen(line); i > 0; i--) {
+			if (isspace((unsigned char)line[i - 1]) == 0)
+				break;
+			line[i - 1] = '\0';
+		}
+		strlcpy(buf, line + strspn(line, WHITESPACE), buflen);
+		break;
+	}
 }
 
 int
@@ -127,9 +134,7 @@ getuint64(const char *prompt, uint64_t oval, const uint64_t minval,
 	do {
 		printf("%s [%llu - %llu]: [%llu] ", prompt, minval, maxval,
 		    oval);
-
-		if (string_from_line(buf, sizeof(buf)))
-			errx(1, "eof");
+		string_from_line(buf, sizeof(buf), TRIMMED);
 
 		if (buf[0] == '\0') {
 			rslt = snprintf(buf, sizeof(buf), "%llu", oval);

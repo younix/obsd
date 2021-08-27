@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-resize-window.c,v 1.5 2020/04/13 10:59:58 nicm Exp $ */
+/* $OpenBSD: cmd-resize-window.c,v 1.8 2021/08/21 10:28:05 nicm Exp $ */
 
 /*
  * Copyright (c) 2018 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -33,7 +33,7 @@ const struct cmd_entry cmd_resize_window_entry = {
 	.name = "resize-window",
 	.alias = "resizew",
 
-	.args = { "aADLRt:Ux:y:", 0, 1 },
+	.args = { "aADLRt:Ux:y:", 0, 1, NULL },
 	.usage = "[-aADLRU] [-x width] [-y height] " CMD_TARGET_WINDOW_USAGE " "
 		 "[adjustment]",
 
@@ -56,10 +56,10 @@ cmd_resize_window_exec(struct cmd *self, struct cmdq_item *item)
 	u_int			 adjust, sx, sy;
 	int			 xpixel = -1, ypixel = -1;
 
-	if (args->argc == 0)
+	if (args_count(args) == 0)
 		adjust = 1;
 	else {
-		adjust = strtonum(args->argv[0], 1, INT_MAX, &errstr);
+		adjust = strtonum(args_string(args, 0), 1, INT_MAX, &errstr);
 		if (errstr != NULL) {
 			cmdq_error(item, "adjustment %s", errstr);
 			return (CMD_RETURN_ERROR);

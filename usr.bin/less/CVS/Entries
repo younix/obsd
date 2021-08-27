@@ -2,7 +2,6 @@
 /Makefile/1.1/Fri Sep 16 18:12:09 2011//
 /Makefile.inc/1.4/Mon Nov 23 09:14:44 2015//
 /brac.c/1.9/Mon Nov  9 16:39:13 2015//
-/ch.c/1.21/Tue Sep  3 23:08:42 2019//
 /charset.c/1.26/Mon Sep  2 14:07:45 2019//
 /charset.h/1.5/Wed May 15 19:06:01 2019//
 /cmd.h/1.10/Fri Nov  6 15:58:01 2015//
@@ -50,3 +49,4 @@
 /version.c/1.9/Fri Nov  6 15:50:33 2015//
 D/less////
 D/lesskey////
+/ch.c/1.22/Fri Aug 27 15:27:23 2021//

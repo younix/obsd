@@ -30,7 +30,6 @@
 /fq_codel.h/1.4/Fri Dec 11 17:58:24 2020//
 /if_loop.c/1.91/Fri Dec 11 17:58:24 2020//
 /if_trunk.h/1.30/Fri Dec 11 17:58:24 2020//
-/if_vlan_var.h/1.42/Fri Dec 11 17:58:24 2020//
 /if_wg.h/1.4/Fri Dec 11 17:58:24 2020//
 /pf_if.c/1.100/Fri Dec 11 17:58:24 2020//
 /bpf.h/1.70/Thu Dec 17 19:39:59 2020//
@@ -75,7 +74,6 @@
 /if_types.h/1.23/Tue May 18 14:06:17 2021//
 /if_var.h/1.114/Tue May 18 14:06:17 2021//
 /if_vxlan.c/1.82/Tue May 18 14:06:17 2021//
-/if_wg.c/1.17/Tue May 18 14:06:17 2021//
 /ifq.h/1.33/Tue May 18 14:06:17 2021//
 /netisr.h/1.55/Tue May 18 14:06:17 2021//
 /ofp.h/1.14/Tue May 18 14:06:17 2021//
@@ -93,7 +91,6 @@
 /if_bridge.c/1.356/Thu Aug  5 11:01:51 2021//
 /if_etherbridge.c/1.7/Thu Aug  5 11:01:51 2021//
 /if_etherbridge.h/1.4/Thu Aug  5 11:01:51 2021//
-/if_ethersubr.c/1.275/Thu Aug  5 11:01:51 2021//
 /if_pfsync.c/1.297/Thu Aug  5 11:01:51 2021//
 /if_pfsync.h/1.57/Thu Aug  5 11:01:51 2021//
 /if_pppoe.c/1.78/Thu Aug  5 11:01:51 2021//
@@ -102,7 +99,6 @@
 /if_tpmr.c/1.31/Thu Aug  5 11:01:51 2021//
 /if_trunk.c/1.152/Thu Aug  5 11:01:51 2021//
 /if_veb.c/1.20/Thu Aug  5 11:01:51 2021//
-/if_vlan.c/1.207/Thu Aug  5 11:01:51 2021//
 /ifq.c/1.44/Thu Aug  5 11:01:51 2021//
 /pf.c/1.1122/Thu Aug  5 11:01:51 2021//
 /pf_ioctl.c/1.365/Thu Aug  5 11:01:51 2021//
@@ -118,4 +114,8 @@
 /route.c/1.399/Tue Jun  1 14:33:07 2021//
 /rtable.c/1.75/Tue Jun  1 14:33:07 2021//
 /rtsock.c/1.319/Thu Aug  5 11:01:51 2021//
+/if_ethersubr.c/1.276/Fri Aug 27 15:27:22 2021//
+/if_vlan.c/1.208/Fri Aug 27 15:27:22 2021//
+/if_vlan_var.h/1.43/Fri Aug 27 15:27:22 2021//
+/if_wg.c/1.18/Fri Aug 27 15:27:22 2021//
 D

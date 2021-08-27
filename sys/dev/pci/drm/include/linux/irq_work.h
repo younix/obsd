@@ -1,4 +1,4 @@
-/*	$OpenBSD: irq_work.h,v 1.3 2021/07/07 02:38:36 jsg Exp $	*/
+/*	$OpenBSD: irq_work.h,v 1.5 2021/08/11 16:14:00 sthen Exp $	*/
 /*
  * Copyright (c) 2015 Mark Kettenis
  *

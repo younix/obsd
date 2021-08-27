@@ -1,4 +1,4 @@
-/*	$OpenBSD: jot.c,v 1.51 2021/07/30 02:47:37 tb Exp $	*/
+/*	$OpenBSD: jot.c,v 1.56 2021/08/13 12:37:28 jmc Exp $	*/
 /*	$NetBSD: jot.c,v 1.3 1994/12/02 20:29:43 pk Exp $	*/
 
 /*-
@@ -70,6 +70,7 @@ static bool	intdata;
 static bool	longdata;
 static bool	nosign;
 static bool	randomize;
+static bool	word;
 
 static void	getformat(void);
 static int	getprec(char *);
@@ -94,10 +95,13 @@ main(int argc, char *argv[])
 		switch (ch) {
 		case 'b':
 			boring = true;
+			chardata = word = false;
 			format = optarg;
 			break;
 		case 'c':
 			chardata = true;
+			boring = word = false;
+			format = "";
 			break;
 		case 'n':
 			finalnl = false;
@@ -115,6 +119,8 @@ main(int argc, char *argv[])
 			sepstring = optarg;
 			break;
 		case 'w':
+			word = true;
+			boring = chardata = false;
 			format = optarg;
 			break;
 		default:
@@ -160,10 +166,10 @@ main(int argc, char *argv[])
 			mask |= REPS;
 			if (reps == 0)
 				infinity = true;
-			if (prec == -1)
-				prec = 0;
 		}
 	case 0:
+		if (prec == -1)
+			prec = 0;
 		break;
 	default:
 		errx(1, "Too many arguments.  What do you mean by %s?",
@@ -258,9 +264,7 @@ main(int argc, char *argv[])
 		}
 		x = ender - begin;
 
-		if (prec == 0 && (fmod(ender, 1) != 0 || fmod(begin, 1) != 0))
-			use_unif = 0;
-		else {
+		if (prec > 0 || (fmod(ender, 1) == 0 && fmod(begin, 1) == 0)) {
 			double range;
 
 			while (prec-- > 0)
@@ -304,25 +308,21 @@ putdata(double x, bool last)
 	if (boring)
 		printf("%s", format);
 	else if (longdata && nosign) {
-		if (x <= (double)ULONG_MAX && x >= 0.0)
-			printf(format, (unsigned long)x);
-		else
+		if (x < 0.0 || x > (double)ULONG_MAX)
 			return 1;
+		printf(format, (unsigned long)x);
 	} else if (longdata) {
-		if (x <= (double)LONG_MAX && x >= (double)LONG_MIN)
-			printf(format, (long)x);
-		else
+		if (x < (double)LONG_MIN || x > (double)LONG_MAX)
 			return 1;
+		printf(format, (long)x);
 	} else if (chardata || (intdata && !nosign)) {
-		if (x <= (double)INT_MAX && x >= (double)INT_MIN)
-			printf(format, (int)x);
-		else
+		if (x < (double)INT_MIN || x > (double)INT_MAX)
 			return 1;
+		printf(format, (int)x);
 	} else if (intdata) {
-		if (x <= (double)UINT_MAX && x >= 0.0)
-			printf(format, (unsigned int)x);
-		else
+		if (x < 0.0 || x > (double)UINT_MAX)
 			return 1;
+		printf(format, (unsigned int)x);
 	} else
 		printf(format, x);
 	if (!last)
@@ -336,7 +336,7 @@ usage(void)
 {
 	(void)fprintf(stderr, "usage: jot [-cnr] [-b word] [-p precision] "
 	    "[-s string] [-w word]\n"
-	    "	   [reps [begin [end [s]]]]\n");
+	    "	   [reps [begin [end [step]]]]\n");
 	exit(1);
 }
 

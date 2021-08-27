@@ -12,10 +12,10 @@
 /privsep.c/1.79/Sat May  1 08:41:50 2021//
 /privsep.h/1.70/Sat May  1 08:41:50 2021//
 /clparse.c/1.203/Tue May 18 14:06:16 2021//
-/dhclient.8/1.47/Tue May 18 14:06:16 2021//
 /dhcpd.h/1.299/Tue May 18 14:06:16 2021//
 /dispatch.c/1.172/Tue May 18 14:06:16 2021//
 /kroute.c/1.197/Tue May 18 14:06:16 2021//
 /packet.c/1.45/Tue May 18 14:06:16 2021//
-/dhclient.c/1.724/Thu Aug  5 11:01:39 2021//
+/dhclient.8/1.48/Fri Aug 27 15:27:11 2021//
+/dhclient.c/1.725/Fri Aug 27 15:27:11 2021//
 D

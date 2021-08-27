@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-display-message.c,v 1.57 2021/04/12 09:36:12 nicm Exp $ */
+/* $OpenBSD: cmd-display-message.c,v 1.60 2021/08/21 10:22:39 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Tiago Cunha <me@tiagocunha.org>
@@ -39,7 +39,7 @@ const struct cmd_entry cmd_display_message_entry = {
 	.name = "display-message",
 	.alias = "display",
 
-	.args = { "acd:INpt:F:v", 0, 1 },
+	.args = { "ac:d:INpt:F:v", 0, 1, NULL },
 	.usage = "[-aINpv] [-c target-client] [-d delay] [-F format] "
 		 CMD_TARGET_PANE_USAGE " [message]",
 
@@ -68,9 +68,9 @@ cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 	struct window_pane	*wp = target->wp;
 	const char		*template;
 	char			*msg, *cause;
-	int			 delay = -1;
+	int			 delay = -1, flags;
 	struct format_tree	*ft;
-	int			 flags;
+	u_int			 count = args_count(args);
 
 	if (args_has(args, 'I')) {
 		if (wp == NULL)
@@ -83,7 +83,7 @@ cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 		return (CMD_RETURN_WAIT);
 	}
 
-	if (args_has(args, 'F') && args->argc != 0) {
+	if (args_has(args, 'F') && count != 0) {
 		cmdq_error(item, "only one of -F or argument must be given");
 		return (CMD_RETURN_ERROR);
 	}
@@ -97,9 +97,10 @@ cmd_display_message_exec(struct cmd *self, struct cmdq_item *item)
 		}
 	}
 
-	template = args_get(args, 'F');
-	if (args->argc != 0)
-		template = args->argv[0];
+	if (count != 0)
+		template = args_string(args, 0);
+	else
+		template = args_get(args, 'F');
 	if (template == NULL)
 		template = DISPLAY_MESSAGE_TEMPLATE;
 

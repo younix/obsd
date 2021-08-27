@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_verify.c,v 1.39 2021/07/12 15:12:38 beck Exp $ */
+/* $OpenBSD: x509_verify.c,v 1.42 2021/08/19 03:44:00 beck Exp $ */
 /*
  * Copyright (c) 2020-2021 Bob Beck <beck@openbsd.org>
  *
@@ -207,21 +207,29 @@ static int
 x509_verify_ctx_cert_is_root(struct x509_verify_ctx *ctx, X509 *cert,
     int full_chain)
 {
+	X509 *match = NULL;
 	int i;
 
 	if (!x509_verify_cert_cache_extensions(cert))
 		return 0;
 
+	/* Check the provided roots */
 	for (i = 0; i < sk_X509_num(ctx->roots); i++) {
 		if (X509_cmp(sk_X509_value(ctx->roots, i), cert) == 0)
 			return !full_chain ||
 			    x509_verify_cert_self_signed(cert);
 	}
-	/*
-	 * XXX what if this is a by_dir thing? this currently isn't
-	 * handled so this case is a bit messed up for loonix with
-	 * by directory trust bundles...
-	 */
+
+	/* Check by lookup if we have a legacy xsc */
+	if (ctx->xsc != NULL) {
+		if ((match = x509_vfy_lookup_cert_match(ctx->xsc,
+		    cert)) != NULL) {
+			X509_free(match);
+			return !full_chain ||
+			    x509_verify_cert_self_signed(cert);
+		}
+	}
+
 	return 0;
 }
 
@@ -307,6 +315,79 @@ x509_verify_ctx_restore_xsc_error(struct x509_verify_ctx *ctx)
 	return 1;
 }
 
+/* Perform legacy style validation of a chain */
+static int
+x509_verify_ctx_validate_legacy_chain(struct x509_verify_ctx *ctx,
+    struct x509_verify_chain *chain, size_t depth)
+{
+	int ret = 0, trust;
+
+	if (ctx->xsc == NULL)
+		return 1;
+
+	/*
+	 * If we have a legacy xsc, choose a validated chain, and
+	 * apply the extensions, revocation, and policy checks just
+	 * like the legacy code did. We do this here instead of as
+	 * building the chains to more easily support the callback and
+	 * the bewildering array of VERIFY_PARAM knobs that are there
+	 * for the fiddling.
+	 */
+
+	/* These may be set in one of the following calls. */
+	ctx->xsc->error = X509_V_OK;
+	ctx->xsc->error_depth = 0;
+
+	trust = x509_vfy_check_trust(ctx->xsc);
+	if (trust == X509_TRUST_REJECTED)
+		goto err;
+
+	if (!x509_verify_ctx_set_xsc_chain(ctx, chain, 0, 1))
+		goto err;
+
+	/*
+	 * XXX currently this duplicates some work done in chain
+	 * build, but we keep it here until we have feature parity
+	 */
+	if (!x509_vfy_check_chain_extensions(ctx->xsc))
+		goto err;
+
+	if (!x509_constraints_chain(ctx->xsc->chain,
+		&ctx->xsc->error, &ctx->xsc->error_depth)) {
+		X509 *cert = sk_X509_value(ctx->xsc->chain, depth);
+		if (!x509_verify_cert_error(ctx, cert,
+			ctx->xsc->error_depth, ctx->xsc->error, 0))
+			goto err;
+	}
+
+	if (!x509_vfy_check_revocation(ctx->xsc))
+		goto err;
+
+	if (!x509_vfy_check_policy(ctx->xsc))
+		goto err;
+
+	if ((!(ctx->xsc->param->flags & X509_V_FLAG_PARTIAL_CHAIN)) &&
+	    trust != X509_TRUST_TRUSTED)
+		goto err;
+
+	ret = 1;
+
+ err:
+	/*
+	 * The above checks may have set ctx->xsc->error and
+	 * ctx->xsc->error_depth - save these for later on.
+	 */
+	if (ctx->xsc->error != X509_V_OK) {
+		if (ctx->xsc->error_depth < 0 ||
+		    ctx->xsc->error_depth >= X509_VERIFY_MAX_CHAIN_CERTS)
+			return 0;
+		chain->cert_errors[ctx->xsc->error_depth] =
+		    ctx->xsc->error;
+	}
+
+	return ret;
+}
+
 /* Add a validated chain to our list of valid chains */
 static int
 x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
@@ -328,59 +409,12 @@ x509_verify_ctx_add_chain(struct x509_verify_ctx *ctx,
 	    X509_V_ERR_UNABLE_TO_GET_ISSUER_CERT_LOCALLY)
 		chain->cert_errors[depth] = X509_V_OK;
 
+	if (!x509_verify_ctx_validate_legacy_chain(ctx, chain, depth))
+		return 0;
+
 	/*
-	 * If we have a legacy xsc, choose a validated chain,
-	 * and apply the extensions, revocation, and policy checks
-	 * just like the legacy code did. We do this here instead
-	 * of as building the chains to more easily support the
-	 * callback and the bewildering array of VERIFY_PARAM
-	 * knobs that are there for the fiddling.
-	 */
-	if (ctx->xsc != NULL) {
-		/* These may be set in one of the following calls. */
-		ctx->xsc->error = X509_V_OK;
-		ctx->xsc->error_depth = 0;
-
-		if (!x509_verify_ctx_set_xsc_chain(ctx, chain, 0, 1))
-			return 0;
-
-		/*
-		 * XXX currently this duplicates some work done
-		 * in chain build, but we keep it here until
-		 * we have feature parity
-		 */
-		if (!x509_vfy_check_chain_extensions(ctx->xsc))
-			return 0;
-
-		if (!x509_constraints_chain(ctx->xsc->chain,
-		    &ctx->xsc->error, &ctx->xsc->error_depth)) {
-			X509 *cert = sk_X509_value(ctx->xsc->chain, depth);
-			if (!x509_verify_cert_error(ctx, cert,
-			    ctx->xsc->error_depth, ctx->xsc->error, 0))
-				return 0;
-		}
-
-		if (!x509_vfy_check_revocation(ctx->xsc))
-			return 0;
-
-		if (!x509_vfy_check_policy(ctx->xsc))
-			return 0;
-
-		/*
-		 * The above checks may have set ctx->xsc->error and
-		 * ctx->xsc->error_depth - save these for later on.
-		 */
-		if (ctx->xsc->error != X509_V_OK) {
-			if (ctx->xsc->error_depth < 0 ||
-			    ctx->xsc->error_depth >= X509_VERIFY_MAX_CHAIN_CERTS)
-				return 0;
-			chain->cert_errors[ctx->xsc->error_depth] =
-			    ctx->xsc->error;
-		}
-	}
-	/*
-	 * no xsc means we are being called from the non-legacy API,
-	 * extensions and purpose are dealt with as the chain is built.
+	 * In the non-legacy code, extensions and purpose are dealt
+	 * with as the chain is built.
 	 *
 	 * The non-legacy api returns multiple chains but does not do
 	 * any revocation checking (it must be done by the caller on

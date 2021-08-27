@@ -1,4 +1,4 @@
-/* $OpenBSD: status.c,v 1.225 2021/06/10 07:56:47 nicm Exp $ */
+/* $OpenBSD: status.c,v 1.227 2021/08/20 17:50:42 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -390,10 +390,10 @@ status_redraw(struct client *c)
 	/* Set up default colour. */
 	style_apply(&gc, s->options, "status-style", ft);
 	fg = options_get_number(s->options, "status-fg");
-	if (fg != 8)
+	if (!COLOUR_DEFAULT(fg))
 		gc.fg = fg;
 	bg = options_get_number(s->options, "status-bg");
-	if (bg != 8)
+	if (!COLOUR_DEFAULT(bg))
 		gc.bg = bg;
 	if (!grid_cells_equal(&gc, &sl->style)) {
 		force = 1;
@@ -1413,7 +1413,7 @@ process_key:
 			break;
 		if (c->prompt_buffer[0].size == 0) {
 			prefix = '=';
-			free (c->prompt_buffer);
+			free(c->prompt_buffer);
 			c->prompt_buffer = utf8_fromcstr(c->prompt_last);
 			c->prompt_index = utf8_strlen(c->prompt_buffer);
 		} else
@@ -1424,7 +1424,7 @@ process_key:
 			break;
 		if (c->prompt_buffer[0].size == 0) {
 			prefix = '=';
-			free (c->prompt_buffer);
+			free(c->prompt_buffer);
 			c->prompt_buffer = utf8_fromcstr(c->prompt_last);
 			c->prompt_index = utf8_strlen(c->prompt_buffer);
 		} else

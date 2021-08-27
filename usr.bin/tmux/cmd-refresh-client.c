@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-refresh-client.c,v 1.39 2020/07/06 09:14:20 nicm Exp $ */
+/* $OpenBSD: cmd-refresh-client.c,v 1.44 2021/08/21 10:28:05 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -34,7 +34,7 @@ const struct cmd_entry cmd_refresh_client_entry = {
 	.name = "refresh-client",
 	.alias = "refresh",
 
-	.args = { "A:B:cC:Df:F:lLRSt:U", 0, 1 },
+	.args = { "A:B:cC:Df:F:lLRSt:U", 0, 1, NULL },
 	.usage = "[-cDlLRSU] [-A pane:state] [-B name:what:format] "
 		 "[-C XxY] [-f flags] " CMD_TARGET_CLIENT_USAGE " [adjustment]",
 
@@ -117,7 +117,7 @@ cmd_refresh_client_exec(struct cmd *self, struct cmdq_item *item)
 	struct client		*tc = cmdq_get_target_client(item);
 	struct tty		*tty = &tc->tty;
 	struct window		*w;
-	const char		*size, *errstr, *value;
+	const char		*size, *errstr;
 	u_int			 x, y, adjust;
 	struct args_value	*av;
 
@@ -127,10 +127,11 @@ cmd_refresh_client_exec(struct cmd *self, struct cmdq_item *item)
 	    args_has(args, 'U') ||
 	    args_has(args, 'D'))
 	{
-		if (args->argc == 0)
+		if (args_count(args) == 0)
 			adjust = 1;
 		else {
-			adjust = strtonum(args->argv[0], 1, INT_MAX, &errstr);
+			adjust = strtonum(args_string(args, 0), 1, INT_MAX,
+			    &errstr);
 			if (errstr != NULL) {
 				cmdq_error(item, "adjustment %s", errstr);
 				return (CMD_RETURN_ERROR);
@@ -184,20 +185,20 @@ cmd_refresh_client_exec(struct cmd *self, struct cmdq_item *item)
 	if (args_has(args, 'A')) {
 		if (~tc->flags & CLIENT_CONTROL)
 			goto not_control_client;
-		value = args_first_value(args, 'A', &av);
-		while (value != NULL) {
-			cmd_refresh_client_update_offset(tc, value);
-			value = args_next_value(&av);
+		av = args_first_value(args, 'A');
+		while (av != NULL) {
+			cmd_refresh_client_update_offset(tc, av->string);
+			av = args_next_value(av);
 		}
 		return (CMD_RETURN_NORMAL);
 	}
 	if (args_has(args, 'B')) {
 		if (~tc->flags & CLIENT_CONTROL)
 			goto not_control_client;
-		value = args_first_value(args, 'B', &av);
-		while (value != NULL) {
-			cmd_refresh_client_update_subscription(tc, value);
-			value = args_next_value(&av);
+		av = args_first_value(args, 'B');
+		while (av != NULL) {
+			cmd_refresh_client_update_subscription(tc, av->string);
+			av = args_next_value(av);
 		}
 		return (CMD_RETURN_NORMAL);
 	}

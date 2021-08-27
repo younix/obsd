@@ -1,4 +1,4 @@
-/* $OpenBSD: window.c,v 1.272 2021/06/10 07:33:41 nicm Exp $ */
+/* $OpenBSD: window.c,v 1.275 2021/08/20 17:36:03 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -458,6 +458,52 @@ window_has_pane(struct window *w, struct window_pane *wp)
 	return (0);
 }
 
+void
+window_update_focus(struct window *w)
+{
+	if (w != NULL) {
+		log_debug("%s: @%u", __func__, w->id);
+		window_pane_update_focus(w->active);
+	}
+}
+
+void
+window_pane_update_focus(struct window_pane *wp)
+{
+	struct client	*c;
+	int		 focused = 0;
+
+	if (wp != NULL) {
+		if (wp != wp->window->active)
+			focused = 0;
+		else {
+			TAILQ_FOREACH(c, &clients, entry) {
+				if (c->session != NULL &&
+				    c->session->attached != 0 &&
+				    (c->flags & CLIENT_FOCUSED) &&
+				    c->session->curw->window == wp->window) {
+					focused = 1;
+					break;
+				}
+			}
+		}
+		if (!focused && (wp->flags & PANE_FOCUSED)) {
+			log_debug("%s: %%%u focus out", __func__, wp->id);
+			if (wp->base.mode & MODE_FOCUSON)
+				bufferevent_write(wp->event, "\033[O", 3);
+			notify_pane("pane-focus-out", wp);
+			wp->flags &= ~PANE_FOCUSED;
+		} else if (focused && (~wp->flags & PANE_FOCUSED)) {
+			log_debug("%s: %%%u focus in", __func__, wp->id);
+			if (wp->base.mode & MODE_FOCUSON)
+				bufferevent_write(wp->event, "\033[I", 3);
+			notify_pane("pane-focus-in", wp);
+			wp->flags |= PANE_FOCUSED;
+		} else
+			log_debug("%s: %%%u focus unchanged", __func__, wp->id);
+	}
+}
+
 int
 window_set_active_pane(struct window *w, struct window_pane *wp, int notify)
 {
@@ -471,11 +517,24 @@ window_set_active_pane(struct window *w, struct window_pane *wp, int notify)
 	w->active->active_point = next_active_point++;
 	w->active->flags |= PANE_CHANGED;
 
+	if (options_get_number(global_options, "focus-events")) {
+		window_pane_update_focus(w->last);
+		window_pane_update_focus(w->active);
+	}
+
 	tty_update_window_offset(w);
 
 	if (notify)
 		notify_window("window-pane-changed", w);
 	return (1);
+}
+
+static int
+window_pane_get_palette(struct window_pane *wp, int c)
+{
+	if (wp == NULL)
+		return (-1);
+	return (colour_palette_get(&wp->palette, c));
 }
 
 void
@@ -855,9 +914,6 @@ window_pane_create(struct window *w, u_int sx, u_int sy, u_int hlimit)
 
 	wp->fd = -1;
 
-	wp->fg = 8;
-	wp->bg = 8;
-
 	TAILQ_INIT(&wp->modes);
 
 	TAILQ_INIT (&wp->resize_queue);
@@ -866,6 +922,9 @@ window_pane_create(struct window *w, u_int sx, u_int sy, u_int hlimit)
 	wp->sy = sy;
 
 	wp->pipe_fd = -1;
+
+	colour_palette_init(&wp->palette);
+	colour_palette_from_option(&wp->palette, wp->options);
 
 	screen_init(&wp->base, sx, sy, hlimit);
 	wp->screen = &wp->base;
@@ -916,7 +975,7 @@ window_pane_destroy(struct window_pane *wp)
 	free((void *)wp->cwd);
 	free(wp->shell);
 	cmd_free_argv(wp->argc, wp->argv);
-	free(wp->palette);
+	colour_palette_free(&wp->palette);
 	free(wp);
 }
 
@@ -968,7 +1027,7 @@ window_pane_set_event(struct window_pane *wp)
 
 	wp->event = bufferevent_new(wp->fd, window_pane_read_callback,
 	    NULL, window_pane_error_callback, wp);
-	wp->ictx = input_init(wp, wp->event);
+	wp->ictx = input_init(wp, wp->event, &wp->palette);
 
 	bufferevent_enable(wp->event, EV_READ|EV_WRITE);
 }
@@ -998,60 +1057,6 @@ window_pane_resize(struct window_pane *wp, u_int sx, u_int sy)
 	wme = TAILQ_FIRST(&wp->modes);
 	if (wme != NULL && wme->mode->resize != NULL)
 		wme->mode->resize(wme, sx, sy);
-}
-
-void
-window_pane_set_palette(struct window_pane *wp, u_int n, int colour)
-{
-	if (n > 0xff)
-		return;
-
-	if (wp->palette == NULL)
-		wp->palette = xcalloc(0x100, sizeof *wp->palette);
-
-	wp->palette[n] = colour;
-	wp->flags |= PANE_REDRAW;
-}
-
-void
-window_pane_unset_palette(struct window_pane *wp, u_int n)
-{
-	if (n > 0xff || wp->palette == NULL)
-		return;
-
-	wp->palette[n] = 0;
-	wp->flags |= PANE_REDRAW;
-}
-
-void
-window_pane_reset_palette(struct window_pane *wp)
-{
-	if (wp->palette == NULL)
-		return;
-
-	free(wp->palette);
-	wp->palette = NULL;
-	wp->flags |= PANE_REDRAW;
-}
-
-int
-window_pane_get_palette(struct window_pane *wp, int c)
-{
-	int	new;
-
-	if (wp == NULL || wp->palette == NULL)
-		return (-1);
-
-	new = -1;
-	if (c < 8)
-		new = wp->palette[c];
-	else if (c >= 90 && c <= 97)
-		new = wp->palette[8 + c - 90];
-	else if (c & COLOUR_FLAG_256)
-		new = wp->palette[c & ~COLOUR_FLAG_256];
-	if (new == 0)
-		return (-1);
-	return (new);
 }
 
 int

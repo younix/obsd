@@ -1,4 +1,4 @@
-/*	$OpenBSD: part.c,v 1.102 2021/07/22 13:30:40 krw Exp $	*/
+/*	$OpenBSD: part.c,v 1.104 2021/08/27 11:28:22 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -152,10 +152,6 @@ static const struct protected_guid {
 	{ "2e54b353-1271-4842-806f-e436d6af6985" },	/* HiFive BBL	*/
 };
 
-#ifndef nitems
-#define	nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
-#endif
-
 int
 PRT_protected_guid(const struct uuid *uuid)
 {
@@ -195,7 +191,7 @@ PRT_printall(void)
 		    part_types[i].pt_type, part_types[i].pt_sname,
 		    part_types[i+idrows].pt_type, part_types[i+idrows].pt_sname,
 		    part_types[i+idrows*2].pt_type, part_types[i+idrows*2].pt_sname);
-		if ((i+idrows*3) < (sizeof(part_types)/sizeof(struct part_type))) {
+		if ((i+idrows*3) < nitems(part_types)) {
 			printf("   %02X %s\n",
 			    part_types[i+idrows*3].pt_type,
 			    part_types[i+idrows*3].pt_sname);

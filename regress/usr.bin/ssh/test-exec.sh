@@ -1,7 +1,6 @@
-#	$OpenBSD: test-exec.sh,v 1.83 2021/07/25 12:13:03 dtucker Exp $
+#	$OpenBSD: test-exec.sh,v 1.86 2021/08/08 08:27:28 dtucker Exp $
 #	Placed in the Public Domain.
 
-USER=`id -un`
 #SUDO=sudo
 
 if [ ! -x "$TEST_SSH_ELAPSED_TIMES" ]; then
@@ -39,6 +38,8 @@ else
 	exit 2
 fi
 unset SSH_AUTH_SOCK
+
+USER=`id -un`
 
 SRC=`dirname ${SCRIPT}`
 
@@ -139,10 +140,15 @@ fi
 >$TEST_REGRESS_LOGFILE
 
 # Create wrapper ssh with logging.  We can't just specify "SSH=ssh -E..."
-# because sftp and scp don't handle spaces in arguments.
+# because sftp and scp don't handle spaces in arguments.  scp and sftp like
+# to use -q so we remove those to preserve our debug logging.  In the rare
+# instance where -q is desirable -qq is equivalent and is not removed.
 SSHLOGWRAP=$OBJ/ssh-log-wrapper.sh
-echo "#!/bin/sh" > $SSHLOGWRAP
-echo "exec ${SSH} -E${TEST_SSH_LOGFILE} "'"$@"' >>$SSHLOGWRAP
+cat >$SSHLOGWRAP <<EOD
+#!/bin/sh
+for i in "\$@";do shift;case "\$i" in -q):;; *) set -- "\$@" "\$i";;esac;done
+exec ${SSH} -E${TEST_SSH_LOGFILE} "\$@"
+EOD
 
 chmod a+rx $OBJ/ssh-log-wrapper.sh
 REAL_SSH="$SSH"

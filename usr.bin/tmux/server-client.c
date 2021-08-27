@@ -1,4 +1,4 @@
-/* $OpenBSD: server-client.c,v 1.378 2021/08/05 09:43:51 nicm Exp $ */
+/* $OpenBSD: server-client.c,v 1.384 2021/08/22 13:48:29 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -33,7 +33,6 @@
 #include "tmux.h"
 
 static void	server_client_free(int, short, void *);
-static void	server_client_check_pane_focus(struct window_pane *);
 static void	server_client_check_pane_resize(struct window_pane *);
 static void	server_client_check_pane_buffer(struct window_pane *);
 static void	server_client_check_window_resize(struct window *);
@@ -135,7 +134,7 @@ server_client_clear_overlay(struct client *c)
 		evtimer_del(&c->overlay_timer);
 
 	if (c->overlay_free != NULL)
-		c->overlay_free(c);
+		c->overlay_free(c, c->overlay_data);
 
 	c->overlay_check = NULL;
 	c->overlay_mode = NULL;
@@ -281,7 +280,7 @@ server_client_open(struct client *c, char **cause)
 static void
 server_client_attached_lost(struct client *c)
 {
-	struct session	*s = c->session;
+	struct session	*s;
 	struct window	*w;
 	struct client	*loop;
 	struct client	*found;
@@ -301,14 +300,46 @@ server_client_attached_lost(struct client *c)
 			s = loop->session;
 			if (loop == c || s == NULL || s->curw->window != w)
 				continue;
-			if (found == NULL ||
-			    timercmp(&loop->activity_time, &found->activity_time,
-			    >))
+			if (found == NULL || timercmp(&loop->activity_time,
+			    &found->activity_time, >))
 				found = loop;
 		}
 		if (found != NULL)
 			server_client_update_latest(found);
 	}
+}
+
+/* Set client session. */
+void
+server_client_set_session(struct client *c, struct session *s)
+{
+	struct session	*old = c->session;
+
+	if (s != NULL && c->session != NULL && c->session != s)
+		c->last_session = c->session;
+	else if (s == NULL)
+		c->last_session = NULL;
+	c->session = s;
+	c->flags |= CLIENT_FOCUSED;
+	recalculate_sizes();
+
+	if (old != NULL && old->curw != NULL)
+		window_update_focus(old->curw->window);
+	if (s != NULL) {
+		window_update_focus(s->curw->window);
+		session_update_activity(s, NULL);
+		gettimeofday(&s->last_attached_time, NULL);
+		s->curw->flags &= ~WINLINK_ALERTFLAGS;
+		s->curw->window->latest = c;
+		alerts_check_session(s);
+		tty_update_client_offset(c);
+		status_timer_start(c);
+		notify_client("client-session-changed", c);
+		server_redraw_client(c);
+	}
+
+	server_check_unattached();
+	server_update_socket();
 }
 
 /* Lost a client. */
@@ -1358,7 +1389,7 @@ server_client_handle_key(struct client *c, struct key_event *event)
 			status_message_clear(c);
 		}
 		if (c->overlay_key != NULL) {
-			switch (c->overlay_key(c, event)) {
+			switch (c->overlay_key(c, c->overlay_data, event)) {
 			case 0:
 				return (0);
 			case 1:
@@ -1389,7 +1420,6 @@ server_client_loop(void)
 	struct client		*c;
 	struct window		*w;
 	struct window_pane	*wp;
-	int			 focus;
 
 	/* Check for window resize. This is done before redrawing. */
 	RB_FOREACH(w, windows, &windows)
@@ -1407,14 +1437,11 @@ server_client_loop(void)
 
 	/*
 	 * Any windows will have been redrawn as part of clients, so clear
-	 * their flags now. Also check pane focus and resize.
+	 * their flags now.
 	 */
-	focus = options_get_number(global_options, "focus-events");
 	RB_FOREACH(w, windows, &windows) {
 		TAILQ_FOREACH(wp, &w->panes, entry) {
 			if (wp->fd != -1) {
-				if (focus)
-					server_client_check_pane_focus(wp);
 				server_client_check_pane_resize(wp);
 				server_client_check_pane_buffer(wp);
 			}
@@ -1526,7 +1553,6 @@ server_client_check_pane_resize(struct window_pane *wp)
 	evtimer_add(&wp->resize_timer, &tv);
 }
 
-
 /* Check pane buffer size. */
 static void
 server_client_check_pane_buffer(struct window_pane *wp)
@@ -1615,54 +1641,6 @@ out:
 		bufferevent_enable(wp->event, EV_READ);
 }
 
-/* Check whether pane should be focused. */
-static void
-server_client_check_pane_focus(struct window_pane *wp)
-{
-	struct client	*c;
-	int		 push;
-
-	/* Do we need to push the focus state? */
-	push = wp->flags & PANE_FOCUSPUSH;
-	wp->flags &= ~PANE_FOCUSPUSH;
-
-	/* If we're not the active pane in our window, we're not focused. */
-	if (wp->window->active != wp)
-		goto not_focused;
-
-	/*
-	 * If our window is the current window in any focused clients with an
-	 * attached session, we're focused.
-	 */
-	TAILQ_FOREACH(c, &clients, entry) {
-		if (c->session == NULL || !(c->flags & CLIENT_FOCUSED))
-			continue;
-		if (c->session->attached == 0)
-			continue;
-
-		if (c->session->curw->window == wp->window)
-			goto focused;
-	}
-
-not_focused:
-	if (push || (wp->flags & PANE_FOCUSED)) {
-		if (wp->base.mode & MODE_FOCUSON)
-			bufferevent_write(wp->event, "\033[O", 3);
-		notify_pane("pane-focus-out", wp);
-	}
-	wp->flags &= ~PANE_FOCUSED;
-	return;
-
-focused:
-	if (push || !(wp->flags & PANE_FOCUSED)) {
-		if (wp->base.mode & MODE_FOCUSON)
-			bufferevent_write(wp->event, "\033[I", 3);
-		notify_pane("pane-focus-in", wp);
-		session_update_activity(c->session, NULL);
-	}
-	wp->flags |= PANE_FOCUSED;
-}
-
 /*
  * Update cursor position and mode settings. The scroll region and attributes
  * are cleared when idle (waiting for an event) as this is the most likely time
@@ -1693,7 +1671,7 @@ server_client_reset_state(struct client *c)
 	/* Get mode from overlay if any, else from screen. */
 	if (c->overlay_draw != NULL) {
 		if (c->overlay_mode != NULL)
-			s = c->overlay_mode(c, &cx, &cy);
+			s = c->overlay_mode(c, c->overlay_data, &cx, &cy);
 	} else
 		s = wp->screen;
 	if (s != NULL)
@@ -2070,7 +2048,7 @@ server_client_dispatch(struct imsg *imsg, void *arg)
 		if (c->overlay_resize == NULL)
 			server_client_clear_overlay(c);
 		else
-			c->overlay_resize(c);
+			c->overlay_resize(c, c->overlay_data);
 		server_redraw_client(c);
 		if (c->session != NULL)
 			notify_client("client-resized", c);
@@ -2078,7 +2056,7 @@ server_client_dispatch(struct imsg *imsg, void *arg)
 	case MSG_EXITING:
 		if (datalen != 0)
 			fatalx("bad MSG_EXITING size");
-		c->session = NULL;
+		server_client_set_session(c, NULL);
 		tty_close(&c->tty);
 		proc_send(c->peer, MSG_EXITED, -1, NULL, 0);
 		break;
@@ -2173,9 +2151,6 @@ server_client_dispatch_command(struct client *c, struct imsg *imsg)
 
 	pr = cmd_parse_from_arguments(argc, argv, NULL);
 	switch (pr->status) {
-	case CMD_PARSE_EMPTY:
-		cause = xstrdup("empty command");
-		goto error;
 	case CMD_PARSE_ERROR:
 		cause = pr->error;
 		goto error;
@@ -2398,7 +2373,7 @@ server_client_set_flags(struct client *c, const char *flags)
 	uint64_t flag;
 	int	 not;
 
-	s = copy = xstrdup (flags);
+	s = copy = xstrdup(flags);
 	while ((next = strsep(&s, ",")) != NULL) {
 		not = (*next == '!');
 		if (not)

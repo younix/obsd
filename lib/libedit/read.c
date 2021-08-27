@@ -1,4 +1,4 @@
-/*	$OpenBSD: read.c,v 1.44 2016/05/25 09:36:21 schwarze Exp $	*/
+/*	$OpenBSD: read.c,v 1.49 2021/08/13 10:21:25 schwarze Exp $	*/
 /*	$NetBSD: read.c,v 1.100 2016/05/24 19:31:27 christos Exp $	*/
 
 /*-
@@ -39,9 +39,10 @@
  * read.c: Clean this junk up! This is horrible code.
  *	   Terminal read functions
  */
+#include <sys/ioctl.h>
+
 #include <ctype.h>
 #include <errno.h>
-#include <fcntl.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <string.h>
@@ -65,7 +66,6 @@ struct el_read_t {
 	int		 read_errno;
 };
 
-static int	read__fixio(int, int);
 static int	read_char(EditLine *, wchar_t *);
 static int	read_getcmd(EditLine *, el_action_t *, wchar_t *);
 static void	read_clearmacros(struct macros *);
@@ -128,68 +128,6 @@ el_read_getfn(struct el_read_t *el_read)
 {
 	return el_read->read_char == read_char ?
 	    EL_BUILTIN_GETCFN : el_read->read_char;
-}
-
-
-/* read__fixio():
- *	Try to recover from a read error
- */
-/* ARGSUSED */
-static int
-read__fixio(int fd __attribute__((__unused__)), int e)
-{
-
-	switch (e) {
-	case -1:		/* Make sure that the code is reachable */
-
-#ifdef EWOULDBLOCK
-	case EWOULDBLOCK:
-#ifndef TRY_AGAIN
-#define TRY_AGAIN
-#endif
-#endif /* EWOULDBLOCK */
-
-#if defined(POSIX) && defined(EAGAIN)
-#if defined(EWOULDBLOCK) && EWOULDBLOCK != EAGAIN
-	case EAGAIN:
-#ifndef TRY_AGAIN
-#define TRY_AGAIN
-#endif
-#endif /* EWOULDBLOCK && EWOULDBLOCK != EAGAIN */
-#endif /* POSIX && EAGAIN */
-
-		e = 0;
-#ifdef TRY_AGAIN
-#if defined(F_SETFL) && defined(O_NDELAY)
-		if ((e = fcntl(fd, F_GETFL)) == -1)
-			return -1;
-
-		if (fcntl(fd, F_SETFL, e & ~O_NDELAY) == -1)
-			return -1;
-		else
-			e = 1;
-#endif /* F_SETFL && O_NDELAY */
-
-#ifdef FIONBIO
-		{
-			int zero = 0;
-
-			if (ioctl(fd, FIONBIO, &zero) == -1)
-				return -1;
-			else
-				e = 1;
-		}
-#endif /* FIONBIO */
-
-#endif /* TRY_AGAIN */
-		return e ? 0 : -1;
-
-	case EINTR:
-		return 0;
-
-	default:
-		return -1;
-	}
 }
 
 
@@ -271,40 +209,32 @@ read_getcmd(EditLine *el, el_action_t *cmdnum, wchar_t *ch)
 static int
 read_char(EditLine *el, wchar_t *cp)
 {
-	ssize_t num_read;
-	int tried = 0;
 	char cbuf[MB_LEN_MAX];
 	int cbp = 0;
-	int save_errno = errno;
 
  again:
 	el->el_signal->sig_no = 0;
-	while ((num_read = read(el->el_infd, cbuf + cbp, 1)) == -1) {
-		int e = errno;
-		switch (el->el_signal->sig_no) {
-		case SIGCONT:
-			el_set(el, EL_REFRESH);
-			/*FALLTHROUGH*/
-		case SIGWINCH:
-			sig_set(el);
-			goto again;
-		default:
-			break;
+	switch (read(el->el_infd, cbuf + cbp, 1)) {
+	case -1:
+		if (errno == EINTR) {
+			switch (el->el_signal->sig_no) {
+			case SIGCONT:
+				el_set(el, EL_REFRESH);
+				/*FALLTHROUGH*/
+			case SIGWINCH:
+				sig_set(el);
+				goto again;
+			default:
+				break;
+			}
 		}
-		if (!tried && read__fixio(el->el_infd, e) == 0) {
-			errno = save_errno;
-			tried = 1;
-		} else {
-			errno = e;
-			*cp = L'\0';
-			return -1;
-		}
-	}
-
-	/* Test for EOF */
-	if (num_read == 0) {
+		*cp = L'\0';
+		return -1;
+	case 0:
 		*cp = L'\0';
 		return 0;
+	default:
+		break;
 	}
 
 	for (;;) {

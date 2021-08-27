@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwx.c,v 1.88 2021/07/30 14:09:12 stsp Exp $	*/
+/*	$OpenBSD: if_iwx.c,v 1.97 2021/08/26 07:11:09 kevlo Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -462,6 +462,7 @@ void	iwx_watchdog(struct ifnet *);
 int	iwx_ioctl(struct ifnet *, u_long, caddr_t);
 const char *iwx_desc_lookup(uint32_t);
 void	iwx_nic_error(struct iwx_softc *);
+void	iwx_dump_driver_status(struct iwx_softc *);
 void	iwx_nic_umac_error(struct iwx_softc *);
 int	iwx_detect_duplicate(struct iwx_softc *, struct mbuf *,
 	    struct iwx_rx_mpdu_desc *, struct ieee80211_rxinfo *);
@@ -2043,6 +2044,7 @@ int
 iwx_prepare_card_hw(struct iwx_softc *sc)
 {
 	int t = 0;
+	int ntries;
 
 	if (iwx_set_hw_ready(sc))
 		return 0;
@@ -2051,17 +2053,19 @@ iwx_prepare_card_hw(struct iwx_softc *sc)
 	    IWX_CSR_RESET_LINK_PWR_MGMT_DISABLED);
 	DELAY(1000);
  
+	for (ntries = 0; ntries < 10; ntries++) {
+		/* If HW is not ready, prepare the conditions to check again */
+		IWX_SETBITS(sc, IWX_CSR_HW_IF_CONFIG_REG,
+		    IWX_CSR_HW_IF_CONFIG_REG_PREPARE);
 
-	/* If HW is not ready, prepare the conditions to check again */
-	IWX_SETBITS(sc, IWX_CSR_HW_IF_CONFIG_REG,
-	    IWX_CSR_HW_IF_CONFIG_REG_PREPARE);
-
-	do {
-		if (iwx_set_hw_ready(sc))
-			return 0;
-		DELAY(200);
-		t += 200;
-	} while (t < 150000);
+		do {
+			if (iwx_set_hw_ready(sc))
+				return 0;
+			DELAY(200);
+			t += 200;
+		} while (t < 150000);
+		DELAY(25000);
+	}
 
 	return ETIMEDOUT;
 }
@@ -5593,7 +5597,7 @@ iwx_fill_probe_req(struct iwx_softc *sc, struct iwx_scan_probe_req *preq)
 
 	memset(preq, 0, sizeof(*preq));
 
-	if (remain < sizeof(*wh) + 2 + ic->ic_des_esslen)
+	if (remain < sizeof(*wh) + 2)
 		return ENOBUFS;
 
 	/*
@@ -5989,8 +5993,10 @@ iwx_umac_scan_v14(struct iwx_softc *sc, int bgscan)
 	scan_p->periodic_params.schedule[0].iter_count = 1;
 
 	err = iwx_fill_probe_req(sc, &scan_p->probe_params.preq);
-	if (err)
+	if (err) {
+		free(cmd, M_DEVBUF, sizeof(*cmd));
 		return err;
+	}
 
 	if (ic->ic_des_esslen != 0) {
 		scan_p->probe_params.direct_scan[0].id = IEEE80211_ELEMID_SSID;
@@ -8143,9 +8149,10 @@ iwx_watchdog(struct ifnet *ifp)
 	if (sc->sc_tx_timer > 0) {
 		if (--sc->sc_tx_timer == 0) {
 			printf("%s: device timeout\n", DEVNAME(sc));
-#ifdef IWX_DEBUG
-			iwx_nic_error(sc);
-#endif
+			if (ifp->if_flags & IFF_DEBUG) {
+				iwx_nic_error(sc);
+				iwx_dump_driver_status(sc);
+			}
 			if ((sc->sc_flags & IWX_FLAG_SHUTDOWN) == 0)
 				task_add(systq, &sc->init_task);
 			ifp->if_oerrors++;
@@ -8210,7 +8217,6 @@ iwx_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	return err;
 }
 
-#if 1 /* usually #ifdef IWX_DEBUG but always enabled for now */
 /*
  * Note: This structure is read from the device with IO accesses,
  * and the reading already does the endian conversion. As it is
@@ -8460,7 +8466,23 @@ iwx_nic_error(struct iwx_softc *sc)
 	if (sc->sc_uc.uc_umac_error_event_table)
 		iwx_nic_umac_error(sc);
 }
-#endif
+
+void
+iwx_dump_driver_status(struct iwx_softc *sc)
+{
+	int i;
+
+	printf("driver status:\n");
+	for (i = 0; i < IWX_MAX_QUEUES; i++) {
+		struct iwx_tx_ring *ring = &sc->txq[i];
+		printf("  tx ring %2d: qid=%-2d cur=%-3d "
+		    "queued=%-3d\n",
+		    i, ring->qid, ring->cur, ring->queued);
+	}
+	printf("  rx ring: cur=%d\n", sc->rxq.cur);
+	printf("  802.11 state %s\n",
+	    ieee80211_state_name[sc->sc_ic.ic_state]);
+}
 
 #define SYNC_RESP_STRUCT(_var_, _pkt_)					\
 do {									\
@@ -8618,8 +8640,6 @@ iwx_rx_pkt(struct iwx_softc *sc, struct iwx_rx_data *data, struct mbuf_list *ml)
 				    resp5->lmac_data[1].dbg_ptrs.error_event_table_ptr);
 				sc->sc_uc.uc_log_event_table = le32toh(
 				    resp5->lmac_data[0].dbg_ptrs.log_event_table_ptr);
-				sc->sched_base = le32toh(
-				    resp5->lmac_data[0].dbg_ptrs.scd_base_ptr);
 				sc->sc_uc.uc_umac_error_event_table = le32toh(
 				    resp5->umac_data.dbg_ptrs.error_info_addr);
 				if (resp5->status == IWX_ALIVE_STATUS_OK)
@@ -8632,8 +8652,6 @@ iwx_rx_pkt(struct iwx_softc *sc, struct iwx_rx_data *data, struct mbuf_list *ml)
 				    resp4->lmac_data[1].dbg_ptrs.error_event_table_ptr);
 				sc->sc_uc.uc_log_event_table = le32toh(
 				    resp4->lmac_data[0].dbg_ptrs.log_event_table_ptr);
-				sc->sched_base = le32toh(
-				    resp4->lmac_data[0].dbg_ptrs.scd_base_ptr);
 				sc->sc_uc.uc_umac_error_event_table = le32toh(
 				    resp4->umac_data.dbg_ptrs.error_info_addr);
 				if (resp4->status == IWX_ALIVE_STATUS_OK)
@@ -8876,6 +8894,8 @@ int
 iwx_intr(void *arg)
 {
 	struct iwx_softc *sc = arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ifnet *ifp = IC2IFP(ic);
 	int handled = 0;
 	int r1, r2, rv = 0;
 
@@ -8940,24 +8960,10 @@ iwx_intr(void *arg)
 	}
 
 	if (r1 & IWX_CSR_INT_BIT_SW_ERR) {
-#if 1 /* usually #ifdef IWX_DEBUG but always enabled for now */
-		int i;
-
-		iwx_nic_error(sc);
-
-		/* Dump driver status (TX and RX rings) while we're here. */
-		printf("driver status:\n");
-		for (i = 0; i < IWX_MAX_QUEUES; i++) {
-			struct iwx_tx_ring *ring = &sc->txq[i];
-			printf("  tx ring %2d: qid=%-2d cur=%-3d "
-			    "queued=%-3d\n",
-			    i, ring->qid, ring->cur, ring->queued);
+		if (ifp->if_flags & IFF_DEBUG) {
+			iwx_nic_error(sc);
+			iwx_dump_driver_status(sc);
 		}
-		printf("  rx ring: cur=%d\n", sc->rxq.cur);
-		printf("  802.11 state %s\n",
-		    ieee80211_state_name[sc->sc_ic.ic_state]);
-#endif
-
 		printf("%s: fatal firmware error\n", DEVNAME(sc));
 		if ((sc->sc_flags & IWX_FLAG_SHUTDOWN) == 0)
 			task_add(systq, &sc->init_task);
@@ -9026,6 +9032,8 @@ int
 iwx_intr_msix(void *arg)
 {
 	struct iwx_softc *sc = arg;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ifnet *ifp = IC2IFP(ic);
 	uint32_t inta_fh, inta_hw;
 	int vector = 0;
 
@@ -9050,24 +9058,10 @@ iwx_intr_msix(void *arg)
 	if ((inta_fh & IWX_MSIX_FH_INT_CAUSES_FH_ERR) ||
 	    (inta_hw & IWX_MSIX_HW_INT_CAUSES_REG_SW_ERR) ||
 	    (inta_hw & IWX_MSIX_HW_INT_CAUSES_REG_SW_ERR_V2)) {
-#if 1 /* usually #ifdef IWX_DEBUG but always enabled for now */
-		int i;
-
-		iwx_nic_error(sc);
-
-		/* Dump driver status (TX and RX rings) while we're here. */
-		printf("driver status:\n");
-		for (i = 0; i < IWX_MAX_QUEUES; i++) {
-			struct iwx_tx_ring *ring = &sc->txq[i];
-			printf("  tx ring %2d: qid=%-2d cur=%-3d "
-			    "queued=%-3d\n",
-			    i, ring->qid, ring->cur, ring->queued);
+		if (ifp->if_flags & IFF_DEBUG) {
+			iwx_nic_error(sc);
+			iwx_dump_driver_status(sc);
 		}
-		printf("  rx ring: cur=%d\n", sc->rxq.cur);
-		printf("  802.11 state %s\n",
-		    ieee80211_state_name[sc->sc_ic.ic_state]);
-#endif
-
 		printf("%s: fatal firmware error\n", DEVNAME(sc));
 		if ((sc->sc_flags & IWX_FLAG_SHUTDOWN) == 0)
 			task_add(systq, &sc->init_task);
@@ -9273,15 +9267,6 @@ iwx_attach(struct device *parent, struct device *self, void *aux)
 	reg = pci_conf_read(sc->sc_pct, sc->sc_pcitag, 0x40);
 	pci_conf_write(sc->sc_pct, sc->sc_pcitag, 0x40, reg & ~0xff00);
 
-	/* Enable bus-mastering and hardware bug workaround. */
-	reg = pci_conf_read(sc->sc_pct, sc->sc_pcitag, PCI_COMMAND_STATUS_REG);
-	reg |= PCI_COMMAND_MASTER_ENABLE;
-	/* if !MSI */
-	if (reg & PCI_COMMAND_INTERRUPT_DISABLE) {
-		reg &= ~PCI_COMMAND_INTERRUPT_DISABLE;
-	}
-	pci_conf_write(sc->sc_pct, sc->sc_pcitag, PCI_COMMAND_STATUS_REG, reg);
-
 	memtype = pci_mapreg_type(pa->pa_pc, pa->pa_tag, PCI_MAPREG_START);
 	err = pci_mapreg_map(pa, PCI_MAPREG_START, memtype, 0,
 	    &sc->sc_st, &sc->sc_sh, NULL, &sc->sc_sz, 0);
@@ -9292,9 +9277,18 @@ iwx_attach(struct device *parent, struct device *self, void *aux)
 
 	if (pci_intr_map_msix(pa, 0, &ih) == 0) {
 		sc->sc_msix = 1;
-	} else if (pci_intr_map_msi(pa, &ih) && pci_intr_map(pa, &ih)) {
-		printf("%s: can't map interrupt\n", DEVNAME(sc));
-		return;
+	} else if (pci_intr_map_msi(pa, &ih)) {
+		if (pci_intr_map(pa, &ih)) {
+			printf("%s: can't map interrupt\n", DEVNAME(sc));
+			return;
+		}
+		/* Hardware bug workaround. */
+		reg = pci_conf_read(sc->sc_pct, sc->sc_pcitag,
+		    PCI_COMMAND_STATUS_REG);
+		if (reg & PCI_COMMAND_INTERRUPT_DISABLE)
+			reg &= ~PCI_COMMAND_INTERRUPT_DISABLE;
+		pci_conf_write(sc->sc_pct, sc->sc_pcitag,
+		    PCI_COMMAND_STATUS_REG, reg);
 	}
 
 	intrstr = pci_intr_string(sc->sc_pct, ih);
@@ -9360,55 +9354,17 @@ iwx_attach(struct device *parent, struct device *self, void *aux)
 		sc->sc_uhb_supported = 0;
 		break;
 	case PCI_PRODUCT_INTEL_WL_22500_4:
-	    sc->sc_fwname = "iwx-Qu-c0-hr-b0-63";
-	    sc->sc_device_family = IWX_DEVICE_FAMILY_22000;
-	    sc->sc_integrated = 1;
-	    sc->sc_ltr_delay = IWX_SOC_FLAGS_LTR_APPLY_DELAY_200;
-	    sc->sc_low_latency_xtal = 0;
-	    sc->sc_xtal_latency = 5000;
-	    sc->sc_tx_with_siso_diversity = 0;
-	    sc->sc_uhb_supported = 0;
-	    break;
+		sc->sc_fwname = "iwx-Qu-c0-hr-b0-63";
+		sc->sc_device_family = IWX_DEVICE_FAMILY_22000;
+		sc->sc_integrated = 1;
+		sc->sc_ltr_delay = IWX_SOC_FLAGS_LTR_APPLY_DELAY_200;
+		sc->sc_low_latency_xtal = 0;
+		sc->sc_xtal_latency = 5000;
+		sc->sc_tx_with_siso_diversity = 0;
+		sc->sc_uhb_supported = 0;
+		break;
 	default:
 		printf("%s: unknown adapter type\n", DEVNAME(sc));
-		return;
-	}
-
-	if (iwx_prepare_card_hw(sc) != 0) {
-		printf("%s: could not initialize hardware\n",
-		    DEVNAME(sc));
-		return;
-	}
-
-	/*
-	 * In order to recognize C step the driver should read the
-	 * chip version id located at the AUX bus MISC address.
-	 */
-	IWX_SETBITS(sc, IWX_CSR_GP_CNTRL,
-		    IWX_CSR_GP_CNTRL_REG_FLAG_INIT_DONE);
-	DELAY(2);
-
-	err = iwx_poll_bit(sc, IWX_CSR_GP_CNTRL,
-			   IWX_CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY,
-			   IWX_CSR_GP_CNTRL_REG_FLAG_MAC_CLOCK_READY,
-			   25000);
-	if (!err) {
-		printf("%s: Failed to wake up the nic\n", DEVNAME(sc));
-		return;
-	}
-
-	if (iwx_nic_lock(sc)) {
-		uint32_t hw_step = iwx_read_prph(sc, IWX_WFPM_CTRL_REG);
-		hw_step |= IWX_ENABLE_WFPM;
-		iwx_write_prph(sc, IWX_WFPM_CTRL_REG, hw_step);
-		hw_step = iwx_read_prph(sc, IWX_AUX_MISC_REG);
-		hw_step = (hw_step >> IWX_HW_STEP_LOCATION_BITS) & 0xF;
-		if (hw_step == 0x3)
-			sc->sc_hw_rev = (sc->sc_hw_rev & 0xFFFFFFF3) |
-					(IWX_SILICON_C_STEP << 2);
-		iwx_nic_unlock(sc);
-	} else {
-		printf("%s: Failed to lock the nic\n", DEVNAME(sc));
 		return;
 	}
 
@@ -9427,15 +9383,6 @@ iwx_attach(struct device *parent, struct device *self, void *aux)
 	if (err) {
 		printf("%s: could not allocate ICT table\n", DEVNAME(sc));
 		goto fail1;
-	}
-
-	/* TX scheduler rings must be aligned on a 1KB boundary. */
-	err = iwx_dma_contig_alloc(sc->sc_dmat, &sc->sched_dma,
-	    nitems(sc->txq) * sizeof(struct iwx_agn_scd_bc_tbl), 1024);
-	if (err) {
-		printf("%s: could not allocate TX scheduler rings\n",
-		    DEVNAME(sc));
-		goto fail3;
 	}
 
 	for (txq_i = 0; txq_i < nitems(sc->txq); txq_i++) {
@@ -9551,8 +9498,7 @@ iwx_attach(struct device *parent, struct device *self, void *aux)
 fail4:	while (--txq_i >= 0)
 		iwx_free_tx_ring(sc, &sc->txq[txq_i]);
 	iwx_free_rx_ring(sc, &sc->rxq);
-	iwx_dma_contig_free(&sc->sched_dma);
-fail3:	if (sc->ict_dma.vaddr != NULL)
+	if (sc->ict_dma.vaddr != NULL)
 		iwx_dma_contig_free(&sc->ict_dma);
 	
 fail1:	iwx_dma_contig_free(&sc->ctxt_info_dma);

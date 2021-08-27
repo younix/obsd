@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.135 2021/07/21 20:26:30 krw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.140 2021/08/24 12:34:04 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -51,22 +51,18 @@ extern const int		manpage_sz;
 int
 Xreinit(char *args, struct mbr *mbr)
 {
-	struct dos_mbr		dos_mbr;
 	int			dogpt;
 
 	dogpt = 0;
 
-	if (strncasecmp(args, "gpt", 3) == 0)
+	if (strcasecmp(args, "gpt") == 0)
 		dogpt = 1;
-	else if (strncasecmp(args, "mbr", 3) == 0)
+	else if (strcasecmp(args, "mbr") == 0)
 		dogpt = 0;
 	else if (strlen(args) > 0) {
 		printf("Unrecognized modifier '%s'\n", args);
 		return CMD_CONT;
 	}
-
-	MBR_make(&initial_mbr, &dos_mbr);
-	MBR_parse(&dos_mbr, mbr->mbr_lba_self, mbr->mbr_lba_firstembr, mbr);
 
 	if (dogpt) {
 		GPT_init(GHANDGP);
@@ -88,7 +84,6 @@ Xdisk(char *args, struct mbr *mbr)
 	int			maxhead = 256;
 	int			maxsec  = 63;
 
-	/* Print out disk info */
 	DISK_printgeometry(args);
 
 #if defined (__powerpc__) || defined (__mips__)
@@ -120,7 +115,7 @@ Xswap(char *args, struct mbr *mbr)
 	struct gpt_partition	 gg;
 
 	to = args;
-	from = strsep(&to, " \t");
+	from = strsep(&to, WHITESPACE);
 
 	pt = parsepn(to);
 	if (pt == -1)
@@ -401,7 +396,6 @@ Xselect(char *args, struct mbr *mbr)
 
 	lba_self = mbr->mbr_prt[pn].prt_bs;
 
-	/* Sanity checks */
 	if ((mbr->mbr_prt[pn].prt_id != DOSPTYP_EXTEND) &&
 	    (mbr->mbr_prt[pn].prt_id != DOSPTYP_EXTENDL)) {
 		printf("Partition %d is not an extended partition.\n", pn);
@@ -419,7 +413,6 @@ Xselect(char *args, struct mbr *mbr)
 		printf("New EMBR at offset %llu.\n", lba_self);
 	}
 
-	/* Recursion is beautiful! */
 	USER_edit(lba_self, lba_firstembr);
 
 	return CMD_CONT;
@@ -489,21 +482,7 @@ Xexit(char *args, struct mbr *mbr)
 int
 Xhelp(char *args, struct mbr *mbr)
 {
-	char			 help[80];
-	char			*mbrstr;
-	int			 i;
-
-	for (i = 0; cmd_table[i].cmd_name != NULL; i++) {
-		strlcpy(help, cmd_table[i].cmd_help, sizeof(help));
-		if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
-			if (cmd_table[i].cmd_gpt == 0)
-				continue;
-			mbrstr = strstr(help, "MBR");
-			if (mbrstr)
-				memcpy(mbrstr, "GPT", 3);
-		}
-		printf("\t%s\t\t%s\n", cmd_table[i].cmd_name, help);
-	}
+	USER_help();
 
 	return CMD_CONT;
 }
@@ -511,7 +490,7 @@ Xhelp(char *args, struct mbr *mbr)
 int
 Xupdate(char *args, struct mbr *mbr)
 {
-	memcpy(mbr->mbr_code, initial_mbr.mbr_code, sizeof(mbr->mbr_code));
+	memcpy(mbr->mbr_code, default_dmbr.dmbr_boot, sizeof(mbr->mbr_code));
 	mbr->mbr_signature = DOSMBR_SIGNATURE;
 	printf("Machine code updated.\n");
 	return CMD_DIRTY;
@@ -526,7 +505,7 @@ Xflag(char *args, struct mbr *mbr)
 	int			 i, pn;
 
 	flag = args;
-	part = strsep(&flag, " \t");
+	part = strsep(&flag, WHITESPACE);
 
 	pn = parsepn(part);
 	if (pn == -1)
@@ -607,9 +586,7 @@ ask_num(const char *str, int dflt, int low, int high)
 
 	do {
 		printf("%s [%d - %d]: [%d] ", str, low, high, dflt);
-
-		if (string_from_line(lbuf, sizeof(lbuf)))
-			errx(1, "eof");
+		string_from_line(lbuf, sizeof(lbuf), TRIMMED);
 
 		if (lbuf[0] == '\0') {
 			num = dflt;
@@ -633,11 +610,9 @@ ask_pid(const int dflt, struct uuid *guid)
 	do {
 		printf("Partition id ('0' to disable) [01 - FF]: [%X] ", dflt);
 		printf("(? for help) ");
+		string_from_line(lbuf, sizeof(lbuf), TRIMMED);
 
-		if (string_from_line(lbuf, sizeof(lbuf)))
-			errx(1, "eof");
-
-		if (lbuf[0] == '?') {
+		if (strcmp(lbuf, "?") == 0) {
 			PRT_printall();
 			continue;
 		}
@@ -675,8 +650,7 @@ ask_string(const char *prompt, const char *oval)
 
 	buf[0] = '\0';
 	printf("%s: [%s] ", prompt, oval ? oval : "");
-	if (string_from_line(buf, sizeof(buf)))
-		errx(1, "eof");
+	string_from_line(buf, sizeof(buf), UNTRIMMED);
 
 	if (buf[0] == '\0' && oval)
 		strlcpy(buf, oval, sizeof(buf));

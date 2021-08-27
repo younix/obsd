@@ -1,4 +1,4 @@
-/* $OpenBSD: tty.c,v 1.394 2021/08/05 09:43:51 nicm Exp $ */
+/* $OpenBSD: tty.c,v 1.403 2021/08/17 11:20:13 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -45,9 +45,12 @@ static void	tty_cursor_pane_unless_wrap(struct tty *,
 		    const struct tty_ctx *, u_int, u_int);
 static void	tty_invalidate(struct tty *);
 static void	tty_colours(struct tty *, const struct grid_cell *);
-static void	tty_check_fg(struct tty *, int *, struct grid_cell *);
-static void	tty_check_bg(struct tty *, int *, struct grid_cell *);
-static void	tty_check_us(struct tty *, int *, struct grid_cell *);
+static void	tty_check_fg(struct tty *, struct colour_palette *,
+    		    struct grid_cell *);
+static void	tty_check_bg(struct tty *, struct colour_palette *,
+    		    struct grid_cell *);
+static void	tty_check_us(struct tty *, struct colour_palette *,
+    		    struct grid_cell *);
 static void	tty_colours_fg(struct tty *, const struct grid_cell *);
 static void	tty_colours_bg(struct tty *, const struct grid_cell *);
 static void	tty_colours_us(struct tty *, const struct grid_cell *);
@@ -66,7 +69,7 @@ static void	tty_emulate_repeat(struct tty *, enum tty_code_code,
 static void	tty_repeat_space(struct tty *, u_int);
 static void	tty_draw_pane(struct tty *, const struct tty_ctx *, u_int);
 static void	tty_default_attributes(struct tty *, const struct grid_cell *,
-		    int *, u_int);
+		    struct colour_palette *, u_int);
 static int	tty_check_overlay(struct tty *, u_int, u_int);
 
 #define tty_use_margin(tty) \
@@ -939,27 +942,6 @@ tty_update_client_offset(struct client *c)
 	c->flags |= (CLIENT_REDRAWWINDOW|CLIENT_REDRAWSTATUS);
 }
 
-/* Get a palette entry. */
-static int
-tty_get_palette(int *palette, int c)
-{
-	int	new;
-
-	if (palette == NULL)
-		return (-1);
-
-	new = -1;
-	if (c < 8)
-		new = palette[c];
-	else if (c >= 90 && c <= 97)
-		new = palette[8 + c - 90];
-	else if (c & COLOUR_FLAG_256)
-		new = palette[c & ~COLOUR_FLAG_256];
-	if (new == 0)
-		return (-1);
-	return (new);
-}
-
 /*
  * Is the region large enough to be worth redrawing once later rather than
  * probably several times now? Currently yes if it is more than 50% of the
@@ -1336,19 +1318,20 @@ tty_check_overlay(struct tty *tty, u_int px, u_int py)
 
 	if (c->overlay_check == NULL)
 		return (1);
-	return (c->overlay_check(c, px, py));
+	return (c->overlay_check(c, c->overlay_data, px, py));
 }
 
 void
 tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx,
-    u_int atx, u_int aty, const struct grid_cell *defaults, int *palette)
+    u_int atx, u_int aty, const struct grid_cell *defaults,
+    struct colour_palette *palette)
 {
 	struct grid		*gd = s->grid;
 	struct grid_cell	 gc, last;
 	const struct grid_cell	*gcp;
 	struct grid_line	*gl;
 	struct client		*c = tty->client;
-	u_int			 i, j, ux, sx, width;
+	u_int			 i, j, ux, sx, width, hidden;
 	int			 flags, cleared = 0, wrapped = 0;
 	char			 buf[512];
 	size_t			 len;
@@ -1356,6 +1339,8 @@ tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx,
 
 	log_debug("%s: px=%u py=%u nx=%u atx=%u aty=%u", __func__,
 	    px, py, nx, atx, aty);
+	log_debug("%s: defaults: fg=%d, bg=%d", __func__, defaults->fg,
+	    defaults->bg);
 
 	/*
 	 * py is the line in the screen to draw.
@@ -1449,17 +1434,31 @@ tty_draw_line(struct tty *tty, struct screen *s, u_int px, u_int py, u_int nx,
 			screen_select_cell(s, &last, gcp);
 		else
 			memcpy(&last, gcp, sizeof last);
-		if (!tty_check_overlay(tty, atx + ux, aty)) {
+
+		hidden = 0;
+		for (j = 0; j < gcp->data.width; j++) {
+			if (!tty_check_overlay(tty, atx + ux + j, aty))
+				hidden++;
+		}
+		if (hidden != 0 && hidden == gcp->data.width) {
 			if (~gcp->flags & GRID_FLAG_PADDING)
 				ux += gcp->data.width;
-		} else if (ux + gcp->data.width > nx) {
-			tty_attributes(tty, &last, defaults, palette);
-			tty_cursor(tty, atx + ux, aty);
-			for (j = 0; j < gcp->data.width; j++) {
-				if (ux + j > nx)
-					break;
-				tty_putc(tty, ' ');
-				ux++;
+		} else if (hidden != 0 || ux + gcp->data.width > nx) {
+			if (~gcp->flags & GRID_FLAG_PADDING) {
+				tty_attributes(tty, &last, defaults, palette);
+				tty_cursor(tty, atx + ux, aty);
+				for (j = 0; j < gcp->data.width; j++) {
+					if (ux > nx)
+						break;
+					if (tty_check_overlay(tty, atx + ux,
+					    aty))
+						tty_putc(tty, ' ');
+					else {
+						tty_cursor(tty, atx + ux + 1,
+						    aty);
+					}
+					ux++;
+				}
 			}
 		} else if (gcp->attr & GRID_ATTR_CHARSET) {
 			tty_attributes(tty, &last, defaults, palette);
@@ -2027,6 +2026,7 @@ tty_set_selection(struct tty *tty, const char *buf, size_t len)
 
 	b64_ntop(buf, len, encoded, size);
 	tty_putcode_ptr2(tty, TTYC_MS, "", encoded);
+	tty->client->redraw = EVBUFFER_LENGTH(tty->out);
 
 	free(encoded);
 }
@@ -2039,14 +2039,27 @@ tty_cmd_rawstring(struct tty *tty, const struct tty_ctx *ctx)
 }
 
 void
-tty_cmd_syncstart(struct tty *tty, __unused const struct tty_ctx *ctx)
+tty_cmd_syncstart(struct tty *tty, const struct tty_ctx *ctx)
 {
-	tty_sync_start(tty);
+	if (ctx->num == 0x11) {
+		/*
+		 * This is an overlay and a command that moves the cursor so
+		 * start synchronized updates.
+		 */
+		tty_sync_start(tty);
+	} else if (~ctx->num & 0x10) {
+		/*
+		 * This is a pane. If there is an overlay, always start;
+		 * otherwise, only if requested.
+		 */
+		if (ctx->num || tty->client->overlay_draw != NULL)
+			tty_sync_start(tty);
+	}
 }
 
 void
 tty_cell(struct tty *tty, const struct grid_cell *gc,
-    const struct grid_cell *defaults, int *palette)
+    const struct grid_cell *defaults, struct colour_palette *palette)
 {
 	const struct grid_cell	*gcp;
 
@@ -2366,17 +2379,19 @@ out:
 
 void
 tty_attributes(struct tty *tty, const struct grid_cell *gc,
-    const struct grid_cell *defaults, int *palette)
+    const struct grid_cell *defaults, struct colour_palette *palette)
 {
 	struct grid_cell	*tc = &tty->cell, gc2;
 	int			 changed;
 
 	/* Copy cell and update default colours. */
 	memcpy(&gc2, gc, sizeof gc2);
-	if (gc2.fg == 8)
-		gc2.fg = defaults->fg;
-	if (gc2.bg == 8)
-		gc2.bg = defaults->bg;
+	if (~gc->flags & GRID_FLAG_NOPALETTE) {
+		if (gc2.fg == 8)
+			gc2.fg = defaults->fg;
+		if (gc2.bg == 8)
+			gc2.bg = defaults->bg;
+	}
 
 	/* Ignore cell if it is the same as the last one. */
 	if (gc2.attr == tty->last_cell.attr &&
@@ -2518,13 +2533,14 @@ tty_colours(struct tty *tty, const struct grid_cell *gc)
 	if (!COLOUR_DEFAULT(gc->bg) && gc->bg != tc->bg)
 		tty_colours_bg(tty, gc);
 
-	/* Set the underscore color. */
+	/* Set the underscore colour. */
 	if (gc->us != tc->us)
 		tty_colours_us(tty, gc);
 }
 
 static void
-tty_check_fg(struct tty *tty, int *palette, struct grid_cell *gc)
+tty_check_fg(struct tty *tty, struct colour_palette *palette,
+    struct grid_cell *gc)
 {
 	u_char	r, g, b;
 	u_int	colours;
@@ -2539,7 +2555,7 @@ tty_check_fg(struct tty *tty, int *palette, struct grid_cell *gc)
 		c = gc->fg;
 		if (c < 8 && gc->attr & GRID_ATTR_BRIGHT)
 			c += 90;
-		if ((c = tty_get_palette(palette, c)) != -1)
+		if ((c = colour_palette_get(palette, c)) != -1)
 			gc->fg = c;
 	}
 
@@ -2580,7 +2596,8 @@ tty_check_fg(struct tty *tty, int *palette, struct grid_cell *gc)
 }
 
 static void
-tty_check_bg(struct tty *tty, int *palette, struct grid_cell *gc)
+tty_check_bg(struct tty *tty, struct colour_palette *palette,
+    struct grid_cell *gc)
 {
 	u_char	r, g, b;
 	u_int	colours;
@@ -2588,7 +2605,7 @@ tty_check_bg(struct tty *tty, int *palette, struct grid_cell *gc)
 
 	/* Perform substitution if this pane has a palette. */
 	if (~gc->flags & GRID_FLAG_NOPALETTE) {
-		if ((c = tty_get_palette(palette, gc->bg)) != -1)
+		if ((c = colour_palette_get(palette, gc->bg)) != -1)
 			gc->bg = c;
 	}
 
@@ -2631,13 +2648,14 @@ tty_check_bg(struct tty *tty, int *palette, struct grid_cell *gc)
 }
 
 static void
-tty_check_us(__unused struct tty *tty, int *palette, struct grid_cell *gc)
+tty_check_us(__unused struct tty *tty, struct colour_palette *palette,
+    struct grid_cell *gc)
 {
 	int	c;
 
 	/* Perform substitution if this pane has a palette. */
 	if (~gc->flags & GRID_FLAG_NOPALETTE) {
-		if ((c = tty_get_palette(palette, gc->us)) != -1)
+		if ((c = colour_palette_get(palette, gc->us)) != -1)
 			gc->us = c;
 	}
 
@@ -2778,25 +2796,30 @@ static void
 tty_window_default_style(struct grid_cell *gc, struct window_pane *wp)
 {
 	memcpy(gc, &grid_default_cell, sizeof *gc);
-	gc->fg = wp->fg;
-	gc->bg = wp->bg;
+	gc->fg = wp->palette.fg;
+	gc->bg = wp->palette.bg;
 }
 
 void
 tty_default_colours(struct grid_cell *gc, struct window_pane *wp)
 {
-	struct options	*oo = wp->options;
+	struct options		*oo = wp->options;
+	struct format_tree	*ft;
 
 	memcpy(gc, &grid_default_cell, sizeof *gc);
 
 	if (wp->flags & PANE_STYLECHANGED) {
+		log_debug("%%%u: style changed", wp->id);
 		wp->flags &= ~PANE_STYLECHANGED;
 
+		ft = format_create(NULL, NULL, FORMAT_PANE|wp->id,
+		    FORMAT_NOJOBS);
+		format_defaults(ft, NULL, NULL, NULL, wp);
 		tty_window_default_style(&wp->cached_active_gc, wp);
-		style_add(&wp->cached_active_gc, oo, "window-active-style",
-		    NULL);
+		style_add(&wp->cached_active_gc, oo, "window-active-style", ft);
 		tty_window_default_style(&wp->cached_gc, wp);
-		style_add(&wp->cached_gc, oo, "window-style", NULL);
+		style_add(&wp->cached_gc, oo, "window-style", ft);
+		format_free(ft);
 	}
 
 	if (gc->fg == 8) {
@@ -2816,7 +2839,7 @@ tty_default_colours(struct grid_cell *gc, struct window_pane *wp)
 
 static void
 tty_default_attributes(struct tty *tty, const struct grid_cell *defaults,
-    int *palette, u_int bg)
+    struct colour_palette *palette, u_int bg)
 {
 	struct grid_cell	gc;
 

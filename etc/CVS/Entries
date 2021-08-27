@@ -9,7 +9,6 @@
 /ftpusers/1.50/Mon Mar 17 21:01:02 2014//
 /gettytab/1.7/Tue Mar 12 11:01:25 2019//
 /ksh.kshrc/1.32/Wed May 16 14:01:41 2018//
-/locate.rc/1.7/Fri Aug 14 03:02:07 2015//
 /mailer.conf/1.7/Mon Dec  7 12:32:06 2015//
 /minfree/1.1/Mon Dec 18 15:18:15 1995//
 /monthly/1.13/Wed Jan 19 06:18:05 2011//
@@ -59,6 +58,7 @@ D/etc.riscv64////
 /moduli/1.30/Tue May 18 14:06:10 2021//
 /services/1.102/Tue May 18 14:06:10 2021//
 /changelist/1.128/Thu Aug  5 11:00:38 2021//
-/netstart/1.213/Thu Aug  5 11:00:38 2021//
 /rc/1.553/Thu Aug  5 11:00:38 2021//
 /rc.conf/1.224/Thu Aug  5 11:00:38 2021//
+/locate.rc/1.8/Fri Aug 27 15:26:12 2021//
+/netstart/1.214/Fri Aug 27 15:26:12 2021//

@@ -1,5 +1,5 @@
 #!/bin/ksh
-#	$OpenBSD: install.sub,v 1.1170 2021/08/02 01:29:26 kn Exp $
+#	$OpenBSD: install.sub,v 1.1173 2021/08/24 21:50:09 bluhm Exp $
 #
 # Copyright (c) 1997-2015 Todd Miller, Theo de Raadt, Ken Westerback
 # Copyright (c) 2015, Robert Peichaer <rpe@openbsd.org>
@@ -656,7 +656,8 @@ get_responsefile() {
 			echo "Fetching $_url"
 			if unpriv ftp -Vo - "$_url" \
 				>"/tmp/ai/ai.$AI_MODE.conf" 2>/dev/null; then
-				ifconfig $_if delete down 2>/dev/null
+				ifconfig $_if inet -autoconf delete down \
+				    2>/dev/null
 				rm /var/db/dhcpleased/$_if
 				return 0
 			fi
@@ -685,7 +686,7 @@ get_responsefile() {
 	echo "Fetching $_rf"
 	[[ -f $_rf ]] && _rf="file://$_rf"
 	if unpriv ftp -Vo - "$_rf" >"/tmp/ai/ai.$AI_MODE.conf" 2>/dev/null; then
-		ifconfig $_if delete down 2>/dev/null
+		ifconfig $_if inet -autoconf delete down 2>/dev/null
 		return 0
 	fi
 	return 1
@@ -2355,6 +2356,11 @@ parse_hn_line() {
 		return
 		;;
 	inet)	((${#_c[*]} > 1)) || return
+		if [[ ${_c[_name]} == autoconf ]]; then
+			_cmds[${#_cmds[*]}]="ifconfig $_if ${_c[@]}"
+			V4_AUTOCONF=true
+			return
+		fi
 		[[ ${_c[_name]} == alias ]] && _mask=3 _bc=4
 		[[ -n ${_c[_mask]} ]] && _c[_mask]="netmask ${_c[_mask]}"
 		if [[ -n ${_c[_bc]} ]]; then
@@ -2386,7 +2392,7 @@ parse_hn_line() {
 		;;
 	dhcp)	! $_has_dhcp && return
 		_cmds[${#_cmds[*]}]="ifconfig $_if inet autoconf"
-		V4_DHCPCONF=true
+		V4_AUTOCONF=true
 		;;
 	'!'*|bridge)
 		# Skip shell commands and bridge in the installer.
@@ -2482,7 +2488,7 @@ enable_network() {
 			continue
 			;;
 		!(*:*))
-			($_v4set || $V4_DHCPCONF) && continue
+			($_v4set || $V4_AUTOCONF) && continue
 			route -qn add -host default $_gw
 			_v4set=true
 			;;
@@ -3385,7 +3391,7 @@ ROOTDEV=
 ROOTDISK=
 SETDIR="$VNAME/$ARCH"
 UPGRADE_BSDRD=false
-V4_DHCPCONF=false
+V4_AUTOCONF=false
 V6_AUTOCONF=false
 WLANLIST=/tmp/i/wlanlist
 

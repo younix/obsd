@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-save-buffer.c,v 1.52 2021/02/11 09:03:38 nicm Exp $ */
+/* $OpenBSD: cmd-save-buffer.c,v 1.54 2021/08/21 10:22:39 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Tiago Cunha <me@tiagocunha.org>
@@ -38,7 +38,7 @@ const struct cmd_entry cmd_save_buffer_entry = {
 	.name = "save-buffer",
 	.alias = "saveb",
 
-	.args = { "ab:", 1, 1 },
+	.args = { "ab:", 1, 1, NULL },
 	.usage = "[-a] " CMD_BUFFER_USAGE " path",
 
 	.flags = CMD_AFTERHOOK,
@@ -49,7 +49,7 @@ const struct cmd_entry cmd_show_buffer_entry = {
 	.name = "show-buffer",
 	.alias = "showb",
 
-	.args = { "b:", 0, 0 },
+	.args = { "b:", 0, 0, NULL },
 	.usage = CMD_BUFFER_USAGE,
 
 	.flags = CMD_AFTERHOOK,
@@ -105,7 +105,7 @@ cmd_save_buffer_exec(struct cmd *self, struct cmdq_item *item)
 		}
 		path = xstrdup("-");
 	} else
-		path = format_single_from_target(item, args->argv[0]);
+		path = format_single_from_target(item, args_string(args, 0));
 	if (args_has(args, 'a'))
 		flags = O_APPEND;
 	else

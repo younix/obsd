@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhcpleased.c,v 1.18 2021/07/26 09:26:36 florian Exp $	*/
+/*	$OpenBSD: dhcpleased.c,v 1.20 2021/08/24 14:54:02 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -294,7 +294,8 @@ main(int argc, char *argv[])
 	    AF_INET)) == -1)
 		fatal("route socket");
 
-	rtfilter = ROUTE_FILTER(RTM_IFINFO) | ROUTE_FILTER(RTM_PROPOSAL);
+	rtfilter = ROUTE_FILTER(RTM_IFINFO) | ROUTE_FILTER(RTM_PROPOSAL) |
+	    ROUTE_FILTER(RTM_IFANNOUNCE);
 	if (setsockopt(frontend_routesock, AF_ROUTE, ROUTE_MSGFILTER,
 	    &rtfilter, sizeof(rtfilter)) == -1)
 		fatal("setsockopt(ROUTE_MSGFILTER)");
@@ -567,6 +568,20 @@ main_dispatch_engine(int fd, short event, void *bula)
 			main_imsg_compose_frontend(IMSG_CLOSE_UDPSOCK, -1,
 			    &imsg_interface.if_index,
 			    sizeof(imsg_interface.if_index));
+			break;
+		}
+		case IMSG_WITHDRAW_ROUTES: {
+			struct imsg_configure_interface imsg_interface;
+			if (IMSG_DATA_SIZE(imsg) != sizeof(imsg_interface))
+				fatalx("%s: IMSG_CONFIGURE_INTERFACE wrong "
+				    "length: %lu", __func__,
+				    IMSG_DATA_SIZE(imsg));
+			memcpy(&imsg_interface, imsg.data,
+			    sizeof(imsg_interface));
+			if (imsg_interface.routes_len >= MAX_DHCP_ROUTES)
+				fatalx("%s: too many routes in imsg", __func__);
+			if (imsg_interface.routes_len > 0)
+				configure_routes(RTM_DELETE, &imsg_interface);
 			break;
 		}
 		case IMSG_PROPOSE_RDNS: {

@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-parse.y,v 1.32 2020/12/01 10:48:03 nicm Exp $ */
+/* $OpenBSD: cmd-parse.y,v 1.45 2021/08/23 11:48:21 nicm Exp $ */
 
 /*
  * Copyright (c) 2019 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -42,13 +42,25 @@ struct cmd_parse_scope {
 	TAILQ_ENTRY (cmd_parse_scope)	 entry;
 };
 
+enum cmd_parse_argument_type {
+	CMD_PARSE_STRING,
+	CMD_PARSE_COMMANDS
+};
+
+struct cmd_parse_argument {
+	enum cmd_parse_argument_type	 type;
+	char				*string;
+	struct cmd_parse_commands	*commands;
+
+	TAILQ_ENTRY(cmd_parse_argument)	 entry;
+};
+TAILQ_HEAD(cmd_parse_arguments, cmd_parse_argument);
+
 struct cmd_parse_command {
-	u_int				  line;
+	u_int				 line;
+	struct cmd_parse_arguments	 arguments;
 
-	int				  argc;
-	char				**argv;
-
-	TAILQ_ENTRY(cmd_parse_command)	  entry;
+	TAILQ_ENTRY(cmd_parse_command)	 entry;
 };
 TAILQ_HEAD(cmd_parse_commands, cmd_parse_command);
 
@@ -77,8 +89,9 @@ static char	*cmd_parse_get_error(const char *, u_int, const char *);
 static void	 cmd_parse_free_command(struct cmd_parse_command *);
 static struct cmd_parse_commands *cmd_parse_new_commands(void);
 static void	 cmd_parse_free_commands(struct cmd_parse_commands *);
-static char	*cmd_parse_commands_to_string(struct cmd_parse_commands *);
-static void	 cmd_parse_print_commands(struct cmd_parse_input *, u_int,
+static void	 cmd_parse_build_commands(struct cmd_parse_commands *,
+		     struct cmd_parse_input *, struct cmd_parse_result *);
+static void	 cmd_parse_print_commands(struct cmd_parse_input *,
 		     struct cmd_list *);
 
 %}
@@ -86,10 +99,8 @@ static void	 cmd_parse_print_commands(struct cmd_parse_input *, u_int,
 %union
 {
 	char					 *token;
-	struct {
-		int				  argc;
-		char				**argv;
-	} arguments;
+	struct cmd_parse_arguments		 *arguments;
+	struct cmd_parse_argument		 *argument;
 	int					  flag;
 	struct {
 		int				  flag;
@@ -107,8 +118,9 @@ static void	 cmd_parse_print_commands(struct cmd_parse_input *, u_int,
 %token ENDIF
 %token <token> FORMAT TOKEN EQUALS
 
-%type <token> argument expanded format
+%type <token> expanded format
 %type <arguments> arguments
+%type <argument> argument
 %type <flag> if_open if_elif
 %type <elif> elif elif1
 %type <commands> argument_statements statements statement
@@ -360,7 +372,7 @@ commands	: command
 			struct cmd_parse_state	*ps = &parse_state;
 
 			$$ = cmd_parse_new_commands();
-			if ($1->argc != 0 &&
+			if (!TAILQ_EMPTY(&$1->arguments) &&
 			    (ps->scope == NULL || ps->scope->flag))
 				TAILQ_INSERT_TAIL($$, $1, entry);
 			else
@@ -380,7 +392,7 @@ commands	: command
 		{
 			struct cmd_parse_state	*ps = &parse_state;
 
-			if ($3->argc != 0 &&
+			if (!TAILQ_EMPTY(&$3->arguments) &&
 			    (ps->scope == NULL || ps->scope->flag)) {
 				$$ = $1;
 				TAILQ_INSERT_TAIL($$, $3, entry);
@@ -401,27 +413,38 @@ command		: assignment
 
 			$$ = xcalloc(1, sizeof *$$);
 			$$->line = ps->input->line;
+			TAILQ_INIT(&$$->arguments);
 		}
 		| optional_assignment TOKEN
 		{
-			struct cmd_parse_state	*ps = &parse_state;
+			struct cmd_parse_state		*ps = &parse_state;
+			struct cmd_parse_argument	*arg;
 
 			$$ = xcalloc(1, sizeof *$$);
 			$$->line = ps->input->line;
+			TAILQ_INIT(&$$->arguments);
 
-			cmd_prepend_argv(&$$->argc, &$$->argv, $2);
-
+			arg = xcalloc(1, sizeof *arg);
+			arg->type = CMD_PARSE_STRING;
+			arg->string = $2;
+			TAILQ_INSERT_HEAD(&$$->arguments, arg, entry);
 		}
 		| optional_assignment TOKEN arguments
 		{
-			struct cmd_parse_state	*ps = &parse_state;
+			struct cmd_parse_state		*ps = &parse_state;
+			struct cmd_parse_argument	*arg;
 
 			$$ = xcalloc(1, sizeof *$$);
 			$$->line = ps->input->line;
+			TAILQ_INIT(&$$->arguments);
 
-			$$->argc = $3.argc;
-			$$->argv = $3.argv;
-			cmd_prepend_argv(&$$->argc, &$$->argv, $2);
+			TAILQ_CONCAT(&$$->arguments, $3, entry);
+			free($3);
+
+			arg = xcalloc(1, sizeof *arg);
+			arg->type = CMD_PARSE_STRING;
+			arg->string = $2;
+			TAILQ_INSERT_HEAD(&$$->arguments, arg, entry);
 		}
 
 condition1	: if_open commands if_close
@@ -505,30 +528,34 @@ elif1		: if_elif commands
 
 arguments	: argument
 		{
-			$$.argc = 1;
-			$$.argv = xreallocarray(NULL, 1, sizeof *$$.argv);
+			$$ = xcalloc(1, sizeof *$$);
+			TAILQ_INIT($$);
 
-			$$.argv[0] = $1;
+			TAILQ_INSERT_HEAD($$, $1, entry);
 		}
 		| argument arguments
 		{
-			cmd_prepend_argv(&$2.argc, &$2.argv, $1);
-			free($1);
+			TAILQ_INSERT_HEAD($2, $1, entry);
 			$$ = $2;
 		}
 
 argument	: TOKEN
 		{
-			$$ = $1;
+			$$ = xcalloc(1, sizeof *$$);
+			$$->type = CMD_PARSE_STRING;
+			$$->string = $1;
 		}
 		| EQUALS
 		{
-			$$ = $1;
+			$$ = xcalloc(1, sizeof *$$);
+			$$->type = CMD_PARSE_STRING;
+			$$->string = $1;
 		}
 		| '{' argument_statements
 		{
-			$$ = cmd_parse_commands_to_string($2);
-			cmd_parse_free_commands($2);
+			$$ = xcalloc(1, sizeof *$$);
+			$$->type = CMD_PARSE_COMMANDS;
+			$$->commands = $2;
 		}
 
 argument_statements	: statement '}'
@@ -552,30 +579,54 @@ cmd_parse_get_error(const char *file, u_int line, const char *error)
 	if (file == NULL)
 		s = xstrdup(error);
 	else
-		xasprintf (&s, "%s:%u: %s", file, line, error);
+		xasprintf(&s, "%s:%u: %s", file, line, error);
 	return (s);
 }
 
 static void
-cmd_parse_print_commands(struct cmd_parse_input *pi, u_int line,
-    struct cmd_list *cmdlist)
+cmd_parse_print_commands(struct cmd_parse_input *pi, struct cmd_list *cmdlist)
 {
 	char	*s;
 
-	if (pi->item != NULL && (pi->flags & CMD_PARSE_VERBOSE)) {
-		s = cmd_list_print(cmdlist, 0);
-		if (pi->file != NULL)
-			cmdq_print(pi->item, "%s:%u: %s", pi->file, line, s);
-		else
-			cmdq_print(pi->item, "%u: %s", line, s);
-		free(s);
+	if (pi->item == NULL || (~pi->flags & CMD_PARSE_VERBOSE))
+		return;
+	s = cmd_list_print(cmdlist, 0);
+	if (pi->file != NULL)
+		cmdq_print(pi->item, "%s:%u: %s", pi->file, pi->line, s);
+	else
+		cmdq_print(pi->item, "%u: %s", pi->line, s);
+	free(s);
+}
+
+static void
+cmd_parse_free_argument(struct cmd_parse_argument *arg)
+{
+	switch (arg->type) {
+	case CMD_PARSE_STRING:
+		free(arg->string);
+		break;
+	case CMD_PARSE_COMMANDS:
+		cmd_parse_free_commands(arg->commands);
+		break;
+	}
+	free(arg);
+}
+
+static void
+cmd_parse_free_arguments(struct cmd_parse_arguments *args)
+{
+	struct cmd_parse_argument	*arg, *arg1;
+
+	TAILQ_FOREACH_SAFE(arg, args, entry, arg1) {
+		TAILQ_REMOVE(args, arg, entry);
+		cmd_parse_free_argument(arg);
 	}
 }
 
 static void
 cmd_parse_free_command(struct cmd_parse_command *cmd)
 {
-	cmd_free_argv(cmd->argc, cmd->argv);
+	cmd_parse_free_arguments(&cmd->arguments);
 	free(cmd);
 }
 
@@ -585,7 +636,7 @@ cmd_parse_new_commands(void)
 	struct cmd_parse_commands	*cmds;
 
 	cmds = xmalloc(sizeof *cmds);
-	TAILQ_INIT (cmds);
+	TAILQ_INIT(cmds);
 	return (cmds);
 }
 
@@ -599,30 +650,6 @@ cmd_parse_free_commands(struct cmd_parse_commands *cmds)
 		cmd_parse_free_command(cmd);
 	}
 	free(cmds);
-}
-
-static char *
-cmd_parse_commands_to_string(struct cmd_parse_commands *cmds)
-{
-	struct cmd_parse_command	 *cmd;
-	char				 *string = NULL, *s, *line;
-
-	TAILQ_FOREACH(cmd, cmds, entry) {
-		line = cmd_stringify_argv(cmd->argc, cmd->argv);
-		if (string == NULL)
-			s = line;
-		else {
-			xasprintf(&s, "%s ; %s", s, line);
-			free(line);
-		}
-
-		free(string);
-		string = s;
-	}
-	if (string == NULL)
-		string = xstrdup("");
-	log_debug("%s: %s", __func__, string);
-	return (string);
 }
 
 static struct cmd_parse_commands *
@@ -674,72 +701,160 @@ cmd_parse_do_buffer(const char *buf, size_t len, struct cmd_parse_input *pi,
 	return (cmd_parse_run_parser(cause));
 }
 
-static struct cmd_parse_result *
-cmd_parse_build_commands(struct cmd_parse_commands *cmds,
-    struct cmd_parse_input *pi)
+static void
+cmd_parse_log_commands(struct cmd_parse_commands *cmds, const char *prefix)
 {
-	static struct cmd_parse_result	 pr;
-	struct cmd_parse_commands	*cmds2;
-	struct cmd_parse_command	*cmd, *cmd2, *next, *next2, *after;
-	u_int				 line = UINT_MAX;
-	int				 i;
-	struct cmd_list			*cmdlist = NULL, *result;
+	struct cmd_parse_command	*cmd;
+	struct cmd_parse_argument	*arg;
+	u_int				 i, j;
+	char				*s;
+
+	i = 0;
+	TAILQ_FOREACH(cmd, cmds, entry) {
+		j = 0;
+		TAILQ_FOREACH(arg, &cmd->arguments, entry) {
+			switch (arg->type) {
+			case CMD_PARSE_STRING:
+				log_debug("%s %u:%u: %s", prefix, i, j,
+				    arg->string);
+				break;
+			case CMD_PARSE_COMMANDS:
+				xasprintf(&s, "%s %u:%u", prefix, i, j);
+				cmd_parse_log_commands(arg->commands, s);
+				free(s);
+				break;
+			}
+			j++;
+		}
+		i++;
+	}
+}
+
+static int
+cmd_parse_expand_alias(struct cmd_parse_command *cmd,
+    struct cmd_parse_input *pi, struct cmd_parse_result *pr,
+    struct cmd_list **cmdlist)
+{
+	struct cmd_parse_argument	*arg, *arg1, *first, *after;
+	struct cmd_parse_commands	*cmds;
+	struct cmd_parse_command	*last;
+	char				*alias, *name, *cause;
+
+	*cmdlist = NULL;
+
+	first = TAILQ_FIRST(&cmd->arguments);
+	if (first == NULL || first->type != CMD_PARSE_STRING) {
+		pr->status = CMD_PARSE_SUCCESS;
+		pr->cmdlist = cmd_list_new();
+		return (1);
+	}
+	name = first->string;
+
+	alias = cmd_get_alias(name);
+	if (alias == NULL)
+		return (0);
+	log_debug("%s: %u alias %s = %s", __func__, pi->line, name, alias);
+
+	cmds = cmd_parse_do_buffer(alias, strlen(alias), pi, &cause);
+	free(alias);
+	if (cmds == NULL) {
+		pr->status = CMD_PARSE_ERROR;
+		pr->error = cause;
+		return (1);
+	}
+
+	last = TAILQ_LAST(cmds, cmd_parse_commands);
+	if (last == NULL) {
+		*cmdlist = cmd_list_new();
+		return (1);
+	}
+
+	TAILQ_REMOVE(&cmd->arguments, first, entry);
+	cmd_parse_free_argument(first);
+
+	after = TAILQ_FIRST(&last->arguments);
+	TAILQ_FOREACH_SAFE(arg, &cmd->arguments, entry, arg1) {
+		TAILQ_REMOVE(&cmd->arguments, arg, entry);
+		if (after == NULL)
+			TAILQ_INSERT_TAIL(&last->arguments, arg, entry);
+		else
+			TAILQ_INSERT_AFTER(&last->arguments, after, arg, entry);
+		after = arg;
+	}
+ 	cmd_parse_log_commands(cmds, __func__);
+
+	cmd_parse_build_commands(cmds, pi, pr);
+	if (pr->status != CMD_PARSE_SUCCESS)
+		*cmdlist = pr->cmdlist;
+	return (1);
+}
+
+static struct cmd_list *
+cmd_parse_build_command(struct cmd_parse_command *cmd,
+    struct cmd_parse_input *pi, struct cmd_parse_result *pr)
+{
+	struct cmd_parse_argument	*arg;
+	struct cmd_list			*cmdlist = NULL;
 	struct cmd			*add;
-	char				*name, *alias, *cause, *s;
+	char				*cause;
+	struct args_value		*values = NULL;
+	u_int				 count = 0, idx;
+
+	if (cmd_parse_expand_alias(cmd, pi, pr, &cmdlist))
+		return (cmdlist);
+
+	TAILQ_FOREACH(arg, &cmd->arguments, entry) {
+		values = xrecallocarray(values, count, count + 1,
+		    sizeof *values);
+		switch (arg->type) {
+		case CMD_PARSE_STRING:
+			values[count].type = ARGS_STRING;
+			values[count].string = xstrdup(arg->string);
+			break;
+		case CMD_PARSE_COMMANDS:
+			cmd_parse_build_commands(arg->commands, pi, pr);
+			if (pr->status != CMD_PARSE_SUCCESS)
+				goto out;
+			values[count].type = ARGS_COMMANDS;
+			values[count].cmdlist = pr->cmdlist;
+			break;
+		}
+		count++;
+	}
+
+	add = cmd_parse(values, count, pi->file, pi->line, &cause);
+	if (add == NULL) {
+		pr->status = CMD_PARSE_ERROR;
+		pr->error = cmd_parse_get_error(pi->file, pi->line, cause);
+		free(cause);
+		goto out;
+	}
+	cmdlist = cmd_list_new();
+	cmd_list_append(cmdlist, add);
+
+out:
+	for (idx = 0; idx < count; idx++)
+		args_free_value(&values[idx]);
+	free(values);
+	return (cmdlist);
+}
+
+static void
+cmd_parse_build_commands(struct cmd_parse_commands *cmds,
+    struct cmd_parse_input *pi, struct cmd_parse_result *pr)
+{
+	struct cmd_parse_command	*cmd;
+	u_int				 line = UINT_MAX;
+	struct cmd_list			*current = NULL, *result, *add;
+	char				*s;
 
 	/* Check for an empty list. */
 	if (TAILQ_EMPTY(cmds)) {
-		cmd_parse_free_commands(cmds);
-		pr.status = CMD_PARSE_EMPTY;
-		return (&pr);
+		pr->status = CMD_PARSE_SUCCESS;
+		pr->cmdlist = cmd_list_new();
+		return;
 	}
-
-	/*
-	 * Walk the commands and expand any aliases. Each alias is parsed
-	 * individually to a new command list, any trailing arguments appended
-	 * to the last command, and all commands inserted into the original
-	 * command list.
-	 */
-	TAILQ_FOREACH_SAFE(cmd, cmds, entry, next) {
-		name = cmd->argv[0];
-
-		alias = cmd_get_alias(name);
-		if (alias == NULL)
-			continue;
-
-		line = cmd->line;
-		log_debug("%s: %u %s = %s", __func__, line, name, alias);
-
-		pi->line = line;
-		cmds2 = cmd_parse_do_buffer(alias, strlen(alias), pi, &cause);
-		free(alias);
-		if (cmds2 == NULL) {
-			pr.status = CMD_PARSE_ERROR;
-			pr.error = cause;
-			goto out;
-		}
-
-		cmd2 = TAILQ_LAST(cmds2, cmd_parse_commands);
-		if (cmd2 == NULL) {
-			TAILQ_REMOVE(cmds, cmd, entry);
-			cmd_parse_free_command(cmd);
-			continue;
-		}
-		for (i = 1; i < cmd->argc; i++)
-			cmd_append_argv(&cmd2->argc, &cmd2->argv, cmd->argv[i]);
-
-		after = cmd;
-		TAILQ_FOREACH_SAFE(cmd2, cmds2, entry, next2) {
-			cmd2->line = line;
-			TAILQ_REMOVE(cmds2, cmd2, entry);
-			TAILQ_INSERT_AFTER(cmds, after, cmd2, entry);
-			after = cmd2;
-		}
-		cmd_parse_free_commands(cmds2);
-
-		TAILQ_REMOVE(cmds, cmd, entry);
-		cmd_parse_free_command(cmd);
-	}
+ 	cmd_parse_log_commands(cmds, __func__);
 
 	/*
 	 * Parse each command into a command list. Create a new command list
@@ -749,49 +864,39 @@ cmd_parse_build_commands(struct cmd_parse_commands *cmds,
 	 */
 	result = cmd_list_new();
 	TAILQ_FOREACH(cmd, cmds, entry) {
-		name = cmd->argv[0];
-		log_debug("%s: %u %s", __func__, cmd->line, name);
-		cmd_log_argv(cmd->argc, cmd->argv, __func__);
-
-		if (cmdlist == NULL ||
-		    ((~pi->flags & CMD_PARSE_ONEGROUP) && cmd->line != line)) {
-			if (cmdlist != NULL) {
-				cmd_parse_print_commands(pi, line, cmdlist);
-				cmd_list_move(result, cmdlist);
-				cmd_list_free(cmdlist);
+		if (((~pi->flags & CMD_PARSE_ONEGROUP) && cmd->line != line)) {
+			if (current != NULL) {
+				cmd_parse_print_commands(pi, current);
+				cmd_list_move(result, current);
+				cmd_list_free(current);
 			}
-			cmdlist = cmd_list_new();
+			current = cmd_list_new();
 		}
-		line = cmd->line;
+		if (current == NULL)
+			current = cmd_list_new();
+		line = pi->line = cmd->line;
 
-		add = cmd_parse(cmd->argc, cmd->argv, pi->file, line, &cause);
+		add = cmd_parse_build_command(cmd, pi, pr);
 		if (add == NULL) {
 			cmd_list_free(result);
-			pr.status = CMD_PARSE_ERROR;
-			pr.error = cmd_parse_get_error(pi->file, line, cause);
-			free(cause);
-			cmd_list_free(cmdlist);
-			goto out;
+			cmd_list_free(current);
+			return;
 		}
-		cmd_list_append(cmdlist, add);
+		cmd_list_append_all(current, add);
+		cmd_list_free(add);
 	}
-	if (cmdlist != NULL) {
-		cmd_parse_print_commands(pi, line, cmdlist);
-		cmd_list_move(result, cmdlist);
-		cmd_list_free(cmdlist);
+	if (current != NULL) {
+		cmd_parse_print_commands(pi, current);
+		cmd_list_move(result, current);
+		cmd_list_free(current);
 	}
 
 	s = cmd_list_print(result, 0);
 	log_debug("%s: %s", __func__, s);
 	free(s);
 
-	pr.status = CMD_PARSE_SUCCESS;
-	pr.cmdlist = result;
-
-out:
-	cmd_parse_free_commands(cmds);
-
-	return (&pr);
+	pr->status = CMD_PARSE_SUCCESS;
+	pr->cmdlist = result;
 }
 
 struct cmd_parse_result *
@@ -814,7 +919,10 @@ cmd_parse_from_file(FILE *f, struct cmd_parse_input *pi)
 		pr.error = cause;
 		return (&pr);
 	}
-	return (cmd_parse_build_commands(cmds, pi));
+	cmd_parse_build_commands(cmds, pi, &pr);
+	cmd_parse_free_commands(cmds);
+	return (&pr);
+
 }
 
 struct cmd_parse_result *
@@ -845,8 +953,6 @@ cmd_parse_and_insert(const char *s, struct cmd_parse_input *pi,
 
 	pr = cmd_parse_from_string(s, pi);
 	switch (pr->status) {
-	case CMD_PARSE_EMPTY:
-		break;
 	case CMD_PARSE_ERROR:
 		if (error != NULL)
 			*error = pr->error;
@@ -871,8 +977,6 @@ cmd_parse_and_append(const char *s, struct cmd_parse_input *pi,
 
 	pr = cmd_parse_from_string(s, pi);
 	switch (pr->status) {
-	case CMD_PARSE_EMPTY:
-		break;
 	case CMD_PARSE_ERROR:
 		if (error != NULL)
 			*error = pr->error;
@@ -903,9 +1007,8 @@ cmd_parse_from_buffer(const void *buf, size_t len, struct cmd_parse_input *pi)
 	memset(&pr, 0, sizeof pr);
 
 	if (len == 0) {
-		pr.status = CMD_PARSE_EMPTY;
-		pr.cmdlist = NULL;
-		pr.error = NULL;
+		pr.status = CMD_PARSE_SUCCESS;
+		pr.cmdlist = cmd_list_new();
 		return (&pr);
 	}
 
@@ -915,15 +1018,41 @@ cmd_parse_from_buffer(const void *buf, size_t len, struct cmd_parse_input *pi)
 		pr.error = cause;
 		return (&pr);
 	}
-	return (cmd_parse_build_commands(cmds, pi));
+	cmd_parse_build_commands(cmds, pi, &pr);
+	cmd_parse_free_commands(cmds);
+	return (&pr);
+}
+
+static void
+cmd_parse_add_command(struct cmd_parse_commands *cmds,
+    struct cmd_parse_input *pi, int argc, char **argv)
+{
+	struct cmd_parse_command	*cmd;
+	struct cmd_parse_argument	*arg;
+	int				 i;
+
+	cmd_log_argv(argc, argv, "%s", __func__);
+
+	cmd = xcalloc(1, sizeof *cmd);
+	cmd->line = pi->line;
+
+	TAILQ_INIT(&cmd->arguments);
+	for (i = 0; i < argc; i++) {
+		arg = xcalloc(1, sizeof *arg);
+		arg->type = CMD_PARSE_STRING;
+		arg->string = xstrdup(argv[i]);
+		TAILQ_INSERT_TAIL(&cmd->arguments, arg, entry);
+	}
+
+	TAILQ_INSERT_TAIL(cmds, cmd, entry);
 }
 
 struct cmd_parse_result *
 cmd_parse_from_arguments(int argc, char **argv, struct cmd_parse_input *pi)
 {
+	static struct cmd_parse_result	  pr;
 	struct cmd_parse_input		  input;
 	struct cmd_parse_commands	 *cmds;
-	struct cmd_parse_command	 *cmd;
 	char				**copy, **new_argv;
 	size_t				  size;
 	int				  i, last, new_argc;
@@ -958,41 +1087,22 @@ cmd_parse_from_arguments(int argc, char **argv, struct cmd_parse_input *pi)
 		if (size != 0)
 			new_argc++;
 
-		if (new_argc != 0) {
-			cmd_log_argv(new_argc, new_argv, "%s: at %u", __func__,
-			    i);
-
-			cmd = xcalloc(1, sizeof *cmd);
-			cmd->line = pi->line;
-
-			cmd->argc = new_argc;
-			cmd->argv = cmd_copy_argv(new_argc, new_argv);
-
-			TAILQ_INSERT_TAIL(cmds, cmd, entry);
-		}
-
+		if (new_argc != 0)
+			cmd_parse_add_command(cmds, pi, new_argc, new_argv);
 		last = i + 1;
 	}
 	if (last != argc) {
 		new_argv = copy + last;
 		new_argc = argc - last;
 
-		if (new_argc != 0) {
-			cmd_log_argv(new_argc, new_argv, "%s: at %u", __func__,
-			    last);
-
-			cmd = xcalloc(1, sizeof *cmd);
-			cmd->line = pi->line;
-
-			cmd->argc = new_argc;
-			cmd->argv = cmd_copy_argv(new_argc, new_argv);
-
-			TAILQ_INSERT_TAIL(cmds, cmd, entry);
-		}
+		if (new_argc != 0)
+			cmd_parse_add_command(cmds, pi, new_argc, new_argv);
 	}
 
 	cmd_free_argv(argc, copy);
-	return (cmd_parse_build_commands(cmds, pi));
+	cmd_parse_build_commands(cmds, pi, &pr);
+	cmd_parse_free_commands(cmds);
+	return (&pr);
 }
 
 static int printflike(1, 2)

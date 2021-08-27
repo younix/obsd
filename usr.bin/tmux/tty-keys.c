@@ -1,4 +1,4 @@
-/* $OpenBSD: tty-keys.c,v 1.147 2021/06/10 07:21:10 nicm Exp $ */
+/* $OpenBSD: tty-keys.c,v 1.150 2021/08/13 07:37:58 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -57,6 +57,17 @@ static int	tty_keys_device_attributes(struct tty *, const char *, size_t,
 		    size_t *);
 static int	tty_keys_extended_device_attributes(struct tty *, const char *,
 		    size_t, size_t *);
+
+/* A key tree entry. */
+struct tty_key {
+	char		 ch;
+	key_code	 key;
+
+	struct tty_key	*left;
+	struct tty_key	*right;
+
+	struct tty_key	*next;
+};
 
 /* Default raw keys. */
 struct tty_default_key_raw {
@@ -820,10 +831,15 @@ complete_key:
 	tty->flags &= ~TTY_TIMER;
 
 	/* Check for focus events. */
-	if (key == KEYC_FOCUS_OUT)
-		tty->client->flags &= ~CLIENT_FOCUSED;
-	else if (key == KEYC_FOCUS_IN)
-		tty->client->flags |= CLIENT_FOCUSED;
+	if (key == KEYC_FOCUS_OUT) {
+		c->flags &= ~CLIENT_FOCUSED;
+		window_update_focus(c->session->curw->window);
+		notify_client("client-focus-out", c);
+	} else if (key == KEYC_FOCUS_IN) {
+		c->flags |= CLIENT_FOCUSED;
+		notify_client("client-focus-in", c);
+		window_update_focus(c->session->curw->window);
+	}
 
 	/* Fire the key. */
 	if (key != KEYC_UNKNOWN) {

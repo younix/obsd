@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpc.c,v 1.34 2021/06/20 20:02:14 martijn Exp $	*/
+/*	$OpenBSD: snmpc.c,v 1.37 2021/08/11 18:53:45 martijn Exp $	*/
 
 /*
  * Copyright (c) 2019 Martijn van Duren <martijn@openbsd.org>
@@ -84,12 +84,12 @@ struct snmp_app snmp_apps[] = {
 };
 struct snmp_app *snmp_app = NULL;
 
-char *community = "public";
+char *community = NULL;
 struct snmp_v3 *v3;
 char *mib = "mib_2";
 int retries = 5;
 int timeout = 1;
-enum snmp_version version = SNMP_V2C;
+enum snmp_version version = SNMP_V3;
 int print_equals = 1;
 int print_varbind_only = 0;
 int print_summary = 0;
@@ -468,7 +468,10 @@ main(int argc, char *argv[])
 	argc -= optind;
 	argv += optind;
 
-	if (version == SNMP_V3) {
+	if (version == SNMP_V1 || version == SNMP_V2C) {
+		if (community == NULL || community[0] == '\0')
+			errx(1, "No community name specified.");
+	} else if (version == SNMP_V3) {
 		/* Setup USM */
 		if (user == NULL || user[0] == '\0')
 			errx(1, "No securityName specified");
@@ -476,7 +479,7 @@ main(int argc, char *argv[])
 			err(1, "usm_init");
 		if (seclevel & SNMP_MSGFLAG_AUTH) {
 			if (md == NULL)
-				md = EVP_sha256();
+				md = EVP_sha1();
 			if (authkey == NULL)
 				errx(1, "No authKey or authPassword specified");
 			if (usm_setauth(sec, md, authkey, authkeylen,
@@ -1573,7 +1576,7 @@ usage(void)
 		    "            [-n ctxname] [-O afnqvxSQ] [-r retries] [-t timeout] [-u user]\n"
 		    "            [-v version] [-X privpass] [-x cipher] [-Z boots,time]\n"
 		    "            " : "",
-		    snmp_app->usage == NULL ? "" : snmp_app->usage);
+		    snmp_app->usage == NULL ? " " : snmp_app->usage);
 		exit(1);
 	}
 	for (i = 0; i < (sizeof(snmp_apps)/sizeof(*snmp_apps)); i++) {

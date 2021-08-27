@@ -1,4 +1,4 @@
-/*	$OpenBSD: pchgpio.c,v 1.2 2021/05/16 08:50:59 jsg Exp $	*/
+/*	$OpenBSD: pchgpio.c,v 1.4 2021/08/24 16:18:50 kettenis Exp $	*/
 /*
  * Copyright (c) 2020 Mark Kettenis
  * Copyright (c) 2020 James Hastings
@@ -98,6 +98,7 @@ struct cfdriver pchgpio_cd = {
 
 const char *pchgpio_hids[] = {
 	"INT34BB",
+	"INT34C5",
 	NULL
 };
 
@@ -110,8 +111,8 @@ struct pchgpio_group cnl_lp_groups[] =
 
 	/* Community 1 */
 	{ 1, 0, 68, 92, 0, 96 },	/* GPP_D */
-	{ 1, 1, 93, 116, 24, 128 },	/* GPP_F */
-	{ 1, 2, 117, 140, 48, 160 },	/* GPP_H */
+	{ 1, 1, 93, 116, 25, 128 },	/* GPP_F */
+	{ 1, 2, 117, 140, 49, 160 },	/* GPP_H */
 
 	/* Community 4 */
 	{ 2, 0, 181, 204, 0, 256 },	/* GPP_C */
@@ -128,8 +129,41 @@ struct pchgpio_device cnl_lp_device =
 	.npins = 320,
 };
 
+struct pchgpio_group tgl_lp_groups[] =
+{
+	/* Community 0 */
+	{ 0, 0, 0, 25, 0, 0 },		/* GPP_B */
+	{ 0, 1, 26, 41, 26, 32 },	/* GPP_T */
+	{ 0, 2, 42, 66, 42, 64 },	/* GPP_A */
+
+	/* Community 1 */
+	{ 1, 0, 67, 74, 0, 96 },	/* GPP_S */
+	{ 1, 1, 75, 98, 8, 128 },	/* GPP_H */
+	{ 1, 2, 99, 119, 32, 160 },	/* GPP_D */
+	{ 1, 3, 120, 143, 53, 192 },	/* GPP_U */
+
+	/* Community 4 */
+	{ 2, 0, 171, 194, 0, 256 },	/* GPP_C */
+	{ 2, 1, 195, 219, 24, 288 },	/* GPP_F */
+	{ 2, 3, 226, 250, 55, 320 },	/* GPP_E */
+
+	/* Community 5 */
+	{ 3, 0, 260, 267, 0, 352 },	/* GPP_R */
+};
+
+struct pchgpio_device tgl_lp_device =
+{
+	.pad_size = 16,
+	.gpi_is = 0x100,
+	.gpi_ie = 0x120,
+	.groups = tgl_lp_groups,
+	.ngroups = nitems(tgl_lp_groups),
+	.npins = 360,
+};
+
 struct pchgpio_match pchgpio_devices[] = {
 	{ "INT34BB", &cnl_lp_device },
+	{ "INT34C5", &tgl_lp_device },
 };
 
 int	pchgpio_read_pin(void *, int);
@@ -291,8 +325,8 @@ pchgpio_intr_establish(void *cookie, int pin, int flags,
 	uint32_t reg;
 	uint16_t offset;
 	uint8_t bank, bar;
-	
-	KASSERT(pin >= 0 && pin < sc->sc_npins);
+
+	KASSERT(pin >= 0);
 
 	if ((group = pchgpio_find_group(sc, pin)) == NULL)
 		return;

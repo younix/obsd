@@ -8,9 +8,9 @@
 .\"
 .\" Created: Sun May  7 00:14:37 1995 ylo
 .\"
-.\" $OpenBSD: scp.1,v 1.97 2021/08/02 23:38:27 djm Exp $
+.\" $OpenBSD: scp.1,v 1.100 2021/08/11 14:07:54 naddy Exp $
 .\"
-.Dd $Mdocdate: August 2 2021 $
+.Dd $Mdocdate: August 11 2021 $
 .Dt SCP 1
 .Os
 .Sh NAME
@@ -18,14 +18,13 @@
 .Nd OpenSSH secure file copy
 .Sh SYNOPSIS
 .Nm scp
-.Op Fl 346ABCpqrTv
+.Op Fl 346ABCOpqRrsTv
 .Op Fl c Ar cipher
 .Op Fl D Ar sftp_server_path
 .Op Fl F Ar ssh_config
 .Op Fl i Ar identity_file
 .Op Fl J Ar destination
 .Op Fl l Ar limit
-.Op Fl M Ar scp | sftp
 .Op Fl o Ar ssh_option
 .Op Fl P Ar port
 .Op Fl S Ar program
@@ -68,10 +67,10 @@ as host specifiers.
 .Pp
 When copying between two remote hosts, if the URI format is used, a
 .Ar port
-may only be specified on the
+cannot be specified on the
 .Ar target
 if the
-.Fl 3
+.Fl R
 option is used.
 .Pp
 The options are as follows:
@@ -80,10 +79,11 @@ The options are as follows:
 Copies between two remote hosts are transferred through the local host.
 Without this option the data is copied directly between the two remote
 hosts.
-Note that this option disables the progress meter and selects batch mode
-for the second host, since
+Note that, when using the legacy SCP protocol (the default), this option
+selects batch mode for the second host as
 .Nm
 cannot ask for passwords or passphrases for both hosts.
+This mode is the default.
 .It Fl 4
 Forces
 .Nm
@@ -111,7 +111,7 @@ Selects the cipher to use for encrypting the data transfer.
 This option is directly passed to
 .Xr ssh 1 .
 .It Fl D Ar sftp_server_path
-When using the experimental SFTP protocol support via
+When using the SFTP protocol support via
 .Fl M ,
 connect directly to a local SFTP server program rather than a
 remote one via
@@ -143,14 +143,12 @@ This option is directly passed to
 .Xr ssh 1 .
 .It Fl l Ar limit
 Limits the used bandwidth, specified in Kbit/s.
-.It Fl M Ar scp | sftp
-Specifies a mode which will be used to transfer files.
-The default is to use the original
-.Cm scp
-protocol.
-Alternately, experimental support for using the
-.Cm sftp
-protocol is available.
+.It Fl O
+Use the legacy SCP protocol for file transfers instead of the SFTP protocol.
+Forcing the use of the SCP protocol may be necessary for servers that do
+not implement SFTP or for backwards-compatibility for particular filename
+wildcard patterns.
+This mode is the default.
 .It Fl o Ar ssh_option
 Can be used to pass options to
 .Nm ssh
@@ -239,6 +237,15 @@ original file.
 Quiet mode: disables the progress meter as well as warning and diagnostic
 messages from
 .Xr ssh 1 .
+.It Fl R
+Copies between two remote hosts are performed by connecting to the origin
+host and executing
+.Nm
+there.
+This requires that
+.Nm
+running on the origin host can authenticate to the destination host without
+requiring a password.
 .It Fl r
 Recursively copy entire directories.
 Note that
@@ -251,6 +258,16 @@ to use for the encrypted connection.
 The program must understand
 .Xr ssh 1
 options.
+.It Fl s
+Use the SFTP protocol for file transfers instead of the legacy SCP protocol.
+Using SFTP avoids invoking a shell on the remote side and provides
+more predictable filename handling, as the SCP protocol
+relied on the remote shell for expanding
+.Xr glob 3
+wildcards.
+.Pp
+A near-future release of OpenSSH will make the SFTP protocol the default.
+This option will be deleted before the end of 2022.
 .It Fl T
 Disable strict filename checking.
 By default when copying files from a remote host to a local directory
@@ -280,6 +297,7 @@ debugging connection, authentication, and configuration problems.
 .Xr ssh-agent 1 ,
 .Xr ssh-keygen 1 ,
 .Xr ssh_config 5 ,
+.Xr sftp-server 8 ,
 .Xr sshd 8
 .Sh HISTORY
 .Nm
