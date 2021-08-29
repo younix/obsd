@@ -66,12 +66,12 @@
 /intrdefs.h/1.18/Thu Dec 17 19:39:58 2020//
 /segments.h/1.28/Sat May  1 08:41:51 2021//
 /setjmp.h/1.4/Sat May  1 08:41:51 2021//
-/atomic.h/1.19/Tue May 18 14:06:16 2021//
-/i82489var.h/1.15/Tue May 18 14:06:16 2021//
-/npx.h/1.20/Tue May 18 14:06:16 2021//
-/pmap.h/1.89/Tue May 18 14:06:16 2021//
-/smbiosvar.h/1.13/Tue May 18 14:06:16 2021//
-/specialreg.h/1.77/Tue May 18 14:06:16 2021//
-/vmparam.h/1.57/Tue May 18 14:06:16 2021//
-/cpu.h/1.175/Thu Aug  5 11:01:42 2021//
+/atomic.h/1.19/Sun Aug 29 08:01:51 2021//
+/cpu.h/1.175/Sun Aug 29 08:01:51 2021//
+/i82489var.h/1.15/Sun Aug 29 08:01:51 2021//
+/npx.h/1.20/Sun Aug 29 08:01:51 2021//
+/pmap.h/1.89/Sun Aug 29 08:01:51 2021//
+/smbiosvar.h/1.13/Sun Aug 29 08:01:51 2021//
+/specialreg.h/1.77/Sun Aug 29 08:01:51 2021//
+/vmparam.h/1.57/Sun Aug 29 08:01:51 2021//
 D

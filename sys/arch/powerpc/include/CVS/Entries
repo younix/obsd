@@ -34,8 +34,8 @@
 /tcb.h/1.6/Tue Jul  2 20:42:45 2019//
 /trap.h/1.7/Thu Apr 26 21:36:32 2007//
 /asm.h/1.16/Sat May  1 08:41:51 2021//
-/exec.h/1.16/Tue May 18 14:06:16 2021//
-/cpu.h/1.70/Thu Aug  5 11:01:44 2021//
-/mplock.h/1.5/Tue Jun  1 14:33:07 2021//
-/pmap.h/1.60/Tue Jun  1 14:33:07 2021//
+/cpu.h/1.70/Sun Aug 29 08:01:51 2021//
+/exec.h/1.16/Sun Aug 29 08:01:51 2021//
+/mplock.h/1.5/Sun Aug 29 08:01:51 2021//
+/pmap.h/1.60/Sun Aug 29 08:01:51 2021//
 D

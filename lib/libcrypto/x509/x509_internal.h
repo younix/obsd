@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_internal.h,v 1.9 2021/08/19 03:44:00 beck Exp $ */
+/* $OpenBSD: x509_internal.h,v 1.11 2021/08/28 15:22:42 beck Exp $ */
 /*
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
  *
@@ -69,7 +69,6 @@ struct x509_verify_ctx {
 	int saved_error;
 	int saved_error_depth;
 	size_t chains_count;
-	int dump_chain;			/* Dump current chain without erroring */
 	STACK_OF(X509) *roots;		/* Trusted roots for this validation */
 	STACK_OF(X509) *intermediates;	/* Intermediates provided by peer */
 	time_t *check_time;		/* Time for validity checks */
@@ -97,8 +96,7 @@ X509 *x509_vfy_lookup_cert_match(X509_STORE_CTX *ctx, X509 *x);
 int x509_verify_asn1_time_to_tm(const ASN1_TIME *atime, struct tm *tm,
     int notafter);
 
-struct x509_verify_ctx *x509_verify_ctx_new_from_xsc(X509_STORE_CTX *xsc,
-    STACK_OF(X509) *roots);
+struct x509_verify_ctx *x509_verify_ctx_new_from_xsc(X509_STORE_CTX *xsc);
 
 void x509_constraints_name_clear(struct x509_constraints_name *name);
 int x509_constraints_names_add(struct x509_constraints_names *names,

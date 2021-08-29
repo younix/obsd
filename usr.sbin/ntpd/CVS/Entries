@@ -13,9 +13,9 @@
 /util.c/1.25/Thu Jan 30 15:55:41 2020//
 /ntp.c/1.167/Thu Dec 17 19:39:59 2020//
 /ntpd.h/1.150/Thu Dec 17 19:39:59 2020//
-/client.c/1.116/Tue May 18 14:06:17 2021//
-/control.c/1.19/Tue May 18 14:06:17 2021//
-/ntpd.conf.5/1.47/Tue May 18 14:06:17 2021//
-/constraint.c/1.52/Thu Aug  5 11:01:58 2021//
-/ntpd.c/1.132/Thu Aug  5 11:01:58 2021//
+/client.c/1.116/Sun Aug 29 08:01:55 2021//
+/constraint.c/1.52/Sun Aug 29 08:01:55 2021//
+/control.c/1.19/Sun Aug 29 08:01:55 2021//
+/ntpd.c/1.132/Sun Aug 29 08:01:55 2021//
+/ntpd.conf.5/1.47/Sun Aug 29 08:01:55 2021//
 D

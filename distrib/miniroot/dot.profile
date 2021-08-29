@@ -1,4 +1,4 @@
-#	$OpenBSD: dot.profile,v 1.46 2021/07/21 03:53:50 kn Exp $
+#	$OpenBSD: dot.profile,v 1.48 2021/08/29 13:31:52 kn Exp $
 #	$NetBSD: dot.profile,v 1.1 1995/12/18 22:54:43 pk Exp $
 #
 # Copyright (c) 2009 Kenneth R. Westerback
@@ -43,6 +43,28 @@ umask 022
 # emacs-style command line editing.
 set -o emacs
 
+# Leave installer prompt without user interaction.
+TIMEOUT_ACTION='kill $$'
+TIMEOUT_PERIOD_SEC=5
+
+start_timeout() {
+	(
+		sleep $TIMEOUT_PERIOD_SEC && eval $TIMEOUT_ACTION
+	) |&
+	WDPID=$!
+
+	# Close standard input of the co-process.
+	exec 3>&p; exec 3>&-
+}
+
+stop_timeout() {
+	kill -KILL $WDPID 2>/dev/null
+}
+
+reset_watchdog() {
+	stop_timeout
+	start_timeout
+}
 
 if [[ -z $DONEPROFILE ]]; then
 	DONEPROFILE=YES
@@ -78,30 +100,24 @@ __EOT
 	# if netbooted or if a response file is found in / after a timeout,
 	# but only the very first time around.
 	timeout=false
-	timer_pid=
 	if [[ ! -f /tmp/ai/noai ]] && { ifconfig netboot >/dev/null 2>&1 ||
 		[[ -f /auto_install.conf ]] ||
 		[[ -f /auto_upgrade.conf ]]; }; then
 
-		echo "Starting non-interactive mode in 5 seconds..."
+		echo "Starting non-interactive mode in ${TIMEOUT_PERIOD_SEC} seconds..."
 		>/tmp/ai/noai
 
 		# Set trap handlers to remove timer if the shell is interrupted,
 		# killed or about to exit.
-		trap 'kill $timer_pid 2>/dev/null' EXIT
 		trap 'exit 1' INT
 		trap 'timeout=true' TERM
+		trap 'stop_timeout' EXIT
 
 		# Stop monitoring background processes to avoid printing job
-		# completion notices in interactive shell mode. This doesn't
-		# stop the "[1] <pid>" on starting a job though; that's why
-		# stdout and stderr is redirected temporarily.
+		# completion notices in interactive shell mode.
+		# Silence "[1] <pid>" on stderr when starting the timer.
 		set +m
-		exec 3<&1 4<&2 >/dev/null 2>&1
-		(sleep 5; kill $$) &
-		timer_pid=$!
-		exec 1<&3 2<&4 3<&- 4<&-
-		set +m
+		start_timeout 2>/dev/null
 	fi
 
 	while :; do
@@ -114,8 +130,7 @@ __EOT
 			REPLY=a
 		else
 			# User has made a choice; stop the read timeout.
-			[[ -n $timer_pid ]] && kill $timer_pid 2>/dev/null
-			timer_pid=
+			stop_timeout
 		fi
 
 		case $REPLY in

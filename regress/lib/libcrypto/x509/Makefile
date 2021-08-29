@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.4 2020/09/11 18:34:29 beck Exp $
+#	$OpenBSD: Makefile,v 1.6 2021/08/28 15:20:19 tb Exp $
 
 PROGS =	constraints verify x509attribute x509name
 LDADD=	-Wl,-Bstatic -lcrypto -Wl,-Bdynamic
@@ -11,7 +11,15 @@ SUBDIR += bettertls
 REGRESS_TARGETS=regress-constraints regress-verify regress-x509attribute regress-x509name
 CLEANFILES+=	x509name.result
 
+.if make(clean) || make(cleandir)
+. if ${.OBJDIR} != ${.CURDIR}
+.BEGIN:
+	 rm -rf [0-9]*
+. endif
+.endif
+
 regress-verify: verify
+	perl ${.CURDIR}/make-dir-roots.pl ${.CURDIR}/../certs .
 	./verify ${.CURDIR}/../certs
 
 regress-constraints: constraints
