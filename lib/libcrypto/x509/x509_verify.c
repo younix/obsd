@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_verify.c,v 1.45 2021/08/29 17:13:15 beck Exp $ */
+/* $OpenBSD: x509_verify.c,v 1.47 2021/08/30 08:59:33 beck Exp $ */
 /*
  * Copyright (c) 2020-2021 Bob Beck <beck@openbsd.org>
  *

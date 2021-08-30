@@ -10,7 +10,6 @@
 /clock.h/1.2/Thu Jun 26 05:42:12 2008//
 /cpgreg.h/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /cputypes.h/1.2/Thu Jun 26 05:42:12 2008//
-/db_machdep.h/1.10/Thu Nov  7 16:08:07 2019//
 /devreg.h/1.3/Thu Jun 26 05:42:12 2008//
 /disklabel.h/1.10/Wed Sep 30 15:35:30 2015//
 /endian.h/1.8/Sun Feb 17 15:44:26 2019//
@@ -50,4 +49,5 @@
 /ubcreg.h/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /vmparam.h/1.10/Thu Jan 30 18:16:41 2014//
 /cpu.h/1.32/Sun Aug 29 08:01:52 2021//
+/db_machdep.h/1.11/Mon Aug 30 17:52:09 2021//
 D

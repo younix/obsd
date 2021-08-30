@@ -8,7 +8,6 @@
 /cdefs.h/1.4/Thu Mar 28 17:30:45 2013//
 /conf.h/1.11/Sat May 21 21:24:36 2016//
 /cpuconf.h/1.19/Fri Jan  6 00:06:02 2017//
-/db_machdep.h/1.12/Thu Nov  7 14:44:52 2019//
 /disklabel.h/1.15/Wed Sep 30 15:35:30 2015//
 /endian.h/1.11/Tue Oct  2 21:30:44 2018//
 /exec.h/1.6/Wed Feb  8 05:09:25 2017//
@@ -50,4 +49,5 @@
 /cpufunc.h/1.33/Sun Aug 29 08:01:51 2021//
 /pci_machdep.h/1.17/Sun Aug 29 08:01:51 2021//
 /pte.h/1.10/Sun Aug 29 08:01:51 2021//
+/db_machdep.h/1.13/Mon Aug 30 17:52:06 2021//
 D

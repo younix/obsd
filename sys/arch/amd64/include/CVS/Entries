@@ -8,7 +8,6 @@
 /codepatch.h/1.14/Wed Mar 11 07:27:08 2020//
 /conf.h/1.8/Wed May 13 08:32:43 2020//
 /cpu_full.h/1.5/Fri May 17 19:07:47 2019//
-/db_machdep.h/1.18/Thu Nov  7 14:44:52 2019//
 /disklabel.h/1.11/Wed Sep 30 14:57:03 2015//
 /efifbvar.h/1.10/Sat May  4 11:34:47 2019//
 /endian.h/1.7/Tue Oct  2 21:30:44 2018//
@@ -75,4 +74,5 @@
 /smbiosvar.h/1.13/Sun Aug 29 08:01:51 2021//
 /specialreg.h/1.90/Sun Aug 29 08:01:51 2021//
 /vmmvar.h/1.72/Sun Aug 29 08:01:51 2021//
+/db_machdep.h/1.19/Mon Aug 30 17:52:06 2021//
 D

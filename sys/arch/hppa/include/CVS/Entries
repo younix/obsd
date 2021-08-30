@@ -6,7 +6,6 @@
 /cdefs.h/1.10/Thu Mar 28 17:30:45 2013//
 /conf.h/1.6/Mon Nov 14 14:29:53 2011//
 /cpufunc.h/1.29/Sat Mar 29 18:09:29 2014//
-/db_machdep.h/1.21/Thu Nov  7 14:44:53 2019//
 /disklabel.h/1.24/Wed Sep 30 15:13:54 2015//
 /eisa_machdep.h/1.4/Wed Mar 23 16:54:35 2011//
 /endian.h/1.12/Sat Jul 12 16:25:08 2014//
@@ -50,4 +49,5 @@
 /cpu.h/1.95/Sun Aug 29 08:01:51 2021//
 /pdc.h/1.37/Sun Aug 29 08:01:51 2021//
 /psl.h/1.11/Sun Aug 29 08:01:51 2021//
+/db_machdep.h/1.22/Mon Aug 30 17:52:07 2021//
 D
