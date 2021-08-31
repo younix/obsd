@@ -33,7 +33,6 @@
 /SSL_CTX_set_session_cache_mode.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_session_id_context.3/1.6/Sat Jun  8 15:25:43 2019//
 /SSL_CTX_set_timeout.3/1.4/Tue Mar 27 17:35:50 2018//
-/SSL_CTX_set_tlsext_servername_callback.3/1.4/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_tlsext_status_cb.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_tmp_dh_callback.3/1.8/Mon Mar 30 10:28:59 2020//
 /SSL_CTX_set_tmp_rsa_callback.3/1.8/Tue Mar 27 17:35:50 2018//
@@ -119,4 +118,5 @@
 /SSL_get_version.3/1.9/Sun Aug 29 08:01:50 2021//
 /SSL_set1_host.3/1.4/Sun Aug 29 08:01:50 2021//
 /SSL_set_shutdown.3/1.6/Sun Aug 29 08:01:50 2021//
+/SSL_CTX_set_tlsext_servername_callback.3/1.5/Tue Aug 31 12:18:25 2021//
 D

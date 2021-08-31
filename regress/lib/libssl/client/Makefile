@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.1 2015/09/01 17:02:18 jsing Exp $
+#	$OpenBSD: Makefile,v 1.3 2021/08/30 17:34:01 tb Exp $
 
 PROG=	clienttest
 LDADD=	-lssl -lcrypto

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.1 2021/05/03 18:21:00 tb Exp $
+#	$OpenBSD: Makefile,v 1.3 2021/08/30 17:34:02 tb Exp $
 
 OPENSSL_RUBY_TESTS =	/usr/local/share/openssl-ruby-tests
 RUBY_BINREV =		27

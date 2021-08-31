@@ -1,4 +1,4 @@
-/*	$OpenBSD: clienttest.c,v 1.33 2021/06/27 17:13:23 jsing Exp $ */
+/*	$OpenBSD: clienttest.c,v 1.35 2021/08/30 17:34:01 tb Exp $ */
 /*
  * Copyright (c) 2015 Joel Sing <jsing@openbsd.org>
  *

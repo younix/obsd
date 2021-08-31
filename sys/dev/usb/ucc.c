@@ -1,4 +1,4 @@
-/*	$OpenBSD: ucc.c,v 1.19 2021/08/29 19:00:59 anton Exp $	*/
+/*	$OpenBSD: ucc.c,v 1.21 2021/08/31 05:17:49 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>
@@ -859,6 +859,7 @@ ucc_hid_parse(struct ucc_softc *sc, void *desc, int descsiz)
 	enum { OFFSET, LENGTH } istate = OFFSET;
 	struct hid_item hi;
 	struct hid_data *hd;
+	u_int bit = 0;
 	int error = 0;
 	int nsyms = nitems(ucc_keysyms);
 	int repid = sc->sc_hdev.sc_report_id;
@@ -897,8 +898,6 @@ ucc_hid_parse(struct ucc_softc *sc, void *desc, int descsiz)
 
 	hd = hid_start_parse(desc, descsiz, hid_input);
 	while (hid_get_item(hd, &hi)) {
-		u_int bit;
-
 		if (hi.report_ID != repid || hi.kind != hid_input)
 			continue;
 
@@ -931,10 +930,11 @@ ucc_hid_parse(struct ucc_softc *sc, void *desc, int descsiz)
 			break;
 		}
 
-		bit = sc->sc_nusages++;
 		error = ucc_add_key(sc, HID_GET_USAGE(hi.usage), bit);
 		if (error)
 			break;
+		sc->sc_nusages++;
+		bit += hi.loc.size * hi.loc.count;
 	}
 	hid_end_parse(hd);
 
@@ -1003,7 +1003,7 @@ ucc_add_key(struct ucc_softc *sc, int32_t usage, u_int bit)
 int
 ucc_bit_to_sym(struct ucc_softc *sc, u_int bit, const struct ucc_keysym **us)
 {
-	if (bit >= sc->sc_rawsiz)
+	if (bit >= sc->sc_rawsiz || sc->sc_raw[bit] == NULL)
 		return 1;
 	*us = sc->sc_raw[bit];
 	return 0;

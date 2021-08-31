@@ -1,10 +1,16 @@
-#	$OpenBSD: putty-transfer.sh,v 1.7 2020/01/23 11:19:12 dtucker Exp $
+#	$OpenBSD: putty-transfer.sh,v 1.9 2021/08/31 07:13:59 dtucker Exp $
 #	Placed in the Public Domain.
 
 tid="putty transfer data"
 
 if test "x$REGRESS_INTEROP_PUTTY" != "xyes" ; then
 	fatal "putty interop tests not enabled"
+fi
+
+# Re-enable ssh-rsa on older PuTTY versions.
+oldver="`${PLINK} --version | awk '/plink: Release/{if ($3<0.76)print "yes"}'`"
+if [ "x$oldver" = "xyes" ]; then
+	echo "HostKeyalgorithms +ssh-rsa" >> sshd_config
 fi
 
 if [ "`${SSH} -Q compression`" = "none" ]; then
@@ -20,7 +26,7 @@ for c in $comp; do
 	    ${OBJ}/.putty/sessions/compression_$c
 	echo "Compression=$c" >> ${OBJ}/.putty/sessions/kex_$k
 	env HOME=$PWD ${PLINK} -load compression_$c -batch \
-	    -i putty.rsa2 cat ${DATA} > ${COPY}
+	    -i ${OBJ}/putty.rsa2 cat ${DATA} > ${COPY}
 	if [ $? -ne 0 ]; then
 		fail "ssh cat $DATA failed"
 	fi
@@ -31,7 +37,7 @@ for c in $comp; do
 		rm -f ${COPY}
 		dd if=$DATA obs=${s} 2> /dev/null | \
 			env HOME=$PWD ${PLINK} -load compression_$c \
-			    -batch -i putty.rsa2 \
+			    -batch -i ${OBJ}/putty.rsa2 \
 			    "cat > ${COPY}"
 		if [ $? -ne 0 ]; then
 			fail "ssh cat $DATA failed"

@@ -1,4 +1,4 @@
-/* $OpenBSD: tlslegacytest.c,v 1.2 2020/10/07 17:39:43 tb Exp $ */
+/* $OpenBSD: tlslegacytest.c,v 1.4 2021/08/30 17:34:02 tb Exp $ */
 /*
  * Copyright (c) 2015, 2016, 2017, 2020 Joel Sing <jsing@openbsd.org>
  *
