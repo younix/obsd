@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfm.c,v 1.88 2021/08/19 14:13:39 patrick Exp $ */
+/* $OpenBSD: bwfm.c,v 1.90 2021/08/31 23:05:11 patrick Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -73,7 +73,7 @@ int	 bwfm_media_change(struct ifnet *);
 void	 bwfm_process_clm_blob(struct bwfm_softc *);
 
 int	 bwfm_chip_attach(struct bwfm_softc *);
-int	 bwfm_chip_detach(struct bwfm_softc *, int);
+void	 bwfm_chip_detach(struct bwfm_softc *);
 struct bwfm_core *bwfm_chip_get_core_idx(struct bwfm_softc *, int, int);
 struct bwfm_core *bwfm_chip_get_core(struct bwfm_softc *, int);
 struct bwfm_core *bwfm_chip_get_pmu(struct bwfm_softc *);
@@ -337,15 +337,47 @@ bwfm_preinit(struct bwfm_softc *sc)
 	return 0;
 }
 
+void
+bwfm_cleanup(struct bwfm_softc *sc)
+{
+	bwfm_chip_detach(sc);
+	sc->sc_initialized = 0;
+}
+
 int
 bwfm_detach(struct bwfm_softc *sc, int flags)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct ifnet *ifp = &ic->ic_if;
+
 	task_del(sc->sc_taskq, &sc->sc_task);
 	taskq_destroy(sc->sc_taskq);
 	ieee80211_ifdetach(ifp);
 	if_detach(ifp);
+
+	bwfm_cleanup(sc);
+	return 0;
+}
+
+int
+bwfm_activate(struct bwfm_softc *sc, int act)
+{
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct ifnet *ifp = &ic->ic_if;
+
+	switch (act) {
+	case DVACT_QUIESCE:
+		if (ifp->if_flags & IFF_UP)
+			bwfm_stop(ifp);
+		break;
+	case DVACT_WAKEUP:
+		if (ifp->if_flags & IFF_UP)
+			bwfm_init(ifp);
+		break;
+	default:
+		break;
+	}
+
 	return 0;
 }
 
@@ -930,6 +962,17 @@ bwfm_chip_attach(struct bwfm_softc *sc)
 		sc->sc_buscore_ops->bc_setup(sc);
 
 	return 0;
+}
+
+void
+bwfm_chip_detach(struct bwfm_softc *sc)
+{
+	struct bwfm_core *core, *tmp;
+
+	LIST_FOREACH_SAFE(core, &sc->sc_chip.ch_list, co_link, tmp) {
+		LIST_REMOVE(core, co_link);
+		free(core, M_DEVBUF, sizeof(*core));
+	}
 }
 
 struct bwfm_core *

@@ -133,9 +133,9 @@
 /systm.h/1.154/Sun Aug 29 08:01:54 2021//
 /time.h/1.61/Sun Aug 29 08:01:54 2021//
 /timeout.h/1.43/Sun Aug 29 08:01:54 2021//
-/tty.h/1.39/Sun Aug 29 18:24:01 2021//
 /unpcb.h/1.18/Sun Aug 29 08:01:54 2021//
 /vnode.h/1.157/Sun Aug 29 08:01:54 2021//
 /wait.h/1.18/Sun Aug 29 08:01:54 2021//
-/chio.h/1.8/Tue Aug 31 12:18:50 2021//
+/chio.h/1.8/Wed Sep  1 07:23:26 2021//
+/tty.h/1.39/Tue Aug 31 13:53:04 2021//
 D

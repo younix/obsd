@@ -11,7 +11,6 @@
 /apldog.c/1.1/Sun Aug 29 08:01:51 2021//
 /apldwusb.c/1.1/Sun Aug 29 08:01:51 2021//
 /aplintc.c/1.4/Sun Aug 29 08:01:51 2021//
-/aplpcie.c/1.4/Sun Aug 29 08:01:51 2021//
 /aplpmu.c/1.2/Sun Aug 29 08:01:51 2021//
 /aplspmi.c/1.1/Sun Aug 29 08:01:51 2021//
 /apm.c/1.7/Sun Aug 29 08:01:51 2021//
@@ -26,5 +25,7 @@
 /smmu_fdt.c/1.4/Sun Aug 29 08:01:51 2021//
 /smmureg.h/1.1/Sun Aug 29 08:01:51 2021//
 /smmuvar.h/1.6/Sun Aug 29 08:01:51 2021//
-/aplns.c/1.5/Tue Aug 31 12:15:28 2021//
+/aplns.c/1.5/Wed Sep  1 07:23:25 2021//
+/aplpcie.c/1.5/Wed Sep  1 07:26:06 2021//
+/aplpinctrl.c/1.1/Tue Aug 31 15:20:06 2021//
 D

@@ -16,14 +16,14 @@
 /socket.c/1.31/Sun Aug 29 08:01:54 2021//
 /symlinks.c/1.6/Sun Aug 29 08:01:54 2021//
 /uploader.c/1.29/Sun Aug 29 08:01:54 2021//
-/Makefile/1.11/Tue Aug 31 12:15:29 2021//
-/charclass.h/1.1/Tue Aug 31 12:15:29 2021//
-/extern.h/1.40/Tue Aug 31 12:15:29 2021//
-/flist.c/1.33/Tue Aug 31 12:15:29 2021//
-/main.c/1.58/Tue Aug 31 12:18:52 2021//
-/receiver.c/1.29/Tue Aug 31 12:15:29 2021//
-/rmatch.c/1.2/Tue Aug 31 12:15:29 2021//
-/rsync.1/1.25/Tue Aug 31 12:18:52 2021//
-/rules.c/1.1/Tue Aug 31 12:15:29 2021//
-/sender.c/1.30/Tue Aug 31 12:15:29 2021//
+/Makefile/1.11/Wed Sep  1 07:23:26 2021//
+/charclass.h/1.1/Wed Sep  1 07:23:26 2021//
+/extern.h/1.40/Wed Sep  1 07:23:26 2021//
+/flist.c/1.33/Wed Sep  1 07:23:26 2021//
+/main.c/1.58/Wed Sep  1 07:23:26 2021//
+/receiver.c/1.29/Wed Sep  1 07:23:26 2021//
+/rmatch.c/1.2/Wed Sep  1 07:23:26 2021//
+/rsync.1/1.25/Wed Sep  1 07:23:26 2021//
+/rules.c/1.1/Wed Sep  1 07:23:26 2021//
+/sender.c/1.30/Wed Sep  1 07:23:26 2021//
 D
