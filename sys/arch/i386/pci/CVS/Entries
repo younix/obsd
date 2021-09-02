@@ -33,11 +33,11 @@
 /via82c586reg.h/1.5/Fri Jun  8 03:18:04 2001//
 /pchb.c/1.92/Mon Jun  1 06:23:24 2020//
 /pci_machdep.h/1.32/Fri Dec 11 17:58:22 2020//
-/geodesc.c/1.16/Sun Aug 29 08:01:51 2021//
-/glxsb.c/1.37/Sun Aug 29 08:01:51 2021//
-/gscpm.c/1.12/Sun Aug 29 08:01:51 2021//
-/ichpcib.c/1.30/Sun Aug 29 08:01:51 2021//
-/pci_intr_fixup.c/1.63/Sun Aug 29 08:01:51 2021//
-/pci_machdep.c/1.87/Sun Aug 29 08:01:51 2021//
-/vga_post.c/1.10/Sun Aug 29 08:01:51 2021//
+/geodesc.c/1.16/Wed Sep  1 16:07:38 2021//
+/glxsb.c/1.37/Wed Sep  1 16:07:38 2021//
+/gscpm.c/1.12/Wed Sep  1 16:07:38 2021//
+/ichpcib.c/1.30/Wed Sep  1 16:07:38 2021//
+/pci_intr_fixup.c/1.63/Wed Sep  1 16:07:38 2021//
+/pci_machdep.c/1.87/Wed Sep  1 16:07:38 2021//
+/vga_post.c/1.10/Wed Sep  1 16:07:38 2021//
 D

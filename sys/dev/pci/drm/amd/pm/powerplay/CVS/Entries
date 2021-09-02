@@ -1,13 +1,13 @@
 D/hwmgr////
 D/smumgr////
-/amd_powerplay.c/1.1/Sun Aug 29 08:01:53 2021//
-/amdgpu_kv_dpm.c/1.1/Sun Aug 29 08:01:53 2021//
-/amdgpu_kv_smc.c/1.1/Sun Aug 29 08:01:53 2021//
-/cik_dpm.h/1.1/Sun Aug 29 08:01:53 2021//
-/kv_dpm.h/1.1/Sun Aug 29 08:01:53 2021//
-/ppsmc.h/1.1/Sun Aug 29 08:01:53 2021//
-/r600_dpm.h/1.1/Sun Aug 29 08:01:53 2021//
-/si_dpm.c/1.1/Sun Aug 29 08:01:53 2021//
-/si_dpm.h/1.1/Sun Aug 29 08:01:53 2021//
-/si_smc.c/1.1/Sun Aug 29 08:01:53 2021//
-/sislands_smc.h/1.1/Sun Aug 29 08:01:53 2021//
+/amd_powerplay.c/1.1/Wed Sep  1 16:07:39 2021//
+/amdgpu_kv_dpm.c/1.1/Wed Sep  1 16:07:39 2021//
+/amdgpu_kv_smc.c/1.1/Wed Sep  1 16:07:39 2021//
+/cik_dpm.h/1.1/Wed Sep  1 16:07:39 2021//
+/kv_dpm.h/1.1/Wed Sep  1 16:07:39 2021//
+/ppsmc.h/1.1/Wed Sep  1 16:07:39 2021//
+/r600_dpm.h/1.1/Wed Sep  1 16:07:39 2021//
+/si_dpm.c/1.1/Wed Sep  1 16:07:39 2021//
+/si_dpm.h/1.1/Wed Sep  1 16:07:39 2021//
+/si_smc.c/1.1/Wed Sep  1 16:07:39 2021//
+/sislands_smc.h/1.1/Wed Sep  1 16:07:39 2021//

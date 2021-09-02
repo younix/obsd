@@ -19,14 +19,16 @@
 /multismts.ok/1.1/Tue Jan 21 16:27:17 2020//
 /nsecs+var.bt/1.1/Tue Jan 21 16:27:17 2020//
 /nsecs+var.ok/1.1/Tue Jan 21 16:27:17 2020//
-/arithm.bt/1.2/Sun Aug 29 08:01:51 2021//
-/boolean.bt/1.2/Sun Aug 29 08:01:51 2021//
-/boolean.ok/1.2/Sun Aug 29 08:01:51 2021//
-/print.bt/1.1/Sun Aug 29 08:01:51 2021//
-/print.ok/1.1/Sun Aug 29 08:01:51 2021//
-/Makefile/1.11/Wed Sep  1 07:26:03 2021//
-/if.bt/1.1/Tue Aug 31 12:51:56 2021//
-/if.ok/1.1/Tue Aug 31 12:51:56 2021//
-/precedence.bt/1.1/Wed Sep  1 07:23:25 2021//
-/precedence.ok/1.1/Wed Sep  1 07:23:25 2021//
+/Makefile/1.12/Thu Sep  2 08:45:53 2021//
+/arithm.bt/1.2/Wed Sep  1 16:07:38 2021//
+/boolean.bt/1.2/Wed Sep  1 16:07:38 2021//
+/boolean.ok/1.2/Wed Sep  1 16:07:38 2021//
+/if.bt/1.1/Thu Sep  2 08:41:58 2021//
+/if.ok/1.1/Thu Sep  2 08:41:58 2021//
+/precedence.bt/1.1/Thu Sep  2 08:41:58 2021//
+/precedence.ok/1.1/Thu Sep  2 08:41:58 2021//
+/print.bt/1.1/Wed Sep  1 16:07:38 2021//
+/print.ok/1.1/Wed Sep  1 16:07:38 2021//
+/read-map-after-clear.bt/1.1/Wed Sep  1 13:22:36 2021//
+/read-map-after-clear.ok/1.1/Wed Sep  1 13:22:36 2021//
 D

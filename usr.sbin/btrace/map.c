@@ -1,4 +1,4 @@
-/*	$OpenBSD: map.c,v 1.14 2021/08/31 11:30:21 mpi Exp $ */
+/*	$OpenBSD: map.c,v 1.16 2021/09/01 08:06:49 mpi Exp $ */
 
 /*
  * Copyright (c) 2020 Martin Pieuchot <mpi@openbsd.org>
@@ -84,6 +84,9 @@ map_clear(struct map *map)
 {
 	struct mentry *mep;
 
+	if (map == NULL)
+		return;
+
 	while ((mep = RB_MIN(map, map)) != NULL) {
 		RB_REMOVE(map, map, mep);
 		free(mep);
@@ -138,6 +141,9 @@ map_insert(struct map *map, const char *key, struct bt_arg *bval,
 		free(mep->mval);
 		mep->mval = bval;
 		break;
+	case B_AT_BI_PID:
+	case B_AT_BI_TID:
+	case B_AT_BI_CPU:
 	case B_AT_BI_NSECS:
 	case B_AT_BI_ARG0 ... B_AT_BI_ARG9:
 	case B_AT_BI_RETVAL:

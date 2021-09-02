@@ -12,7 +12,7 @@
 /gost_err.c/1.4/Sat Jun  6 11:21:48 2020//
 /gostr341001_params.c/1.4/Sat Jun  6 11:21:48 2020//
 /gost2814789.c/1.6/Thu Dec 17 19:39:58 2020//
-/gostr341001.c/1.8/Sun Aug 29 08:01:50 2021//
-/gostr341001_ameth.c/1.17/Sun Aug 29 08:01:50 2021//
-/gostr341001_key.c/1.9/Sun Aug 29 08:01:50 2021//
+/gostr341001.c/1.8/Wed Sep  1 16:07:37 2021//
+/gostr341001_ameth.c/1.17/Wed Sep  1 16:07:37 2021//
+/gostr341001_key.c/1.9/Wed Sep  1 16:07:37 2021//
 D

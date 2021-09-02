@@ -1,7 +1,7 @@
-/*	$OpenBSD: btrace.c,v 1.42 2021/08/31 12:51:24 mpi Exp $ */
+/*	$OpenBSD: btrace.c,v 1.45 2021/09/01 13:21:24 mpi Exp $ */
 
 /*
- * Copyright (c) 2019 - 2020 Martin Pieuchot <mpi@openbsd.org>
+ * Copyright (c) 2019 - 2021 Martin Pieuchot <mpi@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -522,12 +522,10 @@ rules_teardown(int fd)
 
 	if (rend)
 		rule_eval(rend, &bt_devt);
-	else {
-		debug("eval default 'end' rule\n");
 
-		TAILQ_FOREACH(r, &g_rules, br_next)
-			rule_printmaps(r);
-	}
+	/* Print non-empty map & hist */
+	TAILQ_FOREACH(r, &g_rules, br_next)
+		rule_printmaps(r);
 }
 
 void
@@ -949,6 +947,10 @@ ba_read(struct bt_arg *ba)
 	assert(ba->ba_type == B_AT_VAR);
 
 	debug("bv=%p read '%s' (%p)\n", bv, bv_name(bv), bv->bv_value);
+
+	/* Handle map/hist access after clear(). */
+	if (bv->bv_value == NULL)
+		return &g_nullba;
 
 	return bv->bv_value;
 }

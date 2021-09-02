@@ -14,14 +14,14 @@
 /pcmciareg.h/1.7/Sat Sep  4 12:59:27 2010//
 /pcmciavar.h/1.21/Sat Sep  4 12:59:27 2010//
 /if_malo.c/1.96/Fri Dec 11 17:58:24 2020//
-/aic_pcmcia.c/1.18/Sun Aug 29 08:01:54 2021//
-/com_pcmcia.c/1.58/Sun Aug 29 08:01:54 2021//
-/if_ep_pcmcia.c/1.49/Sun Aug 29 08:01:54 2021//
-/if_ne_pcmcia.c/1.100/Sun Aug 29 08:01:54 2021//
-/if_sm_pcmcia.c/1.38/Sun Aug 29 08:01:54 2021//
-/if_xe.c/1.61/Sun Aug 29 08:01:54 2021//
-/pcmcia.c/1.49/Sun Aug 29 08:01:54 2021//
-/pcmcia_cis.c/1.22/Sun Aug 29 08:01:54 2021//
-/pcmcia_cis_quirks.c/1.15/Sun Aug 29 08:01:54 2021//
-/wdc_pcmcia.c/1.33/Sun Aug 29 08:01:54 2021//
+/aic_pcmcia.c/1.18/Wed Sep  1 16:07:40 2021//
+/com_pcmcia.c/1.58/Wed Sep  1 16:07:40 2021//
+/if_ep_pcmcia.c/1.49/Wed Sep  1 16:07:40 2021//
+/if_ne_pcmcia.c/1.100/Wed Sep  1 16:07:40 2021//
+/if_sm_pcmcia.c/1.38/Wed Sep  1 16:07:40 2021//
+/if_xe.c/1.61/Wed Sep  1 16:07:40 2021//
+/pcmcia.c/1.49/Wed Sep  1 16:07:40 2021//
+/pcmcia_cis.c/1.22/Wed Sep  1 16:07:40 2021//
+/pcmcia_cis_quirks.c/1.15/Wed Sep  1 16:07:40 2021//
+/wdc_pcmcia.c/1.33/Wed Sep  1 16:07:40 2021//
 D
