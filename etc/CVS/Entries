@@ -21,7 +21,6 @@
 /protocols/1.24/Sat Jul 12 14:38:38 2014//
 /rpc/1.6/Thu Mar 13 15:22:21 2014//
 /shells/1.8/Sat Feb 14 17:06:40 2009//
-/syslog.conf/1.20/Tue Dec 27 13:38:14 2016//
 /ttys.pty/1.6/Wed Jul 16 14:34:33 2014//
 /weekly/1.30/Wed Feb 12 20:51:49 2020//
 D/amd////
@@ -55,10 +54,11 @@ D/etc.riscv64////
 /unbound.conf/1.21/Sat May  1 08:41:43 2021//
 /MAKEDEV.common/1.113/Wed Sep  1 16:07:30 2021//
 /Makefile/1.484/Wed Sep  1 16:07:30 2021//
-/changelist/1.128/Wed Sep  1 16:07:30 2021//
-/locate.rc/1.8/Wed Sep  1 16:07:30 2021//
-/moduli/1.30/Wed Sep  1 16:07:30 2021//
-/netstart/1.215/Thu Sep  2 08:41:57 2021//
-/rc/1.554/Thu Sep  2 08:44:30 2021//
-/rc.conf/1.224/Wed Sep  1 16:07:30 2021//
-/services/1.102/Wed Sep  1 16:07:30 2021//
+/changelist/1.129/Tue Sep 14 08:16:41 2021//
+/locate.rc/1.8/Thu Sep  2 14:22:29 2021//
+/netstart/1.216/Tue Sep 14 08:16:41 2021//
+/rc/1.554/Thu Sep  2 14:22:29 2021//
+/rc.conf/1.224/Thu Sep  2 14:22:29 2021//
+/services/1.103/Tue Sep 14 08:16:41 2021//
+/moduli/1.31/Wed Oct 20 17:27:56 2021//
+/syslog.conf/1.21/Wed Oct 20 17:27:56 2021//

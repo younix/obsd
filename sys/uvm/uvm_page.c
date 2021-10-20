@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_page.c,v 1.157 2021/04/21 10:02:05 mpi Exp $	*/
+/*	$OpenBSD: uvm_page.c,v 1.159 2021/10/17 11:39:40 patrick Exp $	*/
 /*	$NetBSD: uvm_page.c,v 1.44 2000/11/27 08:40:04 chs Exp $	*/
 
 /*
@@ -542,8 +542,8 @@ uvm_page_physload(paddr_t start, paddr_t end, paddr_t avail_start,
 
  		npages = end - start;  /* # of pages */
 
-		pgs = km_alloc(npages * sizeof(*pgs), &kv_any, &kp_zero,
-		    &kd_waitok);
+		pgs = km_alloc(round_page(npages * sizeof(*pgs)),
+		    &kv_any, &kp_zero, &kd_waitok);
 		if (pgs == NULL) {
 			printf("uvm_page_physload: can not malloc vm_page "
 			    "structs for segment\n");
@@ -791,6 +791,8 @@ uvm_pagealloc_multi(struct uvm_object *obj, voff_t off, vsize_t size,
 	struct vm_page  *pg;
 	int              i, r;
 
+	KASSERT(UVM_OBJ_IS_BUFCACHE(obj));
+	KERNEL_ASSERT_LOCKED();
 
 	TAILQ_INIT(&plist);
 	r = uvm_pglistalloc(size, dma_constraint.ucr_low,
@@ -823,6 +825,8 @@ uvm_pagerealloc_multi(struct uvm_object *obj, voff_t off, vsize_t size,
 	int              i, r;
 	voff_t		offset;
 
+	KASSERT(UVM_OBJ_IS_BUFCACHE(obj));
+	KERNEL_ASSERT_LOCKED();
 
 	TAILQ_INIT(&plist);
 	if (size == 0)

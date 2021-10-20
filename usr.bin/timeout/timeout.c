@@ -1,5 +1,4 @@
-/* $OpenBSD: timeout.c,v 1.13 2021/09/02 06:23:32 deraadt Exp $ */
-/* $NetBSD: timeout.c,v 1.4 2014/08/05 08:20:02 christos Exp $ */
+/* $OpenBSD: timeout.c,v 1.19 2021/09/04 11:49:11 schwarze Exp $ */
 
 /*
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
@@ -54,8 +53,10 @@ static sig_atomic_t sig_ign = 0;
 static void __dead
 usage(void)
 {
-	fprintf(stderr, "usage: timeout [-s sig] [-k time] [--preserve-status]"
-	    " [--foreground] duration command\n");
+	fprintf(stderr,
+	    "usage: timeout [-k time] [-s sig] [--foreground]"
+	    " [--preserve-status] duration\n"
+	    "               command [args]\n");
 
 	exit(1);
 }
@@ -68,15 +69,15 @@ parse_duration(const char *duration)
 
 	ret = strtod(duration, &suffix);
 	if (ret == 0 && suffix == duration)
-		err(1, "invalid duration");
+		errx(1, "duration is not a number");
 	if (ret < 0 || ret >= 100000000UL)
-		err(1, "invalid duration");
+		errx(1, "duration out of range");
 
 	if (suffix == NULL || *suffix == '\0')
 		return (ret);
 
-	if (suffix != NULL && *(suffix + 1) != '\0')
-		err(1, "invalid duration");
+	if (suffix[1] != '\0')
+		errx(1, "duration unit suffix too long");
 
 	switch (*suffix) {
 	case 's':
@@ -91,7 +92,7 @@ parse_duration(const char *duration)
 		ret *= 60 * 60 * 24;
 		break;
 	default:
-		err(1, "invalid duration");
+		errx(1, "duration unit suffix is invalid");
 	}
 
 	return (ret);
@@ -111,12 +112,12 @@ parse_signal(const char *str)
 			if (strcasecmp(str, sys_signame[i]) == 0)
 				return (i);
 		}
-		err(1, "invalid signal name");
+		errx(1, "invalid signal name");
 	}
 
 	sig = strtonum(str, 1, NSIG, &errstr);
 	if (errstr != NULL)
-		err(1, "signal %s %s", str, errstr);
+		errx(1, "signal %s %s", str, errstr);
 
 	return (int)sig;
 }
@@ -165,7 +166,7 @@ main(int argc, char **argv)
 	int		ch;
 	unsigned long 	i;
 	int 		foreground = 0, preserve = 0;
-	int 		error, pstat, status;
+	int 		pstat, status;
 	int 		killsig = SIGTERM;
 	pid_t 		pgid = 0, pid, cpid = 0;
 	double 		first_kill;
@@ -251,10 +252,11 @@ main(int argc, char **argv)
 		signal(SIGTTIN, SIG_DFL);
 		signal(SIGTTOU, SIG_DFL);
 
-		error = execvp(argv[0], argv);
-		if (error == -1)
-			err(1, "execvp");
+		execvp(argv[0], argv);
+		err(1, "%s", argv[0]);
 	}
+
+	/* parent continues here */
 
 	if (pledge("stdio proc", NULL) == -1)
 		err(1, "pledge");
@@ -262,7 +264,6 @@ main(int argc, char **argv)
 	if (sigprocmask(SIG_BLOCK, &signals.sa_mask, NULL) == -1)
 		err(1, "sigprocmask");
 
-	/* parent continues here */
 	set_interval(first_kill);
 
 	for (;;) {

@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 
 # ex:ts=8 sw=4:
-# $OpenBSD: PkgAdd.pm,v 1.120 2021/06/28 14:17:01 espie Exp $
+# $OpenBSD: PkgAdd.pm,v 1.122 2021/10/12 09:06:37 espie Exp $
 #
 # Copyright (c) 2003-2014 Marc Espie <espie@openbsd.org>
 #
@@ -503,8 +503,8 @@ sub install_issues
 		if (defined $s && $s ne $set) {
 			$set->merge($state->tracker, $s);
 		} else {
-			$set->add_older(OpenBSD::Handle->create_old($toreplace,
-			    $state));
+			my $h = OpenBSD::Handle->create_old($toreplace, $state);
+			$set->add_older($h);
 		}
 	}
 

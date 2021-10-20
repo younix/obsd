@@ -1,7 +1,8 @@
-/*	$OpenBSD: out.c,v 1.52 2021/08/10 12:36:42 schwarze Exp $ */
+/*	$OpenBSD: out.c,v 1.57 2021/10/17 21:03:05 schwarze Exp $ */
 /*
  * Copyright (c) 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
- * Copyright (c) 2011,2014,2015,2017,2018 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2011, 2014, 2015, 2017, 2018, 2019, 2021
+ *               Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -146,7 +147,6 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 		 * to data cells in the data section.
 		 */
 
-		gp = &first_group;
 		for (dp = sp->first; dp != NULL; dp = dp->next) {
 			icol = dp->layout->col;
 			while (maxcol < icol + dp->hspans)
@@ -187,16 +187,16 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 				continue;
 
 			/*
-			 * Build an ordered, singly linked list
+			 * Build a singly linked list
 			 * of all groups of columns joined by spans,
 			 * recording the minimum width for each group.
 			 */
 
-			while (*gp != NULL && ((*gp)->startcol < icol ||
-			    (*gp)->endcol < icol + dp->hspans))
+			gp = &first_group;
+			while (*gp != NULL && ((*gp)->startcol != icol ||
+			    (*gp)->endcol != icol + dp->hspans))
 				gp = &(*gp)->next;
-			if (*gp == NULL || (*gp)->startcol > icol ||
-                            (*gp)->endcol > icol + dp->hspans) {
+			if (*gp == NULL) {
 				g = mandoc_malloc(sizeof(*g));
 				g->next = *gp;
 				g->wanted = width;
@@ -245,13 +245,13 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 				done = 1;
 				break;
 			} else
-				(*gp)->wanted -= width;
+				g->wanted -= width;
 		}
 		if (done) {
 			*gp = g->next;
 			free(g);
 		} else
-			gp = &(*gp)->next;
+			gp = &g->next;
 	}
 
 	colwidth = mandoc_reallocarray(NULL, maxcol + 1, sizeof(*colwidth));
@@ -275,12 +275,12 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 
 		min1 = min2 = SIZE_MAX;
 		for (icol = 0; icol <= maxcol; icol++) {
-			if (min1 > colwidth[icol]) {
+			width = colwidth[icol];
+			if (min1 > width) {
 				min2 = min1;
-				min1 = colwidth[icol];
-			} else if (min1 < colwidth[icol] &&
-			    min2 > colwidth[icol])
-				min2 = colwidth[icol];
+				min1 = width;
+			} else if (min1 < width && min2 > width)
+				min2 = width;
 		}
 
 		/*
@@ -293,7 +293,7 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 		for (g = first_group; g != NULL; g = g->next) {
 			necol = 0;
 			for (icol = g->startcol; icol <= g->endcol; icol++)
-				if (tbl->cols[icol].width == min1)
+				if (colwidth[icol] == min1)
 					necol++;
 			if (necol == 0)
 				continue;
@@ -302,40 +302,30 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 				width = min2;
 			if (wanted > width)
 				wanted = width;
-			for (icol = g->startcol; icol <= g->endcol; icol++)
-				if (colwidth[icol] == min1 ||
-				    (colwidth[icol] < min2 &&
-				     colwidth[icol] > width))
-					colwidth[icol] = width;
 		}
 
-		/* Record the effect of the widening on the group list. */
+		/* Record the effect of the widening. */
 
 		gp = &first_group;
 		while ((g = *gp) != NULL) {
 			done = 0;
 			for (icol = g->startcol; icol <= g->endcol; icol++) {
-				if (colwidth[icol] != wanted ||
-				    tbl->cols[icol].width == wanted)
+				if (colwidth[icol] != min1)
 					continue;
 				if (g->wanted <= wanted - min1) {
+					tbl->cols[icol].width += g->wanted;
 					done = 1;
 					break;
 				}
+				tbl->cols[icol].width = wanted;
 				g->wanted -= wanted - min1;
 			}
 			if (done) {
 				*gp = g->next;
 				free(g);
 			} else
-				gp = &(*gp)->next;
+				gp = &g->next;
 		}
-
-		/* Record the effect of the widening on the columns. */
-
-		for (icol = 0; icol <= maxcol; icol++)
-			if (colwidth[icol] == wanted)
-				tbl->cols[icol].width = wanted;
 	}
 	free(colwidth);
 
@@ -352,8 +342,6 @@ tblcalc(struct rofftbl *tbl, const struct tbl_span *sp_first,
 		col = tbl->cols + icol;
 		if (col->width > col->nwidth)
 			col->decimal += (col->width - col->nwidth) / 2;
-		else
-			col->width = col->nwidth;
 		if (col->flags & TBL_CELL_EQUAL) {
 			necol++;
 			if (ewidth < col->width)
@@ -561,5 +549,7 @@ tblcalc_number(struct rofftbl *tbl, struct roffcol *col,
 
 	if (totsz > col->nwidth)
 		col->nwidth = totsz;
+	if (col->nwidth > col->width)
+		col->width = col->nwidth;
 	return totsz;
 }

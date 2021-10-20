@@ -1,4 +1,4 @@
-/*	$OpenBSD: bt_parser.h,v 1.18 2021/08/31 08:39:26 mpi Exp $	*/
+/*	$OpenBSD: bt_parser.h,v 1.21 2021/10/03 22:01:48 dv Exp $	*/
 
 /*
  * Copyright (c) 2019-2021 Martin Pieuchot <mpi@openbsd.org>
@@ -32,13 +32,23 @@
  *	"provider:function:name"
  * or
  *	"provider:time_unit:rate"
+ *
+ * Multiple probes can be associated to the same action.
  */
 struct bt_probe {
+	SLIST_ENTRY(bt_probe)	 bp_next;	/* next probe for this rule */
 	const char		*bp_prov;	/* provider */
 	const char		*bp_func;	/* function or time unit */
 	const char		*bp_name;
 	uint32_t		 bp_rate;
 #define bp_unit	bp_func
+	enum bt_ptype {
+		 B_PT_BEGIN = 1,
+		 B_PT_END,
+		 B_PT_PROBE,
+	}			 bp_type;	/* BEGIN, END or 'probe' */
+	void			*bp_cookie;	/* ioctl request */
+	uint32_t		 bp_pbn;	/* ID assigned by the kernel */
 };
 
 
@@ -77,19 +87,10 @@ TAILQ_HEAD(bt_ruleq, bt_rule);
  */
 struct bt_rule {
 	TAILQ_ENTRY(bt_rule)	 br_next;	/* linkage in global list */
-	struct bt_probe		*br_probe;
+	SLIST_HEAD(, bt_probe)	 br_probes;	/* list of probes */
 	struct bt_filter	*br_filter;
 	SLIST_HEAD(, bt_stmt)	 br_action;
 	SLIST_HEAD(, bt_var)	 br_variables;	/* local variables */
-
-	enum bt_rtype {
-		 B_RT_BEGIN = 1,
-		 B_RT_END,
-		 B_RT_PROBE,
-	}			 br_type;	/* BEGIN, END or 'probe' */
-
-	uint32_t		 br_pbn;	/* ID assigned by the kernel */
-	void			*br_cookie;
 };
 
 /*
@@ -125,6 +126,7 @@ struct bt_arg {
 		B_AT_VAR,			/* global/local variable */
 		B_AT_MAP,			/* global map (@map[]) */
 		B_AT_HIST,			/* histogram */
+		B_AT_NIL,			/* empty value */
 
 		B_AT_BI_PID,
 		B_AT_BI_TID,
@@ -145,6 +147,8 @@ struct bt_arg {
 		B_AT_BI_ARG9,
 		B_AT_BI_ARGS,
 		B_AT_BI_RETVAL,
+
+		B_AT_FN_STR,			/* str($1); str($1, 3); */
 
 		B_AT_MF_COUNT,			/* @map[key] = count() */
 		B_AT_MF_MAX,			/* @map[key] = max(nsecs) */

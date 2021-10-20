@@ -1,4 +1,4 @@
-/* $OpenBSD: doas.c,v 1.90 2021/07/12 15:09:19 beck Exp $ */
+/* $OpenBSD: doas.c,v 1.92 2021/10/13 17:41:14 millert Exp $ */
 /*
  * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
@@ -199,23 +199,17 @@ checkconfig(const char *confpath, int argc, char **argv,
 	}
 }
 
-static void
-authuser(char *myname, char *login_style, int persist)
+static int
+authuser_checkpass(char *myname, char *login_style)
 {
 	char *challenge = NULL, *response, rbuf[1024], cbuf[128];
 	auth_session_t *as;
-	int fd = -1;
-
-	if (persist)
-		fd = open("/dev/tty", O_RDWR);
-	if (fd != -1) {
-		if (ioctl(fd, TIOCCHKVERAUTH) == 0)
-			goto good;
-	}
 
 	if (!(as = auth_userchallenge(myname, login_style, "auth-doas",
-	    &challenge)))
-		errx(1, "Authentication failed");
+	    &challenge))) {
+		warnx("Authentication failed");
+		return AUTH_FAILED;
+	}
 	if (!challenge) {
 		char host[HOST_NAME_MAX + 1];
 		if (gethostname(host, sizeof(host)))
@@ -235,9 +229,29 @@ authuser(char *myname, char *login_style, int persist)
 		explicit_bzero(rbuf, sizeof(rbuf));
 		syslog(LOG_AUTHPRIV | LOG_NOTICE,
 		    "failed auth for %s", myname);
-		errx(1, "Authentication failed");
+		warnx("Authentication failed");
+		return AUTH_FAILED;
 	}
 	explicit_bzero(rbuf, sizeof(rbuf));
+	return AUTH_OK;
+}
+
+static void
+authuser(char *myname, char *login_style, int persist)
+{
+	int i, fd = -1;
+
+	if (persist)
+		fd = open("/dev/tty", O_RDWR);
+	if (fd != -1) {
+		if (ioctl(fd, TIOCCHKVERAUTH) == 0)
+			goto good;
+	}
+	for (i = 0; i < AUTH_RETRIES; i++) {
+		if (authuser_checkpass(myname, login_style) == AUTH_OK)
+			goto good;
+	}
+	exit(1);
 good:
 	if (fd != -1) {
 		int secs = 5 * 60;

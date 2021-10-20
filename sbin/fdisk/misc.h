@@ -1,4 +1,4 @@
-/*	$OpenBSD: misc.h,v 1.44 2021/08/28 11:55:17 krw Exp $	*/
+/*	$OpenBSD: misc.h,v 1.46 2021/09/13 15:07:51 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -24,8 +24,6 @@ struct unit_type {
 	int64_t		 ut_conversion;
 	char		*ut_lname;
 };
-extern struct unit_type		unit_types[];
-#define	SECTORS		1
 
 #ifndef nitems
 #define	nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
@@ -35,7 +33,8 @@ extern struct unit_type		unit_types[];
 #define	UNTRIMMED	0
 #define	TRIMMED		1
 
-int		 unit_lookup(const char *);
+double		 units_size(const char *, const uint64_t,
+    const struct unit_type **);
 void		 string_from_line(char *, const size_t, const int);
 int		 ask_yn(const char *);
 int		 hex_octet(char *);

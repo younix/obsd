@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.40 2021/05/02 14:39:05 martijn Exp $ */
+/*	$OpenBSD: parse.y,v 1.43 2021/10/15 15:01:28 naddy Exp $ */
 
 /*
  * Copyright (c) 2009, 2010 Martin Hedenfalk <martinh@openbsd.org>
@@ -207,7 +207,7 @@ conf_main	: LISTEN ON STRING port ssl certname	{
 			if (! interface($3, cert, &conf->listeners,
 			    $4, $5)) {
 				if (host($3, cert, &conf->listeners,
-				    $4, $5) <= 0) {
+				    $4, $5) != 1) {
 					yyerror("invalid virtual ip or interface: %s", $3);
 					free($6);
 					free($3);
@@ -598,8 +598,8 @@ findeol(void)
 int
 yylex(void)
 {
-	u_char	 buf[4096];
-	u_char	*p, *val;
+	char	 buf[4096];
+	char	*p, *val;
 	int	 quotec, next, c;
 	int	 token;
 
@@ -637,7 +637,7 @@ top:
 		p = val + strlen(val) - 1;
 		lungetc(DONE_EXPAND);
 		while (p >= val) {
-			lungetc(*p);
+			lungetc((unsigned char)*p);
 			p--;
 		}
 		lungetc(START_EXPAND);
@@ -713,8 +713,8 @@ top:
 		} else {
 nodigits:
 			while (p > buf + 1)
-				lungetc(*--p);
-			c = *--p;
+				lungetc((unsigned char)*--p);
+			c = (unsigned char)*--p;
 			if (c == '-')
 				return (c);
 		}
@@ -1206,15 +1206,16 @@ namespace_new(const char *suffix)
 
 	if ((ns = calloc(1, sizeof(*ns))) == NULL)
 		return NULL;
-	ns->suffix = strdup(suffix);
 	ns->sync = 1;
 	ns->cache_size = 1024;
 	ns->index_cache_size = 512;
+	ns->suffix = strdup(suffix);
 	if (ns->suffix == NULL) {
 		free(ns->suffix);
 		free(ns);
 		return NULL;
 	}
+	normalize_dn(ns->suffix);
 	TAILQ_INIT(&ns->indices);
 	TAILQ_INIT(&ns->request_queue);
 	SIMPLEQ_INIT(&ns->acl);

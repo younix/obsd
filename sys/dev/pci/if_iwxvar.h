@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwxvar.h,v 1.22 2021/08/07 09:21:51 stsp Exp $	*/
+/*	$OpenBSD: if_iwxvar.h,v 1.25 2021/10/15 13:38:10 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014 genua mbh <info@genua.de>
@@ -224,9 +224,6 @@ struct iwx_dma_info {
 #define IWX_TX_RING_LOMARK	192
 #define IWX_TX_RING_HIMARK	224
 
-/* For aggregation queues, index must be aligned to frame sequence number. */
-#define IWX_AGG_SSN_TO_TXQ_IDX(x)	((x) & (IWX_TX_RING_COUNT - 1))
-
 struct iwx_tx_data {
 	bus_dmamap_t	map;
 	bus_addr_t	cmd_paddr;
@@ -247,6 +244,7 @@ struct iwx_tx_ring {
 	int			queued;
 	int			cur;
 	int			tail;
+	int			tid;
 };
 
 #define IWX_RX_MQ_RING_COUNT	512
@@ -279,6 +277,7 @@ struct iwx_rx_ring {
 #define IWX_FLAG_HW_ERR		0x80	/* hardware error occurred */
 #define IWX_FLAG_SHUTDOWN	0x100	/* shutting down; new tasks forbidden */
 #define IWX_FLAG_BGSCAN		0x200	/* background scan in progress */
+#define IWX_FLAG_TXFLUSH	0x400	/* Tx queue flushing in progress */
 
 struct iwx_ucode_status {
 	uint32_t uc_lmac_error_event_table[2];
@@ -321,6 +320,7 @@ struct iwx_phy_ctxt {
 	uint16_t color;
 	uint32_t ref;
 	struct ieee80211_channel *channel;
+	uint8_t sco; /* 40 MHz secondary channel offset */
 };
 
 struct iwx_bf_data {
@@ -445,6 +445,11 @@ struct iwx_setkey_task_arg {
 	struct ieee80211_key *k;
 };
 
+struct iwx_ba_task_data {
+	uint32_t		start_tidmask;
+	uint32_t		stop_tidmask;
+};
+
 struct iwx_softc {
 	struct device sc_dev;
 	struct ieee80211com sc_ic;
@@ -459,11 +464,8 @@ struct iwx_softc {
 
 	/* Task for firmware BlockAck setup/teardown and its arguments. */
 	struct task		ba_task;
-	uint32_t		ba_start_tidmask;
-	uint32_t		ba_stop_tidmask;
-	uint16_t		ba_ssn[IWX_MAX_TID_COUNT];
-	uint16_t		ba_winsize[IWX_MAX_TID_COUNT];
-	int			ba_timeout_val[IWX_MAX_TID_COUNT];
+	struct iwx_ba_task_data	ba_rx;
+	struct iwx_ba_task_data	ba_tx;
 
 	/* Task for setting encryption keys and its arguments. */
 	struct task		setkey_task;
@@ -482,6 +484,9 @@ struct iwx_softc {
 	/* Task for ERP/HT prot/slot-time/EDCA updates. */
 	struct task		mac_ctxt_task;
 
+	/* Task for HT 20/40 MHz channel width updates. */
+	struct task		phy_ctxt_task;
+
 	bus_space_tag_t sc_st;
 	bus_space_handle_t sc_sh;
 	bus_size_t sc_sz;
@@ -492,10 +497,12 @@ struct iwx_softc {
 	int sc_msix;
 
 	/* TX/RX rings. */
-	struct iwx_tx_ring txq[IWX_MAX_QUEUES];
+	struct iwx_tx_ring txq[IWX_LAST_AGG_TX_QUEUE];
 	struct iwx_rx_ring rxq;
 	int qfullmsk;
+	int qenablemsk;
 	int first_data_qid;
+	int aggqid[IEEE80211_NUM_TID];
 
 	int sc_sf_state;
 
@@ -618,6 +625,7 @@ struct iwx_softc {
 struct iwx_node {
 	struct ieee80211_node in_ni;
 	struct iwx_phy_ctxt *in_phyctxt;
+	uint8_t in_macaddr[ETHER_ADDR_LEN];
 
 	uint16_t in_id;
 	uint16_t in_color;

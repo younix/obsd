@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.10 2020/12/17 00:51:11 bluhm Exp $
+#	$OpenBSD: Makefile,v 1.14 2021/09/19 08:20:04 claudio Exp $
 
 # Copyright (c) 2019 Moritz Buhl <openbsd@moritzbuhl.de>
 # Copyright (c) 2019 Alexander Bluhm <bluhm@openbsd.org>
@@ -29,20 +29,46 @@ PROGS =
 PROGS +=	t_access
 PROGS +=	t_bind
 PROGS +=	t_chroot t_clock_gettime
+PROGS +=	t_connect
 PROGS +=	t_dup
+PROGS +=	t_fork
 PROGS +=	t_fsync
 PROGS +=	t_getgroups t_getitimer t_getlogin t_getpid t_getrusage
 PROGS +=	t_getsid t_getsockname t_gettimeofday
+PROGS +=	t_kevent
 PROGS +=	t_kill
 PROGS +=	t_link t_listen
-PROGS +=	t_mkdir t_mkfifo t_mknod t_mlock t_mmap
-PROGS +=	t_msgctl t_msgget t_msgrcv t_msgsnd t_msync
-PROGS +=	t_pipe t_pipe2 t_poll t_ptrace
+PROGS +=	t_minherit
+PROGS +=	t_mkdir
+PROGS +=	t_mkfifo
+PROGS +=	t_mknod
+PROGS +=	t_mlock
+PROGS +=	t_mmap
+PROGS +=	t_msgctl
+PROGS +=	t_msgget
+PROGS +=	t_msgrcv
+PROGS +=	t_msgsnd
+PROGS +=	t_msync
+PROGS +=	t_pipe
+PROGS +=	t_pipe2
+PROGS +=	t_poll
+PROGS +=	t_ppoll
+PROGS +=	t_ptrace
 PROGS +=	t_revoke
-PROGS +=	t_select t_sendrecv t_setuid t_socketpair t_sigaction t_stat
+PROGS +=	t_select
+PROGS +=	t_sendrecv
+PROGS +=	t_setrlimit
+PROGS +=	t_setuid
+PROGS +=	t_sigaction
+PROGS +=	t_sigaltstack
+PROGS +=	t_socketpair
+PROGS +=	t_stat
 PROGS +=	t_syscall
 PROGS +=	t_truncate
 PROGS +=	t_umask t_unlink
+PROGS +=	t_vfork
+PROGS +=	t_wait_noproc
+PROGS +=	t_wait_noproc_wnohang
 PROGS +=	t_write
 
 # failing tests
@@ -52,6 +78,17 @@ REGRESS_EXPECTED_FAILURES +=	run-t_msgrcv-3
 REGRESS_EXPECTED_FAILURES +=	run-t_pipe2-2
 REGRESS_EXPECTED_FAILURES +=	run-t_stat-5
 REGRESS_EXPECTED_FAILURES +=	run-t_unlink-2
+
+. for t in run-t_fork-{3,4,5}
+${t}:
+	# Only works with a controlling tty
+	@echo DISABLED
+. endfor
+
+run-t_vfork-2:
+	# SIGSTOP with vfork is masked before exec(3)/exit(3)
+	# see NetBSD: kern_sig.c,v 1.345
+	@echo DISABLED
 
 . for p in ${PROGS}
 SRCS_$p =		$p.c atf-c.c
@@ -75,6 +112,7 @@ CLEANFILES =	access dummy mmap truncate_test.root_owned
 
 .for p in ${PROGS}
 run-$p: $p
+	ulimit -c unlimited && \
 	ntests="`./$p -n`" && \
 	echo "1..$$ntests" && \
 	tnumbers="`jot -ns' ' - 1 $$ntests`" && \

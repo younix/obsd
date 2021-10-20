@@ -1,4 +1,4 @@
-/* $OpenBSD: ca.c,v 1.43 2021/08/30 12:25:54 inoguchi Exp $ */
+/* $OpenBSD: ca.c,v 1.49 2021/09/05 04:05:14 inoguchi Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1318,6 +1318,7 @@ ca_main(int argc, char **argv)
 		if (ca_config.verbose)
 			BIO_printf(bio_err, "writing new certificates\n");
 		for (i = 0; i < sk_X509_num(cert_sk); i++) {
+			ASN1_INTEGER *serialNumber;
 			int k;
 			char *serialstr;
 			unsigned char *data;
@@ -1325,8 +1326,10 @@ ca_main(int argc, char **argv)
 
 			x = sk_X509_value(cert_sk, i);
 
-			j = x->cert_info->serialNumber->length;
-			data = (unsigned char *)x->cert_info->serialNumber->data;
+			serialNumber = X509_get_serialNumber(x);
+			j = ASN1_STRING_length(serialNumber);
+			data = ASN1_STRING_data(serialNumber);
+
 			if (j > 0)
 				serialstr = bin2hex(data, j);
 			else
@@ -1730,11 +1733,10 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 {
 	X509_NAME *name = NULL, *CAname = NULL;
 	X509_NAME *subject = NULL, *dn_subject = NULL;
-	ASN1_UTCTIME *tm, *tmptm;
+	ASN1_UTCTIME *tm;
 	ASN1_STRING *str, *str2;
 	ASN1_OBJECT *obj;
 	X509 *ret = NULL;
-	X509_CINF *ci;
 	X509_NAME_ENTRY *ne;
 	X509_NAME_ENTRY *tne, *push;
 	EVP_PKEY *pktmp;
@@ -1744,14 +1746,10 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 	OPENSSL_STRING row[DB_NUMBER];
 	OPENSSL_STRING *irow = NULL;
 	OPENSSL_STRING *rrow = NULL;
+	const STACK_OF(X509_EXTENSION) *exts;
 
 	*xret = NULL;
 
-	tmptm = ASN1_UTCTIME_new();
-	if (tmptm == NULL) {
-		BIO_printf(bio_err, "malloc error\n");
-		return (0);
-	}
 	for (i = 0; i < DB_NUMBER; i++)
 		row[i] = NULL;
 
@@ -1838,7 +1836,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 	if (selfsign)
 		CAname = X509_NAME_dup(name);
 	else
-		CAname = X509_NAME_dup(x509->cert_info->subject);
+		CAname = X509_NAME_dup(X509_get_subject_name(x509));
 	if (CAname == NULL)
 		goto err;
 	str = str2 = NULL;
@@ -1954,106 +1952,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 		if (subject == NULL)
 			goto err;
 	}
-	if (verbose)
-		BIO_printf(bio_err,
-		    "The subject name appears to be ok, checking data base for clashes\n");
 
-	/* Build the correct Subject if no email is wanted in the subject */
-	/*
-	 * and add it later on because of the method extensions are added
-	 * (altName)
-	 */
-
-	if (email_dn)
-		dn_subject = subject;
-	else {
-		X509_NAME_ENTRY *tmpne;
-		/*
-		 * Its best to dup the subject DN and then delete any email
-		 * addresses because this retains its structure.
-		 */
-		if ((dn_subject = X509_NAME_dup(subject)) == NULL) {
-			BIO_printf(bio_err, "Memory allocation failure\n");
-			goto err;
-		}
-		while ((i = X509_NAME_get_index_by_NID(dn_subject,
-		    NID_pkcs9_emailAddress, -1)) >= 0) {
-			tmpne = X509_NAME_get_entry(dn_subject, i);
-			if (tmpne == NULL)
-				goto err;
-			if (X509_NAME_delete_entry(dn_subject, i) == NULL) {
-				X509_NAME_ENTRY_free(tmpne);
-				goto err;
-			}
-			X509_NAME_ENTRY_free(tmpne);
-		}
-	}
-
-	if (BN_is_zero(serial))
-		row[DB_serial] = strdup("00");
-	else
-		row[DB_serial] = BN_bn2hex(serial);
-	if (row[DB_serial] == NULL) {
-		BIO_printf(bio_err, "Memory allocation failure\n");
-		goto err;
-	}
-	if (db->attributes.unique_subject) {
-		OPENSSL_STRING *crow = row;
-
-		rrow = TXT_DB_get_by_index(db->db, DB_name, crow);
-		if (rrow != NULL) {
-			BIO_printf(bio_err,
-			    "ERROR:There is already a certificate for %s\n",
-			    row[DB_name]);
-		}
-	}
-	if (rrow == NULL) {
-		rrow = TXT_DB_get_by_index(db->db, DB_serial, row);
-		if (rrow != NULL) {
-			BIO_printf(bio_err,
-			    "ERROR:Serial number %s has already been issued,\n",
-			    row[DB_serial]);
-			BIO_printf(bio_err,
-			    "      check the database/serial_file for corruption\n");
-		}
-	}
-	if (rrow != NULL) {
-		BIO_printf(bio_err,
-		    "The matching entry has the following details\n");
-		if (rrow[DB_type][0] == 'E')
-			p = "Expired";
-		else if (rrow[DB_type][0] == 'R')
-			p = "Revoked";
-		else if (rrow[DB_type][0] == 'V')
-			p = "Valid";
-		else
-			p = "\ninvalid type, Data base error\n";
-		BIO_printf(bio_err, "Type	  :%s\n", p);
-		if (rrow[DB_type][0] == 'R') {
-			p = rrow[DB_exp_date];
-			if (p == NULL)
-				p = "undef";
-			BIO_printf(bio_err, "Was revoked on:%s\n", p);
-		}
-		p = rrow[DB_exp_date];
-		if (p == NULL)
-			p = "undef";
-		BIO_printf(bio_err, "Expires on    :%s\n", p);
-		p = rrow[DB_serial];
-		if (p == NULL)
-			p = "undef";
-		BIO_printf(bio_err, "Serial Number :%s\n", p);
-		p = rrow[DB_file];
-		if (p == NULL)
-			p = "undef";
-		BIO_printf(bio_err, "File name     :%s\n", p);
-		p = rrow[DB_name];
-		if (p == NULL)
-			p = "undef";
-		BIO_printf(bio_err, "Subject Name  :%s\n", p);
-		ok = -1;	/* This is now a 'bad' error. */
-		goto err;
-	}
 	/* We are now totally happy, lets make and sign the certificate */
 	if (verbose)
 		BIO_printf(bio_err,
@@ -2061,16 +1960,15 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 
 	if ((ret = X509_new()) == NULL)
 		goto err;
-	ci = ret->cert_info;
 
 #ifdef X509_V3
 	/* Make it an X509 v3 certificate. */
 	if (!X509_set_version(ret, 2))
 		goto err;
 #endif
-	if (ci->serialNumber == NULL)
+	if (X509_get_serialNumber(ret) == NULL)
 		goto err;
-	if (BN_to_ASN1_INTEGER(serial, ci->serialNumber) == NULL)
+	if (BN_to_ASN1_INTEGER(serial, X509_get_serialNumber(ret)) == NULL)
 		goto err;
 	if (selfsign) {
 		if (!X509_set_issuer_name(ret, subject))
@@ -2112,20 +2010,6 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 	/* Lets add the extensions, if there are any */
 	if (ext_sect != NULL) {
 		X509V3_CTX ctx;
-		if (ci->version == NULL)
-			if ((ci->version = ASN1_INTEGER_new()) == NULL)
-				goto err;
-
-		/* version 3 certificate */
-		if (!ASN1_INTEGER_set(ci->version, 2))
-			goto err;
-
-		/*
-		 * Free the current entries if any, there should not be any I
-		 * believe
-		 */
-		sk_X509_EXTENSION_pop_free(ci->extensions, X509_EXTENSION_free);
-		ci->extensions = NULL;
 
 		/* Initialize the context structure */
 		if (selfsign)
@@ -2172,18 +2056,142 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 				    "Successfully added extensions from config\n");
 		}
 	}
-	/* Copy extensions from request (if any) */
 
+	/* Copy extensions from request (if any) */
 	if (!copy_extensions(ret, req, ext_copy)) {
 		BIO_printf(bio_err, "ERROR: adding extensions from request\n");
 		ERR_print_errors(bio_err);
 		goto err;
 	}
-	/* Set the right value for the noemailDN option */
-	if (email_dn == 0) {
-		if (!X509_set_subject_name(ret, dn_subject))
+
+	exts = X509_get0_extensions(ret);
+	if (exts != NULL && sk_X509_EXTENSION_num(exts) > 0) {
+		/* Make it an X509 v3 certificate. */
+		if (!X509_set_version(ret, 2))
 			goto err;
 	}
+
+	if (verbose)
+		BIO_printf(bio_err,
+		    "The subject name appears to be ok, checking data base for clashes\n");
+
+	/* Build the correct Subject if no email is wanted in the subject */
+	if (!email_dn) {
+		X509_NAME_ENTRY *tmpne;
+		/*
+		 * Its best to dup the subject DN and then delete any email
+		 * addresses because this retains its structure.
+		 */
+		if ((dn_subject = X509_NAME_dup(subject)) == NULL) {
+			BIO_printf(bio_err, "Memory allocation failure\n");
+			goto err;
+		}
+		while ((i = X509_NAME_get_index_by_NID(dn_subject,
+		    NID_pkcs9_emailAddress, -1)) >= 0) {
+			tmpne = X509_NAME_get_entry(dn_subject, i);
+			if (tmpne == NULL)
+				goto err;
+			if (X509_NAME_delete_entry(dn_subject, i) == NULL) {
+				X509_NAME_ENTRY_free(tmpne);
+				goto err;
+			}
+			X509_NAME_ENTRY_free(tmpne);
+		}
+
+		if (!X509_set_subject_name(ret, dn_subject))
+			goto err;
+
+		X509_NAME_free(dn_subject);
+		dn_subject = NULL;
+	}
+
+	row[DB_name] = X509_NAME_oneline(X509_get_subject_name(ret), NULL, 0);
+	if (row[DB_name] == NULL) {
+		BIO_printf(bio_err, "Memory allocation failure\n");
+		goto err;
+	}
+
+	if (BN_is_zero(serial))
+		row[DB_serial] = strdup("00");
+	else
+		row[DB_serial] = BN_bn2hex(serial);
+	if (row[DB_serial] == NULL) {
+		BIO_printf(bio_err, "Memory allocation failure\n");
+		goto err;
+	}
+
+	if (row[DB_name][0] == '\0') {
+		/*
+		 * An empty subject! We'll use the serial number instead. If
+		 * unique_subject is in use then we don't want different
+		 * entries with empty subjects matching each other.
+		 */
+		free(row[DB_name]);
+		row[DB_name] = strdup(row[DB_serial]);
+		if (row[DB_name] == NULL) {
+			BIO_printf(bio_err, "Memory allocation failure\n");
+			goto err;
+		}
+	}
+
+	if (db->attributes.unique_subject) {
+		OPENSSL_STRING *crow = row;
+
+		rrow = TXT_DB_get_by_index(db->db, DB_name, crow);
+		if (rrow != NULL) {
+			BIO_printf(bio_err,
+			    "ERROR:There is already a certificate for %s\n",
+			    row[DB_name]);
+		}
+	}
+	if (rrow == NULL) {
+		rrow = TXT_DB_get_by_index(db->db, DB_serial, row);
+		if (rrow != NULL) {
+			BIO_printf(bio_err,
+			    "ERROR:Serial number %s has already been issued,\n",
+			    row[DB_serial]);
+			BIO_printf(bio_err,
+			    "      check the database/serial_file for corruption\n");
+		}
+	}
+	if (rrow != NULL) {
+		BIO_printf(bio_err,
+		    "The matching entry has the following details\n");
+		if (rrow[DB_type][0] == DB_TYPE_EXP)
+			p = "Expired";
+		else if (rrow[DB_type][0] == DB_TYPE_REV)
+			p = "Revoked";
+		else if (rrow[DB_type][0] == DB_TYPE_VAL)
+			p = "Valid";
+		else
+			p = "\ninvalid type, Data base error\n";
+		BIO_printf(bio_err, "Type	  :%s\n", p);
+		if (rrow[DB_type][0] == DB_TYPE_REV) {
+			p = rrow[DB_exp_date];
+			if (p == NULL)
+				p = "undef";
+			BIO_printf(bio_err, "Was revoked on:%s\n", p);
+		}
+		p = rrow[DB_exp_date];
+		if (p == NULL)
+			p = "undef";
+		BIO_printf(bio_err, "Expires on    :%s\n", p);
+		p = rrow[DB_serial];
+		if (p == NULL)
+			p = "undef";
+		BIO_printf(bio_err, "Serial Number :%s\n", p);
+		p = rrow[DB_file];
+		if (p == NULL)
+			p = "undef";
+		BIO_printf(bio_err, "File name     :%s\n", p);
+		p = rrow[DB_name];
+		if (p == NULL)
+			p = "undef";
+		BIO_printf(bio_err, "Subject Name  :%s\n", p);
+		ok = -1;	/* This is now a 'bad' error. */
+		goto err;
+	}
+
 	if (!default_op) {
 		BIO_printf(bio_err, "Certificate Details:\n");
 		/*
@@ -2250,7 +2258,6 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 
 	/* row[DB_serial] done already */
 	row[DB_file] = malloc(8);
-	row[DB_name] = X509_NAME_oneline(X509_get_subject_name(ret), NULL, 0);
 
 	if ((row[DB_type] == NULL) || (row[DB_file] == NULL) ||
 	    (row[DB_name] == NULL)) {
@@ -2258,7 +2265,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 		goto err;
 	}
 	(void) strlcpy(row[DB_file], "unknown", 8);
-	row[DB_type][0] = 'V';
+	row[DB_type][0] = DB_TYPE_VAL;
 	row[DB_type][1] = '\0';
 
 	if ((irow = reallocarray(NULL, DB_NUMBER + 1, sizeof(char *))) ==
@@ -2288,9 +2295,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 
 	X509_NAME_free(CAname);
 	X509_NAME_free(subject);
-	if (!email_dn)
-		X509_NAME_free(dn_subject);
-	ASN1_UTCTIME_free(tmptm);
+	X509_NAME_free(dn_subject);
 	X509_free(ret);
 
 	return (ok);
@@ -2473,6 +2478,20 @@ do_revoke(X509 *x509, CA_DB *db, int type, char *value)
 	else
 		row[DB_serial] = BN_bn2hex(bn);
 	BN_free(bn);
+
+	if (row[DB_name] != NULL && row[DB_name][0] == '\0') {
+		/*
+		 * Entries with empty Subjects actually use the serial number
+		 * instead
+		 */
+		free(row[DB_name]);
+		row[DB_name] = strdup(row[DB_serial]);
+		if (row[DB_name] == NULL) {
+			BIO_printf(bio_err, "Memory allocation failure\n");
+			goto err;
+		}
+	}
+
 	if ((row[DB_name] == NULL) || (row[DB_serial] == NULL)) {
 		BIO_printf(bio_err, "Memory allocation failure\n");
 		goto err;
@@ -2510,7 +2529,7 @@ do_revoke(X509 *x509, CA_DB *db, int type, char *value)
 			goto err;
 		}
 		(void) strlcpy(row[DB_file], "unknown", 8);
-		row[DB_type][0] = 'V';
+		row[DB_type][0] = DB_TYPE_VAL;
 		row[DB_type][1] = '\0';
 
 		if ((irow = reallocarray(NULL, sizeof(char *),
@@ -2539,7 +2558,7 @@ do_revoke(X509 *x509, CA_DB *db, int type, char *value)
 		BIO_printf(bio_err, "ERROR:name does not match %s\n",
 		    row[DB_name]);
 		goto err;
-	} else if (rrow[DB_type][0] == 'R') {
+	} else if (rrow[DB_type][0] == DB_TYPE_REV) {
 		BIO_printf(bio_err, "ERROR:Already revoked, serial number %s\n",
 		    row[DB_serial]);
 		goto err;
@@ -2551,7 +2570,7 @@ do_revoke(X509 *x509, CA_DB *db, int type, char *value)
 			BIO_printf(bio_err, "Error in revocation arguments\n");
 			goto err;
 		}
-		rrow[DB_type][0] = 'R';
+		rrow[DB_type][0] = DB_TYPE_REV;
 		rrow[DB_type][1] = '\0';
 		rrow[DB_rev_date] = rev_str;
 	}
@@ -2607,19 +2626,19 @@ get_certificate_status(const char *serial, CA_DB *db)
 		    row[DB_serial]);
 		ok = -1;
 		goto err;
-	} else if (rrow[DB_type][0] == 'V') {
+	} else if (rrow[DB_type][0] == DB_TYPE_VAL) {
 		BIO_printf(bio_err, "%s=Valid (%c)\n",
 		    row[DB_serial], rrow[DB_type][0]);
 		goto err;
-	} else if (rrow[DB_type][0] == 'R') {
+	} else if (rrow[DB_type][0] == DB_TYPE_REV) {
 		BIO_printf(bio_err, "%s=Revoked (%c)\n",
 		    row[DB_serial], rrow[DB_type][0]);
 		goto err;
-	} else if (rrow[DB_type][0] == 'E') {
+	} else if (rrow[DB_type][0] == DB_TYPE_EXP) {
 		BIO_printf(bio_err, "%s=Expired (%c)\n",
 		    row[DB_serial], rrow[DB_type][0]);
 		goto err;
-	} else if (rrow[DB_type][0] == 'S') {
+	} else if (rrow[DB_type][0] == DB_TYPE_SUSP) {
 		BIO_printf(bio_err, "%s=Suspended (%c)\n",
 		    row[DB_serial], rrow[DB_type][0]);
 		goto err;
@@ -2670,7 +2689,7 @@ do_updatedb(CA_DB *db)
 	for (i = 0; i < sk_OPENSSL_PSTRING_num(db->db->data); i++) {
 		rrow = sk_OPENSSL_PSTRING_value(db->db->data, i);
 
-		if (rrow[DB_type][0] == 'V') {
+		if (rrow[DB_type][0] == DB_TYPE_VAL) {
 			/* ignore entries that are not valid */
 			if (strncmp(rrow[DB_exp_date], "49", 2) <= 0)
 				db_y2k = 1;
@@ -2680,7 +2699,7 @@ do_updatedb(CA_DB *db)
 			if (db_y2k == a_y2k) {
 				/* all on the same y2k side */
 				if (strcmp(rrow[DB_exp_date], a_tm_s) <= 0) {
-					rrow[DB_type][0] = 'E';
+					rrow[DB_type][0] = DB_TYPE_EXP;
 					rrow[DB_type][1] = '\0';
 					cnt++;
 
@@ -2688,7 +2707,7 @@ do_updatedb(CA_DB *db)
 					    rrow[DB_serial]);
 				}
 			} else if (db_y2k < a_y2k) {
-				rrow[DB_type][0] = 'E';
+				rrow[DB_type][0] = DB_TYPE_EXP;
 				rrow[DB_type][1] = '\0';
 				cnt++;
 

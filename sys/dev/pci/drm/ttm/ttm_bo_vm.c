@@ -711,7 +711,7 @@ ttm_bo_vm_fault(struct uvm_faultinfo *ufi, vaddr_t vaddr, vm_page_t *pps,
 			break;
 		}
 
-		uvmfault_unlockall(ufi, NULL, NULL);
+		uvmfault_unlockall(ufi, NULL, uobj);
 		return ret;
 	}
 
@@ -730,7 +730,7 @@ ttm_bo_vm_fault(struct uvm_faultinfo *ufi, vaddr_t vaddr, vm_page_t *pps,
 
 	dma_resv_unlock(bo->base.resv);
 
-	uvmfault_unlockall(ufi, NULL, NULL);
+	uvmfault_unlockall(ufi, NULL, uobj);
 	return ret;
 }
 EXPORT_SYMBOL(ttm_bo_vm_fault);
@@ -852,7 +852,6 @@ ttm_bo_vm_reference(struct uvm_object *uobj)
 	    (struct ttm_buffer_object *)uobj;
 
 	ttm_bo_get(bo);
-	uobj->uo_refs++;
 }
 
 void
@@ -860,7 +859,6 @@ ttm_bo_vm_detach(struct uvm_object *uobj)
 {
 	struct ttm_buffer_object *bo = (struct ttm_buffer_object *)uobj;
 
-	uobj->uo_refs--;
 	ttm_bo_put(bo);
 }
 
@@ -971,8 +969,8 @@ ttm_bo_mmap(struct file *filp, voff_t off, vsize_t size,
 	if (unlikely(ret != 0))
 		goto out_unref;
 
-	bo->base.uobj.pgops = &ttm_bo_vm_ops;
-	bo->base.uobj.uo_refs++;
+	if (bo->base.uobj.pgops == NULL)
+		uvm_obj_init(&bo->base.uobj, &ttm_bo_vm_ops, 1);
 	return &bo->base.uobj;
 out_unref:
 	ttm_bo_put(bo);

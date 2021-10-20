@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ah.c,v 1.154 2021/07/27 17:13:03 mvs Exp $ */
+/*	$OpenBSD: ip_ah.c,v 1.156 2021/10/13 22:43:44 bluhm Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -699,8 +699,8 @@ ah_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	memcpy(&tc->tc_dst, &tdb->tdb_dst, sizeof(union sockaddr_union));
 	tc->tc_rpl = tdb->tdb_rpl;
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 
  drop:
 	m_freem(m);
@@ -884,8 +884,7 @@ ah_input_cb(struct tdb *tdb, struct tdb_crypto *tc, struct mbuf *m, int clen)
  * AH output routine, called by ipsp_process_packet().
  */
 int
-ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
-    int protoff)
+ah_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 {
 	const struct auth_hash *ahx = tdb->tdb_authalgxform;
 	struct cryptodesc *crda;
@@ -1146,8 +1145,8 @@ ah_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	tc->tc_rdomain = tdb->tdb_rdomain;
 	memcpy(&tc->tc_dst, &tdb->tdb_dst, sizeof(union sockaddr_union));
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 
  drop:
 	m_freem(m);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: disk.c,v 1.71 2021/08/07 13:33:12 krw Exp $	*/
+/*	$OpenBSD: disk.c,v 1.74 2021/10/10 15:34:21 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -57,8 +57,6 @@ DISK_open(const char *name, const int oflags)
 	if (ioctl(disk.dk_fd, DIOCGPDINFO, &dl) == -1)
 		err(1, "DIOCGPDINFO");
 
-	unit_types[SECTORS].ut_conversion = dl.d_secsize;
-
 	/* Set geometry to use in MBR partitions. */
 	if (disk.dk_size > 0) {
 		/* -l has set disk size. */
@@ -73,7 +71,6 @@ DISK_open(const char *name, const int oflags)
 		disk.dk_size = DL_BLKTOSEC(&dl, sz);
 		disk.dk_sectors = DL_BLKTOSEC(&dl, disk.dk_sectors);
 	} else {
-		disk.dk_sectors = dl.d_nsectors;
 		disk.dk_cylinders = dl.d_ncylinders;
 		disk.dk_heads = dl.d_ntracks;
 		disk.dk_sectors = dl.d_nsectors;
@@ -101,21 +98,16 @@ DISK_open(const char *name, const int oflags)
 void
 DISK_printgeometry(const char *units)
 {
-	const int		secsize = unit_types[SECTORS].ut_conversion;
-	double			size;
-	int			i;
+	const struct unit_type	*ut;
+	const int		 secsize = dl.d_secsize;
+	double			 size;
 
-	i = unit_lookup(units);
-	size = ((double)disk.dk_size * secsize) / unit_types[i].ut_conversion;
-	printf("Disk: %s\t", disk.dk_name);
-	if (disk.dk_size) {
-		printf("geometry: %d/%d/%d [%.0f ", disk.dk_cylinders,
-		    disk.dk_heads, disk.dk_sectors, size);
-		if (i == SECTORS && secsize != sizeof(struct dos_mbr))
-			printf("%d-byte ", secsize);
-		printf("%s]\n", unit_types[i].ut_lname);
-	} else
-		printf("geometry: <none>\n");
+	size = units_size(units, disk.dk_size, &ut);
+	printf("Disk: %s\tgeometry: %d/%d/%d [%.0f ", disk.dk_name,
+	    disk.dk_cylinders, disk.dk_heads, disk.dk_sectors, size);
+	if (ut->ut_conversion == 0 && secsize != DEV_BSIZE)
+		printf("%d-byte ", secsize);
+	printf("%s]\n", ut->ut_lname);
 }
 
 /*

@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile,v 1.71 2021/05/12 14:17:27 tb Exp $
+# $OpenBSD: Makefile,v 1.73 2021/09/14 14:30:57 schwarze Exp $
 
 .include <bsd.own.mk>
 
@@ -61,6 +61,7 @@ MAN =	BIO_f_ssl.3 \
 	SSL_SESSION_get0_cipher.3 \
 	SSL_SESSION_get0_peer.3 \
 	SSL_SESSION_has_ticket.3 \
+	SSL_SESSION_is_resumable.3 \
 	SSL_SESSION_new.3 \
 	SSL_SESSION_print.3 \
 	SSL_SESSION_set1_id_context.3 \
@@ -111,6 +112,7 @@ MAN =	BIO_f_ssl.3 \
 	SSL_set_connect_state.3 \
 	SSL_set_fd.3 \
 	SSL_set_max_send_fragment.3 \
+	SSL_set_psk_use_session_callback.3 \
 	SSL_set_session.3 \
 	SSL_set_shutdown.3 \
 	SSL_set_tmp_ecdh.3 \

@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.175 2021/06/16 09:02:21 mpi Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.177 2021/09/14 16:16:51 kettenis Exp $	*/
 
 /*
  * Copyright (c) 1998-2004 Michael Shalayeff
@@ -496,7 +496,7 @@ pmap_bootstrap(vaddr_t vstart)
 	 */
 	kpm = &kernel_pmap_store;
 	bzero(kpm, sizeof(*kpm));
-	uvm_obj_init(&kpm->pm_obj, NULL, 1);
+	uvm_obj_init(&kpm->pm_obj, &pmap_pager, 1);
 	kpm->pm_space = HPPA_SID_KERNEL;
 	kpm->pm_pid = HPPA_PID_KERNEL;
 	kpm->pm_pdir_pg = NULL;
@@ -678,7 +678,7 @@ pmap_create(void)
 
 	mtx_init(&pmap->pm_mtx, IPL_VM);
 
-	uvm_obj_init(&pmap->pm_obj, NULL, 1);
+	uvm_obj_init(&pmap->pm_obj, &pmap_pager, 1);
 
 	for (space = 1 + arc4random_uniform(hppa_sid_max);
 	    pmap_sdir_get(space); space = (space + 1) % hppa_sid_max);
@@ -1090,7 +1090,10 @@ pmap_extract(struct pmap *pmap, vaddr_t va, paddr_t *pap)
 
 	DPRINTF(PDB_FOLLOW|PDB_EXTRACT, ("pmap_extract(%p, %lx)\n", pmap, va));
 
+	pmap_lock(pmap);
 	pte = pmap_vp_find(pmap, va);
+	pmap_unlock(pmap);
+
 	if (pte) {
 		if (pap)
 			*pap = (pte & ~PGOFSET) | (va & PGOFSET);

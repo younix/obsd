@@ -1,6 +1,6 @@
-/* $OpenBSD: roff.c,v 1.250 2021/08/10 12:36:42 schwarze Exp $ */
+/* $OpenBSD: roff.c,v 1.252 2021/10/04 14:18:42 schwarze Exp $ */
 /*
- * Copyright (c) 2010-2015, 2017-2020 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2010-2015, 2017-2021 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008-2012, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -859,6 +859,7 @@ void
 roff_man_free(struct roff_man *man)
 {
 	roff_man_free1(man);
+	free(man->os_r);
 	free(man);
 }
 
@@ -3947,9 +3948,7 @@ roff_userdef(ROFF_ARGS)
 		r->mstacksz += 8;
 	}
 	ctx = r->mstack + r->mstackpos;
-	ctx->argsz = 0;
 	ctx->argc = 0;
-	ctx->argv = NULL;
 
 	/*
 	 * Collect pointers to macro argument strings,

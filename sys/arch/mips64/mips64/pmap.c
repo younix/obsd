@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.119 2021/07/24 08:21:13 visa Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.121 2021/09/13 12:19:10 visa Exp $	*/
 
 /*
  * Copyright (c) 2001-2004 Opsycon AB  (www.opsycon.se / www.opsycon.com)
@@ -252,7 +252,7 @@ pmap_invalidate_icache(pmap_t pmap, vaddr_t va, pt_entry_t entry)
 	CPU_INFO_FOREACH(cii, ci) {
 		if (CPU_IS_RUNNING(ci) &&
 		    pmap->pm_asid[ci->ci_cpuid].pma_asidgen != 0)
-			cpumask |= 1ul << ci->ci_cpuid;
+			cpumask |= 1UL << ci->ci_cpuid;
 	}
 	pmap_swunlock(pmap);
 	if (cpumask != 0) {
@@ -287,7 +287,7 @@ pmap_shootdown_range(pmap_t pmap, vaddr_t sva, vaddr_t eva, int needisync)
 	struct cpu_info *ci, *self = curcpu();
 	CPU_INFO_ITERATOR cii;
 	vaddr_t va;
-	unsigned int cpumask = 0;
+	unsigned long cpumask = 0;
 
 	pmap_swlock(pmap);
 	CPU_INFO_FOREACH(cii, ci) {
@@ -304,7 +304,7 @@ pmap_shootdown_range(pmap_t pmap, vaddr_t sva, vaddr_t eva, int needisync)
 				continue;
 			}
 		}
-		cpumask |= 1 << ci->ci_cpuid;
+		cpumask |= 1UL << ci->ci_cpuid;
 	}
 	pmap_swunlock(pmap);
 	if (cpumask != 0) {
@@ -1387,11 +1387,13 @@ pmap_extract(pmap_t pmap, vaddr_t va, paddr_t *pap)
 				found = 0;
 		}
 	} else {
+		pmap_lock(pmap);
 		pte = pmap_pte_lookup(pmap, va);
 		if (pte != NULL && (*pte & PG_V) != 0)
 			pa = pfn_to_pad(*pte) | (va & PAGE_MASK);
 		else
 			found = 0;
+		pmap_unlock(pmap);
 	}
 
 	if (found != 0)

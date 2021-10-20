@@ -48,6 +48,6 @@
 /trap.h/1.4/Wed Mar 23 16:54:37 2011//
 /ubcreg.h/1.1.1.1/Fri Oct  6 21:02:55 2006//
 /vmparam.h/1.10/Thu Jan 30 18:16:41 2014//
-/cpu.h/1.32/Wed Sep  1 16:07:38 2021//
-/db_machdep.h/1.11/Thu Sep  2 08:41:58 2021//
+/cpu.h/1.32/Thu Sep  2 14:22:31 2021//
+/db_machdep.h/1.11/Thu Sep  2 14:22:31 2021//
 D

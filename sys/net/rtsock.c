@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.319 2021/06/23 16:10:45 cheloha Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.322 2021/09/14 09:15:55 mvs Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -630,8 +630,11 @@ rtm_report(struct rtentry *rt, u_char type, int seq, int tableid)
 	info.rti_info[RTAX_NETMASK] = rt_plen2mask(rt, &sa_mask);
 	info.rti_info[RTAX_LABEL] = rtlabel_id2sa(rt->rt_labelid, &sa_rl);
 #ifdef BFD
-	if (rt->rt_flags & RTF_BFD)
+	if (rt->rt_flags & RTF_BFD) {
+		KERNEL_LOCK();
 		info.rti_info[RTAX_BFD] = bfd2sa(rt, &sa_bfd);
+		KERNEL_UNLOCK();
+	}
 #endif
 #ifdef MPLS
 	if (rt->rt_flags & RTF_MPLS) {
@@ -934,8 +937,17 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 		 * cached route because this can lead to races in the
 		 * receive path.  Instead we update the L2 cache.
 		 */
-		if ((rt != NULL) && ISSET(rt->rt_flags, RTF_CACHED))
+		if ((rt != NULL) && ISSET(rt->rt_flags, RTF_CACHED)) {
+			ifp = if_get(rt->rt_ifidx);
+			if (ifp == NULL) {
+				rtfree(rt);
+				rt = NULL;
+				error = ESRCH;
+				break;
+			}
+
 			goto change;
+		}
 
 		rtfree(rt);
 		rt = NULL;
@@ -970,9 +982,13 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 			break;
 		}
 
-		/* Detaching an interface requires the KERNEL_LOCK(). */
 		ifp = if_get(rt->rt_ifidx);
-		KASSERT(ifp != NULL);
+		if (ifp == NULL) {
+			rtfree(rt);
+			rt = NULL;
+			error = ESRCH;
+			break;
+		}
 
 		/*
 		 * Invalidate the cache of automagically created and
@@ -986,7 +1002,6 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 			rtable_walk(tableid, rt_key(rt)->sa_family, NULL,
 			    route_cleargateway, rt);
 			NET_UNLOCK();
-			if_put(ifp);
 			break;
 		}
 
@@ -995,7 +1010,6 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 		 * kernel.
 		 */
 		if (ISSET(rt->rt_flags, RTF_LOCAL|RTF_BROADCAST)) {
-			if_put(ifp);
 			error = EINVAL;
 			break;
 		}
@@ -1006,7 +1020,6 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 		NET_LOCK();
 		error = rtrequest_delete(info, prio, ifp, &rt, tableid);
 		NET_UNLOCK();
-		if_put(ifp);
 		break;
 	case RTM_CHANGE:
 		rt = rtable_lookup(tableid, info->rti_info[RTAX_DST],
@@ -1021,6 +1034,7 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 			rtfree(rt);
 			rt = NULL;
 		}
+
 		/*
 		 * If RTAX_GATEWAY is the argument we're trying to
 		 * change, try to find a compatible route.
@@ -1046,6 +1060,14 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 		 */
 		if (ISSET(rt->rt_flags, RTF_LOCAL|RTF_BROADCAST)) {
 			error = EINVAL;
+			break;
+		}
+
+		ifp = if_get(rt->rt_ifidx);
+		if (ifp == NULL) {
+			rtfree(rt);
+			rt = NULL;
+			error = ESRCH;
 			break;
 		}
 
@@ -1083,11 +1105,8 @@ rtm_output(struct rt_msghdr *rtm, struct rtentry **prt,
 			}
 			ifa = info->rti_ifa;
 			if (rt->rt_ifa != ifa) {
-				ifp = if_get(rt->rt_ifidx);
-				KASSERT(ifp != NULL);
 				ifp->if_rtrequest(ifp, RTM_DELETE, rt);
 				ifafree(rt->rt_ifa);
-				if_put(ifp);
 
 				ifa->ifa_refcnt++;
 				rt->rt_ifa = ifa;
@@ -1132,11 +1151,16 @@ change:
 
 #ifdef BFD
 		if (ISSET(rtm->rtm_flags, RTF_BFD)) {
-			if ((error = bfdset(rt)))
+			KERNEL_LOCK();
+			error = bfdset(rt);
+			KERNEL_UNLOCK();
+			if (error)
 				break;
 		} else if (!ISSET(rtm->rtm_flags, RTF_BFD) &&
 		    ISSET(rtm->rtm_fmask, RTF_BFD)) {
+			KERNEL_LOCK();
 			bfdclear(rt);
+			KERNEL_UNLOCK();
 		}
 #endif
 
@@ -1152,10 +1176,7 @@ change:
 		}
 		rtm_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx, &rt->rt_rmx);
 
-		ifp = if_get(rt->rt_ifidx);
-		KASSERT(ifp != NULL);
 		ifp->if_rtrequest(ifp, RTM_ADD, rt);
-		if_put(ifp);
 
 		if (info->rti_info[RTAX_LABEL] != NULL) {
 			char *rtlabel = ((struct sockaddr_rtlabel *)
@@ -1178,6 +1199,7 @@ change:
 		break;
 	}
 
+	if_put(ifp);
 	*prt = rt;
 	return (error);
 }
@@ -1839,6 +1861,7 @@ rtm_bfd(struct bfd_config *bfd)
 	bfdm = mtod(m, struct bfd_msghdr *);
 	bfdm->bm_addrs = info.rti_addrs;
 
+	KERNEL_ASSERT_LOCKED();
 	bfd2sa(bfd->bc_rt, &sa_bfd);
 	memcpy(&bfdm->bm_sa, &sa_bfd, sizeof(sa_bfd));
 
@@ -1941,8 +1964,10 @@ sysctl_dumpentry(struct rtentry *rt, void *v, unsigned int id)
 	if_put(ifp);
 	info.rti_info[RTAX_LABEL] = rtlabel_id2sa(rt->rt_labelid, &sa_rl);
 #ifdef BFD
-	if (rt->rt_flags & RTF_BFD)
+	if (rt->rt_flags & RTF_BFD) {
+		KERNEL_ASSERT_LOCKED();
 		info.rti_info[RTAX_BFD] = bfd2sa(rt, &sa_bfd);
+	}
 #endif
 #ifdef MPLS
 	if (rt->rt_flags & RTF_MPLS) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_esp.c,v 1.172 2021/07/27 17:13:03 mvs Exp $ */
+/*	$OpenBSD: ip_esp.c,v 1.174 2021/10/13 22:43:44 bluhm Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -528,8 +528,8 @@ esp_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 			crde->crd_len = m->m_pkthdr.len - (skip + hlen + alen);
 	}
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 
  drop:
 	m_freem(m);
@@ -740,8 +740,7 @@ esp_input_cb(struct tdb *tdb, struct tdb_crypto *tc, struct mbuf *m, int clen)
  * ESP output routine, called by ipsp_process_packet().
  */
 int
-esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
-    int protoff)
+esp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 {
 	const struct enc_xform *espx = tdb->tdb_encalgxform;
 	const struct auth_hash *esph = tdb->tdb_authalgxform;
@@ -1013,8 +1012,8 @@ esp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 			crda->crd_len = m->m_pkthdr.len - (skip + alen);
 	}
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 
  drop:
 	m_freem(m);

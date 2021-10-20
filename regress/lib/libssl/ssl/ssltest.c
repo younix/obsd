@@ -143,7 +143,6 @@
 #define _BSD_SOURCE 1		/* Or gethostname won't be declared properly
 				   on Linux and GNU platforms. */
 #include <sys/types.h>
-#include <sys/param.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
@@ -176,6 +175,8 @@
 #include <openssl/dsa.h>
 #include <openssl/dh.h>
 #include <openssl/bn.h>
+
+#include "ssl_locl.h"
 
 #define TEST_SERVER_CERT "../apps/server.pem"
 #define TEST_CLIENT_CERT "../apps/client.pem"

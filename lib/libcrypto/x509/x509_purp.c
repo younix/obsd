@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_purp.c,v 1.5 2021/07/23 20:40:49 schwarze Exp $ */
+/* $OpenBSD: x509_purp.c,v 1.7 2021/09/13 15:26:53 claudio Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2001.
  */
@@ -366,6 +366,10 @@ X509_supported_extension(X509_EXTENSION *ex)
 		NID_basic_constraints,	/* 87 */
 		NID_certificate_policies, /* 89 */
 		NID_ext_key_usage,	/* 126 */
+#ifndef OPENSSL_NO_RFC3779
+		NID_sbgp_ipAddrBlock,   /* 290 */
+		NID_sbgp_autonomousSysNum, /* 291 */
+#endif
 		NID_policy_constraints,	/* 401 */
 		NID_proxyCertInfo,	/* 663 */
 		NID_name_constraints,	/* 666 */
@@ -586,6 +590,15 @@ x509v3_cache_extensions(X509 *x)
 	if (!x->nc && (i != -1))
 		x->ex_flags |= EXFLAG_INVALID;
 	setup_crldp(x);
+
+#ifndef OPENSSL_NO_RFC3779
+	x->rfc3779_addr = X509_get_ext_d2i(x, NID_sbgp_ipAddrBlock, &i, NULL);
+	if (x->rfc3779_addr == NULL && i != -1)
+		x->ex_flags |= EXFLAG_INVALID;
+	x->rfc3779_asid = X509_get_ext_d2i(x, NID_sbgp_autonomousSysNum, &i, NULL);
+	if (x->rfc3779_asid == NULL && i != -1)
+		x->ex_flags |= EXFLAG_INVALID;
+#endif
 
 	for (i = 0; i < X509_get_ext_count(x); i++) {
 		ex = X509_get_ext(x, i);
@@ -858,10 +871,18 @@ X509_check_issued(X509 *issuer, X509 *subject)
 	if (X509_NAME_cmp(X509_get_subject_name(issuer),
 	    X509_get_issuer_name(subject)))
 		return X509_V_ERR_SUBJECT_ISSUER_MISMATCH;
-	x509v3_cache_extensions(issuer);
+	if (!(issuer->ex_flags & EXFLAG_SET)) {
+		CRYPTO_w_lock(CRYPTO_LOCK_X509);
+		x509v3_cache_extensions(issuer);
+		CRYPTO_w_unlock(CRYPTO_LOCK_X509);
+	}
 	if (issuer->ex_flags & EXFLAG_INVALID)
 		return X509_V_ERR_UNSPECIFIED;
-	x509v3_cache_extensions(subject);
+	if (!(subject->ex_flags & EXFLAG_SET)) {
+		CRYPTO_w_lock(CRYPTO_LOCK_X509);
+		x509v3_cache_extensions(subject);
+		CRYPTO_w_unlock(CRYPTO_LOCK_X509);
+	}
 	if (subject->ex_flags & EXFLAG_INVALID)
 		return X509_V_ERR_UNSPECIFIED;
 

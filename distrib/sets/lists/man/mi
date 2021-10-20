@@ -186,6 +186,7 @@
 ./usr/share/man/man1/nm.1
 ./usr/share/man/man1/nohup.1
 ./usr/share/man/man1/nslookup.1
+./usr/share/man/man1/objcopy.1
 ./usr/share/man/man1/od.1
 ./usr/share/man/man1/openrsync.1
 ./usr/share/man/man1/openssl.1
@@ -415,6 +416,7 @@
 ./usr/share/man/man1/rdist.1
 ./usr/share/man/man1/rdistd.1
 ./usr/share/man/man1/readlink.1
+./usr/share/man/man1/realpath.1
 ./usr/share/man/man1/register-plist.1
 ./usr/share/man/man1/rev.1
 ./usr/share/man/man1/rlog.1
@@ -472,6 +474,7 @@
 ./usr/share/man/man1/tftp.1
 ./usr/share/man/man1/tic.1
 ./usr/share/man/man1/time.1
+./usr/share/man/man1/timeout.1
 ./usr/share/man/man1/tmux.1
 ./usr/share/man/man1/top.1
 ./usr/share/man/man1/touch.1
@@ -1224,6 +1227,7 @@
 ./usr/share/man/man4/andl.4
 ./usr/share/man/man4/aplgpio.4
 ./usr/share/man/man4/aps.4
+./usr/share/man/man4/aq.4
 ./usr/share/man/man4/arc.4
 ./usr/share/man/man4/arcofi.4
 ./usr/share/man/man4/arm64
@@ -1234,6 +1238,7 @@
 ./usr/share/man/man4/arm64/aplintc.4
 ./usr/share/man/man4/arm64/aplns.4
 ./usr/share/man/man4/arm64/aplpcie.4
+./usr/share/man/man4/arm64/aplpinctrl.4
 ./usr/share/man/man4/arm64/aplpmu.4
 ./usr/share/man/man4/arm64/aplspmi.4
 ./usr/share/man/man4/arm64/apm.4
@@ -1413,8 +1418,10 @@
 ./usr/share/man/man4/glenv.4
 ./usr/share/man/man4/glkgpio.4
 ./usr/share/man/man4/gpio.4
+./usr/share/man/man4/gpiocharger.4
 ./usr/share/man/man4/gpiodcf.4
 ./usr/share/man/man4/gpioiic.4
+./usr/share/man/man4/gpioleds.4
 ./usr/share/man/man4/gpioow.4
 ./usr/share/man/man4/graphaudio.4
 ./usr/share/man/man4/gre.4
@@ -1981,6 +1988,7 @@
 ./usr/share/man/man4/twe.4
 ./usr/share/man/man4/txp.4
 ./usr/share/man/man4/txphy.4
+./usr/share/man/man4/uaq.4
 ./usr/share/man/man4/uark.4
 ./usr/share/man/man4/uath.4
 ./usr/share/man/man4/uaudio.4
@@ -2125,6 +2133,7 @@
 ./usr/share/man/man5/bootparams.5
 ./usr/share/man/man5/bsd.port.arch.mk.5
 ./usr/share/man/man5/bsd.port.mk.5
+./usr/share/man/man5/bsd.re-config.5
 ./usr/share/man/man5/bsd.regress.mk.5
 ./usr/share/man/man5/bt.5
 ./usr/share/man/man5/cabal-module.5

@@ -1,4 +1,4 @@
-/*	$OpenBSD: umstc.c,v 1.4 2021/03/08 14:39:34 jcs Exp $ */
+/*	$OpenBSD: umstc.c,v 1.6 2021/09/12 06:58:08 anton Exp $ */
 
 /*
  * Copyright (c) 2020 joshua stein <jcs@jcs.org>

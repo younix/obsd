@@ -33,7 +33,6 @@
 /PNaCl.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /PPC.cpp/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /PPC.h/1.1.1.3/Wed Sep  1 16:07:30 2021/-ko/
-/RISCV.cpp/1.2/Wed Sep  1 16:07:30 2021/-ko/
 /RISCV.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /SPIR.cpp/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /SPIR.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
@@ -46,4 +45,5 @@
 /X86.cpp/1.2/Wed Sep  1 16:07:30 2021/-ko/
 /X86.h/1.3/Wed Sep  1 16:07:30 2021/-ko/
 /XCore.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
+/RISCV.cpp/1.2/Thu Sep  2 14:22:29 2021/-ko/
 D

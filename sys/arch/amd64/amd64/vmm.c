@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmm.c,v 1.289 2021/09/02 07:19:53 dv Exp $	*/
+/*	$OpenBSD: vmm.c,v 1.293 2021/09/13 22:16:27 dv Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -98,6 +98,9 @@ struct vmm_softc {
 	struct vmlist_head	vm_list;
 
 	int			mode;
+
+	size_t			vcpu_ct;
+	size_t			vcpu_max;
 
 	struct rwlock		vm_lock;
 	size_t			vm_ct;		/* number of in-memory VMs */
@@ -368,6 +371,7 @@ vmm_attach(struct device *parent, struct device *self, void *aux)
 	sc->nr_svm_cpus = 0;
 	sc->nr_rvi_cpus = 0;
 	sc->nr_ept_cpus = 0;
+	sc->vcpu_ct = 0;
 	sc->vm_ct = 0;
 	sc->vm_idx = 0;
 
@@ -428,7 +432,7 @@ vmm_attach(struct device *parent, struct device *self, void *aux)
 	bzero(&sc->vpids, sizeof(sc->vpids));
 	rw_init(&sc->vpid_lock, "vpid");
 
-	pool_init(&vm_pool, sizeof(struct vm), 0, IPL_NONE, PR_WAITOK,
+	pool_init(&vm_pool, sizeof(struct vm), 0, IPL_MPFLOOR, PR_WAITOK,
 	    "vmpool", NULL);
 	pool_init(&vcpu_pool, sizeof(struct vcpu), 64, IPL_MPFLOOR, PR_WAITOK,
 	    "vcpupl", NULL);
@@ -786,7 +790,7 @@ vm_rwregs(struct vm_rwregs_params *vrwp, int dir)
 	struct vm *vm;
 	struct vcpu *vcpu;
 	struct vcpu_reg_state *vrs = &vrwp->vrwp_regs;
-	int error;
+	int error, ret;
 
 	/* Find the desired VM */
 	rw_enter_read(&vmm_softc->vm_lock);
@@ -804,20 +808,24 @@ vm_rwregs(struct vm_rwregs_params *vrwp, int dir)
 	if (vcpu == NULL)
 		return (ENOENT);
 
+	rw_enter_write(&vcpu->vc_lock);
 	if (vmm_softc->mode == VMM_MODE_VMX ||
 	    vmm_softc->mode == VMM_MODE_EPT)
-		return (dir == 0) ?
+		ret = (dir == 0) ?
 		    vcpu_readregs_vmx(vcpu, vrwp->vrwp_mask, vrs) :
 		    vcpu_writeregs_vmx(vcpu, vrwp->vrwp_mask, 1, vrs);
 	else if (vmm_softc->mode == VMM_MODE_SVM ||
 	    vmm_softc->mode == VMM_MODE_RVI)
-		return (dir == 0) ?
+		ret = (dir == 0) ?
 		    vcpu_readregs_svm(vcpu, vrwp->vrwp_mask, vrs) :
 		    vcpu_writeregs_svm(vcpu, vrwp->vrwp_mask, vrs);
 	else {
 		DPRINTF("%s: unknown vmm mode", __func__);
-		return (EINVAL);
+		ret = EINVAL;
 	}
+	rw_exit_write(&vcpu->vc_lock);
+
+	return (ret);
 }
 
 /*
@@ -1494,6 +1502,15 @@ vm_create(struct vm_create_params *vcp, struct proc *p)
 	if (vcp->vcp_ncpus != 1)
 		return (EINVAL);
 
+	rw_enter_write(&vmm_softc->vm_lock);
+	if (vmm_softc->vcpu_ct + vcp->vcp_ncpus > VMM_MAX_VCPUS) {
+		DPRINTF("%s: maximum vcpus (%lu) reached\n", __func__,
+		    vmm_softc->vcpu_max);
+		rw_exit_write(&vmm_softc->vm_lock);
+		return (ENOMEM);
+	}
+	vmm_softc->vcpu_ct += vcp->vcp_ncpus;
+
 	vm = pool_get(&vm_pool, PR_WAITOK | PR_ZERO);
 	SLIST_INIT(&vm->vm_vcpu_list);
 	rw_init(&vm->vm_vcpu_lock, "vcpu_list");
@@ -1504,8 +1521,6 @@ vm_create(struct vm_create_params *vcp, struct proc *p)
 	    vm->vm_nmemranges * sizeof(vm->vm_memranges[0]));
 	vm->vm_memory_size = memsize;
 	strncpy(vm->vm_name, vcp->vcp_name, VMM_MAX_NAME_LEN - 1);
-
-	rw_enter_write(&vmm_softc->vm_lock);
 
 	if (vm_impl_init(vm, p)) {
 		printf("failed to init arch-specific features for vm %p\n", vm);
@@ -1685,14 +1700,20 @@ vm_impl_init_svm(struct vm *vm, struct proc *p)
 int
 vm_impl_init(struct vm *vm, struct proc *p)
 {
+	int ret;
+
+	KERNEL_LOCK();
 	if (vmm_softc->mode == VMM_MODE_VMX ||
 	    vmm_softc->mode == VMM_MODE_EPT)
-		return vm_impl_init_vmx(vm, p);
+		ret = vm_impl_init_vmx(vm, p);
 	else if	(vmm_softc->mode == VMM_MODE_SVM ||
 		 vmm_softc->mode == VMM_MODE_RVI)
-		return vm_impl_init_svm(vm, p);
+		ret = vm_impl_init_svm(vm, p);
 	else
 		panic("%s: unknown vmm mode: %d", __func__, vmm_softc->mode);
+	KERNEL_UNLOCK();
+
+	return (ret);
 }
 
 /*
@@ -3774,6 +3795,7 @@ vm_teardown(struct vm *vm)
 		SLIST_REMOVE(&vm->vm_vcpu_list, vcpu, vcpu, vc_vcpu_link);
 		vcpu_deinit(vcpu);
 		pool_put(&vcpu_pool, vcpu);
+		vmm_softc->vcpu_ct--;
 	}
 
 	vm_impl_deinit(vm);
@@ -4223,9 +4245,10 @@ vm_run(struct vm_run_params *vrp)
 
 			if (atomic_cas_uint(&vcpu->vc_state, old, next) != old)
 				ret = EBUSY;
-			else
+			else {
 				atomic_inc_int(&vm->vm_vcpus_running);
-			rw_enter_write(&vcpu->vc_lock);
+				rw_enter_write(&vcpu->vc_lock);
+			}
 		} else
 			ret = ENOENT;
 

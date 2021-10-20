@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.66 2021/09/01 08:09:41 claudio Exp $ */
+/*	$OpenBSD: extern.h,v 1.72 2021/10/12 15:16:45 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -101,6 +101,12 @@ struct cert_ip {
 	};
 };
 
+enum cert_purpose {
+	CERT_PURPOSE_INVALID,
+	CERT_PURPOSE_CA,
+	CERT_PURPOSE_BGPSEC_ROUTER
+};
+
 /*
  * Parsed components of a validated X509 certificate stipulated by RFC
  * 6847 and further (within) by RFC 3779.
@@ -119,8 +125,12 @@ struct cert {
 	char		*aia; /* AIA (or NULL, for trust anchor) */
 	char		*aki; /* AKI (or NULL, for trust anchor) */
 	char		*ski; /* SKI */
+	char		*tal; /* basename of TAL for this cert */
+	enum cert_purpose	 purpose; /* Certificate Purpose (BGPSec or CA) */
+	char		*pubkey; /* Subject Public Key Info */
 	int		 valid; /* validated resources */
 	X509		*x509; /* the cert */
+	time_t		 expires; /* do not use after */
 };
 
 /*
@@ -220,12 +230,30 @@ RB_HEAD(vrp_tree, vrp);
 RB_PROTOTYPE(vrp_tree, vrp, entry, vrpcmp);
 
 /*
+ * A single BGPsec Router Key (including ASID)
+ */
+struct brk {
+	RB_ENTRY(brk)	 entry;
+	uint32_t	 asid;
+	char		*tal; /* basename of TAL for this key */
+	char		*ski; /* Subject Key Identifier */
+	char		*pubkey; /* Subject Public Key Info */
+	time_t		 expires; /* transitive expiry moment */
+};
+/*
+ * Tree of BRK sorted by asid
+ */
+RB_HEAD(brk_tree, brk);
+RB_PROTOTYPE(brk_tree, brk, entry, brkcmp);
+
+/*
  * A single CRL
  */
 struct crl {
 	RB_ENTRY(crl)	 entry;
 	char		*aki;
 	X509_CRL	*x509_crl;
+	time_t		 expires; /* do not use after */
 };
 /*
  * Tree of CRLs sorted by uri
@@ -308,7 +336,7 @@ enum publish_type {
  * An entity (MFT, ROA, certificate, etc.) that needs to be downloaded
  * and parsed.
  */
-struct	entity {
+struct entity {
 	enum rtype	 type; /* type of entity (not RTYPE_EOF) */
 	char		*file; /* local path to file */
 	int		 has_pkey; /* whether pkey/sz is specified */
@@ -327,7 +355,7 @@ RB_HEAD(filepath_tree, filepath);
 /*
  * Statistics collected during run-time.
  */
-struct	stats {
+struct stats {
 	size_t	 tals; /* total number of locators */
 	size_t	 mfts; /* total number of manifests */
 	size_t	 mfts_fail; /* failing syntactic parse */
@@ -351,6 +379,8 @@ struct	stats {
 	size_t	 uniqs; /* number of unique vrps */
 	size_t	 del_files; /* number of files removed in cleanup */
 	size_t	 del_dirs; /* number of directories removed in cleanup */
+	size_t	 brks; /* number of BGPsec Router Key (BRK) certificates */
+	size_t	 brks_invalids; /* invalid BGPsec certs */
 	char	*talnames;
 	struct timeval	elapsed_time;
 	struct timeval	user_time;
@@ -375,6 +405,7 @@ void		 cert_free(struct cert *);
 struct cert	*cert_parse(X509 **, const char *);
 struct cert	*ta_parse(X509 **, const char *, const unsigned char *, size_t);
 struct cert	*cert_read(int);
+void		 cert_insert_brks(struct brk_tree *, struct cert *);
 
 void		 mft_buffer(struct ibuf *, const struct mft *);
 void		 mft_free(struct mft *);
@@ -410,9 +441,9 @@ int		 valid_uri(const char *, size_t, const char *);
 
 /* Working with CMS. */
 unsigned char	*cms_parse_validate(X509 **, const char *,
-			const char *, size_t *);
+		    const ASN1_OBJECT *, size_t *);
 int		 cms_econtent_version(const char *, const unsigned char **,
-			size_t, long *);
+		    size_t, long *);
 /* Helper for ASN1 parsing */
 int		 ASN1_frame(const char *, size_t,
 			const unsigned char **, long *, int *);
@@ -515,12 +546,14 @@ int		 io_recvfd(int, void *, size_t);
 
 /* X509 helpers. */
 
-char		*hex_encode(const unsigned char *, size_t);
 char		*x509_get_aia(X509 *, const char *);
 char		*x509_get_aki(X509 *, int, const char *);
 char		*x509_get_ski(X509 *, const char *);
+time_t		 x509_get_expire(X509 *, const char *);
 char		*x509_get_crl(X509 *, const char *);
 char		*x509_crl_get_aki(X509_CRL *, const char *);
+char		*x509_get_pubkey(X509 *, const char *);
+enum cert_purpose	 x509_get_purpose(X509 *, const char *);
 
 /* Output! */
 
@@ -530,14 +563,21 @@ extern int	 outformats;
 #define FORMAT_CSV	0x04
 #define FORMAT_JSON	0x08
 
-int		 outputfiles(struct vrp_tree *v, struct stats *);
+int		 outputfiles(struct vrp_tree *v, struct brk_tree *b,
+		    struct stats *);
 int		 outputheader(FILE *, struct stats *);
-int		 output_bgpd(FILE *, struct vrp_tree *, struct stats *);
-int		 output_bird1v4(FILE *, struct vrp_tree *, struct stats *);
-int		 output_bird1v6(FILE *, struct vrp_tree *, struct stats *);
-int		 output_bird2(FILE *, struct vrp_tree *, struct stats *);
-int		 output_csv(FILE *, struct vrp_tree *, struct stats *);
-int		 output_json(FILE *, struct vrp_tree *, struct stats *);
+int		 output_bgpd(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
+int		 output_bird1v4(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
+int		 output_bird1v6(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
+int		 output_bird2(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
+int		 output_csv(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
+int		 output_json(FILE *, struct vrp_tree *, struct brk_tree *,
+		    struct stats *);
 
 void	logx(const char *fmt, ...)
 		    __attribute__((format(printf, 1, 2)));

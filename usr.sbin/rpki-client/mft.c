@@ -1,4 +1,4 @@
-/*	$OpenBSD: mft.c,v 1.36 2021/07/13 18:39:39 job Exp $ */
+/*	$OpenBSD: mft.c,v 1.38 2021/09/09 14:15:49 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -39,6 +39,8 @@ struct	parse {
 	const char	*fn; /* manifest file name */
 	struct mft	*res; /* result object */
 };
+
+static ASN1_OBJECT    *mft_oid;
 
 static const char *
 gentime2str(const ASN1_GENERALIZEDTIME *time)
@@ -194,12 +196,6 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	}
 
 	/* Insert the filename and hash value. */
-
-	p->res->files = recallocarray(p->res->files, p->res->filesz,
-	    p->res->filesz + 1, sizeof(struct mftfile));
-	if (p->res->files == NULL)
-		err(1, NULL);
-
 	fent = &p->res->files[p->res->filesz++];
 
 	fent->file = fn;
@@ -231,6 +227,10 @@ mft_parse_flist(struct parse *p, const ASN1_OCTET_STRING *os)
 		    "failed ASN.1 sequence parse", p->fn);
 		goto out;
 	}
+
+	p->res->files = calloc(sk_ASN1_TYPE_num(seq), sizeof(struct mftfile));
+	if (p->res->files == NULL)
+		err(1, NULL);
 
 	for (i = 0; i < sk_ASN1_TYPE_num(seq); i++) {
 		t = sk_ASN1_TYPE_value(seq, i);
@@ -419,8 +419,14 @@ mft_parse(X509 **x509, const char *fn)
 	memset(&p, 0, sizeof(struct parse));
 	p.fn = fn;
 
-	cms = cms_parse_validate(x509, fn, "1.2.840.113549.1.9.16.1.26",
-	    &cmsz);
+	if (mft_oid == NULL) {
+		mft_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.26", 1);
+		if (mft_oid == NULL)
+			errx(1, "OBJ_txt2obj for %s failed",
+			    "1.2.840.113549.1.9.16.1.26");
+	}
+
+	cms = cms_parse_validate(x509, fn, mft_oid, &cmsz);
 	if (cms == NULL)
 		return NULL;
 	assert(*x509 != NULL);

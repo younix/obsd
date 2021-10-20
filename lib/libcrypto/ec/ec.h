@@ -1,4 +1,4 @@
-/* $OpenBSD: ec.h,v 1.24 2021/05/10 16:58:19 tb Exp $ */
+/* $OpenBSD: ec.h,v 1.27 2021/09/12 16:23:19 tb Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -249,6 +249,8 @@ const EC_POINT *EC_GROUP_get0_generator(const EC_GROUP *group);
  *  \return 1 on success and 0 if an error occured
  */
 int EC_GROUP_get_order(const EC_GROUP *group, BIGNUM *order, BN_CTX *ctx);
+
+int EC_GROUP_order_bits(const EC_GROUP *group);
 
 /** Gets the cofactor of a EC_GROUP
  *  \param  group     EC_GROUP object
@@ -706,7 +708,8 @@ int EC_GROUP_get_pentanomial_basis(const EC_GROUP *, unsigned int *k1,
 	unsigned int *k2, unsigned int *k3);
 #endif
 
-#define OPENSSL_EC_NAMED_CURVE	0x001
+#define OPENSSL_EC_EXPLICIT_CURVE	0x000
+#define OPENSSL_EC_NAMED_CURVE		0x001
 
 typedef struct ecpk_parameters_st ECPKPARAMETERS;
 

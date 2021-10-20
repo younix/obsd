@@ -1,4 +1,4 @@
-/* $OpenBSD: screen.c,v 1.74 2021/08/20 17:50:42 nicm Exp $ */
+/* $OpenBSD: screen.c,v 1.76 2021/10/05 12:46:02 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -163,27 +163,27 @@ screen_set_cursor_style(struct screen *s, u_int style)
 		break;
 	case 1:
 		s->cstyle = SCREEN_CURSOR_BLOCK;
-		s->mode |= MODE_BLINKING;
+		s->mode |= MODE_CURSOR_BLINKING;
 		break;
 	case 2:
 		s->cstyle = SCREEN_CURSOR_BLOCK;
-		s->mode &= ~MODE_BLINKING;
+		s->mode &= ~MODE_CURSOR_BLINKING;
 		break;
 	case 3:
 		s->cstyle = SCREEN_CURSOR_UNDERLINE;
-		s->mode |= MODE_BLINKING;
+		s->mode |= MODE_CURSOR_BLINKING;
 		break;
 	case 4:
 		s->cstyle = SCREEN_CURSOR_UNDERLINE;
-		s->mode &= ~MODE_BLINKING;
+		s->mode &= ~MODE_CURSOR_BLINKING;
 		break;
 	case 5:
 		s->cstyle = SCREEN_CURSOR_BAR;
-		s->mode |= MODE_BLINKING;
+		s->mode |= MODE_CURSOR_BLINKING;
 		break;
 	case 6:
 		s->cstyle = SCREEN_CURSOR_BAR;
-		s->mode &= ~MODE_BLINKING;
+		s->mode &= ~MODE_CURSOR_BLINKING;
 		break;
 	}
 }
@@ -677,11 +677,13 @@ screen_mode_to_string(int mode)
 	if (mode & MODE_WRAP)
 		strlcat(tmp, "WRAP,", sizeof tmp);
 	if (mode & MODE_MOUSE_STANDARD)
-		strlcat(tmp, "STANDARD,", sizeof tmp);
+		strlcat(tmp, "MOUSE_STANDARD,", sizeof tmp);
 	if (mode & MODE_MOUSE_BUTTON)
-		strlcat(tmp, "BUTTON,", sizeof tmp);
-	if (mode & MODE_BLINKING)
-		strlcat(tmp, "BLINKING,", sizeof tmp);
+		strlcat(tmp, "MOUSE_BUTTON,", sizeof tmp);
+	if (mode & MODE_CURSOR_BLINKING)
+		strlcat(tmp, "CURSOR_BLINKING,", sizeof tmp);
+	if (mode & MODE_CURSOR_VERY_VISIBLE)
+		strlcat(tmp, "CURSOR_VERY_VISIBLE,", sizeof tmp);
 	if (mode & MODE_MOUSE_UTF8)
 		strlcat(tmp, "UTF8,", sizeof tmp);
 	if (mode & MODE_MOUSE_SGR)
@@ -691,7 +693,7 @@ screen_mode_to_string(int mode)
 	if (mode & MODE_FOCUSON)
 		strlcat(tmp, "FOCUSON,", sizeof tmp);
 	if (mode & MODE_MOUSE_ALL)
-		strlcat(tmp, "ALL,", sizeof tmp);
+		strlcat(tmp, "MOUSE_ALL,", sizeof tmp);
 	if (mode & MODE_ORIGIN)
 		strlcat(tmp, "ORIGIN,", sizeof tmp);
 	if (mode & MODE_CRLF)

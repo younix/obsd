@@ -1,4 +1,4 @@
-/*	$OpenBSD: roa.c,v 1.23 2021/08/01 22:29:49 job Exp $ */
+/*	$OpenBSD: roa.c,v 1.26 2021/10/07 08:28:45 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -35,6 +35,8 @@ struct	parse {
 	const char	 *fn; /* manifest file name */
 	struct roa	 *res; /* results */
 };
+
+static ASN1_OBJECT	*roa_oid;
 
 /*
  * Parse IP address (ROAIPAddress), RFC 6482, section 3.3.
@@ -109,10 +111,6 @@ roa_parse_addr(const ASN1_OCTET_STRING *os, enum afi afi, struct parse *p)
 		}
 	}
 
-	p->res->ips = recallocarray(p->res->ips, p->res->ipsz, p->res->ipsz + 1,
-	    sizeof(struct roa_ip));
-	if (p->res->ips == NULL)
-		err(1, NULL);
 	res = &p->res->ips[p->res->ipsz++];
 
 	res->addr = addr;
@@ -180,6 +178,12 @@ roa_parse_ipfam(const ASN1_OCTET_STRING *os, struct parse *p)
 		    "failed ASN.1 sequence parse", p->fn);
 		goto out;
 	}
+
+	/* will be called multiple times so use recallocarray */
+	p->res->ips = recallocarray(p->res->ips, p->res->ipsz,
+	    p->res->ipsz + sk_ASN1_TYPE_num(sseq), sizeof(struct roa_ip));
+	if (p->res->ips == NULL)
+		err(1, NULL);
 
 	for (i = 0; i < sk_ASN1_TYPE_num(sseq); i++) {
 		t = sk_ASN1_TYPE_value(sseq, i);
@@ -337,9 +341,14 @@ roa_parse(X509 **x509, const char *fn)
 	p.fn = fn;
 
 	/* OID from section 2, RFC 6482. */
+	if (roa_oid == NULL) {
+		roa_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.24", 1);
+		if (roa_oid == NULL)
+			errx(1, "OBJ_txt2obj for %s failed",
+			    "1.2.840.113549.1.9.16.1.24");
+	}
 
-	cms = cms_parse_validate(x509, fn,
-	    "1.2.840.113549.1.9.16.1.24", &cmsz);
+	cms = cms_parse_validate(x509, fn, roa_oid, &cmsz);
 	if (cms == NULL)
 		return NULL;
 
@@ -366,7 +375,7 @@ roa_parse(X509 **x509, const char *fn)
 		goto out;
 	}
 	if ((expires = mktime(&expires_tm)) == -1) {
-		err(1, "mktime failed");
+		errx(1, "mktime failed");
 		goto out;
 	}
 	p.res->expires = expires;

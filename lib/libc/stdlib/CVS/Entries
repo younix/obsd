@@ -34,7 +34,6 @@
 /getenv.c/1.12/Sun Mar 13 18:34:21 2016//
 /getopt.3/1.46/Mon Jan  4 19:43:13 2016//
 /getopt_long.3/1.22/Mon Jan 13 18:05:10 2020//
-/getsubopt.3/1.14/Sat Nov 15 14:41:02 2014//
 /getsubopt.c/1.4/Mon Aug  8 08:05:36 2005//
 /hcreate.3/1.8/Tue Jan 30 11:37:58 2018//
 /hcreate.c/1.7/Sun May 29 20:47:49 2016//
@@ -76,7 +75,6 @@
 /rand48.h/1.6/Mon Sep 14 13:30:17 2015//
 /random.c/1.31/Tue Nov 28 06:55:49 2017//
 /reallocarray.c/1.3/Sun Sep 13 08:31:47 2015//
-/realpath.3/1.25/Wed Dec 11 20:01:50 2019//
 /realpath.c/1.27/Fri Jul  5 05:04:26 2019//
 /remque.c/1.3/Fri Aug 15 04:14:36 2014//
 /seed48.c/1.6/Sun Sep 13 15:20:40 2015//
@@ -101,8 +99,10 @@
 /tsearch.c/1.10/Sat Sep 26 16:03:48 2015//
 /getopt_long.c/1.32/Mon Jun  1 06:23:13 2020//
 /malloc.3/1.128/Wed Sep  1 16:07:37 2021//
-/malloc.c/1.271/Wed Sep  1 16:07:37 2021//
 /rand.3/1.20/Wed Sep  1 16:07:37 2021//
 /random.3/1.29/Wed Sep  1 16:07:37 2021//
 /recallocarray.c/1.2/Wed Sep  1 16:07:37 2021//
+/getsubopt.3/1.15/Tue Sep 14 08:17:17 2021//
+/malloc.c/1.272/Wed Oct 20 17:28:43 2021//
+/realpath.3/1.26/Wed Oct 20 17:28:43 2021//
 D

@@ -1,4 +1,4 @@
-/* $OpenBSD: tls1.h,v 1.45 2021/06/14 05:32:10 tb Exp $ */
+/* $OpenBSD: tls1.h,v 1.50 2021/10/15 16:48:47 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -178,14 +178,6 @@ extern "C" {
 #define TLS1_VERSION_MINOR		0x01
 
 #ifndef LIBRESSL_INTERNAL
-#define TLS1_get_version(s) \
-		((s->version >> 8) == TLS1_VERSION_MAJOR ? s->version : 0)
-
-#define TLS1_get_client_version(s) \
-		((s->client_version >> 8) == TLS1_VERSION_MAJOR ? s->client_version : 0)
-#endif
-
-#ifndef LIBRESSL_INTERNAL
 #define TLS1_AD_DECRYPTION_FAILED		21
 #define TLS1_AD_RECORD_OVERFLOW			22
 #define TLS1_AD_UNKNOWN_CA			48	/* fatal */
@@ -325,6 +317,9 @@ SSL_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_DEBUG_CB,(void (*)(void))cb)
 
 #define SSL_set_tlsext_debug_arg(ssl, arg) \
 SSL_ctrl(ssl,SSL_CTRL_SET_TLSEXT_DEBUG_ARG,0, (void *)arg)
+
+#define SSL_get_tlsext_status_type(ssl) \
+SSL_ctrl(ssl, SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE, 0, NULL)
 
 #define SSL_set_tlsext_status_type(ssl, type) \
 SSL_ctrl(ssl,SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE,type, NULL)
@@ -765,12 +760,6 @@ SSL_CTX_callback_ctrl(ssl,SSL_CTRL_SET_TLSEXT_TICKET_KEY_CB,(void (*)(void))cb)
 #define TLS_MD_IV_BLOCK_CONST_SIZE		8
 #define TLS_MD_MASTER_SECRET_CONST		"master secret"
 #define TLS_MD_MASTER_SECRET_CONST_SIZE		13
-
-/* TLS Session Ticket extension struct. */
-struct tls_session_ticket_ext_st {
-	unsigned short length;
-	void *data;
-};
 
 #ifdef  __cplusplus
 }

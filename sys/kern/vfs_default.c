@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_default.c,v 1.48 2021/04/28 09:53:53 claudio Exp $  */
+/*	$OpenBSD: vfs_default.c,v 1.50 2021/10/15 06:30:06 semarie Exp $  */
 
 /*
  * Portions of this code are:
@@ -128,6 +128,12 @@ vop_generic_revoke(void *v)
 }
 
 int
+vop_generic_badop(void *v)
+{
+	panic("%s", __func__);
+}
+
+int
 vop_generic_bmap(void *v)
 {
 	struct vop_bmap_args *ap = v;
@@ -158,37 +164,6 @@ vop_generic_abortop(void *v)
 	if ((ap->a_cnp->cn_flags & (HASBUF | SAVESTART)) == HASBUF)
 		pool_put(&namei_pool, ap->a_cnp->cn_pnbuf);
 
-	return (0);
-}
-
-/*
- * Stubs to use when there is no locking to be done on the underlying object.
- * A minimal shared lock is necessary to ensure that the underlying object
- * is not revoked while an operation is in progress. So, an active shared
- * count should be maintained in an auxiliary vnode lock structure. However,
- * that's not done now.
- */
-int
-vop_generic_lock(void *v)
-{
-	return (0);
-}
- 
-/*
- * Decrement the active use count. (Not done currently)
- */
-int
-vop_generic_unlock(void *v)
-{
-	return (0);
-}
-
-/*
- * Return whether or not the node is in use. (Not done currently)
- */
-int
-vop_generic_islocked(void *v)
-{
 	return (0);
 }
 

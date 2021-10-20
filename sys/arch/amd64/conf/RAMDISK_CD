@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK_CD,v 1.191 2021/06/10 06:54:42 fcambus Exp $
+#	$OpenBSD: RAMDISK_CD,v 1.193 2021/09/13 09:57:48 jmatthew Exp $
 
 machine		amd64
 maxusers	4
@@ -122,6 +122,7 @@ mos*		at uhub?		# MOSCHIP MCS7730/7830 10/100 Ethernet
 mue*		at uhub?		# Microchip LAN75xx/LAN78xx Ethernet
 url*		at uhub?		# Realtek RTL8150L based adapters
 ure*		at uhub?		# Realtek RTL8152 based adapters
+uaq*		at uhub?		# Aquantia AQC111U/AQC112U adapters
 wi*		at uhub?		# WaveLAN IEEE 802.11DS
 upl*		at uhub?		# Prolific PL2301/PL2302 host-to-host
 ugl*		at uhub?		# Genesys Logic GL620USB-A host-to-host
@@ -254,6 +255,7 @@ bwfm*		at pci?			# Broadcom FullMAC
 ixl*		at pci?			# Intel Ethernet 700 Series
 mcx*		at pci?			# Mellanox ConnectX-4
 iavf*		at pci?			# Intel Ethernet Adaptive VF
+aq*		at pci?			# Aquantia aQtion Ethernet
 
 acx*		at pci?			# TI ACX100/ACX111 (802.11b/g)
 acx*		at cardbus?		# TI ACX100/ACX111 (802.11b/g)

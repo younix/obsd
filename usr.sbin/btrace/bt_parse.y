@@ -1,4 +1,4 @@
-/*	$OpenBSD: bt_parse.y,v 1.37 2021/08/31 12:51:24 mpi Exp $	*/
+/*	$OpenBSD: bt_parse.y,v 1.44 2021/10/03 22:01:48 dv Exp $	*/
 
 /*
  * Copyright (c) 2019-2021 Martin Pieuchot <mpi@openbsd.org>
@@ -59,8 +59,8 @@ SLIST_HEAD(, bt_var)	l_variables;
 struct bt_arg 		g_nullba = BA_INITIALIZER(0, B_AT_LONG);
 struct bt_arg		g_maxba = BA_INITIALIZER(LONG_MAX, B_AT_LONG);
 
-struct bt_rule	*br_new(struct bt_probe *, struct bt_filter *, struct bt_stmt *,
-		     enum bt_rtype);
+struct bt_rule	*br_new(struct bt_probe *, struct bt_filter *,
+		     struct bt_stmt *);
 struct bt_probe	*bp_new(const char *, const char *, const char *, int32_t);
 struct bt_arg	*ba_append(struct bt_arg *, struct bt_arg *);
 struct bt_arg	*ba_op(enum bt_argtype, struct bt_arg *, struct bt_arg *);
@@ -117,18 +117,18 @@ static int pflag;
 /* Builtins */
 %token	<v.i>		BUILTIN BEGIN END HZ IF
 /* Functions and Map operators */
-%token  <v.i>		F_DELETE F_PRINT FUNC0 FUNC1 FUNCN OP1 OP4 MOP0 MOP1
+%token  <v.i>		F_DELETE F_PRINT
+%token	<v.i>		MFUNC FUNC0 FUNC1 FUNCN OP1 OP2 OP4 MOP0 MOP1
 %token	<v.string>	STRING CSTRING
 %token	<v.number>	NUMBER
 
 %type	<v.string>	gvar lvar
-%type	<v.number>	staticv
 %type	<v.i>		beginend
-%type	<v.probe>	probe pname
+%type	<v.probe>	plist probe pname
 %type	<v.filter>	filter
 %type	<v.stmt>	action stmt stmtblck stmtlist block
-%type	<v.arg>		pat vargs mentry mpat pargs
-%type	<v.arg>		expr term fterm factor
+%type	<v.arg>		pat vargs mentry mpat pargs staticv
+%type	<v.arg>		expr term fterm variable factor func
 %%
 
 grammar	: /* empty */
@@ -137,20 +137,25 @@ grammar	: /* empty */
 	| grammar error
 	;
 
-rule	: beginend action		{ br_new(NULL, NULL, $2, $1); }
-	| probe filter action		{ br_new($1, $2, $3, B_RT_PROBE); }
+rule	: plist filter action		{ br_new($1, $2, $3); }
 	;
 
 beginend: BEGIN	| END ;
 
+plist	: plist ',' probe		{ $$ = bp_append($1, $3); }
+	| probe
+	;
+
 probe	: { pflag = 1; } pname		{ $$ = $2; pflag = 0; }
+	| beginend			{ $$ = bp_new(NULL, NULL, NULL, $1); }
+	;
 
 pname	: STRING ':' STRING ':' STRING	{ $$ = bp_new($1, $3, $5, 0); }
 	| STRING ':' HZ ':' NUMBER	{ $$ = bp_new($1, "hz", NULL, $5); }
 	;
 
-staticv	: NUMBER
-	| '$' NUMBER			{ $$ = get_varg($2); }
+staticv	: '$' NUMBER			{ $$ = get_varg($2); }
+	| '$' '#'			{ $$ = get_nargs(); }
 	;
 
 gvar	: '@' STRING			{ $$ = $2; }
@@ -206,14 +211,22 @@ fterm	: fterm '*' factor	{ $$ = ba_op(B_AT_OP_MULT, $1, $3); }
 	| factor
 	;
 
-factor : '(' expr ')'		{ $$ = $2; }
-	| staticv		{ $$ = ba_new($1, B_AT_LONG); }
-	| BUILTIN		{ $$ = ba_new(NULL, $1); }
-	| lvar			{ $$ = bl_find($1); }
+variable: lvar			{ $$ = bl_find($1); }
 	| gvar			{ $$ = bg_find($1); }
-	| mentry
 	;
 
+factor : '(' expr ')'		{ $$ = $2; }
+	| NUMBER		{ $$ = ba_new($1, B_AT_LONG); }
+	| BUILTIN		{ $$ = ba_new(NULL, $1); }
+	| staticv
+	| variable
+	| mentry
+	| func
+	;
+
+func	: STR '(' staticv ')'		{ $$ = ba_new($3, B_AT_FN_STR); }
+	| STR '(' staticv ',' pat ')'	{ $$ = ba_op(B_AT_FN_STR, $3, $5); }
+	;
 
 vargs	: pat
 	| vargs ',' pat			{ $$ = ba_append($1, $3); }
@@ -223,8 +236,9 @@ pargs	: expr
 	| gvar ',' pat			{ $$ = ba_append(bg_find($1), $3); }
 	;
 
-NL	: /* empty */ | '\n'
-		;
+NL	: /* empty */
+	| '\n'
+	;
 
 stmt	: ';' NL			{ $$ = NULL; }
 	| gvar '=' pat			{ $$ = bg_store($1, $3); }
@@ -232,6 +246,7 @@ stmt	: ';' NL			{ $$ = NULL; }
 	| gvar '[' vargs ']' '=' mpat	{ $$ = bm_insert($1, $3, $6); }
 	| FUNCN '(' vargs ')'		{ $$ = bs_new($1, $3, NULL); }
 	| FUNC1 '(' pat ')'		{ $$ = bs_new($1, $3, NULL); }
+	| MFUNC '(' variable ')'	{ $$ = bs_new($1, $3, NULL); }
 	| FUNC0 '(' ')'			{ $$ = bs_new($1, NULL, NULL); }
 	| F_DELETE '(' mentry ')'	{ $$ = bm_op($1, $3, NULL); }
 	| F_PRINT '(' pargs ')'		{ $$ = bs_new($1, $3, NULL); }
@@ -257,41 +272,58 @@ action	: '{' stmtlist '}'		{ $$ = $2; }
 
 %%
 
-int
+struct bt_arg*
 get_varg(int index)
 {
-	extern int vargs[];
+	extern int nargs;
+	extern char **vargs;
+	const char *errstr = NULL;
+	long val;
 
-	assert(index == 1);
+	if (0 < index && index <= nargs) {
+		val = (long)strtonum(vargs[index-1], LONG_MIN, LONG_MAX,
+		    &errstr);
+		if (errstr == NULL)
+			return ba_new(val, B_AT_LONG);
+		return ba_new(vargs[index-1], B_AT_STR);
+	}
 
-	return vargs[index - 1];
+	return ba_new(0L, B_AT_NIL);
+}
+
+struct bt_arg*
+get_nargs(void)
+{
+	extern int nargs;
+
+	return ba_new((long) nargs, B_AT_LONG);
 }
 
 /* Create a new rule, representing  "probe / filter / { action }" */
 struct bt_rule *
-br_new(struct bt_probe *probe, struct bt_filter *filter, struct bt_stmt *head,
-    enum bt_rtype rtype)
+br_new(struct bt_probe *probe, struct bt_filter *filter, struct bt_stmt *head)
 {
 	struct bt_rule *br;
 
 	br = calloc(1, sizeof(*br));
 	if (br == NULL)
 		err(1, "bt_rule: calloc");
-	br->br_probe = probe;
+	/* SLIST_INSERT_HEAD() nullify the next pointer. */
+	SLIST_FIRST(&br->br_probes) = probe;
 	br->br_filter = filter;
 	/* SLIST_INSERT_HEAD() nullify the next pointer. */
 	SLIST_FIRST(&br->br_action) = head;
-	br->br_type = rtype;
 
 	SLIST_FIRST(&br->br_variables) = SLIST_FIRST(&l_variables);
 	SLIST_INIT(&l_variables);
 
-	if (rtype == B_RT_PROBE) {
+	do {
+		if (probe->bp_type != B_PT_PROBE)
+			continue;
 		g_nprobes++;
-		TAILQ_INSERT_TAIL(&g_rules, br, br_next);
-	} else {
-		TAILQ_INSERT_HEAD(&g_rules, br, br_next);
-	}
+	} while ((probe = SLIST_NEXT(probe, bp_next)) != NULL);
+
+	TAILQ_INSERT_TAIL(&g_rules, br, br_next);
 
 	return br;
 }
@@ -327,9 +359,15 @@ struct bt_probe *
 bp_new(const char *prov, const char *func, const char *name, int32_t rate)
 {
 	struct bt_probe *bp;
+	enum bt_ptype ptype;
 
 	if (rate < 0 || rate > INT32_MAX)
 		errx(1, "only positive values permitted");
+
+	if (prov == NULL && func == NULL && name == NULL)
+		ptype = rate; /* BEGIN or END */
+	else
+		ptype = B_PT_PROBE;
 
 	bp = calloc(1, sizeof(*bp));
 	if (bp == NULL)
@@ -338,8 +376,31 @@ bp_new(const char *prov, const char *func, const char *name, int32_t rate)
 	bp->bp_func = func;
 	bp->bp_name = name;
 	bp->bp_rate = rate;
+	bp->bp_type = ptype;
 
 	return bp;
+}
+
+/*
+ * Link two probes together, to build a probe list attached to
+ * a single action.
+ */
+struct bt_probe *
+bp_append(struct bt_probe *bp0, struct bt_probe *bp1)
+{
+	struct bt_probe *bp = bp0;
+
+	assert(bp1 != NULL);
+
+	if (bp0 == NULL)
+		return bp1;
+
+	while (SLIST_NEXT(bp, bp_next) != NULL)
+		bp = SLIST_NEXT(bp, bp_next);
+
+	SLIST_INSERT_AFTER(bp, bp1, bp_next);
+
+	return bp0;
 }
 
 /* Create a new argument */
@@ -478,13 +539,7 @@ bg_get(const char *vname)
 struct bt_arg *
 bg_find(const char *vname)
 {
-	struct bt_var *bv;
-
-	bv = bg_lookup(vname);
-	if (bv == NULL)
-		yyerror("variable '%s' accessed before being set", vname);
-
-	return ba_new(bv, B_AT_VAR);
+	return ba_new(bg_get(vname), B_AT_VAR);
 }
 
 /* Create a 'store' statement to assign a value to a global variable. */
@@ -560,14 +615,9 @@ bm_insert(const char *mname, struct bt_arg *mkey, struct bt_arg *mval)
 struct bt_arg *
 bm_find(const char *vname, struct bt_arg *mkey)
 {
-	struct bt_var *bv;
 	struct bt_arg *ba;
 
-	bv = bg_lookup(vname);
-	if (bv == NULL)
-		yyerror("variable '%s' accessed before being set", vname);
-
-	ba = ba_new(bv, B_AT_MAP);
+	ba = ba_new(bg_get(vname), B_AT_MAP);
 	ba->ba_key = mkey;
 	return ba;
 }
@@ -638,8 +688,8 @@ struct keyword *
 lookup(char *s)
 {
 	static const struct keyword kws[] = {
-		{ "BEGIN",	BEGIN,		B_RT_BEGIN },
-		{ "END",	END,		B_RT_END },
+		{ "BEGIN",	BEGIN,		B_PT_BEGIN },
+		{ "END",	END,		B_PT_END },
 		{ "arg0",	BUILTIN,	B_AT_BI_ARG0 },
 		{ "arg1",	BUILTIN,	B_AT_BI_ARG1 },
 		{ "arg2",	BUILTIN,	B_AT_BI_ARG2 },
@@ -650,7 +700,7 @@ lookup(char *s)
 		{ "arg7",	BUILTIN,	B_AT_BI_ARG7 },
 		{ "arg8",	BUILTIN,	B_AT_BI_ARG8 },
 		{ "arg9",	BUILTIN,	B_AT_BI_ARG9 },
-		{ "clear",	FUNC1,		B_AC_CLEAR },
+		{ "clear",	MFUNC,		B_AC_CLEAR },
 		{ "comm",	BUILTIN,	B_AT_BI_COMM },
 		{ "count",	MOP0, 		B_AT_MF_COUNT },
 		{ "cpu",	BUILTIN,	B_AT_BI_CPU },
@@ -668,11 +718,12 @@ lookup(char *s)
 		{ "print",	F_PRINT,	B_AC_PRINT },
 		{ "printf",	FUNCN,		B_AC_PRINTF },
 		{ "retval",	BUILTIN,	B_AT_BI_RETVAL },
+		{ "str",	STR,		B_AT_FN_STR },
 		{ "sum",	MOP1,		B_AT_MF_SUM },
 		{ "tid",	BUILTIN,	B_AT_BI_TID },
 		{ "time",	FUNC1,		B_AC_TIME },
 		{ "ustack",	BUILTIN,	B_AT_BI_USTACK },
-		{ "zero",	FUNC1,		B_AC_ZERO },
+		{ "zero",	MFUNC,		B_AC_ZERO },
 	};
 
 	return bsearch(s, kws, nitems(kws), sizeof(kws[0]), kw_cmp);
@@ -971,8 +1022,10 @@ btparse(const char *str, size_t len, const char *filename, int debug)
 	yylval.lineno = 1;
 
 	yyparse();
+	if (perrors)
+		return perrors;
 
 	assert(SLIST_EMPTY(&l_variables));
 
-	return perrors;
+	return 0;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl.h,v 1.196 2021/06/30 18:07:50 jsing Exp $ */
+/* $OpenBSD: ssl.h,v 1.210 2021/10/15 16:48:46 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -357,7 +357,6 @@ extern "C" {
  * in SSL_CTX. */
 typedef struct ssl_st *ssl_crock_st;
 
-typedef struct tls_session_ticket_ext_st TLS_SESSION_TICKET_EXT;
 typedef struct ssl_method_st SSL_METHOD;
 typedef struct ssl_cipher_st SSL_CIPHER;
 typedef struct ssl_session_st SSL_SESSION;
@@ -535,57 +534,10 @@ typedef int (*GEN_SESSION_CB)(const SSL *ssl, unsigned char *id,
 typedef struct ssl_comp_st SSL_COMP;
 
 #ifdef LIBRESSL_INTERNAL
-
-struct ssl_comp_st {
-	int id;
-	const char *name;
-};
-
 DECLARE_STACK_OF(SSL_COMP)
 struct lhash_st_SSL_SESSION {
 	int dummy;
 };
-
-struct ssl_ctx_internal_st;
-
-struct ssl_ctx_st {
-	const SSL_METHOD *method;
-
-	STACK_OF(SSL_CIPHER) *cipher_list;
-
-	struct x509_store_st /* X509_STORE */ *cert_store;
-
-	/* If timeout is not 0, it is the default timeout value set
-	 * when SSL_new() is called.  This has been put in to make
-	 * life easier to set things up */
-	long session_timeout;
-
-	int references;
-
-	/* Default values to use in SSL structures follow (these are copied by SSL_new) */
-
-	STACK_OF(X509) *extra_certs;
-
-	int verify_mode;
-	unsigned int sid_ctx_length;
-	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
-
-	X509_VERIFY_PARAM *param;
-
-	/*
-	 * XXX
-	 * default_passwd_cb used by python and openvpn, need to keep it until we
-	 * add an accessor
-	 */
-	/* Default password callback. */
-	pem_password_cb *default_passwd_callback;
-
-	/* Default password callback user data. */
-	void *default_passwd_callback_userdata;
-
-	struct ssl_ctx_internal_st *internal;
-};
-
 #endif
 
 #define SSL_SESS_CACHE_OFF			0x0000
@@ -681,6 +633,12 @@ void SSL_CTX_set_alpn_select_cb(SSL_CTX *ctx,
 void SSL_get0_alpn_selected(const SSL *ssl, const unsigned char **data,
     unsigned int *len);
 
+#if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
+typedef int (*SSL_psk_use_session_cb_func)(SSL *ssl, const EVP_MD *md,
+    const unsigned char **id, size_t *idlen, SSL_SESSION **sess);
+void SSL_set_psk_use_session_callback(SSL *s, SSL_psk_use_session_cb_func cb);
+#endif
+
 #define SSL_NOTHING	1
 #define SSL_WRITING	2
 #define SSL_READING	3
@@ -694,85 +652,6 @@ void SSL_get0_alpn_selected(const SSL *ssl, const unsigned char **data,
 
 #define SSL_MAC_FLAG_READ_MAC_STREAM 1
 #define SSL_MAC_FLAG_WRITE_MAC_STREAM 2
-
-#ifndef OPENSSL_NO_SSL_INTERN
-struct ssl_internal_st;
-
-struct ssl_st {
-	/* protocol version
-	 * (one of SSL2_VERSION, SSL3_VERSION, TLS1_VERSION, DTLS1_VERSION)
-	 */
-	int version;
-
-	const SSL_METHOD *method; /* SSLv3 */
-
-	/* There are 2 BIO's even though they are normally both the
-	 * same.  This is so data can be read and written to different
-	 * handlers */
-
-	BIO *rbio; /* used by SSL_read */
-	BIO *wbio; /* used by SSL_write */
-	BIO *bbio; /* used during session-id reuse to concatenate
-		    * messages */
-	int server;	/* are we the server side? - mostly used by SSL_clear*/
-
-	struct ssl3_state_st *s3; /* SSLv3 variables */
-	struct dtls1_state_st *d1; /* DTLSv1 variables */
-
-	X509_VERIFY_PARAM *param;
-
-	/* crypto */
-	STACK_OF(SSL_CIPHER) *cipher_list;
-
-	/* This is used to hold the server certificate used */
-	struct cert_st /* CERT */ *cert;
-
-	/* the session_id_context is used to ensure sessions are only reused
-	 * in the appropriate context */
-	unsigned int sid_ctx_length;
-	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
-
-	/* This can also be in the session once a session is established */
-	SSL_SESSION *session;
-
-	/* Used in SSL2 and SSL3 */
-	int verify_mode;	/* 0 don't care about verify failure.
-				 * 1 fail if verify fails */
-	int error;		/* error bytes to be written */
-	int error_code;		/* actual code */
-
-	SSL_CTX *ctx;
-
-	long verify_result;
-
-	int references;
-
-	int client_version;	/* what was passed, used for
-				 * SSLv3/TLS rollback check */
-
-	unsigned int max_send_fragment;
-
-	char *tlsext_hostname;
-
-	/* certificate status request info */
-	/* Status type or -1 if no status type */
-	int tlsext_status_type;
-
-	SSL_CTX * initial_ctx; /* initial ctx, used to store sessions */
-#define session_ctx initial_ctx
-
-	/*
-	 * XXX really should be internal, but is
-	 * touched unnaturally by wpa-supplicant
-	 * and freeradius and other perversions
-	 */
-	EVP_CIPHER_CTX *enc_read_ctx;		/* cryptographic state */
-	EVP_MD_CTX *read_hash;			/* used for mac generation */
-
-	struct ssl_internal_st *internal;
-};
-
-#endif
 
 #ifdef __cplusplus
 }
@@ -853,6 +732,13 @@ size_t SSL_get_peer_finished(const SSL *s, void *buf, size_t count);
 #define SSL_VERIFY_PEER			0x01
 #define SSL_VERIFY_FAIL_IF_NO_PEER_CERT	0x02
 #define SSL_VERIFY_CLIENT_ONCE		0x04
+#if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
+#define SSL_VERIFY_POST_HANDSHAKE	0x08
+
+int SSL_verify_client_post_handshake(SSL *s);
+void SSL_CTX_set_post_handshake_auth(SSL_CTX *ctx, int val);
+void SSL_set_post_handshake_auth(SSL *s, int val);
+#endif
 
 #define OpenSSL_add_ssl_algorithms()	SSL_library_init()
 #define SSLeay_add_ssl_algorithms()	SSL_library_init()
@@ -1000,6 +886,7 @@ int PEM_write_SSL_SESSION(FILE *fp, SSL_SESSION *x);
 #define SSL_CTRL_SET_TLSEXT_STATUS_REQ_CB	63
 #define SSL_CTRL_GET_TLSEXT_STATUS_REQ_CB_ARG	129
 #define SSL_CTRL_SET_TLSEXT_STATUS_REQ_CB_ARG	64
+#define SSL_CTRL_GET_TLSEXT_STATUS_REQ_TYPE	127
 #define SSL_CTRL_SET_TLSEXT_STATUS_REQ_TYPE	65
 #define SSL_CTRL_GET_TLSEXT_STATUS_REQ_EXTS	66
 #define SSL_CTRL_SET_TLSEXT_STATUS_REQ_EXTS	67
@@ -1224,6 +1111,7 @@ long SSL_CTX_get_timeout(const SSL_CTX *ctx);
 X509_STORE *SSL_CTX_get_cert_store(const SSL_CTX *);
 void SSL_CTX_set_cert_store(SSL_CTX *, X509_STORE *);
 X509 *SSL_CTX_get0_certificate(const SSL_CTX *ctx);
+EVP_PKEY *SSL_CTX_get0_privatekey(const SSL_CTX *ctx);
 int SSL_want(const SSL *s);
 int	SSL_clear(SSL *s);
 
@@ -1256,6 +1144,7 @@ int	SSL_set_rfd(SSL *s, int fd);
 int	SSL_set_wfd(SSL *s, int fd);
 void	SSL_set_bio(SSL *s, BIO *rbio, BIO *wbio);
 BIO *	SSL_get_rbio(const SSL *s);
+void	SSL_set0_rbio(SSL *s, BIO *rbio);
 BIO *	SSL_get_wbio(const SSL *s);
 int	SSL_set_cipher_list(SSL *s, const char *str);
 #if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
@@ -1309,6 +1198,9 @@ int	SSL_SESSION_set1_id(SSL_SESSION *s, const unsigned char *sid,
 	    unsigned int sid_len);
 int	SSL_SESSION_set1_id_context(SSL_SESSION *s,
 	    const unsigned char *sid_ctx, unsigned int sid_ctx_len);
+#if defined(LIBRESSL_HAS_TLS1_3) || defined(LIBRESSL_INTERNAL)
+int SSL_SESSION_is_resumable(const SSL_SESSION *s);
+#endif
 
 SSL_SESSION *SSL_SESSION_new(void);
 void	SSL_SESSION_free(SSL_SESSION *ses);
@@ -1970,6 +1862,7 @@ void ERR_load_SSL_strings(void);
 #define SSL_R_MISSING_VERIFY_MESSAGE			 174
 #define SSL_R_MULTIPLE_SGC_RESTARTS			 346
 #define SSL_R_NON_SSLV2_INITIAL_PACKET			 175
+#define SSL_R_NO_APPLICATION_PROTOCOL			 235
 #define SSL_R_NO_CERTIFICATES_RETURNED			 176
 #define SSL_R_NO_CERTIFICATE_ASSIGNED			 177
 #define SSL_R_NO_CERTIFICATE_RETURNED			 178

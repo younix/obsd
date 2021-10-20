@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.179 2021/07/27 17:13:03 mvs Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.184 2021/10/13 22:49:11 bluhm Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -166,6 +166,7 @@ ipsec_init(void)
 	strlcpy(ipsec_def_auth, IPSEC_DEFAULT_DEF_AUTH, sizeof(ipsec_def_auth));
 	strlcpy(ipsec_def_comp, IPSEC_DEFAULT_DEF_COMP, sizeof(ipsec_def_comp));
 
+	ipsp_init();
 }
 
 /*
@@ -199,15 +200,8 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto,
 
 	NET_ASSERT_LOCKED();
 
-	ipsecstat_inc(ipsec_ipackets);
-	ipsecstat_add(ipsec_ibytes, m->m_pkthdr.len);
+	ipsecstat_pkt(ipsec_ipackets, ipsec_ibytes, m->m_pkthdr.len);
 	IPSEC_ISTAT(esps_input, ahs_input, ipcomps_input);
-
-	if (m == NULL) {
-		DPRINTF("NULL packet received");
-		IPSEC_ISTAT(esps_hdrops, ahs_hdrops, ipcomps_hdrops);
-		return EINVAL;
-	}
 
 	if ((sproto == IPPROTO_IPCOMP) && (m->m_flags & M_COMP)) {
 		DPRINTF("repeated decompression");
@@ -401,11 +395,7 @@ ipsec_input_cb(struct cryptop *crp)
 			/* Reset the session ID */
 			if (tdb->tdb_cryptoid != 0)
 				tdb->tdb_cryptoid = crp->crp_sid;
-			error = crypto_dispatch(crp);
-			if (error) {
-				DPRINTF("crypto dispatch error %d", error);
-				goto drop;
-			}
+			crypto_dispatch(crp);
 			return;
 		}
 		DPRINTF("crypto error %d", crp->crp_etype);
@@ -479,13 +469,6 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 	sproto = tdbp->tdb_sproto;
 
 	tdbp->tdb_last_used = gettime();
-
-	/* Sanity check */
-	if (m == NULL) {
-		/* The called routine will print a message if necessary */
-		IPSEC_ISTAT(esps_badkcr, ahs_badkcr, ipcomps_badkcr);
-		return -1;
-	}
 
 	/* Fix IPv4 header */
 	if (af == AF_INET) {
@@ -949,6 +932,29 @@ ipcomp4_input(struct mbuf **mp, int *offp, int proto, int af)
 }
 
 void
+ipsec_set_mtu(struct tdb *tdbp, u_int32_t mtu)
+{
+	ssize_t adjust;
+
+	NET_ASSERT_LOCKED();
+
+	/* Walk the chain backwards to the first tdb */
+	for (; tdbp != NULL; tdbp = tdbp->tdb_inext) {
+		if (tdbp->tdb_flags & TDBF_INVALID ||
+		    (adjust = ipsec_hdrsz(tdbp)) == -1)
+			return;
+
+		mtu -= adjust;
+
+		/* Store adjusted MTU in tdb */
+		tdbp->tdb_mtu = mtu;
+		tdbp->tdb_mtutimeout = gettime() + ip_mtudisc_timeout;
+		DPRINTF("spi %08x mtu %d adjust %ld",
+		    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu, adjust);
+	}
+}
+
+void
 ipsec_common_ctlinput(u_int rdomain, int cmd, struct sockaddr *sa,
     void *v, int proto)
 {
@@ -960,7 +966,6 @@ ipsec_common_ctlinput(u_int rdomain, int cmd, struct sockaddr *sa,
 		struct icmp *icp;
 		int hlen = ip->ip_hl << 2;
 		u_int32_t spi, mtu;
-		ssize_t adjust;
 
 		/* Find the right MTU. */
 		icp = (struct icmp *)((caddr_t) ip -
@@ -983,25 +988,7 @@ ipsec_common_ctlinput(u_int rdomain, int cmd, struct sockaddr *sa,
 
 		tdbp = gettdb_rev(rdomain, spi, (union sockaddr_union *)&dst,
 		    proto);
-		if (tdbp == NULL || tdbp->tdb_flags & TDBF_INVALID)
-			return;
-
-		/* Walk the chain backwards to the first tdb */
-		NET_ASSERT_LOCKED();
-		for (; tdbp; tdbp = tdbp->tdb_inext) {
-			if (tdbp->tdb_flags & TDBF_INVALID ||
-			    (adjust = ipsec_hdrsz(tdbp)) == -1)
-				return;
-
-			mtu -= adjust;
-
-			/* Store adjusted MTU in tdb */
-			tdbp->tdb_mtu = mtu;
-			tdbp->tdb_mtutimeout = gettime() +
-			    ip_mtudisc_timeout;
-			DPRINTF("spi %08x mtu %d adjust %ld",
-			    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu, adjust);
-		}
+		ipsec_set_mtu(tdbp, mtu);
 	}
 }
 
@@ -1012,7 +999,6 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 	struct tdb *tdbp;
 	struct icmp *icp;
 	u_int32_t mtu;
-	ssize_t adjust;
 	struct sockaddr_in dst, src;
 	union sockaddr_union *su_dst, *su_src;
 
@@ -1048,15 +1034,7 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 		    TDBF_UDPENCAP) &&
 		    !memcmp(&tdbp->tdb_dst, &dst, su_dst->sa.sa_len) &&
 		    !memcmp(&tdbp->tdb_src, &src, su_src->sa.sa_len)) {
-			if ((adjust = ipsec_hdrsz(tdbp)) != -1) {
-				/* Store adjusted MTU in tdb */
-				tdbp->tdb_mtu = mtu - adjust;
-				tdbp->tdb_mtutimeout = gettime() +
-				    ip_mtudisc_timeout;
-				DPRINTF("spi %08x mtu %d adjust %ld",
-				    ntohl(tdbp->tdb_spi), tdbp->tdb_mtu,
-				    adjust);
-			}
+			ipsec_set_mtu(tdbp, mtu);
 		}
 	}
 }

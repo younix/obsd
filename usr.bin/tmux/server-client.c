@@ -1,4 +1,4 @@
-/* $OpenBSD: server-client.c,v 1.386 2021/08/27 17:25:55 nicm Exp $ */
+/* $OpenBSD: server-client.c,v 1.388 2021/10/11 13:27:50 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -145,6 +145,54 @@ server_client_clear_overlay(struct client *c)
 
 	c->tty.flags &= ~(TTY_FREEZE|TTY_NOCURSOR);
 	server_redraw_client(c);
+}
+
+/*
+ * Given overlay position and dimensions, return parts of the input range which
+ * are visible.
+ */
+void
+server_client_overlay_range(u_int x, u_int y, u_int sx, u_int sy, u_int px,
+    u_int py, u_int nx, struct overlay_ranges *r)
+{
+	u_int	ox, onx;
+
+	/* Return up to 2 ranges. */
+	r->px[2] = 0;
+	r->nx[2] = 0;
+
+	/* Trivial case of no overlap in the y direction. */
+	if (py < y || py > y + sy - 1) {
+		r->px[0] = px;
+		r->nx[0] = nx;
+		r->px[1] = 0;
+		r->nx[1] = 0;
+		return;
+	}
+
+	/* Visible bit to the left of the popup. */
+	if (px < x) {
+		r->px[0] = px;
+		r->nx[0] = x - px;
+		if (r->nx[0] > nx)
+			r->nx[0] = nx;
+	} else {
+		r->px[0] = 0;
+		r->nx[0] = 0;
+	}
+
+	/* Visible bit to the right of the popup. */
+	ox = x + sx;
+	if (px > ox)
+		ox = px;
+	onx = px + nx;
+	if (onx > ox) {
+		r->px[1] = ox;
+		r->nx[1] = onx - ox;
+	} else {
+		r->px[1] = 0;
+		r->nx[1] = 0;
+	}
 }
 
 /* Check if this client is inside this server. */
@@ -321,11 +369,11 @@ server_client_set_session(struct client *c, struct session *s)
 		c->last_session = NULL;
 	c->session = s;
 	c->flags |= CLIENT_FOCUSED;
-	recalculate_sizes();
 
 	if (old != NULL && old->curw != NULL)
 		window_update_focus(old->curw->window);
 	if (s != NULL) {
+		recalculate_sizes();
 		window_update_focus(s->curw->window);
 		session_update_activity(s, NULL);
 		gettimeofday(&s->last_attached_time, NULL);
@@ -2057,6 +2105,7 @@ server_client_dispatch(struct imsg *imsg, void *arg)
 		if (datalen != 0)
 			fatalx("bad MSG_EXITING size");
 		server_client_set_session(c, NULL);
+		recalculate_sizes();
 		tty_close(&c->tty);
 		proc_send(c->peer, MSG_EXITED, -1, NULL, 0);
 		break;

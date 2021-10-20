@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_object.h,v 1.26 2021/06/16 09:02:21 mpi Exp $	*/
+/*	$OpenBSD: uvm_object.h,v 1.28 2021/10/12 18:16:51 kettenis Exp $	*/
 /*	$NetBSD: uvm_object.h,v 1.11 2001/03/09 01:02:12 chs Exp $	*/
 
 /*
@@ -74,6 +74,8 @@ struct uvm_object {
 
 extern const struct uvm_pagerops uvm_vnodeops;
 extern const struct uvm_pagerops uvm_deviceops;
+extern const struct uvm_pagerops pmap_pager;
+extern const struct uvm_pagerops bufcache_pager;
 
 /* For object trees */
 int	uvm_pagecmp(const struct vm_page *, const struct vm_page *);
@@ -92,7 +94,14 @@ RBT_PROTOTYPE(uvm_objtree, vm_page, objt, uvm_pagecmp)
 #define	UVM_OBJ_IS_AOBJ(uobj)						\
 	((uobj)->pgops == &aobj_pager)
 
+#define UVM_OBJ_IS_PMAP(uobj)						\
+	((uobj)->pgops == &pmap_pager)
+
+#define UVM_OBJ_IS_BUFCACHE(uobj)					\
+	((uobj)->pgops == &bufcache_pager)
+
 void	uvm_obj_init(struct uvm_object *, const struct uvm_pagerops *, int);
+void	uvm_obj_destroy(struct uvm_object *);
 int	uvm_obj_wire(struct uvm_object *, voff_t, voff_t, struct pglist *);
 void	uvm_obj_unwire(struct uvm_object *, voff_t, voff_t);
 void	uvm_obj_free(struct uvm_object *);

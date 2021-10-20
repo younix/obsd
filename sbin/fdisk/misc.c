@@ -1,4 +1,4 @@
-/*	$OpenBSD: misc.c,v 1.82 2021/08/28 11:55:17 krw Exp $	*/
+/*	$OpenBSD: misc.c,v 1.86 2021/09/13 15:07:51 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -30,33 +30,35 @@
 #include "disk.h"
 #include "misc.h"
 
-struct unit_type	unit_types[] = {
+const struct unit_type	unit_types[] = {
 	{ "b"	, 1LL				, "Bytes"	},
 	{ " "	, 0LL				, "Sectors"	},
 	{ "K"	, 1024LL			, "Kilobytes"	},
 	{ "M"	, 1024LL * 1024			, "Megabytes"	},
 	{ "G"	, 1024LL * 1024 *1024		, "Gigabytes"	},
 	{ "T"	, 1024LL * 1024 * 1024 * 1024	, "Terabytes"	},
-	{ NULL	, 0				, NULL		},
 };
+#define	SECTORS		1
 
-int
-unit_lookup(const char *units)
+double
+units_size(const char *units, const uint64_t sectors,
+    const struct unit_type **ut)
 {
-	int			i = 0;
+	double			size;
+	unsigned int		i;
 
-	if (units == NULL)
-		return SECTORS;
+	*ut = &unit_types[SECTORS];
+	size = sectors;
 
-	while (unit_types[i].ut_abbr != NULL) {
+	for (i = 0; i < nitems(unit_types); i++) {
 		if (strncasecmp(unit_types[i].ut_abbr, units, 1) == 0)
-			break;
-		i++;
+			*ut = &unit_types[i];
 	}
-	if (unit_types[i].ut_abbr == NULL)
-		return SECTORS;
 
-	return i;
+	if ((*ut)->ut_conversion == 0)
+		return size;
+	else
+		return (size * dl.d_secsize) / (*ut)->ut_conversion;
 }
 
 void
@@ -117,7 +119,7 @@ getuint64(const char *prompt, uint64_t oval, const uint64_t minval,
     const uint64_t maxval)
 {
 	char			buf[BUFSIZ], *endptr, *p, operator = '\0';
-	const int		secsize = unit_types[SECTORS].ut_conversion;
+	const int		secsize = dl.d_secsize;
 	size_t			n;
 	int64_t			mult = 1;
 	double			d, d2;

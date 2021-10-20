@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_synch.c,v 1.177 2021/03/04 09:02:37 mpi Exp $	*/
+/*	$OpenBSD: kern_synch.c,v 1.180 2021/10/07 08:51:00 mpi Exp $	*/
 /*	$NetBSD: kern_synch.c,v 1.37 1996/04/22 01:38:37 christos Exp $	*/
 
 /*
@@ -537,7 +537,8 @@ unsleep(struct proc *p)
 	if (p->p_wchan != NULL) {
 		TAILQ_REMOVE(&slpque[LOOKUP(p->p_wchan)], p, p_runq);
 		p->p_wchan = NULL;
-		TRACEPOINT(sched, wakeup, p->p_tid, p->p_p->ps_pid);
+		TRACEPOINT(sched, wakeup, p->p_tid + THREAD_PID_OFFSET,
+		    p->p_p->ps_pid);
 	}
 }
 
@@ -556,16 +557,13 @@ wakeup_n(const volatile void *ident, int n)
 	qp = &slpque[LOOKUP(ident)];
 	for (p = TAILQ_FIRST(qp); p != NULL && n != 0; p = pnext) {
 		pnext = TAILQ_NEXT(p, p_runq);
-#ifdef DIAGNOSTIC
 		/*
-		 * If the rwlock passed to rwsleep() is contended, the
-		 * CPU will end up calling wakeup() between sleep_setup()
-		 * and sleep_finish().
+		 * This happens if wakeup(9) is called after enqueuing
+		 * itself on the sleep queue and both `ident' collide.
 		 */
-		if (p == curproc) {
-			KASSERT(p->p_stat == SONPROC);
+		if (p == curproc)
 			continue;
-		}
+#ifdef DIAGNOSTIC
 		if (p->p_stat != SSLEEP && p->p_stat != SSTOP)
 			panic("wakeup: p_stat is %d", (int)p->p_stat);
 #endif

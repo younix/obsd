@@ -1,6 +1,5 @@
 /Makefile/1.1/Fri Feb  1 05:27:37 2019//
 /Symbols.map/1.1/Fri Feb  1 05:27:37 2019//
-/_elftc.h/1.1/Fri Feb  1 05:27:37 2019//
 /_libelf.h/1.3/Mon May 18 06:46:23 2020//
 /_libelf_ar.h/1.1/Fri Feb  1 05:27:37 2019//
 /_libelf_config.h/1.2/Mon May 18 06:46:23 2020//
@@ -54,10 +53,8 @@
 /elf_shnum.c/1.1/Fri Feb  1 05:27:37 2019//
 /elf_shstrndx.c/1.1/Fri Feb  1 05:27:37 2019//
 /elf_strptr.3/1.1/Fri Feb  1 05:27:37 2019//
-/elf_strptr.c/1.1/Fri Feb  1 05:27:37 2019//
 /elf_types.m4/1.1/Fri Feb  1 05:27:37 2019//
 /elf_update.3/1.2/Mon May 18 06:46:23 2020//
-/elf_update.c/1.3/Mon May 18 06:46:23 2020//
 /elf_version.3/1.1/Fri Feb  1 05:27:37 2019//
 /elf_version.c/1.1/Fri Feb  1 05:27:37 2019//
 /gelf.h/1.1/Fri Feb  1 05:27:37 2019//
@@ -116,4 +113,7 @@
 /shlib_version/1.2/Sun Dec  1 13:14:39 2019//
 /elf.3/1.7/Sat May  1 08:41:50 2021//
 /gelf.3/1.4/Sat May  1 08:41:50 2021//
+/_elftc.h/1.2/Tue Sep 14 08:17:18 2021//
+/elf_strptr.c/1.2/Tue Sep 14 08:17:18 2021//
+/elf_update.c/1.4/Tue Sep 14 08:17:18 2021//
 D

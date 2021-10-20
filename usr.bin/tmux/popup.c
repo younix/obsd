@@ -1,4 +1,4 @@
-/* $OpenBSD: popup.c,v 1.34 2021/08/17 08:22:44 nicm Exp $ */
+/* $OpenBSD: popup.c,v 1.40 2021/10/20 09:52:27 nicm Exp $ */
 
 /*
  * Copyright (c) 2020 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -31,6 +31,8 @@ struct popup_data {
 	struct client		 *c;
 	struct cmdq_item	 *item;
 	int			  flags;
+	enum box_lines		  lines;
+	char			 *title;
 
 	struct screen		  s;
 	struct colour_palette	  palette;
@@ -117,7 +119,7 @@ popup_set_client_cb(struct tty_ctx *ttyctx, struct client *c)
 	ttyctx->wsx = c->tty.sx;
 	ttyctx->wsy = c->tty.sy;
 
-	if (pd->flags & POPUP_NOBORDER) {
+	if (pd->lines == BOX_LINES_NONE) {
 		ttyctx->xoff = ttyctx->rxoff = pd->px;
 		ttyctx->yoff = ttyctx->ryoff = pd->py;
 	} else {
@@ -147,7 +149,7 @@ popup_mode_cb(__unused struct client *c, void *data, u_int *cx, u_int *cy)
 	if (pd->md != NULL)
 		return (menu_mode_cb(c, pd->md, cx, cy));
 
-	if (pd->flags & POPUP_NOBORDER) {
+	if (pd->lines == BOX_LINES_NONE) {
 		*cx = pd->px + pd->s.cx;
 		*cy = pd->py + pd->s.cy;
 	} else {
@@ -157,18 +159,49 @@ popup_mode_cb(__unused struct client *c, void *data, u_int *cx, u_int *cy)
 	return (&pd->s);
 }
 
-static int
-popup_check_cb(struct client *c, void *data, u_int px, u_int py)
+/* Return parts of the input range which are not obstructed by the popup. */
+static void
+popup_check_cb(struct client* c, void *data, u_int px, u_int py, u_int nx,
+    struct overlay_ranges *r)
 {
 	struct popup_data	*pd = data;
+	struct overlay_ranges	 or[2];
+	u_int			 i, j, k = 0;
 
-	if (pd->md != NULL && menu_check_cb(c, pd->md, px, py) == 0)
-		return (0);
-	if (px < pd->px || px > pd->px + pd->sx - 1)
-		return (1);
-	if (py < pd->py || py > pd->py + pd->sy - 1)
-		return (1);
-	return (0);
+	if (pd->md != NULL) {
+		/* Check each returned range for the menu against the popup. */
+		menu_check_cb(c, pd->md, px, py, nx, r);
+		for (i = 0; i < 2; i++) {
+			server_client_overlay_range(pd->px, pd->py, pd->sx,
+			    pd->sy, r->px[i], py, r->nx[i], &or[i]);
+		}
+
+		/*
+		 * or has up to OVERLAY_MAX_RANGES non-overlapping ranges,
+		 * ordered from left to right. Collect them in the output.
+		 */
+		for (i = 0; i < 2; i++) {
+			/* Each or[i] only has 2 ranges. */
+			for (j = 0; j < 2; j++) {
+				if (or[i].nx[j] > 0) {
+					r->px[k] = or[i].px[j];
+					r->nx[k] = or[i].nx[j];
+					k++;
+				}
+			}
+		}
+
+		/* Zero remaining ranges if any. */
+		for (i = k; i < OVERLAY_MAX_RANGES; i++) {
+			r->px[i] = 0;
+			r->nx[i] = 0;
+		}
+
+		return;
+	}
+
+	server_client_overlay_range(pd->px, pd->py, pd->sx, pd->sy, px, py, nx,
+	    r);
 }
 
 static void
@@ -181,16 +214,24 @@ popup_draw_cb(struct client *c, void *data, struct screen_redraw_ctx *rctx)
 	u_int			 i, px = pd->px, py = pd->py;
 	struct colour_palette	*palette = &pd->palette;
 	struct grid_cell	 gc;
+	struct grid_cell	 bgc;
+	struct options          *o = c->session->curw->window->options;
 
 	screen_init(&s, pd->sx, pd->sy, 0);
 	screen_write_start(&ctx, &s);
 	screen_write_clearscreen(&ctx, 8);
 
-	if (pd->flags & POPUP_NOBORDER) {
+	memcpy(&bgc, &grid_default_cell, sizeof bgc);
+	bgc.attr = 0;
+	style_apply(&bgc, o, "popup-border-style", NULL);
+	bgc.attr = 0;
+
+	if (pd->lines == BOX_LINES_NONE) {
 		screen_write_cursormove(&ctx, 0, 0, 0);
 		screen_write_fast_copy(&ctx, &pd->s, 0, 0, pd->sx, pd->sy);
 	} else if (pd->sx > 2 && pd->sy > 2) {
-		screen_write_box(&ctx, pd->sx, pd->sy);
+		screen_write_box(&ctx, pd->sx, pd->sy, pd->lines, &bgc,
+		    pd->title);
 		screen_write_cursormove(&ctx, 1, 1, 0);
 		screen_write_fast_copy(&ctx, &pd->s, 0, 0, pd->sx - 2,
 		    pd->sy - 2);
@@ -198,8 +239,10 @@ popup_draw_cb(struct client *c, void *data, struct screen_redraw_ctx *rctx)
 	screen_write_stop(&ctx);
 
 	memcpy(&gc, &grid_default_cell, sizeof gc);
-	gc.fg = pd->palette.fg;
-	gc.bg = pd->palette.bg;
+	style_apply(&gc, o, "popup-style", NULL);
+	gc.attr = 0;
+	palette->fg = gc.fg;
+	palette->bg = gc.bg;
 
 	if (pd->md != NULL) {
 		c->overlay_check = menu_check_cb;
@@ -246,6 +289,7 @@ popup_free_cb(struct client *c, void *data)
 	screen_free(&pd->s);
 	colour_palette_free(&pd->palette);
 
+	free(pd->title);
 	free(pd);
 }
 
@@ -279,7 +323,7 @@ popup_resize_cb(__unused struct client *c, void *data)
 		pd->px = pd->ppx;
 
 	/* Avoid zero size screens. */
-	if (pd->flags & POPUP_NOBORDER) {
+	if (pd->lines == BOX_LINES_NONE) {
 		screen_resize(&pd->s, pd->sx, pd->sy, 0);
 		if (pd->job != NULL)
 			job_resize(pd->job, pd->sx, pd->sy );
@@ -405,7 +449,7 @@ popup_handle_drag(struct client *c, struct popup_data *pd,
 		pd->ppy = py;
 		server_redraw_client(c);
 	} else if (pd->dragging == SIZE) {
-		if (pd->flags & POPUP_NOBORDER) {
+		if (pd->lines == BOX_LINES_NONE) {
 			if (m->x < pd->px + 1)
 				return;
 			if (m->y < pd->py + 1)
@@ -421,7 +465,7 @@ popup_handle_drag(struct client *c, struct popup_data *pd,
 		pd->psx = pd->sx;
 		pd->psy = pd->sy;
 
-		if (pd->flags & POPUP_NOBORDER) {
+		if (pd->lines == BOX_LINES_NONE) {
 			screen_resize(&pd->s, pd->sx, pd->sy, 0);
 			if (pd->job != NULL)
 				job_resize(pd->job, pd->sx, pd->sy);
@@ -469,7 +513,7 @@ popup_key_cb(struct client *c, void *data, struct key_event *event)
 				goto menu;
 			return (0);
 		}
-		if (~pd->flags & POPUP_NOBORDER) {
+		if (pd->lines != BOX_LINES_NONE) {
 			if (m->x == pd->px)
 				border = LEFT;
 			else if (m->x == pd->px + pd->sx - 1)
@@ -503,7 +547,7 @@ popup_key_cb(struct client *c, void *data, struct key_event *event)
 	if (pd->job != NULL) {
 		if (KEYC_IS_MOUSE(event->key)) {
 			/* Must be inside, checked already. */
-			if (pd->flags & POPUP_NOBORDER) {
+			if (pd->lines == BOX_LINES_NONE) {
 				px = m->x - pd->px;
 				py = m->y - pd->py;
 			} else {
@@ -589,14 +633,23 @@ popup_job_complete_cb(struct job *job)
 }
 
 int
-popup_display(int flags, struct cmdq_item *item, u_int px, u_int py, u_int sx,
-    u_int sy, const char *shellcmd, int argc, char **argv, const char *cwd,
-    struct client *c, struct session *s, popup_close_cb cb, void *arg)
+popup_display(int flags, enum box_lines lines, struct cmdq_item *item, u_int px,
+    u_int py, u_int sx, u_int sy, struct environ *env, const char *shellcmd,
+    int argc, char **argv, const char *cwd, const char *title, struct client *c,
+    struct session *s, popup_close_cb cb, void *arg)
 {
 	struct popup_data	*pd;
 	u_int			 jx, jy;
+	struct options		*o;
 
-	if (flags & POPUP_NOBORDER) {
+	if (lines == BOX_LINES_DEFAULT) {
+		if (s != NULL)
+			o = s->curw->window->options;
+		else
+			o = c->session->curw->window->options;
+		lines = options_get_number(o, "popup-border-lines");
+	}
+	if (lines == BOX_LINES_NONE) {
 		if (sx < 1 || sy < 1)
 			return (-1);
 		jx = sx;
@@ -613,6 +666,8 @@ popup_display(int flags, struct cmdq_item *item, u_int px, u_int py, u_int sx,
 	pd = xcalloc(1, sizeof *pd);
 	pd->item = item;
 	pd->flags = flags;
+	pd->lines = lines;
+	pd->title = xstrdup(title);
 
 	pd->c = c;
 	pd->c->references++;
@@ -635,7 +690,7 @@ popup_display(int flags, struct cmdq_item *item, u_int px, u_int py, u_int sx,
 	pd->psx = sx;
 	pd->psy = sy;
 
-	pd->job = job_run(shellcmd, argc, argv, s, cwd,
+	pd->job = job_run(shellcmd, argc, argv, env, s, cwd,
 	    popup_job_update_cb, popup_job_complete_cb, NULL, pd,
 	    JOB_NOWAIT|JOB_PTY|JOB_KEEPWRITE, jx, jy);
 	pd->ictx = input_init(NULL, job_get_event(pd->job), &pd->palette);
@@ -724,8 +779,9 @@ popup_editor(struct client *c, const char *buf, size_t len,
 	py = (c->tty.sy / 2) - (sy / 2);
 
 	xasprintf(&cmd, "%s %s", editor, path);
-	if (popup_display(POPUP_INTERNAL|POPUP_CLOSEEXIT, NULL, px, py, sx, sy,
-	    cmd, 0, NULL, _PATH_TMP, c, NULL, popup_editor_close_cb, pe) != 0) {
+	if (popup_display(POPUP_INTERNAL|POPUP_CLOSEEXIT, BOX_LINES_DEFAULT,
+	    NULL, px, py, sx, sy, NULL, cmd, 0, NULL, _PATH_TMP, NULL, c, NULL,
+	    popup_editor_close_cb, pe) != 0) {
 		popup_editor_free(pe);
 		free(cmd);
 		return (-1);

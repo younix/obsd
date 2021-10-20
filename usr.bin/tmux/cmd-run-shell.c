@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-run-shell.c,v 1.78 2021/08/25 08:51:55 nicm Exp $ */
+/* $OpenBSD: cmd-run-shell.c,v 1.82 2021/10/11 10:55:30 nicm Exp $ */
 
 /*
  * Copyright (c) 2009 Tiago Cunha <me@tiagocunha.org>
@@ -54,15 +54,15 @@ const struct cmd_entry cmd_run_shell_entry = {
 };
 
 struct cmd_run_shell_data {
-	struct client		*client;
-	char			*cmd;
-	struct cmd_list		*cmdlist;
-	char			*cwd;
-	struct cmdq_item	*item;
-	struct session		*s;
-	int			 wp_id;
-	struct event		 timer;
-	int			 flags;
+	struct client			*client;
+	char				*cmd;
+	struct args_command_state	*state;
+	char				*cwd;
+	struct cmdq_item		*item;
+	struct session			*s;
+	int				 wp_id;
+	struct event			 timer;
+	int				 flags;
 };
 
 static enum args_parse_type
@@ -132,9 +132,8 @@ cmd_run_shell_exec(struct cmd *self, struct cmdq_item *item)
 		if (cmd != NULL)
 			cdata->cmd = format_single_from_target(item, cmd);
 	} else {
-		cdata->cmdlist = args_make_commands_now(self, item, 0);
-		if (cdata->cmdlist == NULL)
-			return (CMD_RETURN_ERROR);
+		cdata->state = args_make_commands_prepare(self, item, 0, NULL,
+		    wait, 1);
 	}
 
 	if (args_has(args, 't') && wp != NULL)
@@ -179,24 +178,37 @@ cmd_run_shell_timer(__unused int fd, __unused short events, void* arg)
 	struct client			*c = cdata->client;
 	const char			*cmd = cdata->cmd;
 	struct cmdq_item		*item = cdata->item, *new_item;
+	struct cmd_list			*cmdlist;
+	char				*error;
 
-	if (cdata->cmdlist == NULL && cmd != NULL) {
-		if (job_run(cmd, 0, NULL, cdata->s, cdata->cwd, NULL,
+	if (cdata->state == NULL) {
+		if (cmd == NULL) {
+			if (cdata->item != NULL)
+				cmdq_continue(cdata->item);
+			cmd_run_shell_free(cdata);
+			return;
+		}
+		if (job_run(cmd, 0, NULL, NULL, cdata->s, cdata->cwd, NULL,
 		    cmd_run_shell_callback, cmd_run_shell_free, cdata,
 		    cdata->flags, -1, -1) == NULL)
 			cmd_run_shell_free(cdata);
 		return;
 	}
 
-	if (cdata->cmdlist != NULL) {
-		if (item == NULL) {
-			new_item = cmdq_get_command(cdata->cmdlist, NULL);
-			cmdq_append(c, new_item);
-		} else {
-			new_item = cmdq_get_command(cdata->cmdlist,
-			    cmdq_get_state(item));
-			cmdq_insert_after(item, new_item);
-		}
+	cmdlist = args_make_commands(cdata->state, 0, NULL, &error);
+	if (cmdlist == NULL) {
+		if (cdata->item == NULL) {
+			*error = toupper((u_char)*error);
+			status_message_set(c, -1, 1, 0, "%s", error);
+		} else
+			cmdq_error(cdata->item, "%s", error);
+		free(error);
+	} else if (item == NULL) {
+		new_item = cmdq_get_command(cmdlist, NULL);
+		cmdq_append(c, new_item);
+	} else {
+		new_item = cmdq_get_command(cmdlist, cmdq_get_state(item));
+		cmdq_insert_after(item, new_item);
 	}
 
 	if (cdata->item != NULL)
@@ -264,8 +276,8 @@ cmd_run_shell_free(void *data)
 		session_remove_ref(cdata->s, __func__);
 	if (cdata->client != NULL)
 		server_client_unref(cdata->client);
-	if (cdata->cmdlist != NULL)
-		cmd_list_free(cdata->cmdlist);
+	if (cdata->state != NULL)
+		args_make_commands_free(cdata->state);
 	free(cdata->cwd);
 	free(cdata->cmd);
 	free(cdata);

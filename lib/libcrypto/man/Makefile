@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile,v 1.190 2021/08/06 21:50:54 schwarze Exp $
+# $OpenBSD: Makefile,v 1.195 2021/10/20 13:14:00 schwarze Exp $
 
 .include <bsd.own.mk>
 
@@ -17,6 +17,7 @@ MAN=	\
 	ASN1_get_object.3 \
 	ASN1_item_d2i.3 \
 	ASN1_item_new.3 \
+	ASN1_mbstring_copy.3 \
 	ASN1_parse_dump.3 \
 	ASN1_put_object.3 \
 	ASN1_time_parse.3 \
@@ -276,6 +277,7 @@ MAN=	\
 	X25519.3 \
 	X509V3_get_d2i.3 \
 	X509_ALGOR_dup.3 \
+	X509_ATTRIBUTE_get0_object.3 \
 	X509_ATTRIBUTE_new.3 \
 	X509_CINF_new.3 \
 	X509_CRL_get0_by_serial.3 \
@@ -292,6 +294,7 @@ MAN=	\
 	X509_NAME_new.3 \
 	X509_NAME_print_ex.3 \
 	X509_OBJECT_get0_X509.3 \
+	X509_PKEY_new.3 \
 	X509_PUBKEY_new.3 \
 	X509_PURPOSE_set.3 \
 	X509_REQ_new.3 \
@@ -308,6 +311,7 @@ MAN=	\
 	X509_STORE_set_verify_cb_func.3 \
 	X509_STORE_set1_param.3 \
 	X509_TRUST_set.3 \
+	X509_VERIFY_PARAM_new.3 \
 	X509_VERIFY_PARAM_set_flags.3 \
 	X509_add1_trust_object.3 \
 	X509_check_ca.3 \
@@ -321,6 +325,7 @@ MAN=	\
 	X509_digest.3 \
 	X509_find_by_subject.3 \
 	X509_get_pubkey.3 \
+	X509_get_pubkey_parameters.3 \
 	X509_get_serialNumber.3 \
 	X509_get_subject_name.3 \
 	X509_get_version.3 \

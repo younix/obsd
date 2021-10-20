@@ -37,6 +37,6 @@
 /vmparam.h/1.20/Sun Nov  1 20:10:00 2015//
 /trap.h/1.12/Sat May  1 08:41:51 2021//
 /atomic.h/1.15/Wed Sep  1 16:07:38 2021//
-/cpu.h/1.70/Wed Sep  1 16:07:38 2021//
-/db_machdep.h/1.20/Thu Sep  2 08:41:58 2021//
+/cpu.h/1.70/Thu Sep  2 14:22:31 2021//
+/db_machdep.h/1.20/Thu Sep  2 14:22:31 2021//
 D

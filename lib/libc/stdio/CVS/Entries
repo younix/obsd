@@ -126,14 +126,14 @@
 /vwscanf.c/1.3/Mon Aug 31 02:53:57 2015//
 /wbuf.c/1.13/Mon Aug 31 02:53:57 2015//
 /wcio.h/1.2/Wed Apr 17 17:40:35 2013//
-/wprintf.3/1.8/Fri Aug 30 20:27:25 2019//
 /wprintf.c/1.4/Mon Aug 31 02:53:57 2015//
 /wscanf.3/1.5/Fri Aug 30 20:27:25 2019//
 /wscanf.c/1.3/Mon Aug 31 02:53:57 2015//
 /wsetup.c/1.7/Mon Aug  8 08:05:36 2005//
 /fmemopen.c/1.5/Thu Dec 17 19:39:58 2020//
-/printf.3/1.92/Thu Sep  2 08:45:35 2021//
 /ungetwc.3/1.6/Wed Sep  1 16:07:37 2021//
-/vfprintf.c/1.80/Thu Sep  2 08:41:58 2021//
-/vfwprintf.c/1.21/Thu Sep  2 08:41:58 2021//
+/printf.3/1.92/Thu Sep  2 14:22:30 2021//
+/vfprintf.c/1.81/Tue Sep 14 08:17:17 2021//
+/vfwprintf.c/1.22/Tue Sep 14 08:17:17 2021//
+/wprintf.3/1.9/Tue Sep 14 08:17:17 2021//
 D

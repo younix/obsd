@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.h,v 1.206 2021/08/10 21:29:53 mvs Exp $	*/
+/*	$OpenBSD: ip_ipsp.h,v 1.210 2021/10/13 14:36:31 bluhm Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -189,6 +189,12 @@ static inline void
 ipsecstat_add(enum ipsec_counters c, uint64_t v)
 {
 	counters_add(ipseccounters, c, v);
+}
+
+static inline void
+ipsecstat_pkt(enum ipsec_counters p, enum ipsec_counters b, uint64_t v)
+{
+	counters_pkt(ipseccounters, p, b, v);
 }
 
 struct m_tag;
@@ -473,9 +479,8 @@ struct xformsw {
 	int	(*xf_init)(struct tdb *, const struct xformsw *,
 		    struct ipsecinit *);
 	int	(*xf_zeroize)(struct tdb *); /* termination */
-	int	(*xf_input)(struct mbuf *, struct tdb *, int, int); /* input */
-	int	(*xf_output)(struct mbuf *, struct tdb *, struct mbuf **,
-	    int, int);        /* output */
+	int	(*xf_input)(struct mbuf *, struct tdb *, int, int);
+	int	(*xf_output)(struct mbuf *, struct tdb *, int, int);
 };
 
 extern int ipsec_in_use;
@@ -567,7 +572,7 @@ int	ah_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	ah_zeroize(struct tdb *);
 int	ah_input(struct mbuf *, struct tdb *, int, int);
 int	ah_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
-int	ah_output(struct mbuf *, struct tdb *, struct mbuf **, int, int);
+int	ah_output(struct mbuf *, struct tdb *, int, int);
 int	ah_output_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int,
 	    int);
 int	ah_sysctl(int *, u_int, void *, size_t *, void *, size_t);
@@ -586,7 +591,7 @@ int	esp_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	esp_zeroize(struct tdb *);
 int	esp_input(struct mbuf *, struct tdb *, int, int);
 int	esp_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
-int	esp_output(struct mbuf *, struct tdb *, struct mbuf **, int, int);
+int	esp_output(struct mbuf *, struct tdb *, int, int);
 int	esp_output_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int,
 	    int);
 int	esp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
@@ -604,7 +609,7 @@ int	ipcomp_init(struct tdb *, const struct xformsw *, struct ipsecinit *);
 int	ipcomp_zeroize(struct tdb *);
 int	ipcomp_input(struct mbuf *, struct tdb *, int, int);
 int	ipcomp_input_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int);
-int	ipcomp_output(struct mbuf *, struct tdb *, struct mbuf **, int, int);
+int	ipcomp_output(struct mbuf *, struct tdb *, int, int);
 int	ipcomp_output_cb(struct tdb *, struct tdb_crypto *, struct mbuf *, int,
 	    int);
 int	ipcomp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
@@ -619,8 +624,7 @@ int	tcp_signature_tdb_init(struct tdb *, const struct xformsw *,
 	    struct ipsecinit *);
 int	tcp_signature_tdb_zeroize(struct tdb *);
 int	tcp_signature_tdb_input(struct mbuf *, struct tdb *, int, int);
-int	tcp_signature_tdb_output(struct mbuf *, struct tdb *, struct mbuf **,
-	  int, int);
+int	tcp_signature_tdb_output(struct mbuf *, struct tdb *, int, int);
 
 /* Replay window */
 int	checkreplaywindow(struct tdb *, u_int64_t, u_int32_t, u_int32_t *, int);
@@ -640,6 +644,7 @@ struct ipsec_ids *ipsp_ids_insert(struct ipsec_ids *);
 struct ipsec_ids *ipsp_ids_lookup(u_int32_t);
 void	ipsp_ids_free(struct ipsec_ids *);
 
+void	ipsp_init(void);
 void	ipsec_init(void);
 int	ipsec_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 int	ipsec_common_input(struct mbuf *, int, int, int, int, int);
@@ -649,6 +654,7 @@ int	ipsec_common_input_cb(struct mbuf *, struct tdb *, int, int);
 int	ipsec_delete_policy(struct ipsec_policy *);
 ssize_t	ipsec_hdrsz(struct tdb *);
 void	ipsec_adjust_mtu(struct mbuf *, u_int32_t);
+void	ipsec_set_mtu(struct tdb *, u_int32_t);
 struct	ipsec_acquire *ipsec_get_acquire(u_int32_t);
 int	ipsec_forward_check(struct mbuf *, int, int);
 int	ipsec_local_check(struct mbuf *, int, int, int);

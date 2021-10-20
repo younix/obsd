@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_output.c,v 1.86 2021/07/27 17:13:03 mvs Exp $ */
+/*	$OpenBSD: ipsec_output.c,v 1.89 2021/10/13 22:43:44 bluhm Exp $ */
 /*
  * The author of this code is Angelos D. Keromytis (angelos@cis.upenn.edu)
  *
@@ -73,7 +73,6 @@ int
 ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
 {
 	int hlen, off, error;
-	struct mbuf *mp;
 #ifdef INET6
 	struct ip6_ext ip6e;
 	int nxt;
@@ -242,12 +241,10 @@ ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
 			}
 #endif /* INET6 */
 
-			/* Encapsulate -- the last two arguments are unused. */
-			error = ipip_output(m, tdb, &mp, 0, 0);
-			if ((mp == NULL) && (!error))
+			/* Encapsulate -- m may be changed or set to NULL. */
+			error = ipip_output(&m, tdb);
+			if ((m == NULL) && (!error))
 				error = EFAULT;
-			m = mp;
-			mp = NULL;
 			if (error)
 				goto drop;
 
@@ -266,18 +263,14 @@ ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
 			/* Remember that we appended a tunnel header. */
 			tdb->tdb_flags |= TDBF_USEDTUNNEL;
 		}
-
-		/* We may be done with this TDB */
-		if (tdb->tdb_xform->xf_type == XF_IP4)
-			return ipsp_process_done(m, tdb);
-	} else {
-		/*
-		 * If this is just an IP-IP TDB and we're told there's
-		 * already an encapsulation header, move on.
-		 */
-		if (tdb->tdb_xform->xf_type == XF_IP4)
-			return ipsp_process_done(m, tdb);
 	}
+
+	/*
+	 * If this is just an IP-IP TDB and we're told there's already an
+	 * encapsulation header or ipip_output() has encapsulted it, move on.
+	 */
+	if (tdb->tdb_xform->xf_type == XF_IP4)
+		return ipsp_process_done(m, tdb);
 
 	/* Extract some information off the headers. */
 	switch (tdb->tdb_dst.sa.sa_family) {
@@ -377,7 +370,7 @@ ipsp_process_packet(struct mbuf *m, struct tdb *tdb, int af, int tunalready)
 	}
 
 	/* Invoke the IPsec transform. */
-	return (*(tdb->tdb_xform->xf_output))(m, tdb, NULL, hlen, off);
+	return (*(tdb->tdb_xform->xf_output))(m, tdb, hlen, off);
 
  drop:
 	m_freem(m);
@@ -416,11 +409,7 @@ ipsec_output_cb(struct cryptop *crp)
 			/* Reset the session ID */
 			if (tdb->tdb_cryptoid != 0)
 				tdb->tdb_cryptoid = crp->crp_sid;
-			error = crypto_dispatch(crp);
-			if (error) {
-				DPRINTF("crypto dispatch error %d", error);
-				goto drop;
-			}
+			crypto_dispatch(crp);
 			return;
 		}
 		DPRINTF("crypto error %d", crp->crp_etype);
@@ -583,8 +572,7 @@ ipsp_process_done(struct mbuf *m, struct tdb *tdb)
 
 	m_tag_prepend(m, mtag);
 
-	ipsecstat_inc(ipsec_opackets);
-	ipsecstat_add(ipsec_obytes, m->m_pkthdr.len);
+	ipsecstat_pkt(ipsec_opackets, ipsec_obytes, m->m_pkthdr.len);
 	tdb->tdb_opackets++;
 	tdb->tdb_obytes += m->m_pkthdr.len;
 

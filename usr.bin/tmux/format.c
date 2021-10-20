@@ -1,4 +1,4 @@
-/* $OpenBSD: format.c,v 1.294 2021/08/20 20:08:30 nicm Exp $ */
+/* $OpenBSD: format.c,v 1.298 2021/10/11 10:55:30 nicm Exp $ */
 
 /*
  * Copyright (c) 2011 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -390,7 +390,7 @@ format_job_get(struct format_expand_state *es, const char *cmd)
 	if (force && fj->job != NULL)
 	       job_free(fj->job);
 	if (force || (fj->job == NULL && fj->last != t)) {
-		fj->job = job_run(expanded, 0, NULL, NULL,
+		fj->job = job_run(expanded, 0, NULL, NULL, NULL,
 		    server_client_get_cwd(ft->client, NULL), format_job_update,
 		    format_job_complete, NULL, fj, JOB_NOWAIT, -1, -1);
 		if (fj->job == NULL) {
@@ -1614,11 +1614,16 @@ format_cb_mouse_x(struct format_tree *ft)
 	struct window_pane	*wp;
 	u_int			 x, y;
 
-	if (ft->m.valid) {
-		wp = cmd_mouse_pane(&ft->m, NULL, NULL);
-		if (wp != NULL && cmd_mouse_at(wp, &ft->m, &x, &y, 0) == 0)
-			return (format_printf("%u", x));
+	if (!ft->m.valid)
 		return (NULL);
+	wp = cmd_mouse_pane(&ft->m, NULL, NULL);
+	if (wp != NULL && cmd_mouse_at(wp, &ft->m, &x, &y, 0) == 0)
+		return (format_printf("%u", x));
+	if (ft->c != NULL && (ft->c->tty.flags & TTY_STARTED)) {
+		if (ft->m.statusat == 0 && ft->m.y < ft->m.statuslines)
+			return (format_printf("%u", ft->m.x));
+		if (ft->m.statusat > 0 && ft->m.y >= (u_int)ft->m.statusat)
+			return (format_printf("%u", ft->m.x));
 	}
 	return (NULL);
 }
@@ -1630,11 +1635,16 @@ format_cb_mouse_y(struct format_tree *ft)
 	struct window_pane	*wp;
 	u_int			 x, y;
 
-	if (ft->m.valid) {
-		wp = cmd_mouse_pane(&ft->m, NULL, NULL);
-		if (wp != NULL && cmd_mouse_at(wp, &ft->m, &x, &y, 0) == 0)
-			return (format_printf("%u", y));
+	if (!ft->m.valid)
 		return (NULL);
+	wp = cmd_mouse_pane(&ft->m, NULL, NULL);
+	if (wp != NULL && cmd_mouse_at(wp, &ft->m, &x, &y, 0) == 0)
+		return (format_printf("%u", y));
+	if (ft->c != NULL && (ft->c->tty.flags & TTY_STARTED)) {
+		if (ft->m.statusat == 0 && ft->m.y < ft->m.statuslines)
+			return (format_printf("%u", ft->m.y));
+		if (ft->m.statusat > 0 && ft->m.y >= (u_int)ft->m.statusat)
+			return (format_printf("%u", ft->m.y - ft->m.statusat));
 	}
 	return (NULL);
 }
@@ -3327,7 +3337,7 @@ format_find(struct format_tree *ft, const char *key, int modifiers,
 	fte = format_table_get(key);
 	if (fte != NULL) {
 		value = fte->cb(ft);
-		if (fte->type == FORMAT_TABLE_TIME)
+		if (fte->type == FORMAT_TABLE_TIME && value != NULL)
 			t = ((struct timeval *)value)->tv_sec;
 		else
 			found = value;

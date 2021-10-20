@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.143 2021/09/01 20:08:32 krw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.146 2021/09/10 15:26:36 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -345,8 +345,8 @@ setpid(const int pn, struct mbr *mbr)
 
 	pp = &mbr->mbr_prt[pn];
 
-	PRT_print(0, NULL, NULL);
-	PRT_print(pn, pp, NULL);
+	PRT_print(0, NULL, "s");
+	PRT_print(pn, pp, "s");
 
 	pp->prt_id = ask_pid(pp->prt_id);
 
@@ -462,7 +462,7 @@ Xwrite(char *args, struct mbr *mbr)
 int
 Xquit(char *args, struct mbr *mbr)
 {
-	return CMD_SAVE;
+	return CMD_QUIT;
 }
 
 int
@@ -613,7 +613,7 @@ ask_pid(const int dflt)
 		if (strlen(lbuf) == 0)
 			return dflt;
 		if (strcmp(lbuf, "?") == 0) {
-			PRT_printall();
+			PRT_print_mbrtypes();
 			continue;
 		}
 
@@ -659,7 +659,7 @@ ask_uuid(const struct uuid *olduuid)
 		string_from_line(lbuf, sizeof(lbuf), TRIMMED);
 
 		if (strcmp(lbuf, "?") == 0) {
-			PRT_printall();
+			PRT_print_gpttypes();
 			continue;
 		} else if (strlen(lbuf) == 0) {
 			uuid = *olduuid;

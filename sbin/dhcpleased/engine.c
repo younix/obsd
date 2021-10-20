@@ -1,4 +1,4 @@
-/*	$OpenBSD: engine.c,v 1.25 2021/08/12 12:41:08 florian Exp $	*/
+/*	$OpenBSD: engine.c,v 1.27 2021/09/15 15:18:23 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -105,6 +105,8 @@ struct dhcpleased_iface {
 	char				 file[4 * DHCP_FILE_LEN + 1];
 	char				 hostname[4 * 255 + 1];
 	char				 domainname[4 * 255 + 1];
+	struct dhcp_route		 prev_routes[MAX_DHCP_ROUTES];
+	int				 prev_routes_len;
 	struct dhcp_route		 routes[MAX_DHCP_ROUTES];
 	int				 routes_len;
 	struct in_addr			 nameservers[MAX_RDNS_COUNT];
@@ -589,16 +591,11 @@ engine_showinfo_ctl(struct imsg *imsg, uint32_t if_index)
 
 	switch (imsg->hdr.type) {
 	case IMSG_CTL_SHOW_INTERFACE_INFO:
-		if (if_index == 0) {
-			LIST_FOREACH (iface, &dhcpleased_interfaces, entries)
-				send_interface_info(iface, imsg->hdr.pid);
-		} else {
-			if ((iface = get_dhcpleased_iface_by_id(if_index)) !=
-			    NULL)
-				send_interface_info(iface, imsg->hdr.pid);
-		}
-		engine_imsg_compose_frontend(IMSG_CTL_END, imsg->hdr.pid, NULL,
-		    0);
+		if ((iface = get_dhcpleased_iface_by_id(if_index)) != NULL)
+			send_interface_info(iface, imsg->hdr.pid);
+		else
+			engine_imsg_compose_frontend(IMSG_CTL_END,
+			    imsg->hdr.pid, NULL, 0);
 		break;
 	default:
 		log_debug("%s: error handling imsg", __func__);
@@ -1247,6 +1244,9 @@ parse_dhcp(struct dhcpleased_iface *iface, struct imsg_dhcp *dhcp)
 		} else
 #endif /* SMALL */
 		{
+			iface->prev_routes_len = iface->routes_len;
+			memcpy(iface->prev_routes, iface->routes,
+			    sizeof(iface->prev_routes));
 			iface->routes_len = routes_len;
 			memcpy(iface->routes, routes, sizeof(iface->routes));
 		}
@@ -1526,9 +1526,11 @@ void
 send_configure_interface(struct dhcpleased_iface *iface)
 {
 	struct imsg_configure_interface	 imsg;
+	int				 i, j, found;
 
 	log_lease(iface, 0);
 
+	memset(&imsg, 0, sizeof(imsg));
 	imsg.if_index = iface->if_index;
 	imsg.rdomain = iface->rdomain;
 	imsg.addr.s_addr = iface->requested_ip.s_addr;
@@ -1537,6 +1539,21 @@ send_configure_interface(struct dhcpleased_iface *iface)
 	strlcpy(imsg.file, iface->file, sizeof(imsg.file));
 	strlcpy(imsg.domainname, iface->domainname, sizeof(imsg.domainname));
 	strlcpy(imsg.hostname, iface->hostname, sizeof(imsg.hostname));
+	for (i = 0; i < iface->prev_routes_len; i++) {
+		found = 0;
+		for (j = 0; j < iface->routes_len; j++) {
+			if (memcmp(&iface->prev_routes[i], &iface->routes[j],
+			    sizeof(struct dhcp_route)) == 0) {
+				found = 1;
+				break;
+			}
+		}
+		if (!found)
+			imsg.routes[imsg.routes_len++] = iface->prev_routes[i];
+	}
+	if (imsg.routes_len > 0)
+		engine_imsg_compose_main(IMSG_WITHDRAW_ROUTES, 0, &imsg,
+		    sizeof(imsg));
 	imsg.routes_len = iface->routes_len;
 	memcpy(imsg.routes, iface->routes, sizeof(imsg.routes));
 	engine_imsg_compose_main(IMSG_CONFIGURE_INTERFACE, 0, &imsg,

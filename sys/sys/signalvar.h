@@ -1,4 +1,4 @@
-/*	$OpenBSD: signalvar.h,v 1.48 2021/05/10 18:01:24 mpi Exp $	*/
+/*	$OpenBSD: signalvar.h,v 1.50 2021/10/06 15:46:03 claudio Exp $	*/
 /*	$NetBSD: signalvar.h,v 1.17 1996/04/22 01:23:31 christos Exp $	*/
 
 /*
@@ -72,15 +72,6 @@ struct	sigacts {
 	(((p)->p_siglist | (p)->p_p->ps_siglist) & ~(p)->p_sigmask)
 
 /*
- * Clear a pending signal from a process.
- */
-#define CLRSIG(p, sig)	do {						\
-	int __mask = sigmask(sig);					\
-	atomic_clearbits_int(&(p)->p_siglist, __mask);			\
-	atomic_clearbits_int(&(p)->p_p->ps_siglist, __mask);		\
-} while (0)
-
-/*
  * Signal properties and actions.
  * The array below categorizes the signals and their default actions
  * according to the following properties:
@@ -129,6 +120,7 @@ void	sigactsfree(struct process *);
 /*
  * Machine-dependent functions:
  */
-int	sendsig(sig_t _catcher, int _sig, sigset_t _mask, const siginfo_t *_si);
+int	sendsig(sig_t _catcher, int _sig, sigset_t _mask, const siginfo_t *_si,
+	    int _info, int _onstack);
 #endif	/* _KERNEL */
 #endif	/* !_SYS_SIGNALVAR_H_ */

@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_ipcomp.c,v 1.74 2021/07/27 17:13:03 mvs Exp $ */
+/* $OpenBSD: ip_ipcomp.c,v 1.76 2021/10/13 22:43:44 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
@@ -139,7 +139,7 @@ ipcomp_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 {
 	const struct comp_algo *ipcompx = tdb->tdb_compalgxform;
 	struct tdb_crypto *tc;
-	int hlen, error;
+	int hlen;
 
 	struct cryptodesc *crdc = NULL;
 	struct cryptop *crp;
@@ -188,8 +188,8 @@ ipcomp_input(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	tc->tc_rdomain = tdb->tdb_rdomain;
 	tc->tc_dst = tdb->tdb_dst;
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 }
 
 int
@@ -320,8 +320,7 @@ ipcomp_input_cb(struct tdb *tdb, struct tdb_crypto *tc, struct mbuf *m, int clen
  * IPComp output routine, called by ipsp_process_packet()
  */
 int
-ipcomp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
-    int protoff)
+ipcomp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 {
 	const struct comp_algo *ipcompx = tdb->tdb_compalgxform;
 	int error, hlen;
@@ -483,8 +482,8 @@ ipcomp_output(struct mbuf *m, struct tdb *tdb, struct mbuf **mp, int skip,
 	crp->crp_opaque = (caddr_t)tc;
 	crp->crp_sid = tdb->tdb_cryptoid;
 
-	error = crypto_dispatch(crp);
-	return error;
+	crypto_dispatch(crp);
+	return 0;
 
  drop:
 	m_freem(m);

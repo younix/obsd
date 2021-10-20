@@ -18,8 +18,8 @@
 /conf.c/1.71/Wed Sep  1 16:07:38 2021//
 /intr.c/1.51/Wed Sep  1 16:07:38 2021//
 /locore.S/1.203/Wed Sep  1 16:07:38 2021//
-/machdep.c/1.264/Wed Sep  1 16:07:38 2021//
 /mainbus.c/1.89/Wed Sep  1 16:07:38 2021//
-/pmap.c/1.175/Wed Sep  1 16:07:38 2021//
-/trap.c/1.153/Wed Sep  1 16:07:38 2021//
+/machdep.c/1.265/Wed Oct 20 17:29:09 2021//
+/pmap.c/1.177/Wed Oct 20 17:29:09 2021//
+/trap.c/1.154/Wed Oct 20 17:29:09 2021//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uwacom.c,v 1.2 2020/08/23 11:08:02 mglocker Exp $	*/
+/*	$OpenBSD: uwacom.c,v 1.4 2021/09/12 06:58:08 anton Exp $	*/
 
 /*
  * Copyright (c) 2016 Frank Groeneveld <frank@frankgroeneveld.nl>

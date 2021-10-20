@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1139 2021/08/27 17:25:55 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1148 2021/10/20 09:50:40 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -520,7 +520,7 @@ enum tty_code_code {
 #define MODE_WRAP 0x10
 #define MODE_MOUSE_STANDARD 0x20
 #define MODE_MOUSE_BUTTON 0x40
-#define MODE_BLINKING 0x80
+#define MODE_CURSOR_BLINKING 0x80
 #define MODE_MOUSE_UTF8 0x100
 #define MODE_MOUSE_SGR 0x200
 #define MODE_BRACKETPASTE 0x400
@@ -529,10 +529,12 @@ enum tty_code_code {
 #define MODE_ORIGIN 0x2000
 #define MODE_CRLF 0x4000
 #define MODE_KEXTENDED 0x8000
+#define MODE_CURSOR_VERY_VISIBLE 0x10000
 
 #define ALL_MODES 0xffffff
 #define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON|MODE_MOUSE_ALL)
 #define MOTION_MOUSE_MODES (MODE_MOUSE_BUTTON|MODE_MOUSE_ALL)
+#define CURSOR_MODES (MODE_CURSOR|MODE_CURSOR_BLINKING|MODE_CURSOR_VERY_VISIBLE)
 
 /* A single UTF-8 character. */
 typedef u_int utf8_char;
@@ -610,6 +612,24 @@ struct colour_palette {
 #define GRID_LINE_WRAPPED 0x1
 #define GRID_LINE_EXTENDED 0x2
 #define GRID_LINE_DEAD 0x4
+
+#define CELL_INSIDE 0
+#define CELL_TOPBOTTOM 1
+#define CELL_LEFTRIGHT 2
+#define CELL_TOPLEFT 3
+#define CELL_TOPRIGHT 4
+#define CELL_BOTTOMLEFT 5
+#define CELL_BOTTOMRIGHT 6
+#define CELL_TOPJOIN 7
+#define CELL_BOTTOMJOIN 8
+#define CELL_LEFTJOIN 9
+#define CELL_RIGHTJOIN 10
+#define CELL_JOIN 11
+#define CELL_OUTSIDE 12
+
+#define CELL_BORDERS " xqlkmjwvtun~"
+#define SIMPLE_BORDERS " |-+++++++++."
+#define PADDED_BORDERS "             "
 
 /* Grid cell data. */
 struct grid_cell {
@@ -797,6 +817,27 @@ struct screen_write_ctx {
 	u_int				 bg;
 };
 
+/* Box border lines option. */
+enum box_lines {
+	BOX_LINES_DEFAULT = -1,
+	BOX_LINES_SINGLE,
+	BOX_LINES_DOUBLE,
+	BOX_LINES_HEAVY,
+	BOX_LINES_SIMPLE,
+	BOX_LINES_ROUNDED,
+	BOX_LINES_PADDED,
+	BOX_LINES_NONE
+};
+
+/* Pane border lines option. */
+enum pane_lines {
+	PANE_LINES_SINGLE,
+	PANE_LINES_DOUBLE,
+	PANE_LINES_HEAVY,
+	PANE_LINES_SIMPLE,
+	PANE_LINES_NUMBER
+};
+
 /* Screen redraw context. */
 struct screen_redraw_ctx {
 	struct client	*c;
@@ -805,7 +846,7 @@ struct screen_redraw_ctx {
 	int		 statustop;
 
 	int		 pane_status;
-	int		 pane_lines;
+	enum pane_lines	 pane_lines;
 
 	struct grid_cell no_pane_gc;
 	int		 no_pane_gc_set;
@@ -1058,13 +1099,6 @@ TAILQ_HEAD(winlink_stack, winlink);
 #define PANE_STATUS_OFF 0
 #define PANE_STATUS_TOP 1
 #define PANE_STATUS_BOTTOM 2
-
-/* Pane border lines option. */
-#define PANE_LINES_SINGLE 0
-#define PANE_LINES_DOUBLE 1
-#define PANE_LINES_HEAVY 2
-#define PANE_LINES_SIMPLE 3
-#define PANE_LINES_NUMBER 4
 
 /* Layout direction. */
 enum layout_type {
@@ -1565,10 +1599,18 @@ struct client_window {
 };
 RB_HEAD(client_windows, client_window);
 
+/* Visible areas not obstructed by overlays. */
+#define OVERLAY_MAX_RANGES 3
+struct overlay_ranges {
+	u_int	px[OVERLAY_MAX_RANGES];
+	u_int	nx[OVERLAY_MAX_RANGES];
+};
+
 /* Client connection. */
 typedef int (*prompt_input_cb)(struct client *, void *, const char *, int);
 typedef void (*prompt_free_cb)(void *);
-typedef int (*overlay_check_cb)(struct client *, void *, u_int, u_int);
+typedef void (*overlay_check_cb)(struct client*, void *, u_int, u_int, u_int,
+	    struct overlay_ranges *);
 typedef struct screen *(*overlay_mode_cb)(struct client *, void *, u_int *,
 	    u_int *);
 typedef void (*overlay_draw_cb)(struct client *, void *,
@@ -2056,6 +2098,8 @@ struct style	*options_string_to_style(struct options *, const char *,
 int		 options_from_string(struct options *,
 		     const struct options_table_entry *, const char *,
 		     const char *, int, char **);
+int	 	 options_find_choice(const struct options_table_entry *,
+		     const char *, char **);
 void		 options_push_changes(const char *);
 int		 options_remove_or_default(struct options_entry *, int,
 		     char **);
@@ -2071,9 +2115,9 @@ typedef void (*job_free_cb) (void *);
 #define JOB_NOWAIT 0x1
 #define JOB_KEEPWRITE 0x2
 #define JOB_PTY 0x4
-struct job	*job_run(const char *, int, char **, struct session *,
-		     const char *, job_update_cb, job_complete_cb, job_free_cb,
-		     void *, int, int, int);
+struct job	*job_run(const char *, int, char **, struct environ *,
+		     struct session *, const char *, job_update_cb,
+		     job_complete_cb, job_free_cb, void *, int, int, int);
 void		 job_free(struct job *);
 int		 job_transfer(struct job *, pid_t *, char *, size_t);
 void		 job_resize(struct job *, u_int, u_int);
@@ -2206,6 +2250,9 @@ void		 tty_default_features(int *, const char *, u_int);
 int		 tty_acs_needed(struct tty *);
 const char	*tty_acs_get(struct tty *, u_char);
 int		 tty_acs_reverse_get(struct tty *, const char *, size_t);
+const struct utf8_data *tty_acs_double_borders(int);
+const struct utf8_data *tty_acs_heavy_borders(int);
+const struct utf8_data *tty_acs_rounded_borders(int);
 
 /* tty-keys.c */
 void		tty_keys_build(struct tty *);
@@ -2234,7 +2281,7 @@ struct args_value *args_values(struct args *);
 struct args_value *args_value(struct args *, u_int);
 const char	*args_string(struct args *, u_int);
 struct cmd_list	*args_make_commands_now(struct cmd *, struct cmdq_item *,
-		     u_int);
+		     u_int, int);
 struct args_command_state *args_make_commands_prepare(struct cmd *,
 		     struct cmdq_item *, u_int, const char *, int, int);
 struct cmd_list *args_make_commands(struct args_command_state *, int, char **,
@@ -2460,6 +2507,8 @@ void	 server_client_set_overlay(struct client *, u_int, overlay_check_cb,
 	     overlay_mode_cb, overlay_draw_cb, overlay_key_cb,
 	     overlay_free_cb, overlay_resize_cb, void *);
 void	 server_client_clear_overlay(struct client *);
+void	 server_client_overlay_range(u_int, u_int, u_int, u_int, u_int, u_int,
+	     u_int, struct overlay_ranges *);
 void	 server_client_set_key_table(struct client *, const char *);
 const char *server_client_get_key_table(struct client *);
 int	 server_client_check_nested(struct client *);
@@ -2687,7 +2736,8 @@ void	 screen_write_hline(struct screen_write_ctx *, u_int, int, int);
 void	 screen_write_vline(struct screen_write_ctx *, u_int, int, int);
 void	 screen_write_menu(struct screen_write_ctx *, struct menu *, int,
 	     const struct grid_cell *);
-void	 screen_write_box(struct screen_write_ctx *, u_int, u_int);
+void	 screen_write_box(struct screen_write_ctx *, u_int, u_int, int,
+	     const struct grid_cell *, const char *);
 void	 screen_write_preview(struct screen_write_ctx *, struct screen *, u_int,
 	     u_int);
 void	 screen_write_backspace(struct screen_write_ctx *);
@@ -3089,7 +3139,8 @@ int		 menu_display(struct menu *, int, struct cmdq_item *, u_int,
 		    u_int, struct client *, struct cmd_find_state *,
 		    menu_choice_cb, void *);
 struct screen	*menu_mode_cb(struct client *, void *, u_int *, u_int *);
-int		 menu_check_cb(struct client *, void *, u_int, u_int);
+void		 menu_check_cb(struct client *, void *, u_int, u_int, u_int,
+		    struct overlay_ranges *);
 void		 menu_draw_cb(struct client *, void *,
 		    struct screen_redraw_ctx *);
 void		 menu_free_cb(struct client *, void *);
@@ -3098,13 +3149,13 @@ int		 menu_key_cb(struct client *, void *, struct key_event *);
 /* popup.c */
 #define POPUP_CLOSEEXIT 0x1
 #define POPUP_CLOSEEXITZERO 0x2
-#define POPUP_NOBORDER 0x4
-#define POPUP_INTERNAL 0x8
+#define POPUP_INTERNAL 0x4
 typedef void (*popup_close_cb)(int, void *);
 typedef void (*popup_finish_edit_cb)(char *, size_t, void *);
-int		 popup_display(int, struct cmdq_item *, u_int, u_int, u_int,
-		    u_int, const char *, int, char **, const char *,
-		    struct client *, struct session *, popup_close_cb, void *);
+int		 popup_display(int, int, struct cmdq_item *, u_int, u_int,
+		    u_int, u_int, struct environ *, const char *, int, char **,
+		    const char *, const char *, struct client *,
+		    struct session *, popup_close_cb, void *);
 int		 popup_editor(struct client *, const char *, size_t,
 		    popup_finish_edit_cb, void *);
 
