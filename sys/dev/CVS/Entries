@@ -75,6 +75,6 @@ D/x86emu////
 /softraidvar.h/1.173/Wed Sep  1 16:07:40 2021//
 /video.c/1.54/Wed Sep  1 16:07:40 2021//
 /kcov.c/1.38/Thu Sep  2 14:22:31 2021//
-/softraid_crypto.c/1.142/Wed Oct 20 17:29:11 2021//
 /softraid_raid1c.c/1.4/Wed Oct 20 17:29:11 2021//
 /vnd.c/1.172/Wed Oct 20 17:29:11 2021//
+/softraid_crypto.c/1.143/Fri Oct 22 09:05:28 2021//

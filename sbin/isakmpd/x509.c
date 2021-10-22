@@ -1,4 +1,4 @@
-/* $OpenBSD: x509.c,v 1.120 2021/10/13 16:57:43 tb Exp $	 */
+/* $OpenBSD: x509.c,v 1.122 2021/10/21 14:01:00 tb Exp $	 */
 /* $EOM: x509.c,v 1.54 2001/01/16 18:42:16 ho Exp $	 */
 
 /*
@@ -109,7 +109,7 @@ x509_generate_kn(int id, X509 *cert)
 		    "Conditions: %s >= \"%s\" && %s <= \"%s\";\n";
 	X509_NAME *issuer, *subject;
 	struct keynote_deckey dc;
-	X509_STORE_CTX csc;
+	X509_STORE_CTX *csc = NULL;
 	X509_OBJECT obj;
 	X509	*icert;
 	RSA	*key = NULL;
@@ -154,24 +154,32 @@ x509_generate_kn(int id, X509 *cert)
 	RSA_free(key);
 	key = NULL;
 
+	csc = X509_STORE_CTX_new();
+	if (csc == NULL) {
+		log_print("x509_generate_kn: failed to get memory for "
+		    "certificate store");
+		goto fail;
+	}
+
 	/* Now find issuer's certificate so we can get the public key.  */
-	X509_STORE_CTX_init(&csc, x509_cas, cert, NULL);
-	if (X509_STORE_get_by_subject(&csc, X509_LU_X509, issuer, &obj) !=
+	X509_STORE_CTX_init(csc, x509_cas, cert, NULL);
+	if (X509_STORE_get_by_subject(csc, X509_LU_X509, issuer, &obj) !=
 	    X509_LU_X509) {
-		X509_STORE_CTX_cleanup(&csc);
-		X509_STORE_CTX_init(&csc, x509_certs, cert, NULL);
-		if (X509_STORE_get_by_subject(&csc, X509_LU_X509, issuer, &obj)
+		X509_STORE_CTX_cleanup(csc);
+		X509_STORE_CTX_init(csc, x509_certs, cert, NULL);
+		if (X509_STORE_get_by_subject(csc, X509_LU_X509, issuer, &obj)
 		    != X509_LU_X509) {
-			X509_STORE_CTX_cleanup(&csc);
+			X509_STORE_CTX_cleanup(csc);
 			LOG_DBG((LOG_POLICY, 30,
 			    "x509_generate_kn: no certificate found for "
 			    "issuer"));
 			goto fail;
 		}
 	}
-	X509_STORE_CTX_cleanup(&csc);
-	icert = obj.data.x509;
+	X509_STORE_CTX_free(csc);
+	csc = NULL;
 
+	icert = X509_OBJECT_get0_X509(&obj);
 	if (icert == NULL) {
 		LOG_DBG((LOG_POLICY, 30, "x509_generate_kn: "
 		    "missing certificates, cannot construct X509 chain"));
@@ -435,6 +443,7 @@ x509_generate_kn(int id, X509 *cert)
 	return 1;
 
 fail:
+	X509_STORE_CTX_free(csc);
 	free(buf);
 	free(skey);
 	free(ikey);
@@ -812,25 +821,32 @@ x509_cert_get(u_int8_t *asn, u_int32_t len)
 int
 x509_cert_validate(void *scert)
 {
-	X509_STORE_CTX	csc;
+	X509_STORE_CTX	*csc;
 	X509_NAME	*issuer, *subject;
 	X509		*cert = (X509 *) scert;
 	EVP_PKEY	*key;
-	int		res, err;
+	int		res, err, flags;
 
 	/*
 	 * Validate the peer certificate by checking with the CA certificates
 	 * we trust.
 	 */
-	X509_STORE_CTX_init(&csc, x509_cas, cert, NULL);
-	/* XXX See comment in x509_read_crls_from_dir.  */
-	if (x509_cas->param->flags & X509_V_FLAG_CRL_CHECK) {
-		X509_STORE_CTX_set_flags(&csc, X509_V_FLAG_CRL_CHECK);
-		X509_STORE_CTX_set_flags(&csc, X509_V_FLAG_CRL_CHECK_ALL);
+	csc = X509_STORE_CTX_new();
+	if (csc == NULL) {
+		log_print("x509_cert_validate: failed to get memory for "
+		    "certificate store");
+		return 0;
 	}
-	res = X509_verify_cert(&csc);
-	err = csc.error;
-	X509_STORE_CTX_cleanup(&csc);
+	X509_STORE_CTX_init(csc, x509_cas, cert, NULL);
+	/* XXX See comment in x509_read_crls_from_dir.  */
+	flags = X509_VERIFY_PARAM_get_flags(X509_STORE_get0_param(x509_cas));
+	if (flags & X509_V_FLAG_CRL_CHECK) {
+		X509_STORE_CTX_set_flags(csc, X509_V_FLAG_CRL_CHECK);
+		X509_STORE_CTX_set_flags(csc, X509_V_FLAG_CRL_CHECK_ALL);
+	}
+	res = X509_verify_cert(csc);
+	err = X509_STORE_CTX_get_error(csc);
+	X509_STORE_CTX_free(csc);
 
 	/*
 	 * Return if validation succeeded or self-signed certs are not
@@ -1064,9 +1080,10 @@ x509_cert_obtain(u_int8_t *id, size_t id_len, void *data, u_int8_t **cert,
 int
 x509_cert_subjectaltname(X509 *scert, u_int8_t **altname, u_int32_t *len)
 {
-	X509_EXTENSION	*subjectaltname;
-	u_int8_t	*sandata;
-	int		extpos, santype, sanlen;
+	X509_EXTENSION		*subjectaltname;
+	ASN1_OCTET_STRING	*sanasn1data;
+	u_int8_t		*sandata;
+	int			 extpos, santype, sanlen;
 
 	extpos = X509_get_ext_by_NID(scert, NID_subject_alt_name, -1);
 	if (extpos == -1) {
@@ -1075,16 +1092,16 @@ x509_cert_subjectaltname(X509 *scert, u_int8_t **altname, u_int32_t *len)
 		return 0;
 	}
 	subjectaltname = X509_get_ext(scert, extpos);
+	sanasn1data = X509_EXTENSION_get_data(subjectaltname);
 
-	if (!subjectaltname || !subjectaltname->value ||
-	    !subjectaltname->value->data ||
-	    subjectaltname->value->length < 4) {
+	if (!subjectaltname || !sanasn1data || !sanasn1data->data ||
+	    sanasn1data->length < 4) {
 		log_print("x509_cert_subjectaltname: invalid "
 		    "subjectaltname extension");
 		return 0;
 	}
 	/* SSL does not handle unknown ASN stuff well, do it by hand.  */
-	sandata = subjectaltname->value->data;
+	sandata = sanasn1data->data;
 	santype = sandata[2] & 0x3f;
 	sanlen = sandata[3];
 	sandata += 4;
@@ -1094,7 +1111,7 @@ x509_cert_subjectaltname(X509 *scert, u_int8_t **altname, u_int32_t *len)
 	 * extra stuff in subjectAltName, so we will just take the first
 	 * salen bytes, and not worry about what follows.
 	 */
-	if (sanlen + 4 > subjectaltname->value->length) {
+	if (sanlen + 4 > sanasn1data->length) {
 		log_print("x509_cert_subjectaltname: subjectaltname invalid "
 		    "length");
 		return 0;

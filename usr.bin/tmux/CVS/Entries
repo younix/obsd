@@ -65,7 +65,6 @@
 /cmd-set-option.c/1.141/Thu Sep  2 14:22:33 2021//
 /cmd-show-environment.c/1.28/Thu Sep  2 14:22:33 2021//
 /cmd-show-messages.c/1.36/Thu Sep  2 14:22:33 2021//
-/cmd-show-options.c/1.67/Thu Sep  2 14:22:33 2021//
 /cmd-show-prompt-history.c/1.2/Thu Sep  2 14:22:33 2021//
 /cmd-source-file.c/1.53/Thu Sep  2 14:22:33 2021//
 /cmd-swap-pane.c/1.40/Thu Sep  2 14:22:33 2021//
@@ -94,7 +93,6 @@
 /tmux-protocol.h/1.1/Thu Sep  2 14:22:33 2021//
 /tmux.c/1.209/Thu Sep  2 14:22:33 2021//
 /tty-features.c/1.20/Thu Sep  2 14:22:33 2021//
-/tty-keys.c/1.150/Thu Sep  2 14:22:33 2021//
 /tty-term.c/1.91/Thu Sep  2 14:22:33 2021//
 /utf8.c/1.58/Thu Sep  2 14:22:33 2021//
 /window-buffer.c/1.35/Thu Sep  2 14:22:33 2021//
@@ -128,4 +126,6 @@
 /window-copy.c/1.331/Wed Oct 20 17:29:17 2021//
 /window-tree.c/1.59/Wed Oct 20 17:29:17 2021//
 /window.c/1.277/Wed Oct 20 17:29:17 2021//
+/cmd-show-options.c/1.68/Fri Oct 22 09:07:37 2021//
+/tty-keys.c/1.151/Fri Oct 22 09:07:37 2021//
 D

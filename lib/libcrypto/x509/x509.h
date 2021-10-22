@@ -1,4 +1,4 @@
-/* $OpenBSD: x509.h,v 1.76 2021/09/02 12:41:44 job Exp $ */
+/* $OpenBSD: x509.h,v 1.78 2021/10/21 15:52:02 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -265,8 +265,10 @@ typedef struct x509_cert_aux_st
 	STACK_OF(X509_ALGOR) *other;		/* other unspecified info */
 	} X509_CERT_AUX;
 
-struct x509_st
-	{
+struct x509_st;
+
+#if defined(LIBRESSL_INTERNAL) || !defined(LIBRESSL_OPAQUE_X509)
+struct x509_st {
 	X509_CINF *cert_info;
 	X509_ALGOR *sig_alg;
 	ASN1_BIT_STRING *signature;
@@ -295,7 +297,8 @@ struct x509_st
 	unsigned char sha1_hash[SHA_DIGEST_LENGTH];
 #endif
 	X509_CERT_AUX *aux;
-	} /* X509 */;
+} /* X509 */;
+#endif
 
 DECLARE_STACK_OF(X509)
 
@@ -621,9 +624,11 @@ void X509_CRL_METHOD_free(X509_CRL_METHOD *m);
 void X509_CRL_set_meth_data(X509_CRL *crl, void *dat);
 void *X509_CRL_get_meth_data(X509_CRL *crl);
 
-/* This one is only used so that a binary form can output, as in
- * i2d_X509_NAME(X509_get_X509_PUBKEY(x),&buf) */
-#define 	X509_get_X509_PUBKEY(x) ((x)->cert_info->key)
+#if defined(LIBRESSL_NEW_API)
+X509_PUBKEY	*X509_get_X509_PUBKEY(const X509 *x);
+#else
+#define		 X509_get_X509_PUBKEY(x)	(x)->cert_info->key
+#endif
 
 
 const char *X509_verify_cert_error_string(long n);

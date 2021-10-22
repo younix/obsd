@@ -13,8 +13,6 @@
 /smmureg.h/1.1/Wed Sep  1 16:07:38 2021//
 /acpiiort.c/1.4/Thu Sep  2 14:22:31 2021//
 /acpiiort.h/1.4/Thu Sep  2 14:22:31 2021//
-/agintc.c/1.33/Thu Sep  2 14:22:31 2021//
-/ampintc.c/1.23/Thu Sep  2 14:22:31 2021//
 /apldart.c/1.6/Tue Sep 14 08:17:31 2021//
 /apldwusb.c/1.1/Thu Sep  2 14:22:31 2021//
 /aplns.c/1.5/Thu Sep  2 14:22:31 2021//
@@ -28,4 +26,6 @@
 /smmuvar.h/1.6/Thu Sep  2 14:22:31 2021//
 /acpipci.c/1.32/Wed Oct 20 17:29:08 2021//
 /aplpcie.c/1.7/Wed Oct 20 17:29:08 2021//
+/agintc.c/1.34/Fri Oct 22 09:05:25 2021//
+/ampintc.c/1.24/Fri Oct 22 09:05:25 2021//
 D
