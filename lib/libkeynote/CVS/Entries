@@ -8,8 +8,6 @@
 /environment.c/1.29/Wed Dec 23 20:28:15 2015//
 /keynote-keygen.c/1.22/Thu Nov 19 02:35:24 2015//
 /keynote-main.c/1.10/Fri Jun 25 05:06:49 2004//
-/keynote-sign.c/1.19/Fri Jun 28 13:32:42 2019//
-/keynote-sigver.c/1.17/Fri Jun 28 13:32:42 2019//
 /keynote-ver.l/1.20/Mon Aug 28 17:07:19 2017//
 /keynote-ver.y/1.10/Tue Jun 29 11:35:56 2004//
 /keynote.1/1.37/Fri Nov 20 16:31:05 2015//
@@ -25,5 +23,7 @@
 D/Misc////
 D/testsuite////
 /header.h/1.11/Wed Sep  1 16:07:37 2021//
-/keynote-verify.c/1.19/Wed Sep  1 16:07:37 2021//
 /keynote.4/1.37/Thu Sep  2 14:22:30 2021//
+/keynote-sign.c/1.20/Tue Oct 26 13:43:27 2021//
+/keynote-sigver.c/1.18/Tue Oct 26 13:43:27 2021//
+/keynote-verify.c/1.20/Tue Oct 26 13:43:27 2021//

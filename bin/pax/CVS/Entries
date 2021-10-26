@@ -1,6 +1,5 @@
 /Makefile/1.13/Thu Sep 13 12:33:43 2018//
 /ar_io.c/1.63/Fri Jun 28 13:34:59 2019//
-/ar_subs.c/1.49/Fri Jun 28 13:34:59 2019//
 /buf_subs.c/1.31/Fri Jun 28 13:34:59 2019//
 /cpio.1/1.36/Thu Jan 16 16:46:46 2020//
 /cpio.c/1.33/Sat Sep 16 07:42:34 2017//
@@ -21,4 +20,5 @@
 /tty_subs.c/1.17/Fri Aug 26 04:22:13 2016//
 /tar.1/1.63/Sat May  1 08:41:43 2021//
 /tar.c/1.69/Thu Sep  2 14:22:29 2021//
+/ar_subs.c/1.50/Tue Oct 26 13:42:37 2021//
 D

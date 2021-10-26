@@ -1,7 +1,6 @@
 /Makefile/1.12/Tue Feb 26 07:14:35 2019//
 /extern.c/1.9/Sat Aug 27 02:02:44 2016//
 /init_field.c/1.8/Mon Jan  4 17:33:24 2016//
-/main.c/1.29/Fri Feb 14 19:17:33 2020//
 /make_level.c/1.8/Mon Jan  4 17:33:24 2016//
 /move.c/1.13/Sat Aug 27 02:02:44 2016//
 /move_robs.c/1.9/Mon Jan  4 17:33:24 2016//
@@ -11,4 +10,5 @@
 /robots.6/1.18/Sun May 28 22:27:10 2017//
 /robots.h/1.14/Mon Jan  4 17:33:24 2016//
 /score.c/1.16/Fri Jun 28 13:32:52 2019//
+/main.c/1.30/Tue Oct 26 13:42:40 2021//
 D

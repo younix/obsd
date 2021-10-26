@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty_pty.c,v 1.108 2021/02/08 09:18:30 claudio Exp $	*/
+/*	$OpenBSD: tty_pty.c,v 1.110 2021/10/24 00:02:25 jsg Exp $	*/
 /*	$NetBSD: tty_pty.c,v 1.33.4.1 1996/06/02 09:08:11 mrg Exp $	*/
 
 /*
@@ -107,6 +107,7 @@ void	filt_ptcrdetach(struct knote *);
 int	filt_ptcread(struct knote *, long);
 void	filt_ptcwdetach(struct knote *);
 int	filt_ptcwrite(struct knote *, long);
+int	filt_ptcexcept(struct knote *, long);
 
 static struct pt_softc **ptyarralloc(int);
 static int check_pty(int);
@@ -334,7 +335,7 @@ ptswrite(dev_t dev, struct uio *uio, int flag)
 	struct pt_softc *pti = pt_softc[minor(dev)];
 	struct tty *tp = pti->pt_tty;
 
-	if (tp->t_oproc == 0)
+	if (tp->t_oproc == NULL)
 		return (EIO);
 	return ((*linesw[tp->t_line].l_write)(tp, uio, flag));
 }
@@ -428,7 +429,7 @@ ptcclose(dev_t dev, int flag, int devtype, struct proc *p)
 
 	(void)(*linesw[tp->t_line].l_modem)(tp, 0);
 	tp->t_state &= ~TS_CARR_ON;
-	tp->t_oproc = 0;		/* mark closed */
+	tp->t_oproc = NULL;		/* mark closed */
 	return (0);
 }
 
@@ -670,16 +671,6 @@ filt_ptcread(struct knote *kn, long hint)
 	tp = pti->pt_tty;
 	kn->kn_data = 0;
 
-	if (kn->kn_sfflags & NOTE_OOB) {
-		/* If in packet or user control mode, check for data. */
-		if (((pti->pt_flags & PF_PKT) && pti->pt_send) ||
-		    ((pti->pt_flags & PF_UCNTL) && pti->pt_ucntl)) {
-			kn->kn_fflags |= NOTE_OOB;
-			kn->kn_data = 1;
-			return (1);
-		}
-		return (0);
-	}
 	if (ISSET(tp->t_state, TS_ISOPEN)) {
 		if (!ISSET(tp->t_state, TS_TTSTOP))
 			kn->kn_data = tp->t_outq.c_cc;
@@ -731,6 +722,34 @@ filt_ptcwrite(struct knote *kn, long hint)
 	return (kn->kn_data > 0);
 }
 
+int
+filt_ptcexcept(struct knote *kn, long hint)
+{
+	struct pt_softc *pti = (struct pt_softc *)kn->kn_hook;
+	struct tty *tp;
+
+	tp = pti->pt_tty;
+
+	if (kn->kn_sfflags & NOTE_OOB) {
+		/* If in packet or user control mode, check for data. */
+		if (((pti->pt_flags & PF_PKT) && pti->pt_send) ||
+		    ((pti->pt_flags & PF_UCNTL) && pti->pt_ucntl)) {
+			kn->kn_fflags |= NOTE_OOB;
+			kn->kn_data = 1;
+			return (1);
+		}
+		return (0);
+	}
+	if (!ISSET(tp->t_state, TS_CARR_ON)) {
+		kn->kn_flags |= EV_EOF;
+		if (kn->kn_flags & __EV_POLL)
+			kn->kn_flags |= __EV_HUP;
+		return (1);
+	}
+
+	return (0);
+}
+
 const struct filterops ptcread_filtops = {
 	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
@@ -749,7 +768,7 @@ const struct filterops ptcexcept_filtops = {
 	.f_flags	= FILTEROP_ISFD,
 	.f_attach	= NULL,
 	.f_detach	= filt_ptcrdetach,
-	.f_event	= filt_ptcread,
+	.f_event	= filt_ptcexcept,
 };
 
 int

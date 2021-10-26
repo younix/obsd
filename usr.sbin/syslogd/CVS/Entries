@@ -7,8 +7,8 @@
 /ringbuf.c/1.10/Sun Oct 16 22:12:50 2016//
 /syslog.conf.5/1.39/Sun Jan 13 11:07:47 2019//
 /syslogd.8/1.60/Thu Sep 27 08:33:25 2018//
-/privsep.c/1.73/Thu Sep  2 14:22:33 2021//
 /syslogd.h/1.35/Tue Sep 14 08:17:43 2021//
 /ttymsg.c/1.19/Tue Sep 14 08:17:43 2021//
-/syslogd.c/1.270/Wed Oct 20 17:29:20 2021//
+/privsep.c/1.74/Tue Oct 26 13:44:03 2021//
+/syslogd.c/1.271/Tue Oct 26 13:44:03 2021//
 D

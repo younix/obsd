@@ -8,7 +8,6 @@
 /extern.h/1.29/Sun Sep 16 02:38:57 2018//
 /fio.c/1.38/Fri Jun 28 13:35:01 2019//
 /head.c/1.12/Fri Jan 17 18:42:30 2014//
-/lex.c/1.41/Fri Jun 28 13:35:01 2019//
 /list.c/1.20/Fri Oct 16 17:56:07 2015//
 /names.c/1.25/Fri Jun 28 13:35:02 2019//
 /pathnames.h/1.7/Tue Jun  3 02:56:11 2003//
@@ -29,3 +28,4 @@ D/misc////
 /glob.h/1.10/Wed Sep  1 16:07:40 2021//
 /mail.1/1.81/Wed Sep  1 16:07:40 2021//
 /main.c/1.35/Wed Sep  1 16:07:40 2021//
+/lex.c/1.42/Tue Oct 26 13:43:57 2021//

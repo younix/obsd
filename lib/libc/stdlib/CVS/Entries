@@ -18,7 +18,6 @@
 /atol.3/1.10/Thu Sep 10 15:16:43 2015//
 /atol.c/1.5/Mon Aug  8 08:05:36 2005//
 /atoll.3/1.8/Thu Sep 10 15:16:43 2015//
-/atoll.c/1.3/Mon Aug  8 08:05:36 2005//
 /bsearch.3/1.10/Mon Nov 30 17:03:05 2015//
 /bsearch.c/1.8/Sat Oct 22 19:19:34 2016//
 /div.3/1.12/Sun Aug 14 23:18:03 2016//
@@ -32,8 +31,6 @@
 /gcvt.c/1.14/Fri Jan 25 00:19:25 2019//
 /getenv.3/1.21/Fri Jul 11 09:24:03 2014//
 /getenv.c/1.12/Sun Mar 13 18:34:21 2016//
-/getopt.3/1.46/Mon Jan  4 19:43:13 2016//
-/getopt_long.3/1.22/Mon Jan 13 18:05:10 2020//
 /getsubopt.c/1.4/Mon Aug  8 08:05:36 2005//
 /hcreate.3/1.8/Tue Jan 30 11:37:58 2018//
 /hcreate.c/1.7/Sun May 29 20:47:49 2016//
@@ -105,4 +102,7 @@
 /getsubopt.3/1.15/Tue Sep 14 08:17:17 2021//
 /malloc.c/1.272/Wed Oct 20 17:28:43 2021//
 /realpath.3/1.26/Wed Oct 20 17:28:43 2021//
+/atoll.c/1.4/Tue Oct 26 13:43:25 2021//
+/getopt.3/1.47/Tue Oct 26 13:43:25 2021//
+/getopt_long.3/1.23/Tue Oct 26 13:43:25 2021//
 D

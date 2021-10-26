@@ -16,7 +16,6 @@
 /ex_file.c/1.9/Fri May 27 09:18:12 2016//
 /ex_filter.c/1.15/Mon Aug  1 18:27:35 2016//
 /ex_global.c/1.17/Fri May 27 09:18:12 2016//
-/ex_init.c/1.18/Tue Apr 18 01:45:35 2017//
 /ex_join.c/1.8/Wed Jan  6 22:28:52 2016//
 /ex_map.c/1.9/Fri May 27 09:18:12 2016//
 /ex_mark.c/1.7/Wed Jan  6 22:28:52 2016//
@@ -33,10 +32,8 @@
 /ex_set.c/1.6/Wed Nov 12 04:28:41 2014//
 /ex_shell.c/1.15/Sat Mar 28 12:54:37 2015//
 /ex_shift.c/1.9/Thu Apr 30 10:40:21 2020//
-/ex_source.c/1.10/Mon Dec  7 20:39:19 2015//
 /ex_stop.c/1.6/Wed Nov 12 04:28:41 2014//
 /ex_subst.c/1.30/Tue Apr 18 01:45:35 2017//
-/ex_tag.c/1.25/Tue Apr 18 01:45:35 2017//
 /ex_txt.c/1.17/Thu Apr 30 10:40:21 2020//
 /ex_undo.c/1.6/Wed Nov 12 04:28:41 2014//
 /ex_usage.c/1.10/Fri Jul 13 09:02:07 2018//
@@ -49,4 +46,7 @@
 /script.h/1.4/Wed Nov 12 16:29:04 2014//
 /tag.h/1.7/Thu Nov 19 07:53:31 2015//
 /version.h/1.9/Mon Jan 29 01:58:46 2001//
+/ex_init.c/1.19/Tue Oct 26 13:43:59 2021//
+/ex_source.c/1.11/Tue Oct 26 13:43:59 2021//
+/ex_tag.c/1.26/Tue Oct 26 13:43:59 2021//
 D

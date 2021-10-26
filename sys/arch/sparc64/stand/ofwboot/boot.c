@@ -1,4 +1,4 @@
-/*	$OpenBSD: boot.c,v 1.36 2021/01/30 21:06:45 deraadt Exp $	*/
+/*	$OpenBSD: boot.c,v 1.38 2021/10/26 10:45:55 patrick Exp $	*/
 /*	$NetBSD: boot.c,v 1.3 2001/05/31 08:55:19 mrg Exp $	*/
 /*
  * Copyright (c) 1997, 1999 Eduardo E. Horvath.  All rights reserved.
@@ -287,8 +287,6 @@ loadrandom(char *path, char *buf, size_t buflen)
 	struct stat sb;
 	int fd, i, error = 0;
 
-#define O_RDONLY	0
-
 	fd = open(path, O_RDONLY);
 	if (fd == -1)
 		return -1;
@@ -483,7 +481,7 @@ main(void)
 		rc4_keysetup(&randomctx, rnddata, sizeof rnddata);
 		rc4_skip(&randomctx, 1536);
 
-		if ((fd = open(bootline, 0)) < 0) {
+		if ((fd = open(bootline, O_RDONLY)) < 0) {
 			printf("open %s: %s\n", opened_name, strerror(errno));
 			continue;
 		}

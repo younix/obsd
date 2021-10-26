@@ -119,11 +119,9 @@
 /wait.h/1.18/Wed Sep  1 16:07:40 2021//
 /chio.h/1.8/Thu Sep  2 14:22:33 2021//
 /domain.h/1.22/Thu Sep  2 14:22:33 2021//
-/event.h/1.56/Thu Sep  2 14:22:33 2021//
 /eventvar.h/1.12/Thu Sep  2 14:22:33 2021//
 /namei.h/1.48/Tue Sep 14 08:17:37 2021//
 /pledge.h/1.42/Thu Sep  2 14:22:33 2021//
-/proc.h/1.314/Thu Sep  2 14:22:33 2021//
 /protosw.h/1.32/Thu Sep  2 14:22:33 2021//
 /socket.h/1.100/Thu Sep  2 14:22:33 2021//
 /socketvar.h/1.100/Thu Sep  2 14:22:33 2021//
@@ -137,5 +135,7 @@
 /signalvar.h/1.50/Wed Oct 20 17:29:15 2021//
 /specdev.h/1.40/Wed Oct 20 17:29:15 2021//
 /vnode.h/1.162/Wed Oct 20 17:29:15 2021//
-/file.h/1.63/Fri Oct 22 09:05:31 2021//
+/event.h/1.57/Tue Oct 26 13:43:56 2021//
+/file.h/1.64/Tue Oct 26 13:43:56 2021//
+/proc.h/1.315/Tue Oct 26 13:43:56 2021//
 D

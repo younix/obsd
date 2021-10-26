@@ -1,4 +1,4 @@
-/*	$OpenBSD: roa.c,v 1.26 2021/10/07 08:28:45 claudio Exp $ */
+/*	$OpenBSD: roa.c,v 1.28 2021/10/26 10:52:50 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -327,7 +327,7 @@ out:
  * Returns the ROA or NULL if the document was malformed.
  */
 struct roa *
-roa_parse(X509 **x509, const char *fn)
+roa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 {
 	struct parse	 p;
 	size_t		 cmsz;
@@ -348,7 +348,7 @@ roa_parse(X509 **x509, const char *fn)
 			    "1.2.840.113549.1.9.16.1.24");
 	}
 
-	cms = cms_parse_validate(x509, fn, roa_oid, &cmsz);
+	cms = cms_parse_validate(x509, fn, der, len, roa_oid, &cmsz);
 	if (cms == NULL)
 		return NULL;
 
@@ -448,7 +448,7 @@ roa_buffer(struct ibuf *b, const struct roa *p)
  * Result must be passed to roa_free().
  */
 struct roa *
-roa_read(int fd)
+roa_read(struct ibuf *b)
 {
 	struct roa	*p;
 	size_t		 i;
@@ -456,26 +456,26 @@ roa_read(int fd)
 	if ((p = calloc(1, sizeof(struct roa))) == NULL)
 		err(1, NULL);
 
-	io_simple_read(fd, &p->valid, sizeof(int));
-	io_simple_read(fd, &p->asid, sizeof(uint32_t));
-	io_simple_read(fd, &p->ipsz, sizeof(size_t));
-	io_simple_read(fd, &p->expires, sizeof(time_t));
+	io_read_buf(b, &p->valid, sizeof(int));
+	io_read_buf(b, &p->asid, sizeof(uint32_t));
+	io_read_buf(b, &p->ipsz, sizeof(size_t));
+	io_read_buf(b, &p->expires, sizeof(time_t));
 
 	if ((p->ips = calloc(p->ipsz, sizeof(struct roa_ip))) == NULL)
 		err(1, NULL);
 
 	for (i = 0; i < p->ipsz; i++) {
-		io_simple_read(fd, &p->ips[i].afi, sizeof(enum afi));
-		io_simple_read(fd, &p->ips[i].maxlength, sizeof(size_t));
-		io_simple_read(fd, &p->ips[i].min, sizeof(p->ips[i].min));
-		io_simple_read(fd, &p->ips[i].max, sizeof(p->ips[i].max));
-		ip_addr_read(fd, &p->ips[i].addr);
+		io_read_buf(b, &p->ips[i].afi, sizeof(enum afi));
+		io_read_buf(b, &p->ips[i].maxlength, sizeof(size_t));
+		io_read_buf(b, &p->ips[i].min, sizeof(p->ips[i].min));
+		io_read_buf(b, &p->ips[i].max, sizeof(p->ips[i].max));
+		ip_addr_read(b, &p->ips[i].addr);
 	}
 
-	io_str_read(fd, &p->aia);
-	io_str_read(fd, &p->aki);
-	io_str_read(fd, &p->ski);
-	io_str_read(fd, &p->tal);
+	io_read_str(b, &p->aia);
+	io_read_str(b, &p->aki);
+	io_read_str(b, &p->ski);
+	io_read_str(b, &p->tal);
 	assert(p->aia && p->aki && p->ski && p->tal);
 
 	return p;

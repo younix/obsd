@@ -186,7 +186,6 @@
 /args-sendsyslog-fault.pl/1.1/Wed Sep  1 16:07:38 2021//
 /args-sendsyslog-logstash.pl/1.1/Wed Sep  1 16:07:38 2021//
 /args-sendsyslog-nostash.pl/1.1/Wed Sep  1 16:07:38 2021//
-/logflush.c/1.1/Wed Sep  1 16:07:38 2021//
 /args-client-tls-tcp.pl/1.8/Thu Sep  2 14:22:31 2021//
 /args-privsep.pl/1.6/Thu Sep  2 14:22:31 2021//
 /args-server-tls-tcp.pl/1.13/Thu Sep  2 14:22:31 2021//
@@ -201,4 +200,5 @@
 /args-tls-cafile-fake.pl/1.15/Thu Sep  2 14:22:31 2021//
 /ttylog.c/1.8/Thu Sep  2 14:22:31 2021//
 /args-server-tls-error.pl/1.8/Wed Oct 20 17:29:05 2021//
+/logflush.c/1.2/Tue Oct 26 13:43:47 2021//
 D

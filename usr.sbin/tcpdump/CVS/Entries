@@ -88,7 +88,6 @@
 /print-sl.c/1.21/Mon Oct 22 16:12:45 2018//
 /print-slow.c/1.4/Mon Nov 16 00:16:39 2015//
 /print-smb.c/1.5/Tue May 30 20:10:45 2017//
-/print-snmp.c/1.25/Fri Jan 24 22:46:37 2020//
 /print-stp.c/1.9/Fri Jan 16 06:40:21 2015//
 /print-sunrpc.c/1.20/Mon Nov 16 00:16:39 2015//
 /print-tcp.c/1.39/Fri Jan 24 22:46:37 2020//
@@ -125,8 +124,9 @@
 /print-ppp.c/1.35/Wed Sep  1 16:07:41 2021//
 /print-802_11.c/1.41/Thu Sep  2 14:22:33 2021//
 /print-bgp.c/1.30/Thu Sep  2 14:22:33 2021//
-/privsep.c/1.56/Thu Sep  2 14:22:33 2021//
 /tcpdump.8/1.112/Tue Sep 14 08:17:43 2021//
 /extract.h/1.10/Wed Oct 20 17:29:20 2021//
 /print-wg.c/1.7/Wed Oct 20 17:29:20 2021//
+/print-snmp.c/1.28/Tue Oct 26 13:44:03 2021//
+/privsep.c/1.57/Tue Oct 26 13:44:03 2021//
 D

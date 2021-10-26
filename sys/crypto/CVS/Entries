@@ -50,9 +50,9 @@
 /set_key.c/1.5/Wed Sep  1 16:07:39 2021//
 /sha2.c/1.19/Wed Sep  1 16:07:39 2021//
 /cryptosoft.h/1.16/Thu Sep  2 14:22:31 2021//
-/xform.c/1.60/Thu Sep  2 14:22:31 2021//
-/xform.h/1.31/Thu Sep  2 14:22:31 2021//
-/cryptosoft.c/1.89/Wed Oct 20 17:29:11 2021//
-/crypto.c/1.89/Fri Oct 22 09:05:28 2021//
-/cryptodev.h/1.78/Fri Oct 22 09:05:28 2021//
+/crypto.c/1.92/Tue Oct 26 13:43:52 2021//
+/cryptodev.h/1.81/Tue Oct 26 13:43:52 2021//
+/cryptosoft.c/1.91/Tue Oct 26 13:43:52 2021//
+/xform.c/1.61/Tue Oct 26 13:43:52 2021//
+/xform.h/1.32/Tue Oct 26 13:43:52 2021//
 D

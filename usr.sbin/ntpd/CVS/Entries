@@ -3,14 +3,12 @@
 /log.c/1.19/Wed Jul  3 05:04:19 2019//
 /log.h/1.5/Thu Jun 27 15:18:42 2019//
 /ntp.h/1.14/Thu Jan 30 15:55:41 2020//
-/ntp_dns.c/1.26/Sun Apr 12 14:20:56 2020//
 /ntp_msg.c/1.22/Sat Sep  3 11:52:06 2016//
 /ntpctl.8/1.8/Wed Mar 11 19:38:48 2015//
 /ntpd.8/1.45/Mon Nov 11 17:42:28 2019//
 /sensors.c/1.54/Mon Nov 11 06:32:52 2019//
 /server.c/1.44/Sat Sep  3 11:52:06 2016//
 /util.c/1.25/Thu Jan 30 15:55:41 2020//
-/ntp.c/1.167/Thu Dec 17 19:39:59 2020//
 /ntpd.h/1.150/Thu Dec 17 19:39:59 2020//
 /client.c/1.116/Wed Sep  1 16:07:41 2021//
 /control.c/1.19/Wed Sep  1 16:07:41 2021//
@@ -18,4 +16,6 @@
 /constraint.c/1.52/Thu Sep  2 14:22:33 2021//
 /ntpd.c/1.132/Thu Sep  2 14:22:33 2021//
 /parse.y/1.78/Wed Oct 20 17:29:20 2021//
+/ntp.c/1.168/Tue Oct 26 13:44:02 2021//
+/ntp_dns.c/1.27/Tue Oct 26 13:44:02 2021//
 D

@@ -44,11 +44,11 @@
 /name_match.c/1.4/Tue Jan 12 23:22:06 2010//
 /parse_entry.c/1.13/Tue Jan 12 23:22:06 2010//
 /read_entry.c/1.17/Thu Dec  3 11:29:55 2015//
-/read_termcap.c/1.22/Tue Jan 12 23:22:06 2010//
 /setbuf.c/1.5/Tue Jan 12 23:22:06 2010//
 /strings.c/1.4/Tue Jan 12 23:22:06 2010//
 /trim_sgr0.c/1.1/Tue Jan 12 23:22:06 2010//
 /use_screen.c/1.1/Tue Jan 12 23:22:06 2010//
 /write_entry.c/1.13/Tue Jan 12 23:22:06 2010//
 /lib_setup.c/1.13/Wed Sep  1 16:07:37 2021//
+/read_termcap.c/1.23/Tue Oct 26 13:43:27 2021//
 D

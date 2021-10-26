@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.c,v 1.219 2021/07/20 16:32:28 bluhm Exp $ */
+/* $OpenBSD: pfkeyv2.c,v 1.221 2021/10/25 18:25:01 bluhm Exp $ */
 
 /*
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
@@ -118,8 +118,7 @@ static const struct sadb_alg aalgs[] = {
 };
 
 static const struct sadb_alg calgs[] = {
-	{ SADB_X_CALG_DEFLATE, 0, 0, 0},
-	{ SADB_X_CALG_LZS, 0, 0, 0}
+	{ SADB_X_CALG_DEFLATE, 0, 0, 0}
 };
 
 struct pool pkpcb_pool;
@@ -1043,8 +1042,10 @@ int
 pfkeyv2_sa_flush(struct tdb *tdb, void *satype_vp, int last)
 {
 	if (!(*((u_int8_t *) satype_vp)) ||
-	    tdb->tdb_satype == *((u_int8_t *) satype_vp))
-		tdb_delete(tdb);
+	    tdb->tdb_satype == *((u_int8_t *) satype_vp)) {
+		tdb_unlink_locked(tdb);
+		tdb_free(tdb);
+	}
 	return (0);
 }
 
@@ -2266,11 +2267,6 @@ pfkeyv2_acquire(struct ipsec_policy *ipo, union sockaddr_union *gw,
 			if (!strncasecmp(ipsec_def_comp, "deflate",
 			    sizeof("deflate"))) {
 				sadb_comb->sadb_comb_encrypt = SADB_X_CALG_DEFLATE;
-				sadb_comb->sadb_comb_encrypt_minbits = 0;
-				sadb_comb->sadb_comb_encrypt_maxbits = 0;
-			} else if (!strncasecmp(ipsec_def_comp, "lzs",
-			    sizeof("lzs"))) {
-				sadb_comb->sadb_comb_encrypt = SADB_X_CALG_LZS;
 				sadb_comb->sadb_comb_encrypt_minbits = 0;
 				sadb_comb->sadb_comb_encrypt_maxbits = 0;
 			}

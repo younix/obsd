@@ -1,5 +1,4 @@
 /Makefile/1.5/Thu May 23 18:43:00 2002//
-/bog.c/1.33/Mon Sep 12 20:11:10 2016//
 /bog.h/1.4/Thu Mar 20 12:02:27 2008//
 /boggle.6/1.21/Sat Sep 12 16:10:25 2015//
 /extern.h/1.9/Fri Dec 25 20:59:09 2015//
@@ -9,4 +8,5 @@
 /prtable.c/1.11/Mon Aug  4 18:42:09 2008//
 /timer.c/1.15/Sat Aug 27 02:11:27 2016//
 /word.c/1.8/Sun Jan 10 13:18:07 2016//
+/bog.c/1.34/Tue Oct 26 13:42:40 2021//
 D

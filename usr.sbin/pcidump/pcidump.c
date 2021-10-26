@@ -1,4 +1,4 @@
-/*	$OpenBSD: pcidump.c,v 1.66 2021/07/16 09:14:17 jsg Exp $	*/
+/*	$OpenBSD: pcidump.c,v 1.68 2021/10/25 19:54:29 kn Exp $	*/
 
 /*
  * Copyright (c) 2006, 2007 David Gwynne <loki@animata.net>
@@ -223,13 +223,13 @@ main(int argc, char *argv[])
 		dumpall = 0;
 
 	if (dumpall == 0) {
-		pcifd = open(pcidev, O_RDONLY, 0777);
+		pcifd = open(pcidev, O_RDONLY);
 		if (pcifd == -1)
 			err(1, "%s", pcidev);
 	} else {
 		for (;;) {
 			snprintf(pcidev, 16, "/dev/pci%d", domid++);
-			pcifd = open(pcidev, O_RDONLY, 0777);
+			pcifd = open(pcidev, O_RDONLY);
 			if (pcifd == -1) {
 				if (errno == ENXIO || errno == ENOENT) {
 					return 0;
@@ -377,7 +377,7 @@ print_vpd(const uint8_t *buf, size_t len)
 	const struct pci_vpd *vpd;
 	char key0[8];
 	char key1[8];
-	size_t vlen, i;
+	size_t vlen;
 
 	while (len > 0) {
 		if (len < sizeof(*vpd))
@@ -411,7 +411,6 @@ dump_vpd(int bus, int dev, int func)
 	uint32_t data[64]; /* XXX this can be up to 32k of data */
 	uint8_t *buf = (uint8_t *)data;
 	size_t len = sizeof(data);
-	size_t i;
 
 	bzero(&io, sizeof(io));
 	io.pv_sel.pc_bus = bus;
@@ -1124,7 +1123,7 @@ dump_vga_bios(void)
 	void *bios;
 	int fd;
 
-	fd = open(_PATH_MEM, O_RDONLY, 0777);
+	fd = open(_PATH_MEM, O_RDONLY);
 	if (fd == -1)
 		err(1, "%s", _PATH_MEM);
 

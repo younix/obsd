@@ -1,4 +1,4 @@
-/* $OpenBSD: ca.c,v 1.49 2021/09/05 04:05:14 inoguchi Exp $ */
+/* $OpenBSD: ca.c,v 1.51 2021/10/23 12:00:18 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1764,7 +1764,6 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 			X509_NAME_free(n);
 			goto err;
 		}
-		req->req_info->enc.modified = 1;
 		X509_NAME_free(n);
 	}
 	if (default_op)
@@ -1785,7 +1784,7 @@ do_body(X509 **xret, EVP_PKEY *pkey, X509 *x509, const EVP_MD *dgst,
 
 		if (ca_config.msie_hack) {
 			/* assume all type should be strings */
-			nid = OBJ_obj2nid(ne->object);
+			nid = OBJ_obj2nid(X509_NAME_ENTRY_get_object(ne));
 			if (nid == NID_undef)
 				goto err;
 
@@ -2329,7 +2328,6 @@ certify_spkac(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 	X509_REQ *req = NULL;
 	CONF_VALUE *cv = NULL;
 	NETSCAPE_SPKI *spki = NULL;
-	X509_REQ_INFO *ri;
 	char *type, *buf;
 	EVP_PKEY *pktmp = NULL;
 	X509_NAME *n = NULL;
@@ -2371,8 +2369,7 @@ certify_spkac(X509 **xret, char *infile, EVP_PKEY *pkey, X509 *x509,
 	/*
 	 * Build up the subject name set.
 	 */
-	ri = req->req_info;
-	n = ri->subject;
+	n = X509_REQ_get_subject_name(req);
 
 	for (i = 0;; i++) {
 		if (sk_CONF_VALUE_num(sk) <= i)

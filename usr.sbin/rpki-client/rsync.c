@@ -1,4 +1,4 @@
-/*	$OpenBSD: rsync.c,v 1.25 2021/09/01 12:26:26 claudio Exp $ */
+/*	$OpenBSD: rsync.c,v 1.28 2021/10/23 20:01:16 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -120,6 +120,7 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 	int			 rc = 0;
 	struct pollfd		 pfd;
 	struct msgbuf		 msgq;
+	struct ibuf		*b, *inbuf = NULL;
 	sigset_t		 mask, oldmask;
 	struct rsyncproc	*ids = NULL;
 
@@ -178,7 +179,6 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 
 	for (;;) {
 		char *uri = NULL, *dst = NULL;
-		ssize_t ssz;
 		size_t id;
 		pid_t pid;
 		int st;
@@ -199,7 +199,6 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 			 */
 
 			while ((pid = waitpid(WAIT_ANY, &st, WNOHANG)) > 0) {
-				struct ibuf *b;
 				int ok = 1;
 
 				for (i = 0; i < idsz; i++)
@@ -217,12 +216,10 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 					ok = 0;
 				}
 
-				b = ibuf_open(sizeof(size_t) + sizeof(ok));
-				if (b == NULL)
-					err(1, NULL);
+				b = io_new_buffer();
 				io_simple_buffer(b, &ids[i].id, sizeof(size_t));
 				io_simple_buffer(b, &ok, sizeof(ok));
-				ibuf_close(&msgq, b);
+				io_close_buffer(&msgq, b);
 
 				free(ids[i].uri);
 				ids[i].uri = NULL;
@@ -243,23 +240,24 @@ proc_rsync(char *prog, char *bind_addr, int fd)
 			}
 		}
 
+		/* connection closed */
+		if (pfd.revents & POLLHUP)
+			break;
+
 		if (!(pfd.revents & POLLIN))
 			continue;
 
-		/*
-		 * Read til the parent exits.
-		 * That will mean that we can safely exit.
-		 */
-
-		if ((ssz = read(fd, &id, sizeof(size_t))) == -1)
-			err(1, "read");
-		if (ssz == 0)
-			break;
+		b = io_buf_read(fd, &inbuf);
+		if (b == NULL)
+			continue;
 
 		/* Read host and module. */
+		io_read_buf(b, &id, sizeof(id));
+		io_read_str(b, &dst);
+		io_read_str(b, &uri);
 
-		io_str_read(fd, &dst);
-		io_str_read(fd, &uri);
+		ibuf_free(b);
+
 		assert(dst);
 		assert(uri);
 

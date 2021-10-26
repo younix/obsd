@@ -44,7 +44,6 @@
 /acpihpet.c/1.25/Wed Sep  1 16:07:39 2021//
 /acpiprt.c/1.51/Wed Sep  1 16:07:39 2021//
 /acpipwrres.c/1.10/Wed Sep  1 16:07:39 2021//
-/acpireg.h/1.55/Wed Sep  1 16:07:39 2021//
 /acpitimer.c/1.14/Wed Sep  1 16:07:39 2021//
 /acpitz.c/1.56/Wed Sep  1 16:07:39 2021//
 /acpivar.h/1.114/Wed Sep  1 16:07:39 2021//
@@ -62,6 +61,7 @@
 /acpidmar.c/1.5/Thu Sep  2 14:22:31 2021//
 /dsdt.c/1.263/Thu Sep  2 14:22:31 2021//
 /imxiic_acpi.c/1.2/Thu Sep  2 14:22:31 2021//
-/tpm.c/1.12/Tue Sep 14 08:17:33 2021//
 /pchgpio.c/1.8/Wed Oct 20 17:29:11 2021//
+/acpireg.h/1.56/Tue Oct 26 13:43:53 2021//
+/tpm.c/1.13/Tue Oct 26 13:43:53 2021//
 D
