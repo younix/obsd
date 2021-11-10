@@ -33,9 +33,9 @@
 /locore.S/1.39/Tue Sep 14 08:17:31 2021//
 /machdep.c/1.65/Thu Sep  2 14:22:31 2021//
 /vfp.c/1.6/Thu Sep  2 14:22:31 2021//
-/pmap.c/1.81/Wed Oct 20 17:29:08 2021//
 /sig_machdep.c/1.8/Wed Oct 20 17:29:08 2021//
 /acpi_machdep.c/1.16/Tue Oct 26 13:43:50 2021//
 /cpu.c/1.56/Tue Oct 26 13:43:50 2021//
 /cryptox.c/1.5/Tue Oct 26 13:43:50 2021//
+/pmap.c/1.82/Wed Nov 10 16:46:46 2021//
 D

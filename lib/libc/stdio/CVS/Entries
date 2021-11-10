@@ -6,7 +6,6 @@
 /fclose.c/1.10/Mon Aug 31 02:53:57 2015//
 /fdopen.c/1.10/Fri Jun 28 13:32:42 2019//
 /feof.c/1.9/Mon Aug 31 02:53:57 2015//
-/ferror.3/1.10/Wed Jul 17 05:42:11 2013//
 /ferror.c/1.9/Mon Aug 31 02:53:57 2015//
 /fflush.3/1.13/Sat Sep  7 10:28:27 2019//
 /fflush.c/1.9/Mon Aug 31 02:53:57 2015//
@@ -136,4 +135,5 @@
 /wprintf.3/1.9/Tue Sep 14 08:17:17 2021//
 /fputws.c/1.9/Tue Oct 26 13:43:25 2021//
 /getwchar.c/1.3/Tue Oct 26 13:43:25 2021//
+/ferror.3/1.11/Wed Nov 10 16:46:24 2021//
 D

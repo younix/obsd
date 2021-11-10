@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_alt.c,v 1.3 2021/10/26 09:09:53 beck Exp $ */
+/* $OpenBSD: x509_alt.c,v 1.5 2021/10/28 10:58:23 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */

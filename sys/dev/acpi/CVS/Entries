@@ -26,7 +26,6 @@
 /xhci_acpi.c/1.3/Fri May  8 11:18:01 2020//
 /acpihve.c/1.3/Mon Jun  1 06:23:26 2020//
 /acpihid.c/1.2/Sat Jun  6 11:21:49 2020//
-/acpiac.c/1.33/Fri Dec 11 17:58:22 2020//
 /acpibat.c/1.68/Fri Dec 11 17:58:22 2020//
 /acpisbs.c/1.10/Fri Dec 11 17:58:22 2020//
 /acpiutil.c/1.9/Fri Dec 11 17:58:22 2020//
@@ -56,7 +55,6 @@
 /dwgpio.c/1.3/Wed Sep  1 16:07:39 2021//
 /glkgpio.c/1.3/Wed Sep  1 16:07:39 2021//
 /sdhc_acpi.c/1.18/Wed Sep  1 16:07:39 2021//
-/acpi.c/1.399/Thu Sep  2 14:22:31 2021//
 /acpicpu.c/1.90/Thu Sep  2 14:22:31 2021//
 /acpidmar.c/1.5/Thu Sep  2 14:22:31 2021//
 /dsdt.c/1.263/Thu Sep  2 14:22:31 2021//
@@ -64,4 +62,6 @@
 /pchgpio.c/1.8/Wed Oct 20 17:29:11 2021//
 /acpireg.h/1.56/Tue Oct 26 13:43:53 2021//
 /tpm.c/1.13/Tue Oct 26 13:43:53 2021//
+/acpi.c/1.401/Wed Nov 10 16:46:48 2021//
+/acpiac.c/1.34/Wed Nov 10 16:46:48 2021//
 D

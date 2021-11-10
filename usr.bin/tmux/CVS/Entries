@@ -15,7 +15,6 @@
 /layout.c/1.48/Wed Sep  1 16:07:40 2021//
 /proc.c/1.20/Wed Sep  1 16:07:40 2021//
 /Makefile/1.108/Thu Sep  2 14:22:33 2021//
-/arguments.c/1.51/Tue Sep 14 08:17:39 2021//
 /cfg.c/1.84/Thu Sep  2 14:22:33 2021//
 /client.c/1.156/Thu Sep  2 14:22:33 2021//
 /cmd-attach-session.c/1.87/Thu Sep  2 14:22:33 2021//
@@ -23,7 +22,6 @@
 /cmd-break-pane.c/1.60/Thu Sep  2 14:22:33 2021//
 /cmd-capture-pane.c/1.55/Thu Sep  2 14:22:33 2021//
 /cmd-choose-tree.c/1.50/Thu Sep  2 14:22:33 2021//
-/cmd-confirm-before.c/1.51/Tue Sep 14 08:17:39 2021//
 /cmd-copy-mode.c/1.47/Thu Sep  2 14:22:33 2021//
 /cmd-detach-client.c/1.36/Thu Sep  2 14:22:33 2021//
 /cmd-display-panes.c/1.44/Thu Sep  2 14:22:33 2021//
@@ -101,11 +99,6 @@
 /cmd-run-shell.c/1.82/Wed Oct 20 17:29:17 2021//
 /cmd-send-keys.c/1.71/Wed Oct 20 17:29:17 2021//
 /cmd-split-window.c/1.111/Wed Oct 20 17:29:17 2021//
-/input.c/1.193/Wed Oct 20 17:29:17 2021//
-/options-table.c/1.152/Wed Oct 20 17:29:17 2021//
-/options.c/1.65/Wed Oct 20 17:29:17 2021//
-/screen.c/1.76/Wed Oct 20 17:29:17 2021//
-/server-client.c/1.388/Wed Oct 20 17:29:17 2021//
 /session.c/1.90/Wed Oct 20 17:29:17 2021//
 /tty-acs.c/1.12/Wed Oct 20 17:29:17 2021//
 /window-copy.c/1.331/Wed Oct 20 17:29:17 2021//
@@ -115,7 +108,6 @@
 /tty-keys.c/1.151/Fri Oct 22 09:07:37 2021//
 /cmd-display-menu.c/1.37/Tue Oct 26 13:43:59 2021//
 /cmd-pipe-pane.c/1.59/Tue Oct 26 13:43:59 2021//
-/colour.c/1.23/Tue Oct 26 13:43:59 2021//
 /format-draw.c/1.25/Tue Oct 26 13:43:59 2021//
 /format.c/1.299/Tue Oct 26 13:43:59 2021//
 /job.c/1.66/Tue Oct 26 13:43:59 2021//
@@ -124,8 +116,16 @@
 /popup.c/1.42/Tue Oct 26 13:43:59 2021//
 /screen-redraw.c/1.91/Tue Oct 26 13:43:59 2021//
 /screen-write.c/1.205/Tue Oct 26 13:43:59 2021//
-/status.c/1.229/Tue Oct 26 13:43:59 2021//
-/tmux.1/1.867/Tue Oct 26 13:43:59 2021//
-/tmux.h/1.1151/Tue Oct 26 13:43:59 2021//
-/tty.c/1.408/Tue Oct 26 13:43:59 2021//
+/arguments.c/1.52/Wed Nov 10 16:46:53 2021//
+/cmd-confirm-before.c/1.52/Wed Nov 10 16:46:53 2021//
+/colour.c/1.24/Wed Nov 10 16:46:53 2021//
+/input.c/1.195/Wed Nov 10 16:46:53 2021//
+/options-table.c/1.154/Wed Nov 10 16:46:53 2021//
+/options.c/1.67/Wed Nov 10 16:46:53 2021//
+/screen.c/1.78/Wed Nov 10 16:46:53 2021//
+/server-client.c/1.389/Wed Nov 10 16:46:53 2021//
+/status.c/1.230/Wed Nov 10 16:46:53 2021//
+/tmux.1/1.870/Wed Nov 10 16:46:53 2021//
+/tmux.h/1.1154/Wed Nov 10 16:46:53 2021//
+/tty.c/1.411/Wed Nov 10 16:46:53 2021//
 D

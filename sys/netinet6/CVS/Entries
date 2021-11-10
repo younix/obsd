@@ -23,7 +23,6 @@
 /ip6_mroute.c/1.126/Wed Sep  1 16:07:40 2021//
 /ip6_var.h/1.88/Wed Sep  1 16:07:40 2021//
 /ip6protosw.h/1.14/Wed Sep  1 16:07:40 2021//
-/nd6.c/1.235/Wed Sep  1 16:07:40 2021//
 /udp6_output.c/1.57/Wed Sep  1 16:07:40 2021//
 /icmp6.c/1.236/Thu Sep  2 14:22:32 2021//
 /in6.h/1.109/Thu Sep  2 14:22:32 2021//
@@ -31,4 +30,5 @@
 /ip6_output.c/1.260/Thu Sep  2 14:22:32 2021//
 /ip6_forward.c/1.101/Wed Oct 20 17:29:14 2021//
 /in6_proto.c/1.106/Tue Oct 26 13:43:56 2021//
+/nd6.c/1.236/Wed Nov 10 16:46:51 2021//
 D

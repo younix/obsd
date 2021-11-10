@@ -1,4 +1,4 @@
-/*	$OpenBSD: parser.c,v 1.18 2021/10/26 10:52:50 claudio Exp $ */
+/*	$OpenBSD: parser.c,v 1.28 2021/11/04 18:26:48 claudio Exp $ */
 /*
  * Copyright (c) 2019 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -17,13 +17,11 @@
  */
 
 #include <sys/queue.h>
-#include <sys/stat.h>
 #include <sys/tree.h>
 #include <sys/types.h>
 
 #include <assert.h>
 #include <err.h>
-#include <fcntl.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -42,9 +40,6 @@
 static void		 build_chain(const struct auth *, STACK_OF(X509) **);
 static struct crl	*get_crl(const struct auth *);
 static void		 build_crls(const struct crl *, STACK_OF(X509_CRL) **);
-
-/* Limit how deep the RPKI tree can be. */
-#define	MAX_CERT_DEPTH	12
 
 static X509_STORE_CTX	*ctx;
 static struct auth_tree  auths = RB_INITIALIZER(&auths);
@@ -70,7 +65,6 @@ proc_parser_roa(struct entity *entp, const unsigned char *der, size_t len)
 		return NULL;
 
 	a = valid_ski_aki(entp->file, &auths, roa->ski, roa->aki);
-
 	build_chain(a, &chain);
 	crl = get_crl(a);
 	build_crls(crl, &crls);
@@ -101,14 +95,14 @@ proc_parser_roa(struct entity *entp, const unsigned char *der, size_t len)
 	/*
 	 * Check CRL to figure out the soonest transitive expiry moment
 	 */
-	if (roa->expires > crl->expires)
+	if (crl != NULL && roa->expires > crl->expires)
 		roa->expires = crl->expires;
 
 	/*
 	 * Scan the cert tree to figure out the soonest transitive
 	 * expiry moment
 	 */
-	for (; a->parent != NULL; a = a->parent) {
+	for (; a != NULL; a = a->parent) {
 		if (roa->expires > a->cert->expires)
 			roa->expires = a->cert->expires;
 	}
@@ -191,20 +185,21 @@ proc_parser_mft(struct entity *entp, const unsigned char *der, size_t len)
  * parse failure.
  */
 static struct cert *
-proc_parser_cert(const struct entity *entp)
+proc_parser_cert(const struct entity *entp, const unsigned char *der,
+    size_t len)
 {
 	struct cert		*cert;
 	X509			*x509;
 	int			 c;
-	struct auth		*a = NULL, *na;
+	struct auth		*a = NULL;
 	STACK_OF(X509)		*chain;
 	STACK_OF(X509_CRL)	*crls;
 
-	assert(!entp->has_pkey);
+	assert(!entp->has_data);
 
 	/* Extract certificate data and X509. */
 
-	cert = cert_parse(&x509, entp->file);
+	cert = cert_parse(&x509, entp->file, der, len);
 	if (cert == NULL)
 		return NULL;
 
@@ -237,40 +232,28 @@ proc_parser_cert(const struct entity *entp)
 	X509_STORE_CTX_cleanup(ctx);
 	sk_X509_free(chain);
 	sk_X509_CRL_free(crls);
+	X509_free(x509);
+
+	cert->talid = a->cert->talid;
 
 	/* Validate the cert to get the parent */
 	if (!valid_cert(entp->file, &auths, cert)) {
-		X509_free(x509); // needed? XXX
-		return cert;
+		cert_free(cert);
+		return NULL;
 	}
 
 	/*
-	 * Add validated certs to the RPKI auth tree.
+	 * Add validated CA certs to the RPKI auth tree.
 	 */
-
-	cert->valid = 1;
-
-	na = malloc(sizeof(*na));
-	if (na == NULL)
-		err(1, NULL);
-
-	cert->tal = strdup(a->tal);
-	if (cert->tal == NULL)
-		err(1, NULL);
-
-	na->parent = a;
-	na->cert = cert;
-	na->tal = a->tal;
-	na->fn = strdup(entp->file);
-	if (na->fn == NULL)
-		err(1, NULL);
-
-	if (RB_INSERT(auth_tree, &auths, na) != NULL)
-		err(1, "auth tree corrupted");
+	if (cert->purpose == CERT_PURPOSE_CA) {
+		if (!auth_insert(&auths, cert, a)) {
+			cert_free(cert);
+			return NULL;
+		}
+	}
 
 	return cert;
 }
-
 
 /*
  * Root certificates come from TALs (has a pkey and is self-signed).
@@ -282,21 +265,20 @@ proc_parser_cert(const struct entity *entp)
  * parse failure.
  */
 static struct cert *
-proc_parser_root_cert(const struct entity *entp)
+proc_parser_root_cert(const struct entity *entp, const unsigned char *der,
+    size_t len)
 {
 	char			subject[256];
 	ASN1_TIME		*notBefore, *notAfter;
 	X509_NAME		*name;
 	struct cert		*cert;
 	X509			*x509;
-	struct auth		*na;
-	char			*tal;
 
-	assert(entp->has_pkey);
+	assert(entp->has_data);
 
 	/* Extract certificate data and X509. */
 
-	cert = ta_parse(&x509, entp->file, entp->pkey, entp->pkeysz);
+	cert = ta_parse(&x509, entp->file, der, len, entp->data, entp->datasz);
 	if (cert == NULL)
 		return NULL;
 
@@ -335,33 +317,24 @@ proc_parser_root_cert(const struct entity *entp)
 		goto badcert;
 	}
 
+	X509_free(x509);
+
+	cert->talid = entp->talid;
+
 	/*
 	 * Add valid roots to the RPKI auth tree.
 	 */
-
-	cert->valid = 1;
-
-	na = malloc(sizeof(*na));
-	if (na == NULL)
-		err(1, NULL);
-
-	if ((tal = strdup(entp->descr)) == NULL)
-		err(1, NULL);
-
-	na->parent = NULL;
-	na->cert = cert;
-	na->tal = tal;
-	na->fn = strdup(entp->file);
-	if (na->fn == NULL)
-		err(1, NULL);
-
-	if (RB_INSERT(auth_tree, &auths, na) != NULL)
-		err(1, "auth tree corrupted");
+	if (!auth_insert(&auths, cert, NULL)) {
+		cert_free(cert);
+		return NULL;
+	}
 
 	return cert;
+
  badcert:
-	X509_free(x509); // needed? XXX
-	return cert;
+	X509_free(x509);
+	cert_free(cert);
+	return NULL;
 }
 
 /*
@@ -382,30 +355,37 @@ proc_parser_crl(struct entity *entp, const unsigned char *der, size_t len)
 		if ((crl = malloc(sizeof(*crl))) == NULL)
 			err(1, NULL);
 		if ((crl->aki = x509_crl_get_aki(x509_crl, entp->file)) ==
-		    NULL)
-			errx(1, "x509_crl_get_aki failed");
+		    NULL) {
+			warnx("x509_crl_get_aki failed");
+			goto err;
+		}
+
 		crl->x509_crl = x509_crl;
 
 		/* extract expire time for later use */
 		at = X509_CRL_get0_nextUpdate(x509_crl);
 		if (at == NULL) {
-			errx(1, "%s: X509_CRL_get0_nextUpdate failed",
+			warnx("%s: X509_CRL_get0_nextUpdate failed",
 			    entp->file);
+			goto err;
 		}
 		memset(&expires_tm, 0, sizeof(expires_tm));
 		if (ASN1_time_parse(at->data, at->length, &expires_tm,
 		    0) == -1) {
-			errx(1, "%s: ASN1_time_parse failed", entp->file);
+			warnx("%s: ASN1_time_parse failed", entp->file);
+			goto err;
 		}
-		if ((crl->expires = mktime(&expires_tm)) == -1) {
+		if ((crl->expires = mktime(&expires_tm)) == -1)
 			errx(1, "%s: mktime failed", entp->file);
-		}
 
 		if (RB_INSERT(crl_tree, &crlt, crl) != NULL) {
 			warnx("%s: duplicate AKI %s", entp->file, crl->aki);
-			free_crl(crl);
+			goto err;
 		}
 	}
+	return;
+ err:
+	free_crl(crl);
 }
 
 /*
@@ -508,39 +488,6 @@ build_crls(const struct crl *crl, STACK_OF(X509_CRL) **crls)
 		err(1, "sk_X509_CRL_push");
 }
 
-static unsigned char *
-load_file(const char *name, size_t *len)
-{
-	unsigned char *buf = NULL;
-	struct stat st;
-	ssize_t n;
-	size_t size;
-	int fd;
-
-	*len = 0;
-
-	if ((fd = open(name, O_RDONLY)) == -1)
-		return NULL;
-	if (fstat(fd, &st) != 0)
-		goto err;
-	if (st.st_size < 0)
-		goto err;
-	size = (size_t)st.st_size;
-	if ((buf = malloc(size)) == NULL)
-		goto err;
-	n = read(fd, buf, size);
-	if (n < 0 || (size_t)n != size)
-		goto err;
-	close(fd);
-	*len = size;
-	return buf;
-
-err:
-	close(fd);
-	free(buf);
-	return NULL;
-}
-
 static void
 parse_entity(struct entityq *q, struct msgbuf *msgq)
 {
@@ -561,7 +508,7 @@ parse_entity(struct entityq *q, struct msgbuf *msgq)
 		io_simple_buffer(b, &entp->type, sizeof(entp->type));
 
 		f = NULL;
-		if (entp->type != RTYPE_TAL && entp->type != RTYPE_CER) {
+		if (entp->type != RTYPE_TAL) {
 			f = load_file(entp->file, &flen);
 			if (f == NULL)
 				warn("%s", entp->file);
@@ -569,17 +516,19 @@ parse_entity(struct entityq *q, struct msgbuf *msgq)
 
 		switch (entp->type) {
 		case RTYPE_TAL:
-			if ((tal = tal_parse(entp->file, entp->descr)) == NULL)
+			if ((tal = tal_parse(entp->file, entp->data,
+			    entp->datasz)) == NULL)
 				errx(1, "%s: could not parse tal file",
 				    entp->file);
+			tal->id = entp->talid;
 			tal_buffer(b, tal);
 			tal_free(tal);
 			break;
 		case RTYPE_CER:
-			if (entp->has_pkey)
-				cert = proc_parser_root_cert(entp);
+			if (entp->has_data)
+				cert = proc_parser_root_cert(entp, f, flen);
 			else
-				cert = proc_parser_cert(entp);
+				cert = proc_parser_cert(entp, f, flen);
 			c = (cert != NULL);
 			io_simple_buffer(b, &c, sizeof(int));
 			if (cert != NULL)

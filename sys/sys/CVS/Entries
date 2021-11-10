@@ -11,7 +11,6 @@
 /cdio.h/1.17/Tue Oct 24 09:36:13 2017//
 /core.h/1.7/Sat Sep 17 06:09:08 2016//
 /ctf.h/1.5/Sun Aug 13 14:56:05 2017//
-/device.h/1.55/Mon Sep 10 16:18:34 2018//
 /dir.h/1.5/Mon Jun  2 23:28:21 2003//
 /dirent.h/1.11/Fri Dec 13 18:09:27 2013//
 /disk.h/1.36/Thu May  4 22:47:27 2017//
@@ -47,7 +46,6 @@
 /poll.h/1.15/Tue Jun  7 06:12:37 2016//
 /ptrace.h/1.16/Mon Mar 16 11:58:46 2020//
 /radioio.h/1.5/Wed Jan 14 21:15:36 2015//
-/reboot.h/1.19/Sat May 23 00:40:53 2020//
 /refcnt.h/1.4/Tue Jun  7 07:53:33 2016//
 /resource.h/1.14/Fri Oct 25 04:42:48 2013//
 /resourcevar.h/1.24/Fri Jun 21 09:39:48 2019//
@@ -115,7 +113,6 @@
 /rwlock.h/1.28/Wed Sep  1 16:07:40 2021//
 /shm.h/1.30/Wed Sep  1 16:07:40 2021//
 /tty.h/1.39/Thu Sep  2 08:41:58 2021//
-/unpcb.h/1.18/Wed Sep  1 16:07:40 2021//
 /wait.h/1.18/Wed Sep  1 16:07:40 2021//
 /chio.h/1.8/Thu Sep  2 14:22:33 2021//
 /domain.h/1.22/Thu Sep  2 14:22:33 2021//
@@ -123,11 +120,6 @@
 /namei.h/1.48/Tue Sep 14 08:17:37 2021//
 /pledge.h/1.42/Thu Sep  2 14:22:33 2021//
 /protosw.h/1.32/Thu Sep  2 14:22:33 2021//
-/socket.h/1.100/Thu Sep  2 14:22:33 2021//
-/socketvar.h/1.100/Thu Sep  2 14:22:33 2021//
-/syscall.h/1.227/Thu Sep  2 14:22:33 2021//
-/syscallargs.h/1.230/Thu Sep  2 14:22:33 2021//
-/sysctl.h/1.218/Thu Sep  2 14:22:33 2021//
 /systm.h/1.154/Thu Sep  2 14:22:33 2021//
 /time.h/1.61/Thu Sep  2 14:22:33 2021//
 /timeout.h/1.43/Thu Sep  2 14:22:33 2021//
@@ -138,4 +130,12 @@
 /event.h/1.57/Tue Oct 26 13:43:56 2021//
 /file.h/1.64/Tue Oct 26 13:43:56 2021//
 /proc.h/1.315/Tue Oct 26 13:43:56 2021//
+/device.h/1.56/Wed Nov 10 16:46:51 2021//
+/reboot.h/1.20/Wed Nov 10 16:46:51 2021//
+/socket.h/1.101/Wed Nov 10 16:46:51 2021//
+/socketvar.h/1.101/Wed Nov 10 16:46:51 2021//
+/syscall.h/1.228/Wed Nov 10 16:46:51 2021//
+/syscallargs.h/1.231/Wed Nov 10 16:46:51 2021//
+/sysctl.h/1.219/Wed Nov 10 16:46:51 2021//
+/unpcb.h/1.19/Wed Nov 10 16:46:51 2021//
 D

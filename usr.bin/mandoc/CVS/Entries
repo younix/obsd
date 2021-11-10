@@ -58,7 +58,6 @@
 /man.1/1.39/Fri Dec 11 17:58:24 2020//
 /manconf.h/1.9/Fri Dec 11 17:58:24 2020//
 /man_macro.c/1.107/Thu Dec 17 19:39:59 2020//
-/manpath.c/1.30/Thu Dec 17 19:39:59 2020//
 /term_ascii.c/1.52/Thu Dec 17 19:39:59 2020//
 /term_ps.c/1.56/Thu Dec 17 19:39:59 2020//
 /apropos.1/1.45/Sat May  1 08:41:52 2021//
@@ -98,4 +97,5 @@
 /term_tab.c/1.5/Wed Oct 20 17:29:16 2021//
 /cgi.c/1.115/Tue Oct 26 13:43:57 2021//
 /mandocdb.c/1.218/Tue Oct 26 13:43:57 2021//
+/manpath.c/1.31/Wed Nov 10 16:46:52 2021//
 D

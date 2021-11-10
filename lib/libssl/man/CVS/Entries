@@ -88,7 +88,6 @@
 /d2i_SSL_SESSION.3/1.7/Sat Jun  8 15:25:43 2019//
 /SSL_CTX_set_mode.3/1.7/Sat May  1 08:41:50 2021//
 /SSL_get_ciphers.3/1.11/Sat May  1 08:41:50 2021//
-/SSL_read_early_data.3/1.2/Sat May  1 08:41:50 2021//
 /SSL_set_SSL_CTX.3/1.3/Sat May  1 08:41:50 2021//
 /SSL_set_bio.3/1.6/Sat May  1 08:41:50 2021//
 /ssl.3/1.20/Sat May  1 08:41:50 2021//
@@ -123,4 +122,5 @@
 /SSL_CTX_set_num_tickets.3/1.2/Sat Oct 23 17:20:50 2021//
 /SSL_read.3/1.8/Tue Oct 26 13:43:28 2021//
 /SSL_write.3/1.7/Tue Oct 26 13:43:28 2021//
+/SSL_read_early_data.3/1.3/Wed Nov 10 16:46:27 2021//
 D

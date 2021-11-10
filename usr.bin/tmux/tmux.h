@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1151 2021/10/26 12:22:23 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1154 2021/11/03 13:37:17 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -530,6 +530,7 @@ enum tty_code_code {
 #define MODE_CRLF 0x4000
 #define MODE_KEXTENDED 0x8000
 #define MODE_CURSOR_VERY_VISIBLE 0x10000
+#define MODE_CURSOR_BLINKING_SET 0x20000
 
 #define ALL_MODES 0xffffff
 #define ALL_MOUSE_MODES (MODE_MOUSE_STANDARD|MODE_MOUSE_BUTTON|MODE_MOUSE_ALL)
@@ -779,12 +780,15 @@ struct screen {
 	u_int				 cy;	  /* cursor y */
 
 	enum screen_cursor_style	 cstyle;  /* cursor style */
-	char				*ccolour; /* cursor colour */
+	enum screen_cursor_style	 default_cstyle;
+	int				 ccolour; /* cursor colour */
+	int				 default_ccolour;
 
 	u_int				 rupper;  /* scroll region top */
 	u_int				 rlower;  /* scroll region bottom */
 
 	int				 mode;
+	int				 default_mode;
 
 	u_int				 saved_cx;
 	u_int				 saved_cy;
@@ -1276,7 +1280,7 @@ struct tty {
 	u_int		 cx;
 	u_int		 cy;
 	enum screen_cursor_style cstyle;
-	char		*ccolour;
+	int		 ccolour;
 
 	int		 oflag;
 	u_int		 oox;
@@ -1709,6 +1713,9 @@ struct client {
 #define CLIENT_UNATTACHEDFLAGS	\
 	(CLIENT_DEAD|		\
 	 CLIENT_SUSPENDED|	\
+	 CLIENT_EXIT)
+#define CLIENT_NODETACHFLAGS 	\
+	(CLIENT_DEAD|		\
 	 CLIENT_EXIT)
 #define CLIENT_NOSIZEFLAGS	\
 	(CLIENT_DEAD|		\
@@ -2789,8 +2796,8 @@ void	 screen_init(struct screen *, u_int, u_int, u_int);
 void	 screen_reinit(struct screen *);
 void	 screen_free(struct screen *);
 void	 screen_reset_tabs(struct screen *);
-void	 screen_set_cursor_style(struct screen *, u_int);
-void	 screen_set_cursor_colour(struct screen *, const char *);
+void	 screen_set_cursor_style(u_int, enum screen_cursor_style *, int *);
+void	 screen_set_cursor_colour(struct screen *, int);
 int	 screen_set_title(struct screen *, const char *);
 void	 screen_set_path(struct screen *, const char *);
 void	 screen_push_title(struct screen *);

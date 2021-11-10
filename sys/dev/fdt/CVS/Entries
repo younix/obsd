@@ -3,7 +3,6 @@
 /bcm2835_sdhost.c/1.1/Wed Apr 22 09:48:44 2020//
 /if_bse_fdt.c/1.1/Sat Apr 18 07:55:06 2020//
 /imxanatopvar.h/1.2/Thu Jun 28 10:07:35 2018//
-/imxehci.c/1.4/Mon Apr 27 20:15:41 2020//
 /imxpciephy.c/1.1/Sun Apr 26 15:03:04 2020//
 /imxpwm.c/1.1/Fri Mar 27 16:53:06 2020//
 /imxuartreg.h/1.1/Thu Mar 29 20:33:53 2018//
@@ -56,9 +55,7 @@
 /rktcphy.c/1.1/Thu Sep  2 14:22:31 2021//
 /spmivar.h/1.1/Thu Sep  2 14:22:31 2021//
 /bcm2711_pcie.c/1.7/Wed Oct 20 17:29:11 2021//
-/files.fdt/1.157/Wed Oct 20 17:29:11 2021//
 /gpiocharger.c/1.1/Sat Sep 25 18:40:08 2021//
-/gpioleds.c/1.1/Sat Sep 25 10:43:24 2021//
 /mvkpcie.c/1.11/Wed Oct 20 17:29:11 2021//
 /acrtc.c/1.5/Tue Oct 26 13:43:53 2021//
 /ahci_fdt.c/1.6/Tue Oct 26 13:43:53 2021//
@@ -95,7 +92,6 @@
 /hitemp.c/1.2/Tue Oct 26 13:43:53 2021//
 /if_dwge.c/1.12/Tue Oct 26 13:43:53 2021//
 /if_dwxe.c/1.19/Tue Oct 26 13:43:53 2021//
-/if_fec.c/1.12/Tue Oct 26 13:43:53 2021//
 /if_mvneta.c/1.17/Tue Oct 26 13:43:53 2021//
 /imxanatop.c/1.6/Tue Oct 26 13:43:53 2021//
 /imxccm.c/1.27/Tue Oct 26 13:43:53 2021//
@@ -104,7 +100,6 @@
 /imxgpio.c/1.6/Tue Oct 26 13:43:53 2021//
 /imxiomuxc.c/1.7/Tue Oct 26 13:43:53 2021//
 /imxrtc.c/1.2/Tue Oct 26 13:43:53 2021//
-/imxspi.c/1.2/Tue Oct 26 13:43:53 2021//
 /imxsrc.c/1.5/Tue Oct 26 13:43:53 2021//
 /imxtmu.c/1.3/Tue Oct 26 13:43:53 2021//
 /imxuart.c/1.12/Tue Oct 26 13:43:53 2021//
@@ -119,7 +114,6 @@
 /mvpinctrl.c/1.9/Tue Oct 26 13:43:53 2021//
 /mvrng.c/1.4/Tue Oct 26 13:43:53 2021//
 /mvrtc.c/1.2/Tue Oct 26 13:43:53 2021//
-/mvspi.c/1.2/Tue Oct 26 13:43:53 2021//
 /mvtemp.c/1.2/Tue Oct 26 13:43:53 2021//
 /mvuart.c/1.4/Tue Oct 26 13:43:53 2021//
 /ohci_fdt.c/1.3/Tue Oct 26 13:43:53 2021//
@@ -145,7 +139,6 @@
 /sdhc_fdt.c/1.18/Tue Oct 26 13:43:53 2021//
 /sfp.c/1.5/Tue Oct 26 13:43:53 2021//
 /simplefb.c/1.14/Tue Oct 26 13:43:53 2021//
-/simplepanel.c/1.5/Tue Oct 26 13:43:53 2021//
 /ssdfb.c/1.12/Tue Oct 26 13:43:53 2021//
 /sxiccmu.c/1.29/Tue Oct 26 13:43:53 2021//
 /sxidog.c/1.3/Tue Oct 26 13:43:53 2021//
@@ -163,4 +156,12 @@
 /syscon.c/1.7/Tue Oct 26 13:43:53 2021//
 /virtio_mmio.c/1.10/Tue Oct 26 13:43:53 2021//
 /xhci_fdt.c/1.18/Tue Oct 26 13:43:53 2021//
+/files.fdt/1.159/Wed Nov 10 16:46:49 2021//
+/gpiokeys.c/1.1/Tue Nov  9 16:16:11 2021//
+/gpioleds.c/1.3/Wed Nov 10 16:46:49 2021//
+/if_fec.c/1.13/Wed Nov 10 16:46:49 2021//
+/imxehci.c/1.5/Wed Nov 10 16:46:49 2021//
+/imxspi.c/1.3/Wed Nov 10 16:46:49 2021//
+/mvspi.c/1.3/Wed Nov 10 16:46:49 2021//
+/simplepanel.c/1.6/Wed Nov 10 16:46:49 2021//
 D

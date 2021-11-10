@@ -102,8 +102,6 @@
 /if_ie.c/1.57/Wed Sep  1 16:07:39 2021//
 /if_lc_isa.c/1.13/Wed Sep  1 16:07:39 2021//
 /if_sm_isa.c/1.15/Wed Sep  1 16:07:39 2021//
-/isa.c/1.48/Wed Sep  1 16:07:39 2021//
-/isadma.c/1.35/Wed Sep  1 16:07:39 2021//
 /isapnp.c/1.42/Wed Sep  1 16:07:39 2021//
 /lpt_isa.c/1.16/Wed Sep  1 16:07:39 2021//
 /mpu401.c/1.16/Wed Sep  1 16:07:39 2021//
@@ -119,4 +117,6 @@
 /tcic2_isa.c/1.9/Wed Sep  1 16:07:39 2021//
 /uha_isa.c/1.14/Wed Sep  1 16:07:39 2021//
 /wdc_isapnp.c/1.12/Wed Sep  1 16:07:39 2021//
+/isa.c/1.49/Wed Nov 10 16:46:49 2021//
+/isadma.c/1.36/Wed Nov 10 16:46:49 2021//
 D
