@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwn.c,v 1.250 2021/10/11 09:01:05 stsp Exp $	*/
+/*	$OpenBSD: if_iwn.c,v 1.253 2021/11/12 11:41:04 stsp Exp $	*/
 
 /*-
  * Copyright (c) 2007-2010 Damien Bergamini <damien.bergamini@free.fr>
@@ -241,15 +241,21 @@ uint16_t	iwn_get_passive_dwell_time(struct iwn_softc *, uint16_t);
 int		iwn_scan(struct iwn_softc *, uint16_t, int);
 void		iwn_scan_abort(struct iwn_softc *);
 int		iwn_bgscan(struct ieee80211com *);
+void		iwn_rxon_configure_ht40(struct ieee80211com *,
+		    struct ieee80211_node *);
+int		iwn_rxon_ht40_enabled(struct iwn_softc *);
 int		iwn_auth(struct iwn_softc *, int);
 int		iwn_run(struct iwn_softc *);
 int		iwn_set_key(struct ieee80211com *, struct ieee80211_node *,
 		    struct ieee80211_key *);
 void		iwn_delete_key(struct ieee80211com *, struct ieee80211_node *,
 		    struct ieee80211_key *);
+void		iwn_updatechan(struct ieee80211com *);
 void		iwn_updateprot(struct ieee80211com *);
 void		iwn_updateslot(struct ieee80211com *);
-void		iwn_update_rxon(struct iwn_softc *);
+void		iwn_update_rxon_restore_power(struct iwn_softc *);
+void		iwn5000_update_rxon(struct iwn_softc *);
+void		iwn4965_update_rxon(struct iwn_softc *);
 int		iwn_ampdu_rx_start(struct ieee80211com *,
 		    struct ieee80211_node *, uint8_t);
 void		iwn_ampdu_rx_stop(struct ieee80211com *,
@@ -489,13 +495,15 @@ iwn_attach(struct device *parent, struct device *self, void *aux)
 		ic->ic_caps |= (IEEE80211_C_QOS | IEEE80211_C_TX_AMPDU);
 		/* Set HT capabilities. */
 		ic->ic_htcaps = IEEE80211_HTCAP_SGI20;
+		/* 6200 devices have issues with SGI40 for some reason. */
+		if ((sc->sc_flags & IWN_FLAG_INTERNAL_PA) == 0)
+			ic->ic_htcaps |= IEEE80211_HTCAP_SGI40;
+		ic->ic_htcaps |= IEEE80211_HTCAP_CBW20_40;
 #ifdef notyet
 		ic->ic_htcaps |=
 #if IWN_RBUF_SIZE == 8192
 		    IEEE80211_HTCAP_AMSDU7935 |
 #endif
-		    IEEE80211_HTCAP_CBW20_40 |
-		    IEEE80211_HTCAP_SGI40;
 		if (sc->hw_type != IWN_HW_REV_TYPE_4965)
 			ic->ic_htcaps |= IEEE80211_HTCAP_GF;
 		if (sc->hw_type == IWN_HW_REV_TYPE_6050)
@@ -541,6 +549,7 @@ iwn_attach(struct device *parent, struct device *self, void *aux)
 	ic->ic_updateedca = iwn_updateedca;
 	ic->ic_set_key = iwn_set_key;
 	ic->ic_delete_key = iwn_delete_key;
+	ic->ic_updatechan = iwn_updatechan;
 	ic->ic_updateprot = iwn_updateprot;
 	ic->ic_updateslot = iwn_updateslot;
 	ic->ic_ampdu_rx_start = iwn_ampdu_rx_start;
@@ -585,6 +594,7 @@ iwn4965_attach(struct iwn_softc *sc, pci_product_id_t pid)
 	ops->nic_config = iwn4965_nic_config;
 	ops->reset_sched = iwn4965_reset_sched;
 	ops->update_sched = iwn4965_update_sched;
+	ops->update_rxon = iwn4965_update_rxon;
 	ops->get_temperature = iwn4965_get_temperature;
 	ops->get_rssi = iwn4965_get_rssi;
 	ops->set_txpower = iwn4965_set_txpower;
@@ -624,6 +634,7 @@ iwn5000_attach(struct iwn_softc *sc, pci_product_id_t pid)
 	ops->nic_config = iwn5000_nic_config;
 	ops->reset_sched = iwn5000_reset_sched;
 	ops->update_sched = iwn5000_update_sched;
+	ops->update_rxon = iwn5000_update_rxon;
 	ops->get_temperature = iwn5000_get_temperature;
 	ops->get_rssi = iwn5000_get_rssi;
 	ops->set_txpower = iwn5000_set_txpower;
@@ -1473,8 +1484,8 @@ iwn4965_read_eeprom(struct iwn_softc *sc)
 	/* Read regulatory domain (4 ASCII characters). */
 	iwn_read_prom_data(sc, IWN4965_EEPROM_DOMAIN, sc->eeprom_domain, 4);
 
-	/* Read the list of authorized channels (20MHz ones only). */
-	for (i = 0; i < 5; i++) {
+	/* Read the list of authorized channels. */
+	for (i = 0; i < 7; i++) {
 		addr = iwn4965_regulatory_bands[i];
 		iwn_read_eeprom_channels(sc, i, addr);
 	}
@@ -1558,8 +1569,8 @@ iwn5000_read_eeprom(struct iwn_softc *sc)
 	iwn_read_prom_data(sc, base + IWN5000_EEPROM_DOMAIN,
 	    sc->eeprom_domain, 4);
 
-	/* Read the list of authorized channels (20MHz ones only). */
-	for (i = 0; i < 5; i++) {
+	/* Read the list of authorized channels. */
+	for (i = 0; i < 7; i++) {
 		addr = base + iwn5000_regulatory_bands[i];
 		iwn_read_eeprom_channels(sc, i, addr);
 	}
@@ -1629,7 +1640,7 @@ iwn_read_eeprom_channels(struct iwn_softc *sc, int n, uint32_t addr)
 			    IEEE80211_CHAN_CCK | IEEE80211_CHAN_OFDM |
 			    IEEE80211_CHAN_DYN | IEEE80211_CHAN_2GHZ;
 
-		} else {	/* 5GHz band */
+		} else if (n < 5) {	/* 5GHz band */
 			/*
 			 * Some adapters support channels 7, 8, 11 and 12
 			 * both in the 2GHz and 4.9GHz bands.
@@ -1644,22 +1655,29 @@ iwn_read_eeprom_channels(struct iwn_softc *sc, int n, uint32_t addr)
 			ic->ic_channels[chan].ic_flags = IEEE80211_CHAN_A;
 			/* We have at least one valid 5GHz channel. */
 			sc->sc_flags |= IWN_FLAG_HAS_5GHZ;
+		} else  { /* 40 MHz */
+			sc->maxpwr40[chan] = channels[i].maxpwr;
+			ic->ic_channels[chan].ic_flags |= IEEE80211_CHAN_40MHZ;
 		}
 
-		/* Is active scan allowed on this channel? */
-		if (!(channels[i].flags & IWN_EEPROM_CHAN_ACTIVE)) {
-			ic->ic_channels[chan].ic_flags |=
-			    IEEE80211_CHAN_PASSIVE;
+		if (n < 5) {
+			/* Is active scan allowed on this channel? */
+			if (!(channels[i].flags & IWN_EEPROM_CHAN_ACTIVE)) {
+				ic->ic_channels[chan].ic_flags |=
+				    IEEE80211_CHAN_PASSIVE;
+			}
+
+			/* Save maximum allowed TX power for this channel. */
+			sc->maxpwr[chan] = channels[i].maxpwr;
+
+			if (sc->sc_flags & IWN_FLAG_HAS_11N)
+				ic->ic_channels[chan].ic_flags |=
+				    IEEE80211_CHAN_HT;
 		}
 
-		/* Save maximum allowed TX power for this channel. */
-		sc->maxpwr[chan] = channels[i].maxpwr;
-
-		if (sc->sc_flags & IWN_FLAG_HAS_11N)
-			ic->ic_channels[chan].ic_flags |= IEEE80211_CHAN_HT;
-
-		DPRINTF(("adding chan %d flags=0x%x maxpwr=%d\n",
-		    chan, channels[i].flags, sc->maxpwr[chan]));
+		DPRINTF(("adding chan %d flags=0x%x maxpwr=%d maxpwr40=%d\n",
+		    chan, channels[i].flags, sc->maxpwr[chan],
+		    sc->maxpwr40[chan]));
 	}
 }
 
@@ -1678,7 +1696,7 @@ iwn_read_eeprom_enhinfo(struct iwn_softc *sc)
 
 	memset(sc->enh_maxpwr, 0, sizeof sc->enh_maxpwr);
 	for (i = 0; i < nitems(enhinfo); i++) {
-		if (enhinfo[i].chan == 0 || enhinfo[i].reserved != 0)
+		if ((enhinfo[i].flags & IWN_TXP_VALID) == 0)
 			continue;	/* Skip invalid entries. */
 
 		maxpwr = 0;
@@ -2283,8 +2301,9 @@ iwn_ht_single_rate_control(struct iwn_softc *sc, struct ieee80211_node *ni,
 	struct iwn_node *wn = (void *)ni;
 	int mcs = rate;
 	const struct ieee80211_ht_rateset *rs =
-	    ieee80211_ra_get_ht_rateset(rate, 0 /* chan40 */,
-	    ieee80211_ra_use_ht_sgi(ni));
+	    ieee80211_ra_get_ht_rateset(rate,
+		ieee80211_node_supports_ht_chan40(ni),
+		ieee80211_ra_use_ht_sgi(ni));
 	unsigned int retries = 0, i;
 
 	/*
@@ -2483,6 +2502,8 @@ iwn_rx_statistics(struct iwn_softc *sc, struct iwn_rx_desc *desc,
 
 	DPRINTFN(3, ("received statistics (cmd=%d)\n", desc->type));
 	sc->calib_cnt = 0;	/* Reset TX power calibration timeout. */
+
+	sc->rx_stats_flags = htole32(stats->flags);
 
 	/* Test if temperature has changed. */
 	if (stats->general.temp != sc->rawtemp) {
@@ -3533,7 +3554,9 @@ iwn_tx(struct iwn_softc *sc, struct mbuf *m, struct ieee80211_node *ni)
 	if ((ni->ni_flags & IEEE80211_NODE_HT) &&
 	    tx->id != sc->broadcast_id) {
 		tx->rflags = rinfo->ht_flags;
-		if (ni->ni_htcaps & IEEE80211_HTCAP_SGI20)
+		if (iwn_rxon_ht40_enabled(sc))
+			tx->rflags |= IWN_RFLAG_HT40;
+		if (ieee80211_ra_use_ht_sgi(ni))
 			tx->rflags |= IWN_RFLAG_SGI;
 	}
 	else
@@ -3921,11 +3944,16 @@ iwn_set_link_quality(struct iwn_softc *sc, struct ieee80211_node *ni)
 			linkq.retry[i].plcp = rinfo->ht_plcp;
 			linkq.retry[i].rflags = rinfo->ht_flags;
 
-			if (ni->ni_htcaps & IEEE80211_HTCAP_SGI20)
-				linkq.retry[i].rflags |= IWN_RFLAG_SGI;
-
 			/* XXX set correct ant mask for MIMO rates here */
 			linkq.retry[i].rflags |= IWN_RFLAG_ANT(txant);
+
+			/* First two Tx attempts may use 40MHz/SGI. */
+			if (i < 2) {
+				if (iwn_rxon_ht40_enabled(sc))
+					linkq.retry[i].rflags |= IWN_RFLAG_HT40;
+				if (ieee80211_ra_use_ht_sgi(ni))
+					linkq.retry[i].rflags |= IWN_RFLAG_SGI;
+			}
 
 			if (++i >= IWN_MAX_TX_RETRIES)
 				break;
@@ -4117,8 +4145,8 @@ iwn4965_set_txpower(struct iwn_softc *sc, int async)
 	struct iwn4965_eeprom_chan_samples *chans;
 	const uint8_t *rf_gain, *dsp_gain;
 	int32_t vdiff, tdiff;
-	int i, c, grp, maxpwr;
-	uint8_t chan;
+	int i, c, grp, maxpwr, is_ht40 = 0;
+	uint8_t chan, ext_chan;
 
 	/* Retrieve current channel from last RXON. */
 	chan = sc->rxon.chan;
@@ -4171,17 +4199,26 @@ iwn4965_set_txpower(struct iwn_softc *sc, int async)
 	chans = sc->bands[i].chans;
 	DPRINTF(("chan %d sub-band=%d\n", chan, i));
 
+	if (iwn_rxon_ht40_enabled(sc)) {
+		is_ht40 = 1;
+		if (le32toh(sc->rxon.flags) & IWN_RXON_HT_HT40MINUS)
+			ext_chan = chan - 2;
+		else
+			ext_chan = chan + 2;
+	} else
+		ext_chan = chan;
+
 	for (c = 0; c < 2; c++) {
 		uint8_t power, gain, temp;
 		int maxchpwr, pwr, ridx, idx;
 
-		power = interpolate(chan,
+		power = interpolate(ext_chan,
 		    chans[0].num, chans[0].samples[c][1].power,
 		    chans[1].num, chans[1].samples[c][1].power, 1);
-		gain  = interpolate(chan,
+		gain  = interpolate(ext_chan,
 		    chans[0].num, chans[0].samples[c][1].gain,
 		    chans[1].num, chans[1].samples[c][1].gain, 1);
-		temp  = interpolate(chan,
+		temp  = interpolate(ext_chan,
 		    chans[0].num, chans[0].samples[c][1].temp,
 		    chans[1].num, chans[1].samples[c][1].temp, 1);
 		DPRINTF(("TX chain %d: power=%d gain=%d temp=%d\n",
@@ -4194,7 +4231,10 @@ iwn4965_set_txpower(struct iwn_softc *sc, int async)
 
 		for (ridx = 0; ridx <= IWN_RIDX_MAX; ridx++) {
 			/* Convert dBm to half-dBm. */
-			maxchpwr = sc->maxpwr[chan] * 2;
+			if (is_ht40)
+				maxchpwr = sc->maxpwr40[chan] * 2;
+			else
+				maxchpwr = sc->maxpwr[chan] * 2;
 #ifdef notyet
 			if (ridx > iwn_mcs2ridx[7] && ridx < iwn_mcs2ridx[16])
 				maxchpwr -= 6;	/* MIMO 2T: -3dB */
@@ -4330,9 +4370,15 @@ iwn4965_get_temperature(struct iwn_softc *sc)
 	struct iwn_ucode_info *uc = &sc->ucode_info;
 	int32_t r1, r2, r3, r4, temp;
 
-	r1 = letoh32(uc->temp[0].chan20MHz);
-	r2 = letoh32(uc->temp[1].chan20MHz);
-	r3 = letoh32(uc->temp[2].chan20MHz);
+	if (sc->rx_stats_flags & IWN_STATS_FLAGS_BAND_HT40) {
+		r1 = letoh32(uc->temp[0].chan40MHz);
+		r2 = letoh32(uc->temp[1].chan40MHz);
+		r3 = letoh32(uc->temp[2].chan40MHz);
+	} else {
+		r1 = letoh32(uc->temp[0].chan20MHz);
+		r2 = letoh32(uc->temp[1].chan20MHz);
+		r3 = letoh32(uc->temp[2].chan20MHz);
+	}
 	r4 = letoh32(sc->rawtemp);
 
 	if (r1 == r3)	/* Prevents division by 0 (should not happen). */
@@ -5371,6 +5417,37 @@ iwn_bgscan(struct ieee80211com *ic)
 	return error;
 }
 
+void
+iwn_rxon_configure_ht40(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	struct iwn_softc *sc = ic->ic_softc;
+	uint8_t sco = (ni->ni_htop0 & IEEE80211_HTOP0_SCO_MASK);
+	enum ieee80211_htprot htprot = (ni->ni_htop1 &
+	    IEEE80211_HTOP1_PROT_MASK);
+
+	sc->rxon.flags &= ~htole32(IWN_RXON_HT_CHANMODE_MIXED2040 |
+	    IWN_RXON_HT_CHANMODE_PURE40 | IWN_RXON_HT_HT40MINUS);
+
+	if (ieee80211_node_supports_ht_chan40(ni) &&
+	    (sco == IEEE80211_HTOP0_SCO_SCA ||
+	    sco == IEEE80211_HTOP0_SCO_SCB)) {
+		if (sco == IEEE80211_HTOP0_SCO_SCB)
+			sc->rxon.flags |= htole32(IWN_RXON_HT_HT40MINUS);
+		if (htprot == IEEE80211_HTPROT_20MHZ)
+			sc->rxon.flags |= htole32(IWN_RXON_HT_CHANMODE_PURE40);
+		else
+			sc->rxon.flags |= htole32(
+			    IWN_RXON_HT_CHANMODE_MIXED2040);
+	}
+}
+
+int
+iwn_rxon_ht40_enabled(struct iwn_softc *sc)
+{
+	return ((le32toh(sc->rxon.flags) & IWN_RXON_HT_CHANMODE_MIXED2040) ||
+	    (le32toh(sc->rxon.flags) & IWN_RXON_HT_CHANMODE_PURE40)) ? 1 : 0;
+}
+
 int
 iwn_auth(struct iwn_softc *sc, int arg)
 {
@@ -5414,6 +5491,8 @@ iwn_auth(struct iwn_softc *sc, int arg)
 		sc->rxon.cck_mask  = 0x0f;
 		sc->rxon.ofdm_mask = 0x15;
 	}
+	/* Configure 40MHz early to avoid problems on 6205 devices. */
+	iwn_rxon_configure_ht40(ic, ni);
 	DPRINTF(("%s: rxon chan %d flags %x cck %x ofdm %x\n", __func__,
 	    sc->rxon.chan, le32toh(sc->rxon.flags), sc->rxon.cck_mask,
 	    sc->rxon.ofdm_mask));
@@ -5499,6 +5578,8 @@ iwn_run(struct iwn_softc *sc)
 	} else
 		sc->rxon.flags &= ~htole32(IWN_RXON_HT_PROTMODE(3));
 
+	iwn_rxon_configure_ht40(ic, ni);
+
 	if (IEEE80211_IS_CHAN_5GHZ(ni->ni_chan)) {
 		/* 11a or 11n 5GHz */
 		sc->rxon.cck_mask  = 0;
@@ -5550,6 +5631,8 @@ iwn_run(struct iwn_softc *sc)
 			(ic->ic_ampdu_params & IEEE80211_AMPDU_PARAM_LE)) |
 		    IWN_AMDPU_DENSITY(
 			(ic->ic_ampdu_params & IEEE80211_AMPDU_PARAM_SS) >> 2));
+		if (iwn_rxon_ht40_enabled(sc))
+			node.htflags |= htole32(IWN_40MHZ_ENABLE);
 	}
 	DPRINTF(("adding BSS node\n"));
 	error = ops->add_node(sc, &node, 1);
@@ -5648,6 +5731,19 @@ iwn_delete_key(struct ieee80211com *ic, struct ieee80211_node *ni,
 }
 
 void
+iwn_updatechan(struct ieee80211com *ic)
+{
+	struct iwn_softc *sc = ic->ic_softc;
+
+	if (ic->ic_state != IEEE80211_S_RUN)
+		return;
+
+	iwn_rxon_configure_ht40(ic, ic->ic_bss);
+	sc->ops.update_rxon(sc);
+	iwn_set_link_quality(sc, ic->ic_bss);
+}
+
+void
 iwn_updateprot(struct ieee80211com *ic)
 {
 	struct iwn_softc *sc = ic->ic_softc;
@@ -5668,7 +5764,7 @@ iwn_updateprot(struct ieee80211com *ic)
 	sc->rxon.flags &= ~htole32(IWN_RXON_HT_PROTMODE(3));
 	sc->rxon.flags |= htole32(IWN_RXON_HT_PROTMODE(htprot));
 
-	iwn_update_rxon(sc);
+	sc->ops.update_rxon(sc);
 }
 
 void
@@ -5689,13 +5785,37 @@ iwn_updateslot(struct ieee80211com *ic)
 	else
 		sc->rxon.flags &= ~htole32(IWN_RXON_SHPREAMBLE);
 
-	iwn_update_rxon(sc);
+	sc->ops.update_rxon(sc);
 }
+
 void
-iwn_update_rxon(struct iwn_softc *sc)
+iwn_update_rxon_restore_power(struct iwn_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
 	struct iwn_ops *ops = &sc->ops;
+	int error;
+
+	DELAY(100);
+
+	/* All RXONs wipe the firmware's txpower table. Restore it. */
+	error = ops->set_txpower(sc, 1);
+	if (error != 0)
+		printf("%s: could not set TX power\n", sc->sc_dev.dv_xname);
+
+	DELAY(100);
+
+	/* Restore power saving level */
+	if (ic->ic_flags & IEEE80211_F_PMGTON)
+		error = iwn_set_pslevel(sc, 0, 3, 1);
+	else
+		error = iwn_set_pslevel(sc, 0, 0, 1);
+	if (error != 0)
+		printf("%s: could not set PS level\n", sc->sc_dev.dv_xname);
+}
+
+void
+iwn5000_update_rxon(struct iwn_softc *sc)
+{
 	struct iwn_rxon_assoc rxon_assoc;
 	int s, error;
 
@@ -5718,22 +5838,35 @@ iwn_update_rxon(struct iwn_softc *sc)
 	if (error != 0)
 		printf("%s: RXON_ASSOC command failed\n", sc->sc_dev.dv_xname);
 
-	DELAY(100);
+	iwn_update_rxon_restore_power(sc);
 
-	/* All RXONs wipe the firmware's txpower table. Restore it. */
-	error = ops->set_txpower(sc, 1);
+	splx(s);
+}
+
+void
+iwn4965_update_rxon(struct iwn_softc *sc)
+{
+	struct iwn4965_rxon_assoc rxon_assoc;
+	int s, error;
+
+	/* Update RXON config. */
+	memset(&rxon_assoc, 0, sizeof(rxon_assoc));
+	rxon_assoc.flags = sc->rxon.flags;
+	rxon_assoc.filter = sc->rxon.filter;
+	rxon_assoc.ofdm_mask = sc->rxon.ofdm_mask;
+	rxon_assoc.cck_mask = sc->rxon.cck_mask;
+	rxon_assoc.ht_single_mask = sc->rxon.ht_single_mask;
+	rxon_assoc.ht_dual_mask = sc->rxon.ht_dual_mask;
+	rxon_assoc.rxchain = sc->rxon.rxchain;
+
+	s = splnet();
+
+	error = iwn_cmd(sc, IWN_CMD_RXON_ASSOC, &rxon_assoc,
+	    sizeof(rxon_assoc), 1);
 	if (error != 0)
-		printf("%s: could not set TX power\n", sc->sc_dev.dv_xname);
+		printf("%s: RXON_ASSOC command failed\n", sc->sc_dev.dv_xname);
 
-	DELAY(100);
-
-	/* Restore power saving level */
-	if (ic->ic_flags & IEEE80211_F_PMGTON)
-		error = iwn_set_pslevel(sc, 0, 3, 1);
-	else
-		error = iwn_set_pslevel(sc, 0, 0, 1);
-	if (error != 0)
-		printf("%s: could not set PS level\n", sc->sc_dev.dv_xname);
+	iwn_update_rxon_restore_power(sc);
 
 	splx(s);
 }

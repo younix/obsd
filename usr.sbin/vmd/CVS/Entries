@@ -9,12 +9,9 @@
 /vioscsi.h/1.3/Thu Dec 17 19:40:00 2020//
 /Makefile/1.26/Wed Sep  1 16:07:41 2021//
 /loadfile_elf.c/1.39/Wed Sep  1 16:07:41 2021//
-/priv.c/1.17/Wed Sep  1 16:07:41 2021//
 /proc.c/1.19/Wed Sep  1 16:07:41 2021//
-/vm.conf.5/1.56/Wed Sep  1 16:07:41 2021//
 /vmm.c/1.101/Wed Sep  1 16:07:41 2021//
 /atomicio.h/1.2/Thu Sep  2 14:22:33 2021//
-/config.c/1.63/Thu Sep  2 14:22:33 2021//
 /control.c/1.37/Thu Sep  2 14:22:33 2021//
 /dhcp.c/1.11/Thu Sep  2 14:22:33 2021//
 /fw_cfg.h/1.2/Thu Sep  2 14:22:33 2021//
@@ -37,5 +34,8 @@
 /vmd.c/1.126/Thu Sep  2 14:22:33 2021//
 /vmd.h/1.106/Thu Sep  2 14:22:33 2021//
 /parse.y/1.59/Wed Oct 20 17:29:21 2021//
-/fw_cfg.c/1.5/Wed Nov 10 16:46:57 2021//
+/config.c/1.64/Mon Nov 15 19:03:19 2021//
+/fw_cfg.c/1.5/Mon Nov 15 19:01:54 2021//
+/priv.c/1.18/Mon Nov 15 19:03:19 2021//
+/vm.conf.5/1.57/Mon Nov 15 19:03:19 2021//
 D

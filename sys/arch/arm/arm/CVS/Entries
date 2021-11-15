@@ -23,7 +23,6 @@
 /arm_machdep.c/1.6/Wed Sep  1 16:07:38 2021//
 /ast.c/1.17/Wed Sep  1 16:07:38 2021//
 /bus_dma.c/1.41/Wed Sep  1 16:07:38 2021//
-/conf.c/1.57/Wed Sep  1 16:07:38 2021//
 /cpu.c/1.55/Wed Sep  1 16:07:38 2021//
 /cpufunc.c/1.57/Wed Sep  1 16:07:38 2021//
 /db_interface.c/1.17/Wed Sep  1 16:07:38 2021//
@@ -43,4 +42,5 @@
 /vm_machdep.c/1.27/Wed Sep  1 16:07:38 2021//
 /sigcode.S/1.11/Thu Sep  2 14:22:31 2021//
 /sig_machdep.c/1.21/Wed Oct 20 17:29:08 2021//
+/conf.c/1.58/Mon Nov 15 19:03:07 2021//
 D

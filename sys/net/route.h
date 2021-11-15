@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.185 2021/03/17 09:05:42 claudio Exp $	*/
+/*	$OpenBSD: route.h,v 1.187 2021/11/12 15:49:41 deraadt Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -171,7 +171,8 @@ struct rtentry {
 #define RTP_PROPOSAL_DHCLIENT	58
 #define RTP_PROPOSAL_SLAAC	59
 #define RTP_PROPOSAL_UMB	60
-#define RTP_PROPOSAL_SOLICIT	61	/* request reply of all RTM_PROPOSAL */
+#define RTP_PROPOSAL_PPP	61
+#define RTP_PROPOSAL_SOLICIT	62	/* request reply of all RTM_PROPOSAL */
 #define RTP_MAX		63	/* maximum priority */
 #define RTP_ANY		64	/* any of the above */
 #define RTP_MASK	0x7f
@@ -240,7 +241,7 @@ struct rt_msghdr {
 #define RTM_DESYNC	0x10	/* route socket buffer overflow */
 #define RTM_INVALIDATE	0x11	/* Invalidate cache of L2 route */
 #define RTM_BFD		0x12	/* bidirectional forwarding detection */
-#define RTM_PROPOSAL	0x13	/* proposal for netconfigd */
+#define RTM_PROPOSAL	0x13	/* proposal for resolvd(8) */
 #define RTM_CHGADDRATTR	0x14	/* address attribute change */
 #define RTM_80211INFO	0x15	/* 80211 iface change */
 #define RTM_SOURCE	0x16	/* set source address */
