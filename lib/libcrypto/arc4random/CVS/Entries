@@ -9,9 +9,9 @@
 /getentropy_freebsd.c/1.4/Sat May  1 08:41:50 2021//
 /getentropy_netbsd.c/1.4/Sat May  1 08:41:50 2021//
 /getentropy_win.c/1.6/Sat May  1 08:41:50 2021//
-/getentropy_aix.c/1.8/Mon Nov 15 19:01:51 2021//
-/getentropy_hpux.c/1.8/Mon Nov 15 19:01:51 2021//
-/getentropy_linux.c/1.48/Mon Nov 15 19:01:51 2021//
-/getentropy_osx.c/1.14/Mon Nov 15 19:01:51 2021//
-/getentropy_solaris.c/1.15/Mon Nov 15 19:01:51 2021//
+/getentropy_aix.c/1.8/Mon Nov 15 19:06:15 2021//
+/getentropy_hpux.c/1.8/Mon Nov 15 19:06:15 2021//
+/getentropy_linux.c/1.48/Mon Nov 15 19:06:15 2021//
+/getentropy_osx.c/1.14/Mon Nov 15 19:06:15 2021//
+/getentropy_solaris.c/1.15/Mon Nov 15 19:06:15 2021//
 D

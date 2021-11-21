@@ -1,4 +1,4 @@
-/*	$OpenBSD: crypto.c,v 1.34 2021/02/25 20:13:24 tobhe Exp $	*/
+/*	$OpenBSD: crypto.c,v 1.36 2021/11/18 22:59:03 tb Exp $	*/
 
 /*
  * Copyright (c) 2010-2013 Reyk Floeter <reyk@openbsd.org>
@@ -551,10 +551,7 @@ cipher_free(struct iked_cipher *encr)
 {
 	if (encr == NULL)
 		return;
-	if (encr->encr_ctx != NULL) {
-		EVP_CIPHER_CTX_cleanup(encr->encr_ctx);
-		free(encr->encr_ctx);
-	}
+	EVP_CIPHER_CTX_free(encr->encr_ctx);
 	ibuf_release(encr->encr_iv);
 	ibuf_release(encr->encr_key);
 	free(encr);
@@ -958,6 +955,8 @@ dsa_init(struct iked_dsa *dsa, const void *buf, size_t len)
 		    EVP_PKEY_CTX_set_rsa_pss_saltlen(pctx, -1) <= 0)
 			return (-1);
 	}
+	if (_dsa_sign_encode(dsa, NULL, 0, NULL) < 0)
+		return (-1);
 
 	return (ret == 1 ? 0 : -1);
 }

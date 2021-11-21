@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwm.c,v 1.377 2021/10/12 11:20:32 landry Exp $	*/
+/*	$OpenBSD: if_iwm.c,v 1.380 2021/11/19 13:05:19 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -7780,9 +7780,15 @@ iwm_umac_scan(struct iwm_softc *sc, int bgscan)
 			IWM_UMAC_SCAN_GEN_FLAGS2_ALLOW_CHNL_REORDER;
 	}
 
-	/* Check if we're doing an active directed scan. */
-	if (ic->ic_des_esslen != 0) {
-		if (isset(sc->sc_ucode_api, IWM_UCODE_TLV_API_SCAN_EXT_CHAN_VER)) {
+	/*
+	 * Check if we're doing an active directed scan.
+	 * 9k devices may randomly lock up (no interrupts) after association
+	 * following active scans. Use passive scan only for now on 9k.
+	 */
+	if (sc->sc_device_family != IWM_DEVICE_FAMILY_9000 &&
+	    ic->ic_des_esslen != 0) {
+		if (isset(sc->sc_ucode_api,
+		    IWM_UCODE_TLV_API_SCAN_EXT_CHAN_VER)) {
 			tail->direct_scan[0].id = IEEE80211_ELEMID_SSID;
 			tail->direct_scan[0].len = ic->ic_des_esslen;
 			memcpy(tail->direct_scan[0].ssid, ic->ic_des_essid,
@@ -8356,7 +8362,7 @@ iwm_phy_ctxt_update(struct iwm_softc *sc, struct iwm_phy_ctxt *phyctxt,
 		err = iwm_phy_ctxt_cmd(sc, phyctxt, chains_static,
 		    chains_dynamic, IWM_FW_CTXT_ACTION_ADD, apply_time, sco);
 		if (err) {
-			printf("%s: could not remove PHY context "
+			printf("%s: could not add PHY context "
 			    "(error %d)\n", DEVNAME(sc), err);
 			return err;
 		}
@@ -10069,6 +10075,7 @@ iwm_stop(struct ifnet *ifp)
 	sc->ba_tx.stop_tidmask = 0;
 
 	sc->sc_newstate(ic, IEEE80211_S_INIT, -1);
+	sc->ns_nstate = IEEE80211_S_INIT;
 
 	timeout_del(&sc->sc_calib_to); /* XXX refcount? */
 	for (i = 0; i < nitems(sc->sc_rxba_data); i++) {

@@ -1,4 +1,4 @@
-/* $OpenBSD: sshd.c,v 1.579 2021/11/14 18:47:43 deraadt Exp $ */
+/* $OpenBSD: sshd.c,v 1.582 2021/11/18 03:07:59 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -251,7 +251,7 @@ close_listen_socks(void)
 
 	for (i = 0; i < num_listen_socks; i++)
 		close(listen_socks[i]);
-	num_listen_socks = -1;
+	num_listen_socks = 0;
 }
 
 static void
@@ -1165,7 +1165,7 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 
 		for (i = 0; i < options.max_startups; i++) {
 			if (startup_pipes[i] == -1 ||
-			    !(pfd[num_listen_socks+i].revents & POLLIN))
+			    !(pfd[num_listen_socks+i].revents & (POLLIN|POLLHUP)))
 				continue;
 			switch (read(startup_pipes[i], &c, sizeof(c))) {
 			case -1:
@@ -1211,8 +1211,10 @@ server_accept_loop(int *sock_in, int *sock_out, int *newsock, int *config_s)
 				continue;
 			}
 			if (unset_nonblock(*newsock) == -1 ||
-			    pipe(startup_p) == -1)
+			    pipe(startup_p) == -1) {
+				close(*newsock);
 				continue;
+			}
 			if (drop_connection(*newsock, startups, startup_p[0])) {
 				close(*newsock);
 				close(startup_p[0]);

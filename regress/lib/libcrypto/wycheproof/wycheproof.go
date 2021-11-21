@@ -1,4 +1,4 @@
-/* $OpenBSD: wycheproof.go,v 1.122 2021/09/24 20:48:23 tb Exp $ */
+/* $OpenBSD: wycheproof.go,v 1.124 2021/11/21 11:55:00 tb Exp $ */
 /*
  * Copyright (c) 2018 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2018, 2019 Theo Buehler <tb@openbsd.org>
@@ -1270,12 +1270,21 @@ func encodeDSAP1363Sig(wtSig string) (*C.uchar, C.int) {
 	s := C.CString(wtSig[sigLen/2:])
 	defer C.free(unsafe.Pointer(r))
 	defer C.free(unsafe.Pointer(s))
-	if C.BN_hex2bn(&cSig.r, r) == 0 {
+	var sigR *C.BIGNUM
+	var sigS *C.BIGNUM
+	defer C.BN_free(sigR)
+	defer C.BN_free(sigS)
+	if C.BN_hex2bn(&sigR, r) == 0 {
 		return nil, 0
 	}
-	if C.BN_hex2bn(&cSig.s, s) == 0 {
+	if C.BN_hex2bn(&sigS, s) == 0 {
 		return nil, 0
 	}
+	if C.DSA_SIG_set0(cSig, sigR, sigS) == 0 {
+		return nil, 0
+	}
+	sigR = nil
+	sigS = nil
 
 	derLen := C.i2d_DSA_SIG(cSig, nil)
 	if derLen == 0 {
@@ -1805,12 +1814,21 @@ func encodeECDSAWebCryptoSig(wtSig string) (*C.uchar, C.int) {
 	s := C.CString(wtSig[sigLen/2:])
 	defer C.free(unsafe.Pointer(r))
 	defer C.free(unsafe.Pointer(s))
-	if C.BN_hex2bn(&cSig.r, r) == 0 {
+	var sigR *C.BIGNUM
+	var sigS *C.BIGNUM
+	defer C.BN_free(sigR)
+	defer C.BN_free(sigS)
+	if C.BN_hex2bn(&sigR, r) == 0 {
 		return nil, 0
 	}
-	if C.BN_hex2bn(&cSig.s, s) == 0 {
+	if C.BN_hex2bn(&sigS, s) == 0 {
 		return nil, 0
 	}
+	if C.ECDSA_SIG_set0(cSig, sigR, sigS) == 0 {
+		return nil, 0
+	}
+	sigR = nil
+	sigS = nil
 
 	derLen := C.i2d_ECDSA_SIG(cSig, nil)
 	if derLen == 0 {
@@ -2211,22 +2229,35 @@ func runRsaesOaepTestGroup(algorithm string, wtg *wycheproofTestGroupRsaesOaep) 
 	defer C.RSA_free(rsa)
 
 	d := C.CString(wtg.D)
-	if C.BN_hex2bn(&rsa.d, d) == 0 {
+	var rsaD *C.BIGNUM
+	defer C.BN_free(rsaD)
+	if C.BN_hex2bn(&rsaD, d) == 0 {
 		log.Fatal("Failed to set RSA d")
 	}
 	C.free(unsafe.Pointer(d))
 
 	e := C.CString(wtg.E)
-	if C.BN_hex2bn(&rsa.e, e) == 0 {
+	var rsaE *C.BIGNUM
+	defer C.BN_free(rsaE)
+	if C.BN_hex2bn(&rsaE, e) == 0 {
 		log.Fatal("Failed to set RSA e")
 	}
 	C.free(unsafe.Pointer(e))
 
 	n := C.CString(wtg.N)
-	if C.BN_hex2bn(&rsa.n, n) == 0 {
+	var rsaN *C.BIGNUM
+	defer C.BN_free(rsaN)
+	if C.BN_hex2bn(&rsaN, n) == 0 {
 		log.Fatal("Failed to set RSA n")
 	}
 	C.free(unsafe.Pointer(n))
+
+	if C.RSA_set0_key(rsa, rsaN, rsaE, rsaD) == 0 {
+		log.Fatal("RSA_set0_key failed")
+	}
+	rsaN = nil
+	rsaE = nil
+	rsaD = nil
 
 	sha, err := hashEvpMdFromString(wtg.SHA)
 	if err != nil {
@@ -2298,22 +2329,35 @@ func runRsaesPkcs1TestGroup(algorithm string, wtg *wycheproofTestGroupRsaesPkcs1
 	defer C.RSA_free(rsa)
 
 	d := C.CString(wtg.D)
-	if C.BN_hex2bn(&rsa.d, d) == 0 {
+	var rsaD *C.BIGNUM
+	defer C.BN_free(rsaD)
+	if C.BN_hex2bn(&rsaD, d) == 0 {
 		log.Fatal("Failed to set RSA d")
 	}
 	C.free(unsafe.Pointer(d))
 
 	e := C.CString(wtg.E)
-	if C.BN_hex2bn(&rsa.e, e) == 0 {
+	var rsaE *C.BIGNUM
+	defer C.BN_free(rsaE)
+	if C.BN_hex2bn(&rsaE, e) == 0 {
 		log.Fatal("Failed to set RSA e")
 	}
 	C.free(unsafe.Pointer(e))
 
 	n := C.CString(wtg.N)
-	if C.BN_hex2bn(&rsa.n, n) == 0 {
+	var rsaN *C.BIGNUM
+	defer C.BN_free(rsaN)
+	if C.BN_hex2bn(&rsaN, n) == 0 {
 		log.Fatal("Failed to set RSA n")
 	}
 	C.free(unsafe.Pointer(n))
+
+	if C.RSA_set0_key(rsa, rsaN, rsaE, rsaD) == 0 {
+		log.Fatal("RSA_set0_key failed")
+	}
+	rsaN = nil
+	rsaE = nil
+	rsaD = nil
 
 	success := true
 	for _, wt := range wtg.Tests {
@@ -2393,16 +2437,26 @@ func runRsassaTestGroup(algorithm string, wtg *wycheproofTestGroupRsassa) bool {
 	defer C.RSA_free(rsa)
 
 	e := C.CString(wtg.E)
-	if C.BN_hex2bn(&rsa.e, e) == 0 {
+	var rsaE *C.BIGNUM
+	defer C.BN_free(rsaE)
+	if C.BN_hex2bn(&rsaE, e) == 0 {
 		log.Fatal("Failed to set RSA e")
 	}
 	C.free(unsafe.Pointer(e))
 
 	n := C.CString(wtg.N)
-	if C.BN_hex2bn(&rsa.n, n) == 0 {
+	var rsaN *C.BIGNUM
+	defer C.BN_free(rsaN)
+	if C.BN_hex2bn(&rsaN, n) == 0 {
 		log.Fatal("Failed to set RSA n")
 	}
 	C.free(unsafe.Pointer(n))
+
+	if C.RSA_set0_key(rsa, rsaN, rsaE, nil) == 0 {
+		log.Fatal("RSA_set0_key failed")
+	}
+	rsaN = nil
+	rsaE = nil
 
 	h, err := hashFromString(wtg.SHA)
 	if err != nil {
@@ -2478,16 +2532,26 @@ func runRSATestGroup(algorithm string, wtg *wycheproofTestGroupRSA) bool {
 	defer C.RSA_free(rsa)
 
 	e := C.CString(wtg.E)
-	if C.BN_hex2bn(&rsa.e, e) == 0 {
+	var rsaE *C.BIGNUM
+	defer C.BN_free(rsaE)
+	if C.BN_hex2bn(&rsaE, e) == 0 {
 		log.Fatal("Failed to set RSA e")
 	}
 	C.free(unsafe.Pointer(e))
 
 	n := C.CString(wtg.N)
-	if C.BN_hex2bn(&rsa.n, n) == 0 {
+	var rsaN *C.BIGNUM
+	defer C.BN_free(rsaN)
+	if C.BN_hex2bn(&rsaN, n) == 0 {
 		log.Fatal("Failed to set RSA n")
 	}
 	C.free(unsafe.Pointer(n))
+
+	if C.RSA_set0_key(rsa, rsaN, rsaE, nil) == 0 {
+		log.Fatal("RSA_set0_key failed")
+	}
+	rsaN = nil
+	rsaE = nil
 
 	nid, err := nidFromString(wtg.SHA)
 	if err != nil {

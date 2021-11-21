@@ -5,7 +5,6 @@
 /files.c/1.20/Fri Jan 16 06:40:16 2015//
 /gram.y/1.24/Fri Jan 16 06:40:16 2015//
 /hash.c/1.18/Sat Jan 17 07:37:14 2015//
-/misc.c/1.10/Tue May 14 13:44:25 2019//
 /misc.h/1.5/Tue May 14 13:44:25 2019//
 /mkheaders.c/1.22/Sun Oct 16 17:50:00 2016//
 /mkioconf.c/1.38/Fri Jun 28 13:33:55 2019//
@@ -17,10 +16,11 @@
 /sem.h/1.13/Mon Mar 24 21:35:03 2008//
 /ukc.c/1.25/Tue Aug 13 21:36:18 2019//
 /ukc.h/1.17/Fri Sep  6 21:30:31 2019//
-/ukcutil.c/1.25/Fri Sep  6 21:30:31 2019//
 /util.c/1.18/Sun Oct 16 09:35:40 2016//
 /config.h/1.31/Wed Sep  1 16:07:40 2021//
-/main.c/1.62/Wed Sep  1 16:07:40 2021//
-/config.8/1.74/Mon Nov 15 19:01:54 2021//
-/exec_elf.c/1.18/Mon Nov 15 19:01:54 2021//
+/config.8/1.75/Sun Nov 21 20:13:29 2021//
+/exec_elf.c/1.18/Mon Nov 15 19:06:15 2021//
+/main.c/1.63/Sun Nov 21 20:13:29 2021//
+/misc.c/1.11/Sun Nov 21 20:13:29 2021//
+/ukcutil.c/1.26/Sun Nov 21 20:13:29 2021//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.249 2021/10/27 16:58:44 bluhm Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.253 2021/11/21 16:17:48 mvs Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -335,8 +335,8 @@ reserve_spi(u_int rdomain, u_int32_t sspi, u_int32_t tspi,
  * is really one of our addresses if we received the packet!
  */
 struct tdb *
-gettdb_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *dst, u_int8_t proto,
-    int reverse)
+gettdb_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *dst,
+    u_int8_t proto, int reverse)
 {
 	u_int32_t hashval;
 	struct tdb *tdbp;
@@ -532,6 +532,85 @@ tdb_hashstats(void)
 			db_printf("%d%s\t\t%d\n", i, i == NBUCKETS - 1 ?
 			    "+" : "", buckets[i]);
 }
+
+#define DUMP(m, f) pr("%18s: " f "\n", #m, tdb->tdb_##m)
+void
+tdb_printit(void *addr, int full, int (*pr)(const char *, ...))
+{
+	struct tdb *tdb = addr;
+	char buf[INET6_ADDRSTRLEN];
+
+	if (full) {
+		pr("tdb at %p\n", tdb);
+		DUMP(hnext, "%p");
+		DUMP(dnext, "%p");
+		DUMP(snext, "%p");
+		DUMP(inext, "%p");
+		DUMP(onext, "%p");
+		DUMP(xform, "%p");
+		DUMP(encalgxform, "%p");
+		DUMP(authalgxform, "%p");
+		DUMP(compalgxform, "%p");
+		pr("%18s: %b\n", "flags", tdb->tdb_flags, TDBF_BITS);
+		/* tdb_XXX_tmo */
+		DUMP(seq, "%d");
+		DUMP(exp_allocations, "%d");
+		DUMP(soft_allocations, "%d");
+		DUMP(cur_allocations, "%d");
+		DUMP(exp_bytes, "%lld");
+		DUMP(soft_bytes, "%lld");
+		DUMP(cur_bytes, "%lld");
+		DUMP(exp_timeout, "%lld");
+		DUMP(soft_timeout, "%lld");
+		DUMP(established, "%lld");
+		DUMP(first_use, "%lld");
+		DUMP(soft_first_use, "%lld");
+		DUMP(exp_first_use, "%lld");
+		DUMP(last_used, "%lld");
+		DUMP(last_marked, "%lld");
+		/* tdb_data */
+		DUMP(cryptoid, "%lld");
+		pr("%18s: %08x\n", "tdb_spi", ntohl(tdb->tdb_spi));
+		DUMP(amxkeylen, "%d");
+		DUMP(emxkeylen, "%d");
+		DUMP(ivlen, "%d");
+		DUMP(sproto, "%d");
+		DUMP(wnd, "%d");
+		DUMP(satype, "%d");
+		DUMP(updates, "%d");
+		pr("%18s: %s\n", "dst",
+		    ipsp_address(&tdb->tdb_dst, buf, sizeof(buf)));
+		pr("%18s: %s\n", "src",
+		    ipsp_address(&tdb->tdb_src, buf, sizeof(buf)));
+		DUMP(amxkey, "%p");
+		DUMP(emxkey, "%p");
+		DUMP(rpl, "%lld");
+		/* tdb_seen */
+		/* tdb_iv */
+		DUMP(ids, "%p");
+		DUMP(ids_swapped, "%d");
+		DUMP(mtu, "%d");
+		DUMP(mtutimeout, "%lld");
+		pr("%18s: %d\n", "udpencap_port",
+		    ntohs(tdb->tdb_udpencap_port));
+		DUMP(tag, "%d");
+		DUMP(tap, "%d");
+		DUMP(rdomain, "%d");
+		DUMP(rdomain_post, "%d");
+		/* tdb_filter */
+		/* tdb_filtermask */
+		/* tdb_policy_head */
+		/* tdb_sync_entry */
+	} else {
+		pr("%p:", tdb);
+		pr(" %08x", ntohl(tdb->tdb_spi));
+		pr(" %s", ipsp_address(&tdb->tdb_src, buf, sizeof(buf)));
+		pr("->%s", ipsp_address(&tdb->tdb_dst, buf, sizeof(buf)));
+		pr(":%d", tdb->tdb_sproto);
+		pr(" %08x\n", tdb->tdb_flags);
+	}
+}
+#undef DUMP
 #endif	/* DDB */
 
 int
@@ -573,8 +652,10 @@ tdb_timeout(void *v)
 	NET_LOCK();
 	if (tdb->tdb_flags & TDBF_TIMER) {
 		/* If it's an "invalid" TDB do a silent expiration. */
-		if (!(tdb->tdb_flags & TDBF_INVALID))
+		if (!(tdb->tdb_flags & TDBF_INVALID)) {
+			ipsecstat_inc(ipsec_exctdb);
 			pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
+		}
 		tdb_delete(tdb);
 	}
 	NET_UNLOCK();
@@ -588,8 +669,10 @@ tdb_firstuse(void *v)
 	NET_LOCK();
 	if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) {
 		/* If the TDB hasn't been used, don't renew it. */
-		if (tdb->tdb_first_use != 0)
+		if (tdb->tdb_first_use != 0) {
+			ipsecstat_inc(ipsec_exctdb);
 			pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
+		}
 		tdb_delete(tdb);
 	}
 	NET_UNLOCK();
@@ -939,7 +1022,7 @@ tdb_init(struct tdb *tdbp, u_int16_t alg, struct ipsecinit *ii)
 	return EINVAL;
 }
 
-#ifdef ENCDEBUG
+#if defined(DDB) || defined(ENCDEBUG)
 /* Return a printable string for the address. */
 const char *
 ipsp_address(union sockaddr_union *sa, char *buf, socklen_t size)
@@ -959,7 +1042,7 @@ ipsp_address(union sockaddr_union *sa, char *buf, socklen_t size)
 		return "(unknown address family)";
 	}
 }
-#endif /* ENCDEBUG */
+#endif /* DDB || ENCDEBUG */
 
 /* Check whether an IP{4,6} address is unspecified. */
 int
@@ -1087,7 +1170,7 @@ ipsp_ids_free(struct ipsec_ids *ids)
 	if (--ids->id_refcount > 0)
 		return;
 
-	/* 
+	/*
 	 * Add second for the case ipsp_ids_gc() is already running and
 	 * awaits netlock to be released.
 	 */

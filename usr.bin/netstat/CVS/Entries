@@ -5,11 +5,11 @@
 /net80211.c/1.19/Fri Jun 28 13:35:02 2019//
 /unix.c/1.32/Thu Apr 26 12:42:51 2018//
 /if.c/1.77/Wed Sep  1 16:07:40 2021//
-/inet.c/1.171/Wed Sep  1 16:07:40 2021//
 /inet6.c/1.55/Wed Sep  1 16:07:40 2021//
 /main.c/1.121/Wed Sep  1 16:07:40 2021//
 /netstat.1/1.92/Wed Sep  1 16:07:40 2021//
 /netstat.h/1.76/Wed Sep  1 16:07:40 2021//
 /route.c/1.107/Wed Sep  1 16:07:40 2021//
 /show.c/1.58/Wed Sep  1 16:07:40 2021//
+/inet.c/1.172/Sun Nov 21 20:13:26 2021//
 D

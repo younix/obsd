@@ -11,7 +11,6 @@
 /sendmail.8/1.4/Fri Oct 23 15:48:16 2015//
 /smtpd-api.h/1.36/Sun Dec 23 16:06:24 2018//
 /smtpd-defines.h/1.12/Mon Feb 24 16:16:08 2020//
-/smtpd-filters.7/1.6/Sat Apr 25 09:44:02 2020//
 /smtpd.8/1.32/Tue Jan  3 22:11:39 2017//
 /tree.h/1.1/Sun Dec 23 16:06:24 2018//
 D/mail////
@@ -86,7 +85,6 @@ D/smtpd////
 /smtpc.c/1.19/Thu Sep  2 14:22:33 2021//
 /smtpctl.c/1.169/Thu Sep  2 14:22:33 2021//
 /smtpd.c/1.341/Thu Sep  2 14:22:33 2021//
-/smtpd.conf.5/1.261/Thu Sep  2 14:22:33 2021//
 /spfwalk.c/1.20/Thu Sep  2 14:22:33 2021//
 /srs.c/1.5/Thu Sep  2 14:22:33 2021//
 /ssl.c/1.96/Thu Sep  2 14:22:33 2021//
@@ -107,3 +105,5 @@ D/smtpd////
 /parse.y/1.290/Wed Oct 20 17:29:20 2021//
 /smtpd.h/1.671/Wed Oct 20 17:29:20 2021//
 /table_db.c/1.25/Wed Oct 20 17:29:20 2021//
+/smtpd-filters.7/1.8/Sun Nov 21 20:13:31 2021//
+/smtpd.conf.5/1.262/Sun Nov 21 20:13:31 2021//

@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbr.c,v 1.107 2021/11/14 17:28:29 krw Exp $	*/
+/*	$OpenBSD: mbr.c,v 1.110 2021/11/20 21:35:52 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -43,9 +43,9 @@ MBR_init(struct mbr *mbr)
 {
 	struct dos_partition	dp;
 	struct prt		bootprt, obsdprt;
-	uint64_t		adj;
 	daddr_t			daddr;
-	uint32_t		spc;
+	uint64_t		disksz;
+	const uint32_t		spc = disk.dk_heads * disk.dk_sectors;
 
 	memset(&gmbr, 0, sizeof(gmbr));
 	memset(&gh, 0, sizeof(gh));
@@ -61,15 +61,12 @@ MBR_init(struct mbr *mbr)
 
 	memset(&obsdprt, 0, sizeof(obsdprt));
 	memset(&bootprt, 0, sizeof(bootprt));
+	disksz = disk.dk_cylinders * spc; /* Use only complete cylinders. */
 
 	memcpy(&dp, &default_dmbr.dmbr_parts[0], sizeof(dp));
 	PRT_parse(&dp, 0, 0, &bootprt);
 
-	if (bootprt.prt_flag != DOSACTIVE)
-		obsdprt.prt_flag = DOSACTIVE;
-
 	/* Reserve first track, or first cyl, if possible. */
-	obsdprt.prt_id = DOSPTYP_OPENBSD;
 	if (disk.dk_heads > 1 || disk.dk_cylinders > 1)
 		obsdprt.prt_bs = disk.dk_sectors;
 	else
@@ -78,10 +75,8 @@ MBR_init(struct mbr *mbr)
 #if defined(__powerpc__) || defined(__mips__)
 	/* Now fix up for the MS-DOS boot partition on PowerPC/MIPS. */
 	bootprt.prt_flag = DOSACTIVE;	/* Boot from dos part */
-	obsdprt.prt_flag = 0;
 	if (bootprt.prt_ns > 0)
 		obsdprt.prt_bs = bootprt.prt_bs + bootprt.prt_ns;
-	spc = disk.dk_heads * disk.dk_sectors;
 	if (obsdprt.prt_bs % spc != 0)
 		obsdprt.prt_bs += spc - (obsdprt.prt_bs % spc);
 #else
@@ -95,15 +90,19 @@ MBR_init(struct mbr *mbr)
 	daddr = 1;
 	while (daddr < DL_SECTOBLK(&dl, obsdprt.prt_bs))
 		daddr *= 2;
-	adj = DL_BLKTOSEC(&dl, daddr) - obsdprt.prt_bs;
-	obsdprt.prt_bs += adj;
+	obsdprt.prt_bs = DL_BLKTOSEC(&dl, daddr);
 
-	/* Use all space up to end of last complete cylinder. */
-	obsdprt.prt_ns = disk.dk_cylinders * disk.dk_heads * disk.dk_sectors;
-	obsdprt.prt_ns -= obsdprt.prt_bs;
+	if (obsdprt.prt_bs >= disksz) {
+		memset(&obsdprt, 0, sizeof(obsdprt));
+	} else {
+		obsdprt.prt_ns = disksz - obsdprt.prt_bs;
+		obsdprt.prt_id = DOSPTYP_OPENBSD;
+		if (bootprt.prt_flag != DOSACTIVE)
+			obsdprt.prt_flag = DOSACTIVE;
+		PRT_fix_CHS(&obsdprt);
+	}
 
 	PRT_fix_CHS(&bootprt);
-	PRT_fix_CHS(&obsdprt);
 
 	memset(mbr, 0, sizeof(*mbr));
 	memcpy(mbr->mbr_code, default_dmbr.dmbr_boot, sizeof(mbr->mbr_code));

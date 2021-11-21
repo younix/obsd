@@ -54,7 +54,6 @@
 /vega10_sdma_pkt_open.h/1.1/Tue May 21 22:40:07 2019//
 /amdgpu_afmt.c/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_amdkfd_fence.c/1.2/Fri Dec 11 17:58:22 2020//
-/amdgpu_bo_list.h/1.2/Fri Dec 11 17:58:22 2020//
 /amdgpu_csa.c/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_csa.h/1.1/Fri Dec 11 17:58:22 2020//
 /amdgpu_display.h/1.2/Fri Dec 11 17:58:22 2020//
@@ -138,7 +137,6 @@
 /amdgpu_atomfirmware.h/1.3/Thu Sep  2 14:22:31 2021//
 /amdgpu_benchmark.c/1.3/Thu Sep  2 14:22:31 2021//
 /amdgpu_bios.c/1.4/Thu Sep  2 14:22:31 2021//
-/amdgpu_bo_list.c/1.5/Thu Sep  2 14:22:31 2021//
 /amdgpu_cgs.c/1.3/Thu Sep  2 14:22:31 2021//
 /amdgpu_cik.c/1.3/Thu Sep  2 14:22:31 2021//
 /amdgpu_cik_sdma.c/1.3/Thu Sep  2 14:22:31 2021//
@@ -252,7 +250,6 @@
 /gfxhub_v2_0.h/1.2/Thu Sep  2 14:22:32 2021//
 /gfxhub_v2_1.c/1.1/Thu Sep  2 14:22:32 2021//
 /gfxhub_v2_1.h/1.1/Thu Sep  2 14:22:32 2021//
-/gmc_v6_0.c/1.3/Thu Sep  2 14:22:32 2021//
 /gmc_v7_0.c/1.4/Thu Sep  2 14:22:32 2021//
 /gmc_v8_0.c/1.4/Thu Sep  2 14:22:32 2021//
 /gmc_v9_0.h/1.3/Thu Sep  2 14:22:32 2021//
@@ -336,7 +333,10 @@
 /gmc_v10_0.c/1.4/Wed Oct 20 17:29:12 2021//
 /gmc_v9_0.c/1.10/Wed Oct 20 17:29:12 2021//
 /vcn_v1_0.c/1.5/Wed Oct 20 17:29:12 2021//
-/vcn_v2_0.c/1.3/Wed Oct 20 17:29:12 2021//
-/vcn_v2_5.c/1.3/Wed Oct 20 17:29:12 2021//
 /vcn_v3_0.c/1.2/Wed Oct 20 17:29:12 2021//
+/amdgpu_bo_list.c/1.6/Sun Nov 21 20:13:21 2021//
+/amdgpu_bo_list.h/1.3/Sun Nov 21 20:13:21 2021//
+/gmc_v6_0.c/1.4/Sun Nov 21 20:13:21 2021//
+/vcn_v2_0.c/1.4/Sun Nov 21 20:13:22 2021//
+/vcn_v2_5.c/1.4/Sun Nov 21 20:13:22 2021//
 D

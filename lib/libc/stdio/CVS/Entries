@@ -133,7 +133,7 @@
 /vfprintf.c/1.81/Tue Sep 14 08:17:17 2021//
 /vfwprintf.c/1.22/Tue Sep 14 08:17:17 2021//
 /wprintf.3/1.9/Tue Sep 14 08:17:17 2021//
-/ferror.3/1.11/Mon Nov 15 19:01:51 2021//
-/fputws.c/1.9/Mon Nov 15 19:01:51 2021//
-/getwchar.c/1.3/Mon Nov 15 19:01:51 2021//
+/ferror.3/1.11/Sun Nov 21 20:09:21 2021//
+/fputws.c/1.9/Mon Nov 15 19:06:15 2021//
+/getwchar.c/1.3/Mon Nov 15 19:06:15 2021//
 D
