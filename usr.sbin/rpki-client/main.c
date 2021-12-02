@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.165 2021/11/19 09:47:30 job Exp $ */
+/*	$OpenBSD: main.c,v 1.167 2021/11/25 15:03:04 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -68,6 +68,7 @@ const char	*bird_tablename = "ROAS";
 int	verbose;
 int	noop;
 int	rrdpon = 1;
+int	repo_timeout;
 
 struct stats	 stats;
 
@@ -708,6 +709,7 @@ main(int argc, char *argv[])
 	}
 	cachedir = RPKI_PATH_BASE_DIR;
 	outputdir = RPKI_PATH_OUT_DIR;
+	repo_timeout = timeout / 4;
 
 	if (pledge("stdio rpath wpath cpath inet fattr dns sendfd recvfd "
 	    "proc exec unveil", NULL) == -1)
@@ -753,6 +755,12 @@ main(int argc, char *argv[])
 			timeout = strtonum(optarg, 0, 24*60*60, &errs);
 			if (errs)
 				errx(1, "-s: %s", errs);
+			if (timeout == 0)
+				repo_timeout = 24*60*60;
+			else if (timeout < 1)
+				errx(1, "-s: %i too small", timeout);
+			else
+				repo_timeout = timeout / 4;
 			break;
 		case 't':
 			if (talsz >= TALSZ_MAX)

@@ -216,7 +216,6 @@
 /sysconf.c/1.27/Sat May  1 08:41:50 2021//
 /glob.c/1.50/Wed May 19 15:54:45 2021//
 /cgetent.3/1.2/Wed Sep  1 16:07:37 2021//
-/fts.c/1.60/Wed Sep  1 16:07:37 2021//
 /sleep.c/1.13/Wed Sep  1 16:07:37 2021//
 /alarm.3/1.16/Thu Sep  2 14:22:30 2021//
 /alarm.c/1.10/Thu Sep  2 14:22:30 2021//
@@ -230,4 +229,5 @@
 /daemon.c/1.8/Mon Nov 15 19:06:15 2021//
 /err.3/1.22/Mon Nov 15 19:06:15 2021//
 /login_cap.c/1.40/Mon Nov 15 19:06:15 2021//
+/fts.c/1.61/Thu Dec  2 13:56:06 2021//
 D

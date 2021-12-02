@@ -4,7 +4,6 @@
 /arm64_bus_space.c/1.8/Wed Sep  1 16:07:38 2021//
 /pci_machdep.c/1.5/Wed Sep  1 16:07:38 2021//
 /smmureg.h/1.1/Wed Sep  1 16:07:38 2021//
-/acpiiort.c/1.4/Thu Sep  2 14:22:31 2021//
 /acpiiort.h/1.4/Thu Sep  2 14:22:31 2021//
 /apldwusb.c/1.1/Thu Sep  2 14:22:31 2021//
 /aplns.c/1.5/Thu Sep  2 14:22:31 2021//
@@ -18,16 +17,17 @@
 /agintc.c/1.35/Mon Nov 15 19:06:15 2021//
 /agtimer.c/1.19/Mon Nov 15 19:06:15 2021//
 /ampintc.c/1.26/Mon Nov 15 19:06:15 2021//
-/apldart.c/1.8/Sun Nov 21 20:09:21 2021//
-/apldog.c/1.2/Sun Nov 21 20:09:21 2021//
-/aplhidev.c/1.2/Sun Nov 21 20:09:21 2021//
-/aplpcie.c/1.8/Sun Nov 21 20:09:21 2021//
-/aplpinctrl.c/1.2/Sun Nov 21 20:09:21 2021//
-/aplspi.c/1.2/Sun Nov 21 20:09:21 2021//
 /apm.c/1.8/Mon Nov 15 19:06:15 2021//
 /bcm2836_intr.c/1.13/Mon Nov 15 19:06:15 2021//
 /efi.c/1.11/Mon Nov 15 19:06:15 2021//
 /mainbus.c/1.22/Mon Nov 15 19:06:15 2021//
 /simplebus.c/1.14/Mon Nov 15 19:06:15 2021//
 /smbios.c/1.7/Mon Nov 15 19:06:15 2021//
+/acpiiort.c/1.5/Thu Dec  2 13:56:26 2021//
+/apldart.c/1.8/Sun Nov 21 20:15:22 2021//
+/apldog.c/1.2/Sun Nov 21 20:15:22 2021//
+/aplhidev.c/1.2/Sun Nov 21 20:15:22 2021//
+/aplpcie.c/1.8/Sun Nov 21 20:15:22 2021//
+/aplpinctrl.c/1.2/Sun Nov 21 20:15:22 2021//
+/aplspi.c/1.2/Sun Nov 21 20:15:22 2021//
 D

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: iic.4,v 1.117 2021/06/23 15:32:40 kettenis Exp $
+.\"	$OpenBSD: iic.4,v 1.120 2021/11/22 20:24:41 kettenis Exp $
 .\"
 .\" Copyright (c) 2004, 2006 Alexander Yurchenko <grange@openbsd.org>
 .\"
@@ -14,7 +14,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: June 23 2021 $
+.Dd $Mdocdate: November 22 2021 $
 .Dt IIC 4
 .Os
 .Sh NAME
@@ -30,6 +30,7 @@
 .Cd "iic* at glxpcib?               # i386"
 .Cd "iic* at gscsio?                # i386"
 .Cd "iic* at ichiic?                # amd64 i386"
+.Cd "iic* at iicmux?                # arm64"
 .Cd "iic* at nviic?                 # amd64 i386"
 .Cd "iic* at pcamux?                # arm64"
 .Cd "iic* at pcfiic?                # sparc64"
@@ -232,6 +233,8 @@ Philips PCF8591 temperature sensor
 NXP PCF8523 real-time clock
 .It Xr pcxrtc 4
 NXP PCF8563 real-time clock
+.It Xr pcyrtc 4
+NXP PCF85063A/TP real-time clock
 .It Xr ricohrtc 4
 Ricoh RS5C372 real-time clock
 .It Xr rkpmic 4
@@ -260,6 +263,7 @@ Winbond W83L784R/W83L785R/W83L785TS-L temperature, voltage, and fan sensor
 Winbond W83793G temperature, voltage, and fan sensor
 .El
 .Sh SEE ALSO
+.Xr iicmux 4 ,
 .Xr intro 4 ,
 .Xr iic 9
 .Sh HISTORY

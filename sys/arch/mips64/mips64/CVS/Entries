@@ -19,7 +19,6 @@
 /lcore_access.S/1.31/Wed Sep  1 16:07:38 2021//
 /mips64_machdep.c/1.37/Wed Sep  1 16:07:38 2021//
 /vm_machdep.c/1.41/Wed Sep  1 16:07:38 2021//
-/cpu.c/1.80/Thu Sep  2 14:22:31 2021//
 /db_machdep.c/1.57/Thu Sep  2 14:22:31 2021//
 /ipifuncs.c/1.24/Thu Sep  2 14:22:31 2021//
 /pmap.c/1.121/Tue Sep 14 08:17:32 2021//
@@ -27,4 +26,5 @@
 /sendsig.c/1.35/Wed Oct 20 17:29:10 2021//
 /tlbhandler.S/1.53/Wed Oct 20 17:29:10 2021//
 /trap.c/1.155/Mon Nov 15 19:06:15 2021//
+/cpu.c/1.81/Thu Dec  2 13:56:27 2021//
 D

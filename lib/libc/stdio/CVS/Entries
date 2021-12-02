@@ -22,7 +22,6 @@
 /fgetws.c/1.8/Mon Jan  4 16:14:19 2016//
 /fileext.h/1.2/Fri Jun 17 20:40:32 2005//
 /fileno.c/1.9/Mon Aug 31 02:53:57 2015//
-/findfp.c/1.19/Tue Apr  5 04:29:21 2016//
 /flags.c/1.8/Sun Aug 31 02:21:18 2014//
 /floatio.h/1.5/Mon Sep 14 12:49:33 2015//
 /flockfile.c/1.9/Sat May  7 19:05:22 2016//
@@ -133,7 +132,8 @@
 /vfprintf.c/1.81/Tue Sep 14 08:17:17 2021//
 /vfwprintf.c/1.22/Tue Sep 14 08:17:17 2021//
 /wprintf.3/1.9/Tue Sep 14 08:17:17 2021//
-/ferror.3/1.11/Sun Nov 21 20:09:21 2021//
 /fputws.c/1.9/Mon Nov 15 19:06:15 2021//
 /getwchar.c/1.3/Mon Nov 15 19:06:15 2021//
+/ferror.3/1.11/Sun Nov 21 20:15:22 2021//
+/findfp.c/1.20/Thu Dec  2 13:56:06 2021//
 D

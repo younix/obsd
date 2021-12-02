@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.332 2021/11/16 21:43:36 tobhe Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.340 2021/12/01 16:42:12 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -17,7 +17,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/param.h>	/* roundup */
+#include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
@@ -887,7 +887,7 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 		id = &sa->sa_iid;
 
 	/* try to relookup the policy based on the peerid */
-	if (msg->msg_id.id_type && !sa->sa_hdr.sh_initiator) {
+	if (msg->msg_peerid.id_type && !sa->sa_hdr.sh_initiator) {
 		old = sa->sa_policy;
 
 		sa->sa_policy = NULL;
@@ -930,9 +930,9 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 		    old->pol_nflows) != 0 || msg->msg_policy != old) {
 
 			/* get dstid */
-			if (msg->msg_id.id_type) {
-				memcpy(id, &msg->msg_id, sizeof(*id));
-				bzero(&msg->msg_id, sizeof(msg->msg_id));
+			if (msg->msg_peerid.id_type) {
+				memcpy(id, &msg->msg_peerid, sizeof(*id));
+				bzero(&msg->msg_peerid, sizeof(msg->msg_peerid));
 			}
 			log_warnx("%s: policy mismatch", SPI_SA(sa, __func__));
 			ikev2_send_auth_failed(env, sa);
@@ -949,18 +949,18 @@ ikev2_ike_auth_recv(struct iked *env, struct iked_sa *sa,
 	if (!msg->msg_auth.id_type &&
 	    !sa->sa_policy->pol_auth.auth_eap) {
 		/* get dstid */
-		if (msg->msg_id.id_type) {
-			memcpy(id, &msg->msg_id, sizeof(*id));
-			bzero(&msg->msg_id, sizeof(msg->msg_id));
+		if (msg->msg_peerid.id_type) {
+			memcpy(id, &msg->msg_peerid, sizeof(*id));
+			bzero(&msg->msg_peerid, sizeof(msg->msg_peerid));
 		}
 		log_debug("%s: missing auth payload", SPI_SA(sa, __func__));
 		ikev2_send_auth_failed(env, sa);
 		return (-1);
 	}
 
-	if (msg->msg_id.id_type) {
-		memcpy(id, &msg->msg_id, sizeof(*id));
-		bzero(&msg->msg_id, sizeof(msg->msg_id));
+	if (msg->msg_peerid.id_type) {
+		memcpy(id, &msg->msg_peerid, sizeof(*id));
+		bzero(&msg->msg_peerid, sizeof(msg->msg_peerid));
 
 		if (!sa->sa_hdr.sh_initiator) {
 			if ((authmsg = ikev2_msg_auth(env, sa,
@@ -1991,7 +1991,7 @@ ikev2_add_ipcompnotify(struct iked *env, struct ibuf *e,
 		csa.csa_ikesa = sa;
 		csa.csa_local = &sa->sa_peer;
 		csa.csa_peer = &sa->sa_local;
-		if (pfkey_sa_init(env->sc_pfkey, &csa, &spi) == -1)
+		if (pfkey_sa_init(env, &csa, &spi) == -1)
 			return (-1);
 		ic->ic_cpi_in = spi;
 	} else {
@@ -2490,7 +2490,7 @@ ikev2_add_proposals(struct iked *env, struct iked_sa *sa, struct ibuf *buf,
 				csa.csa_local = &sa->sa_peer;
 				csa.csa_peer = &sa->sa_local;
 
-				if (pfkey_sa_init(env->sc_pfkey, &csa, &spi) == -1)
+				if (pfkey_sa_init(env, &csa, &spi) == -1)
 					return (-1);
 			}
 
@@ -2679,7 +2679,7 @@ ikev2_resp_informational(struct iked *env, struct iked_sa *sa,
 
 	/*
 	 * Include NAT_DETECTION notification on UPDATE_SA_ADDRESSES or if
-	 * the peer did include them, too (RFC 455, 3.8).
+	 * the peer did include them, too (RFC 4555, 3.8).
 	 */
 	if (sa->sa_mobike &&
 	    (msg->msg_update_sa_addresses || msg->msg_natt_rcvd)) {
@@ -3095,7 +3095,7 @@ ikev2_handle_notifies(struct iked *env, struct iked_message *msg)
 		case IKEV2_EXCHANGE_CREATE_CHILD_SA:
 			if (!(sa->sa_stateflags & IKED_REQ_CHILDSA)) {
 				log_debug("%s: IKED_REQ_CHILDSA missing",
-				     __func__);
+				    __func__);
 				return (-1);
 			}
 			sa->sa_stateflags &= ~IKED_REQ_CHILDSA;
@@ -4177,7 +4177,7 @@ ikev2_nonce_cmp(struct ibuf *a, struct ibuf *b)
 
 	alen = ibuf_length(a);
 	blen = ibuf_length(b);
-	len = MIN(alen, blen);
+	len = MINIMUM(alen, blen);
 	ret = memcmp(ibuf_data(a), ibuf_data(b), len);
 	if (ret == 0)
 		ret = (alen < blen ? -1 : 1);
@@ -4525,7 +4525,7 @@ ikev2_ikesa_enable(struct iked *env, struct iked_sa *sa, struct iked_sa *nsa)
 	nsa->sa_cp_dns = sa->sa_cp_dns;
 	sa->sa_cp_dns = NULL;
 	/* Transfer other attributes */
-        if (sa->sa_dstid_entry_valid) {
+	if (sa->sa_dstid_entry_valid) {
 		sa_dstid_remove(env, sa);
 		sa_dstid_insert(env, nsa);
 	}
@@ -4836,8 +4836,8 @@ ikev2_resp_create_child_sa(struct iked *env, struct iked_message *msg)
 		goto done;
 
 	if ((len = ikev2_add_proposals(env, nsa ? nsa : sa, e,
-		nsa ? &nsa->sa_proposals : &proposals,
-		protoid, 0, nsa ? 1 : 0, 0)) == -1)
+	    nsa ? &nsa->sa_proposals : &proposals,
+	    protoid, 0, nsa ? 1 : 0, 0)) == -1)
 		goto done;
 
 	if (ikev2_next_payload(pld, len, IKEV2_PAYLOAD_NONCE) == -1)
@@ -4978,7 +4978,7 @@ ikev2_ike_sa_alive(struct iked *env, void *arg)
 	TAILQ_FOREACH(csa, &sa->sa_childsas, csa_entry) {
 		if (!csa->csa_loaded)
 			continue;
-		if (pfkey_sa_last_used(env->sc_pfkey, csa, &last_used) != 0)
+		if (pfkey_sa_last_used(env, csa, &last_used) != 0)
 			continue;
 		diff = (uint32_t)(gettime() - last_used);
 		log_debug("%s: %s CHILD SA spi %s last used %llu second(s) ago",
@@ -6086,7 +6086,7 @@ ikev2_childsa_negotiate(struct iked *env, struct iked_sa *sa,
 			csa->csa_local = &sa->sa_peer;
 			csa->csa_peer = &sa->sa_local;
 
-			if ((ret = pfkey_sa_init(env->sc_pfkey, csa,
+			if ((ret = pfkey_sa_init(env, csa,
 			    &spi)) != 0)
 				goto done;
 			csa->csa_allocated = 1;
@@ -6166,7 +6166,7 @@ ikev2_childsa_negotiate(struct iked *env, struct iked_sa *sa,
 				ic->ic_transform = 0;
 				ic->ic_cpi_in = ic->ic_cpi_out = 0;
 			} else {
-				if ((ret = pfkey_sa_init(env->sc_pfkey, csa2,
+				if ((ret = pfkey_sa_init(env, csa2,
 				    &spi)) != 0)
 					goto done;
 				ic->ic_cpi_in = spi;
@@ -6246,14 +6246,14 @@ ikev2_childsa_enable(struct iked *env, struct iked_sa *sa)
 			continue;
 		}
 
-		if (pfkey_sa_add(env->sc_pfkey, csa, NULL) != 0) {
+		if (pfkey_sa_add(env, csa, NULL) != 0) {
 			log_debug("%s: failed to load CHILD SA spi %s",
 			    __func__, print_spi(csa->csa_spi.spi,
 			    csa->csa_spi.spi_size));
 			return (-1);
 		}
 		if (ipcomp) {
-			if (pfkey_sa_add(env->sc_pfkey, ipcomp, csa) != 0) {
+			if (pfkey_sa_add(env, ipcomp, csa) != 0) {
 				log_debug("%s: failed to load IPCOMP spi %s",
 				    __func__, print_spi(ipcomp->csa_spi.spi,
 				    ipcomp->csa_spi.spi_size));
@@ -6319,12 +6319,12 @@ ikev2_childsa_enable(struct iked *env, struct iked_sa *sa)
 				continue;
 			}
 			RB_REMOVE(iked_flows, &env->sc_activeflows, flow);
-			(void)pfkey_flow_delete(env->sc_pfkey, flow);
+			(void)pfkey_flow_delete(env, flow);
 			flow->flow_loaded = 0; /* we did RB_REMOVE */
 			reload = 1;
 		}
 
-		if (pfkey_flow_add(env->sc_pfkey, flow) != 0) {
+		if (pfkey_flow_add(env, flow) != 0) {
 			log_debug("%s: failed to load flow", __func__);
 			return (-1);
 		}
@@ -6405,7 +6405,7 @@ ikev2_childsa_delete(struct iked *env, struct iked_sa *sa, uint8_t saproto,
 		if (csa->csa_loaded)
 			RB_REMOVE(iked_activesas, &env->sc_activesas, csa);
 
-		if (pfkey_sa_delete(env->sc_pfkey, csa) != 0)
+		if (pfkey_sa_delete(env, csa) != 0)
 			log_info("%s: failed to delete CHILD SA spi %s",
 			    SPI_SA(sa, __func__), print_spi(csa->csa_spi.spi,
 			    csa->csa_spi.spi_size));
@@ -6421,7 +6421,7 @@ ikev2_childsa_delete(struct iked *env, struct iked_sa *sa, uint8_t saproto,
 		ipcomp = csa->csa_bundled;
 		if (ipcomp) {
 			if (ipcomp->csa_loaded) {
-				if (pfkey_sa_delete(env->sc_pfkey, ipcomp) != 0)
+				if (pfkey_sa_delete(env, ipcomp) != 0)
 					log_info("%s: failed to delete IPCOMP"
 					    " SA spi %s", SPI_SA(sa, __func__),
 					    print_spi(ipcomp->csa_spi.spi,
@@ -6579,14 +6579,20 @@ ikev2_child_sa_rekey(struct iked *env, struct iked_spi *rekey)
 		return (0);
 	}
 	if (!sa_stateok(sa, IKEV2_STATE_ESTABLISHED)) {
-		log_warnx("%s: SA %s is not established", __func__,
+		log_warnx("%s: not established, SPI %s", SPI_SA(sa, __func__),
 		    print_spi(rekey->spi, rekey->spi_size));
 		return (0);
 	}
-	if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF))
+	if (sa->sa_stateflags & (IKED_REQ_CHILDSA|IKED_REQ_INF)) {
+		log_info("%s: busy, retrying, SPI %s", SPI_SA(sa, __func__),
+		    print_spi(rekey->spi, rekey->spi_size));
 		return (-1);	/* busy, retry later */
-	if (sa->sa_tmpfail)
+	}
+	if (sa->sa_tmpfail) {
+		log_info("%s: peer busy, retrying, SPI %s", SPI_SA(sa, __func__),
+		    print_spi(rekey->spi, rekey->spi_size));
 		return (-1);	/* peer is busy, retry later */
+	}
 	if (csa->csa_allocated)	/* Peer SPI died first, get the local one */
 		rekey->spi = csa->csa_peerspi;
 	if (ikev2_send_create_child_sa(env, sa, rekey, rekey->spi_protoid, 0))
@@ -6933,7 +6939,7 @@ ikev2_cp_setaddr_pool(struct iked *env, struct iked_sa *sa,
 				return (-1);
 			}
 			if (RB_FIND(iked_addrpool, &env->sc_addrpool,
-			     &key)) {
+			    &key)) {
 				*errstr = "requested addr in use";
 				return (-1);
 			}
@@ -7150,12 +7156,12 @@ ikev2_update_sa_addresses(struct iked *env, struct iked_sa *sa)
 	TAILQ_FOREACH(csa, &sa->sa_childsas, csa_entry) {
 		if (!csa->csa_loaded)
 			continue;
-		if (pfkey_sa_update_addresses(env->sc_pfkey, csa) != 0)
+		if (pfkey_sa_update_addresses(env, csa) != 0)
 			log_debug("%s: failed to update sa", __func__);
 		if ((ipcomp = csa->csa_bundled) != NULL &&
 		    ipcomp->csa_loaded)
-			if (pfkey_sa_update_addresses(env->sc_pfkey, ipcomp)
-			     != 0)
+			if (pfkey_sa_update_addresses(env, ipcomp)
+			    != 0)
 				log_debug("%s: failed to update sa", __func__);
 	}
 
@@ -7163,10 +7169,10 @@ ikev2_update_sa_addresses(struct iked *env, struct iked_sa *sa)
 	TAILQ_FOREACH(flow, &sa->sa_flows, flow_entry) {
 		if (flow->flow_loaded) {
 			RB_REMOVE(iked_flows, &env->sc_activeflows, flow);
-			(void)pfkey_flow_delete(env->sc_pfkey, flow);
+			(void)pfkey_flow_delete(env, flow);
 			flow->flow_loaded = 0;
 		}
-		if (pfkey_flow_add(env->sc_pfkey, flow) != 0)
+		if (pfkey_flow_add(env, flow) != 0)
 			log_debug("%s: failed to add flow %p", __func__, flow);
 		if (!flow->flow_loaded)
 			continue;

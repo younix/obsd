@@ -48,8 +48,8 @@
 /pte.h/1.7/Wed Sep  1 16:07:38 2021//
 /smbiosvar.h/1.5/Wed Sep  1 16:07:38 2021//
 /armreg.h/1.17/Tue Sep 14 08:17:31 2021//
-/cpu.h/1.22/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.5/Thu Sep  2 14:22:31 2021//
 /intr.h/1.18/Thu Sep  2 14:22:31 2021//
 /pci_machdep.h/1.11/Thu Sep  2 14:22:31 2021//
+/cpu.h/1.23/Thu Dec  2 13:56:26 2021//
 D

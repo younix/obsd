@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.192 2021/11/21 02:54:56 bluhm Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.195 2021/12/02 12:39:15 bluhm Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -328,12 +328,16 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 	/* Register first use, setup expiration timer. */
 	if (tdbp->tdb_first_use == 0) {
 		tdbp->tdb_first_use = gettime();
-		if (tdbp->tdb_flags & TDBF_FIRSTUSE)
-			timeout_add_sec(&tdbp->tdb_first_tmo,
-			    tdbp->tdb_exp_first_use);
-		if (tdbp->tdb_flags & TDBF_SOFT_FIRSTUSE)
-			timeout_add_sec(&tdbp->tdb_sfirst_tmo,
-			    tdbp->tdb_soft_first_use);
+		if (tdbp->tdb_flags & TDBF_FIRSTUSE) {
+			if (timeout_add_sec(&tdbp->tdb_first_tmo,
+			    tdbp->tdb_exp_first_use))
+				tdb_ref(tdbp);
+		}
+		if (tdbp->tdb_flags & TDBF_SOFT_FIRSTUSE) {
+			if (timeout_add_sec(&tdbp->tdb_sfirst_tmo,
+			    tdbp->tdb_soft_first_use))
+				tdb_ref(tdbp);
+		}
 	}
 
 	tdbp->tdb_ipackets++;
@@ -348,6 +352,7 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 		ipsecstat_inc(ipsec_idrops);
 		tdbp->tdb_idrops++;
 	}
+	tdb_unref(tdbp);
 	return prot;
 
  drop:
@@ -355,6 +360,7 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 	ipsecstat_inc(ipsec_idrops);
 	if (tdbp != NULL)
 		tdbp->tdb_idrops++;
+	tdb_unref(tdbp);
 	return IPPROTO_DONE;
 }
 
@@ -938,6 +944,7 @@ ipsec_common_ctlinput(u_int rdomain, int cmd, struct sockaddr *sa,
 		tdbp = gettdb_rev(rdomain, spi, (union sockaddr_union *)&dst,
 		    proto);
 		ipsec_set_mtu(tdbp, mtu);
+		tdb_unref(tdbp);
 	}
 }
 
@@ -945,7 +952,7 @@ void
 udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 {
 	struct ip *ip = v;
-	struct tdb *tdbp;
+	struct tdb *tdbp, *first;
 	struct icmp *icp;
 	u_int32_t mtu;
 	struct sockaddr_in dst, src;
@@ -974,10 +981,9 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 	src.sin_addr.s_addr = ip->ip_src.s_addr;
 	su_src = (union sockaddr_union *)&src;
 
-	tdbp = gettdbbysrcdst_rev(rdomain, 0, su_src, su_dst,
-	    IPPROTO_ESP);
+	first = gettdbbysrcdst_rev(rdomain, 0, su_src, su_dst, IPPROTO_ESP);
 
-	for (; tdbp != NULL; tdbp = tdbp->tdb_snext) {
+	for (tdbp = first; tdbp != NULL; tdbp = tdbp->tdb_snext) {
 		if (tdbp->tdb_sproto == IPPROTO_ESP &&
 		    ((tdbp->tdb_flags & (TDBF_INVALID|TDBF_UDPENCAP)) ==
 		    TDBF_UDPENCAP) &&
@@ -986,6 +992,7 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 			ipsec_set_mtu(tdbp, mtu);
 		}
 	}
+	tdb_unref(first);
 }
 
 void
@@ -1002,8 +1009,10 @@ esp4_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 int
 ipsec_protoff(struct mbuf *m, int off, int af)
 {
+#ifdef INET6
 	struct ip6_ext ip6e;
 	int protoff, nxt, l;
+#endif /* INET6 */
 
 	switch (af) {
 	case AF_INET:
@@ -1011,11 +1020,12 @@ ipsec_protoff(struct mbuf *m, int off, int af)
 #ifdef INET6
 	case AF_INET6:
 		break;
-#endif
+#endif /* INET6 */
 	default:
 		unhandled_af(af);
 	}
 
+#ifdef INET6
 	if (off < sizeof(struct ip6_hdr))
 		return -1;
 
@@ -1050,6 +1060,7 @@ ipsec_protoff(struct mbuf *m, int off, int af)
 
 	protoff += offsetof(struct ip6_ext, ip6e_nxt);
 	return protoff;
+#endif /* INET6 */
 }
 
 int
@@ -1070,7 +1081,9 @@ ipsec_forward_check(struct mbuf *m, int hlen, int af)
 		tdb = gettdb(tdbi->rdomain, tdbi->spi, &tdbi->dst, tdbi->proto);
 	} else
 		tdb = NULL;
-	ipsp_spd_lookup(m, af, hlen, &error, IPSP_DIRECTION_IN, tdb, NULL, 0);
+	error = ipsp_spd_lookup(m, af, hlen, IPSP_DIRECTION_IN,
+	    tdb, NULL, NULL, 0);
+	tdb_unref(tdb);
 
 	return error;
 }
@@ -1141,8 +1154,9 @@ ipsec_local_check(struct mbuf *m, int hlen, int proto, int af)
 		    tdbi->proto);
 	} else
 		tdb = NULL;
-	ipsp_spd_lookup(m, af, hlen, &error, IPSP_DIRECTION_IN,
-	    tdb, NULL, 0);
+	error = ipsp_spd_lookup(m, af, hlen, IPSP_DIRECTION_IN,
+	    tdb, NULL, NULL, 0);
+	tdb_unref(tdb);
 
 	return error;
 }

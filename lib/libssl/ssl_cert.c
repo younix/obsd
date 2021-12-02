@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_cert.c,v 1.86 2021/10/23 20:42:50 beck Exp $ */
+/* $OpenBSD: ssl_cert.c,v 1.88 2021/11/29 18:36:27 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -229,9 +229,7 @@ ssl_cert_dup(CERT *cert)
 
 		if (cert->pkeys[i].privatekey != NULL) {
 			ret->pkeys[i].privatekey = cert->pkeys[i].privatekey;
-			CRYPTO_add(&ret->pkeys[i].privatekey->references, 1,
-			CRYPTO_LOCK_EVP_PKEY);
-
+			EVP_PKEY_up_ref(ret->pkeys[i].privatekey);
 			switch (i) {
 				/*
 				 * If there was anything special to do for
@@ -586,7 +584,7 @@ SSL_load_client_CA_file(const char *file)
 
 	sk = sk_X509_NAME_new(xname_cmp);
 
-	in = BIO_new(BIO_s_file_internal());
+	in = BIO_new(BIO_s_file());
 
 	if ((sk == NULL) || (in == NULL)) {
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
@@ -655,7 +653,7 @@ SSL_add_file_cert_subjects_to_stack(STACK_OF(X509_NAME) *stack,
 
 	oldcmp = sk_X509_NAME_set_cmp_func(stack, xname_cmp);
 
-	in = BIO_new(BIO_s_file_internal());
+	in = BIO_new(BIO_s_file());
 
 	if (in == NULL) {
 		SSLerrorx(ERR_R_MALLOC_FAILURE);

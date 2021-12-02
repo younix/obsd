@@ -1,4 +1,4 @@
-/*	$OpenBSD: kvm_arm64.c,v 1.1 2017/01/11 14:32:36 patrick Exp $	*/
+/*	$OpenBSD: kvm_arm64.c,v 1.3 2021/12/01 21:45:19 deraadt Exp $	*/
 /*
  * Copyright (c) 2006 Miodrag Vallat.
  *
@@ -50,10 +50,8 @@
  * ARM64 machine dependent routines for kvm.
  */
 
-#include <sys/param.h>
-#include <sys/core.h>
+#include <sys/types.h>
 #include <sys/kcore.h>
-#include <sys/vnode.h>
 
 #include <unistd.h>
 #include <stdlib.h>
@@ -64,7 +62,7 @@
 
 #include "kvm_private.h"
 
-#include <arm64/kcore.h>
+#include <machine/kcore.h>
 
 void
 _kvm_freevtop(kvm_t *kd)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_smr.c,v 1.12 2021/07/06 09:34:07 kettenis Exp $	*/
+/*	$OpenBSD: kern_smr.c,v 1.15 2021/11/24 13:17:37 visa Exp $	*/
 
 /*
  * Copyright (c) 2019-2020 Visa Hankala
@@ -25,6 +25,7 @@
 #include <sys/proc.h>
 #include <sys/smr.h>
 #include <sys/time.h>
+#include <sys/tracepoint.h>
 #include <sys/witness.h>
 
 #include <machine/cpu.h>
@@ -84,6 +85,7 @@ smr_thread(void *arg)
 	struct timeval elapsed, end, loglast, start;
 	struct smr_entry_list deferred;
 	struct smr_entry *smr;
+	unsigned long count;
 
 	KERNEL_ASSERT_LOCKED();
 	KERNEL_UNLOCK();
@@ -115,19 +117,25 @@ smr_thread(void *arg)
 		WITNESS_CHECKORDER(&smr_lock_obj, LOP_NEWORDER, NULL);
 		WITNESS_LOCK(&smr_lock_obj, 0);
 
+		count = 0;
 		while ((smr = SIMPLEQ_FIRST(&deferred)) != NULL) {
 			SIMPLEQ_REMOVE_HEAD(&deferred, smr_list);
+			TRACEPOINT(smr, called, smr->smr_func, smr->smr_arg);
 			smr->smr_func(smr->smr_arg);
+			count++;
 		}
 
 		WITNESS_UNLOCK(&smr_lock_obj, 0);
 
 		getmicrouptime(&end);
 		timersub(&end, &start, &elapsed);
-		if (elapsed.tv_sec >= 5 &&
-		    ratecheck(&loglast, &smr_logintvl))
-			printf("smr: dispatch took %ld seconds\n",
-			    (long)elapsed.tv_sec);
+		if (elapsed.tv_sec >= 2 &&
+		    ratecheck(&loglast, &smr_logintvl)) {
+			printf("smr: dispatch took %ld.%06lds\n",
+			    (long)elapsed.tv_sec,
+			    (long)elapsed.tv_usec);
+		}
+		TRACEPOINT(smr, thread, TIMEVAL_TO_NSEC(&elapsed), count);
 	}
 }
 
@@ -163,6 +171,7 @@ smr_grace_wait(void)
 void
 smr_wakeup(void *arg)
 {
+	TRACEPOINT(smr, wakeup, NULL);
 	wakeup(&smr_ndeferred);
 }
 
@@ -207,7 +216,7 @@ smr_dispatch(struct schedstate_percpu *spc)
 	mtx_leave(&smr_lock);
 
 	if (expedite)
-		wakeup(&smr_ndeferred);
+		smr_wakeup(NULL);
 	else if (wake)
 		timeout_add_msec(&smr_wakeup_tmo, SMR_PAUSE);
 }
@@ -256,6 +265,7 @@ smr_call_impl(struct smr_entry *smr, void (*func)(void *), void *arg,
 	spc->spc_ndeferred++;
 	spc->spc_smrexpedite |= expedite;
 	splx(s);
+	TRACEPOINT(smr, call, func, arg, expedite);
 
 	/*
 	 * If this call was made from an interrupt context that
@@ -287,7 +297,9 @@ smr_barrier_impl(int expedite)
 
 	WITNESS_CHECKORDER(&smr_lock_obj, LOP_NEWORDER, NULL);
 
+	TRACEPOINT(smr, barrier_enter, expedite);
 	smr_init(&smr);
 	smr_call_impl(&smr, smr_barrier_func, &c, expedite);
 	cond_wait(&c, "smrbar");
+	TRACEPOINT(smr, barrier_exit, expedite);
 }

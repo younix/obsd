@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2_pld.c,v 1.119 2021/11/12 14:18:54 tobhe Exp $	*/
+/*	$OpenBSD: ikev2_pld.c,v 1.122 2021/12/01 16:42:13 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -759,14 +759,17 @@ ikev2_pld_id(struct iked *env, struct ikev2_payload *pld,
 		return (0);
 	}
 
-	if (!((sa->sa_hdr.sh_initiator && payload == IKEV2_PAYLOAD_IDr) ||
-	    (!sa->sa_hdr.sh_initiator && payload == IKEV2_PAYLOAD_IDi))) {
+	if (((sa->sa_hdr.sh_initiator && payload == IKEV2_PAYLOAD_IDr) ||
+	    (!sa->sa_hdr.sh_initiator && payload == IKEV2_PAYLOAD_IDi)))
+		idp = &msg->msg_parent->msg_peerid;
+	else if (!sa->sa_hdr.sh_initiator && payload == IKEV2_PAYLOAD_IDr)
+		idp = &msg->msg_parent->msg_localid;
+	else {
 		ibuf_release(idb.id_buf);
 		log_debug("%s: unexpected id payload", __func__);
 		return (0);
 	}
 
-	idp = &msg->msg_parent->msg_id;
 	if (idp->id_type) {
 		ibuf_release(idb.id_buf);
 		log_debug("%s: duplicate id payload", __func__);
@@ -1058,7 +1061,7 @@ ikev2_pld_notify(struct iked *env, struct ikev2_payload *pld,
 			return (-1);
 		}
 		if (ikev2_nat_detection(env, msg, md, sizeof(md), type,
-		     ikev2_msg_frompeer(msg)) == -1)
+		    ikev2_msg_frompeer(msg)) == -1)
 			return (-1);
 		if (memcmp(buf, md, left) != 0) {
 			log_debug("%s: %s detected NAT", __func__,
@@ -1335,7 +1338,7 @@ ikev2_pld_notify(struct iked *env, struct ikev2_payload *pld,
 		if (left < sizeof(signature_hash) ||
 		    left % sizeof(signature_hash)) {
 			log_debug("%s: malformed signature hash notification"
-			     "(%zu bytes)", __func__, left);
+			    "(%zu bytes)", __func__, left);
 			return (0);
 		}
 		while (left >= sizeof(signature_hash)) {
@@ -1600,7 +1603,7 @@ ikev2_pld_ef(struct iked *env, struct ikev2_payload *pld,
 	uint8_t				*buf;
 	struct ibuf			*e = NULL;
 	size_t				 frag_num, frag_total;
-	size_t			 	 len;
+	size_t				 len;
 	int				 ret = -1;
 	ssize_t				 elen;
 
@@ -1627,13 +1630,13 @@ ikev2_pld_ef(struct iked *env, struct ikev2_payload *pld,
 		goto done;
 	}
 	log_debug("%s: Received fragment: %zu of %zu",
-	     __func__, frag_num, frag_total);
+	    __func__, frag_num, frag_total);
 
 	/* Drop fragment if frag_num and frag_total don't match */
 	if (frag_num > frag_total)
 		goto done;
 
-        /* Decrypt fragment */
+	/* Decrypt fragment */
 	if ((e = ibuf_new(buf, len)) == NULL)
 		goto done;
 

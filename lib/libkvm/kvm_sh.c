@@ -1,4 +1,4 @@
-/*	$OpenBSD: kvm_sh.c,v 1.7 2020/06/28 09:45:12 kettenis Exp $	*/
+/*	$OpenBSD: kvm_sh.c,v 1.9 2021/12/01 21:45:19 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2007 Miodrag Vallat.
@@ -17,10 +17,8 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/param.h>
-#include <sys/core.h>
+#include <sys/types.h>
 #include <sys/kcore.h>
-#include <sys/vnode.h>
 
 #include <unistd.h>
 #include <stdlib.h>

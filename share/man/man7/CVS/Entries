@@ -9,9 +9,7 @@
 /intro.7/1.20/Sun Sep 30 13:24:33 2018//
 /library-specs.7/1.13/Mon Jul  9 15:34:10 2018//
 /operator.7/1.11/Fri Jun 21 02:28:34 2019//
-/packages.7/1.45/Wed Dec  4 11:07:58 2019//
 /pkgpath.7/1.5/Mon Mar 27 10:37:43 2017//
-/ports.7/1.128/Tue Apr 28 13:11:32 2020//
 /script.7/1.8/Sun Aug 11 15:48:08 2019//
 /securelevel.7/1.31/Wed Aug 21 20:44:09 2019//
 /mirroring-ports.7/1.28/Thu Dec 17 19:39:58 2020//
@@ -21,5 +19,7 @@
 /man.7/1.60/Thu Sep  2 14:22:31 2021//
 /mdoc.7/1.179/Thu Sep  2 14:22:31 2021//
 /tbl.7/1.25/Tue Sep 14 08:17:30 2021//
-/packages-specs.7/1.28/Sun Nov 21 20:13:16 2021//
+/packages-specs.7/1.28/Sun Nov 21 20:15:22 2021//
+/packages.7/1.46/Thu Dec  2 13:56:25 2021//
+/ports.7/1.129/Thu Dec  2 13:56:25 2021//
 D

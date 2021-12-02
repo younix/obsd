@@ -1,4 +1,4 @@
-.\" $OpenBSD: bsd.port.mk.5,v 1.548 2021/11/16 21:19:24 sthen Exp $
+.\" $OpenBSD: bsd.port.mk.5,v 1.550 2021/11/22 11:17:39 espie Exp $
 .\"
 .\" Copyright (c) 2000-2008 Marc Espie
 .\"
@@ -24,7 +24,7 @@
 .\" (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 .\" THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 .\"
-.Dd $Mdocdate: November 16 2021 $
+.Dd $Mdocdate: November 22 2021 $
 .Dt BSD.PORT.MK 5
 .Os
 .Sh NAME
@@ -3913,11 +3913,7 @@ In dependency checking and bulk builds, a subpackage can be
 specified after a comma, e.g.,
 .Li SUBDIR+=quake,-server .
 .Ev MULTI_PACKAGES
-only affects the actual package building step (and the
-.Cm describe
-step, since a
-.Ev MULTI_PACKAGES
-port will produce several descriptions).
+only affects the actual package building step.
 .Pp
 If
 .Ev MULTI_PACKAGES
@@ -3999,17 +3995,25 @@ in order to avoid recursion.
 and
 .Ev FULLPKGNAME
 are special as well.
-You must set
+If
+.Ev PKGNAME
+is <stem>-<version>,
+then
 .Ev PKGNAME-sub
-or
-.Ev FULLPKGNAME-sub
-for each subpackage, but
+will be set to
+<stem>-sub-<version>
+by default, except for
+.Ev PKGNAME-main
+which has
+.Ev PKGNAME
+as a default.
+Normally,
 .Ev FULLPKGPATH-sub
-is set automatically to the right value.
-In very rare cases, one may override
-.Ev FULLPKGPATH-sub .
-(for instance, if one specific subpackage is not affected by option
-settings that affect other subpackages, e.g., for include files packs).
+is automatically set to the right value,
+but in very rare cases, one may need to override the default:
+for instance, if one specific subpackage is not affected by flavor
+settings that affect other subpackages, e.g., for include files packs,
+then the flavoring part of the fullpkgpath may need to be dropped.
 .Pp
 In terms of using the port, quite a few targets will have a subpackage
 specific subtarget:
@@ -4113,9 +4117,7 @@ by inserting fragments
 and applying the same variable substitutions as other package information.
 .El
 .Pp
-Note that ${COMMENT} is currently not substituted, to speed up
-.Cm describe
-generation.
+Note that ${COMMENT} is currently not substituted.
 .Pp
 To avoid substitution, variables can be escaped as follows:
 .Li "$\e{PREFIX}"
@@ -4214,7 +4216,7 @@ target.
 Renamed into
 .Cm full-build-depends .
 .It Cm describe
-Prints a one-line index entry of the port.
+Printed a one-line index entry of the port.
 .Cm dump-vars
 provides much more accurate information, and the indexing role
 has been taken over by the
@@ -4400,7 +4402,7 @@ should always be kept up to date.
 If ${CONFIGURE_SCRIPT} does not exist, no automatic configuration will
 be done anyway.
 .It Ev NO_DESCRIBE
-All ports should generate a description.
+Describe was killed ages ago.
 .It Ev NO_EXTRACT
 Set EXTRACT_ONLY= instead.
 .It Ev NO_INSTALL_MANPAGES

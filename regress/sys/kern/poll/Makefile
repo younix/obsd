@@ -1,6 +1,6 @@
-#	$OpenBSD: Makefile,v 1.2 2021/11/21 06:21:01 visa Exp $
+#	$OpenBSD: Makefile,v 1.6 2021/11/29 16:11:46 visa Exp $
 
-PROGS=		poll_close pollnval
+PROGS=		poll_close poll_regevent pollnval pollretval
 LDADD=		-lpthread
 WARNINGS=	yes
 

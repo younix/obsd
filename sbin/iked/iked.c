@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.c,v 1.58 2021/09/01 15:30:06 tobhe Exp $	*/
+/*	$OpenBSD: iked.c,v 1.62 2021/12/01 16:42:12 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -36,6 +36,7 @@
 
 #include "iked.h"
 #include "ikev2.h"
+#include "version.h"
 
 __dead void usage(void);
 
@@ -57,7 +58,7 @@ usage(void)
 {
 	extern char	*__progname;
 
-	fprintf(stderr, "usage: %s [-dnSTtv] [-D macro=value] "
+	fprintf(stderr, "usage: %s [-dnSTtVv] [-D macro=value] "
 	    "[-f file] [-p udpencap_port] [-s socket]\n", __progname);
 	exit(1);
 }
@@ -78,7 +79,7 @@ main(int argc, char *argv[])
 
 	log_init(1, LOG_DAEMON);
 
-	while ((c = getopt(argc, argv, "6D:df:np:Ss:Ttv")) != -1) {
+	while ((c = getopt(argc, argv, "6D:df:np:Ss:TtvV")) != -1) {
 		switch (c) {
 		case '6':
 			log_warnx("the -6 option is ignored and will be "
@@ -127,6 +128,9 @@ main(int argc, char *argv[])
 			verbose++;
 			opts |= IKED_OPT_VERBOSE;
 			break;
+		case 'V':
+			fprintf(stderr, "OpenIKED %s\n", IKED_VERSION);
+			return 0;
 		default:
 			usage();
 		}
@@ -312,7 +316,7 @@ parent_reload(struct iked *env, int reset, const char *filename)
 		config_setcoupled(env, env->sc_decoupled ? 0 : 1);
 		config_setocsp(env);
 		config_setcertpartialchain(env);
- 		/* Must be last */
+		/* Must be last */
 		config_setmode(env, env->sc_passive ? 1 : 0);
 	} else {
 		config_setreset(env, reset, PROC_IKEV2);
@@ -350,7 +354,7 @@ parent_sig_handler(int sig, short event, void *arg)
 		/* FALLTHROUGH */
 	case SIGCHLD:
 		do {
-			int len;
+			int len = 0;
 
 			pid = waitpid(-1, &status, WNOHANG);
 			if (pid <= 0)

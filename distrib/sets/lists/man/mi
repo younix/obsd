@@ -1515,6 +1515,7 @@
 ./usr/share/man/man4/iha.4
 ./usr/share/man/man4/ihidev.4
 ./usr/share/man/man4/iic.4
+./usr/share/man/man4/iicmux.4
 ./usr/share/man/man4/ikbd.4
 ./usr/share/man/man4/ims.4
 ./usr/share/man/man4/imt.4
@@ -1762,6 +1763,7 @@
 ./usr/share/man/man4/pcppi.4
 ./usr/share/man/man4/pcscp.4
 ./usr/share/man/man4/pcxrtc.4
+./usr/share/man/man4/pcyrtc.4
 ./usr/share/man/man4/pf.4
 ./usr/share/man/man4/pflog.4
 ./usr/share/man/man4/pflow.4
@@ -2282,6 +2284,7 @@
 ./usr/share/man/man7/roff.7
 ./usr/share/man/man7/script.7
 ./usr/share/man/man7/securelevel.7
+./usr/share/man/man7/smtpd-filters.7
 ./usr/share/man/man7/sndio.7
 ./usr/share/man/man7/symlink.7
 ./usr/share/man/man7/tbl.7

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.c,v 1.358 2021/11/11 18:08:17 bluhm Exp $	*/
+/*	$OpenBSD: if_bridge.c,v 1.360 2021/12/01 12:51:09 bluhm Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -1567,28 +1567,36 @@ bridge_ipsec(struct ifnet *ifp, struct ether_header *eh, int hassnap,
 		    tdb->tdb_xform != NULL) {
 			if (tdb->tdb_first_use == 0) {
 				tdb->tdb_first_use = gettime();
-				if (tdb->tdb_flags & TDBF_FIRSTUSE)
-					timeout_add_sec(&tdb->tdb_first_tmo,
-					    tdb->tdb_exp_first_use);
-				if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE)
-					timeout_add_sec(&tdb->tdb_sfirst_tmo,
-					    tdb->tdb_soft_first_use);
+				if (tdb->tdb_flags & TDBF_FIRSTUSE) {
+					if (timeout_add_sec(
+					    &tdb->tdb_first_tmo,
+					    tdb->tdb_exp_first_use))
+						tdb_ref(tdb);
+				}
+				if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) {
+					if (timeout_add_sec(
+					    &tdb->tdb_sfirst_tmo,
+					    tdb->tdb_soft_first_use))
+						tdb_ref(tdb);
+				}
 			}
 
 			prot = (*(tdb->tdb_xform->xf_input))(&m, tdb, hlen,
 			    off);
+			tdb_unref(tdb);
 			if (prot != IPPROTO_DONE)
 				ip_deliver(&m, &hlen, prot, af);
 			return (1);
 		} else {
+			tdb_unref(tdb);
  skiplookup:
 			/* XXX do an input policy lookup */
 			return (0);
 		}
 	} else { /* Outgoing from the bridge. */
-		tdb = ipsp_spd_lookup(m, af, hlen, &error,
-		    IPSP_DIRECTION_OUT, NULL, NULL, 0);
-		if (tdb != NULL) {
+		error = ipsp_spd_lookup(m, af, hlen, IPSP_DIRECTION_OUT,
+		    NULL, NULL, &tdb, 0);
+		if (error == 0 && tdb != NULL) {
 			/*
 			 * We don't need to do loop detection, the
 			 * bridge will do that for us.

@@ -1110,6 +1110,8 @@
 ./usr/include/openssl/conf.h
 ./usr/include/openssl/conf_api.h
 ./usr/include/openssl/crypto.h
+./usr/include/openssl/ct.h
+./usr/include/openssl/cterr.h
 ./usr/include/openssl/curve25519.h
 ./usr/include/openssl/des.h
 ./usr/include/openssl/dh.h
@@ -1749,6 +1751,7 @@
 ./usr/share/man/man3/ASN1_BIT_STRING_num_asc.3
 ./usr/share/man/man3/ASN1_BIT_STRING_set.3
 ./usr/share/man/man3/ASN1_INTEGER_get.3
+./usr/share/man/man3/ASN1_NULL_new.3
 ./usr/share/man/man3/ASN1_OBJECT_new.3
 ./usr/share/man/man3/ASN1_PRINTABLE_type.3
 ./usr/share/man/man3/ASN1_STRING_TABLE_add.3
@@ -1775,6 +1778,7 @@
 ./usr/share/man/man3/BF_set_key.3
 ./usr/share/man/man3/BIO_ctrl.3
 ./usr/share/man/man3/BIO_dump.3
+./usr/share/man/man3/BIO_f_asn1.3
 ./usr/share/man/man3/BIO_f_base64.3
 ./usr/share/man/man3/BIO_f_buffer.3
 ./usr/share/man/man3/BIO_f_cipher.3
@@ -2236,6 +2240,7 @@
 ./usr/share/man/man3/X509at_get_attr.3
 ./usr/share/man/man3/X509v3_get_ext_by_NID.3
 ./usr/share/man/man3/__tfork_thread.3
+./usr/share/man/man3/a2d_ASN1_OBJECT.3
 ./usr/share/man/man3/a64l.3
 ./usr/share/man/man3/abort.3
 ./usr/share/man/man3/abs.3
@@ -2366,6 +2371,7 @@
 ./usr/share/man/man3/curs_util.3
 ./usr/share/man/man3/curs_window.3
 ./usr/share/man/man3/curses.3
+./usr/share/man/man3/d2i_ASN1_BOOLEAN.3
 ./usr/share/man/man3/d2i_ASN1_NULL.3
 ./usr/share/man/man3/d2i_ASN1_OBJECT.3
 ./usr/share/man/man3/d2i_ASN1_OCTET_STRING.3

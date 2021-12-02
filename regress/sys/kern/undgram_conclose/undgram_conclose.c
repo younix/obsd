@@ -1,4 +1,4 @@
-/* $OpenBSD: undgram_conclose.c,v 1.1 2021/11/19 17:14:38 mvs Exp $ */
+/* $OpenBSD: undgram_conclose.c,v 1.4 2021/12/01 10:24:40 mvs Exp $ */
 
 /*
  * Copyright (c) 2021 Vitaliy Makkoveev <mvs@openbsd.org>
@@ -25,6 +25,7 @@
 #include <sys/types.h>
 #include <sys/select.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <sys/sysctl.h>
 #include <sys/un.h>
 #include <stdarg.h>
@@ -32,6 +33,7 @@
 #include <err.h>
 #include <pthread.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 static pthread_mutex_t therr_mtx = PTHREAD_MUTEX_INITIALIZER;
@@ -95,25 +97,26 @@ thr_conn(void *arg)
 	return NULL;
 }
 
+static struct sockaddr_un sun;
+
 int
 main(int argc, char *argv[])
 {
-	struct timeval testtime = {
+	struct timespec testtime = {
 		.tv_sec = 60,
-		.tv_usec = 0,
+		.tv_nsec = 0,
 	};
-	struct timeval *tv = &testtime;
 
 	int mib[2], ncpu;
 	size_t len;
 
-	struct sockaddr_un sun;
-	
 	pthread_t thr;
 	int error, i;
 
+	umask(0077);
+
 	if (argc == 2 && !strcmp(argv[1], "--infinite"))
-		tv = NULL;
+		testtime.tv_sec = (10 * 365 * 86400);
 
 	mib[0] = CTL_HW;
 	mib[1] = HW_NCPUONLINE;
@@ -128,7 +131,7 @@ main(int argc, char *argv[])
 	sun.sun_len = sizeof(sun);
 	sun.sun_family = AF_UNIX;
 	snprintf(sun.sun_path, sizeof(sun.sun_path) - 1,
-		"/tmp/socket%d", getpid());
+	    "undgram_conclose.socket");
 
 	if ((error = pthread_create(&thr, NULL, thr_close, &sun)))
 		therrc(1, error, "pthread_create");
@@ -138,7 +141,7 @@ main(int argc, char *argv[])
 			therrc(1, error, "pthread_create");
 	}
 
-	select(0, NULL, NULL, NULL, tv);
+	nanosleep(&testtime, NULL);
 
 	return 0;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.118 2021/11/19 18:53:10 tb Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.120 2021/11/29 16:00:32 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1223,46 +1223,24 @@ ssl3_get_server_certificate(SSL *s)
 static int
 ssl3_get_server_kex_dhe(SSL *s, EVP_PKEY **pkey, CBS *cbs)
 {
-	CBS dhp, dhg, dhpk;
-	BN_CTX *bn_ctx = NULL;
 	SESS_CERT *sc = NULL;
 	DH *dh = NULL;
 	long alg_a;
-	int al;
 
 	alg_a = S3I(s)->hs.cipher->algorithm_auth;
 	sc = s->session->sess_cert;
 
-	if ((dh = DH_new()) == NULL) {
-		SSLerror(s, ERR_R_DH_LIB);
+	if ((dh = DH_new()) == NULL)
 		goto err;
-	}
 
-	if (!CBS_get_u16_length_prefixed(cbs, &dhp))
+	if (!ssl_kex_peer_params_dhe(dh, cbs))
 		goto decode_err;
-	if ((dh->p = BN_bin2bn(CBS_data(&dhp), CBS_len(&dhp), NULL)) == NULL) {
-		SSLerror(s, ERR_R_BN_LIB);
-		goto err;
-	}
-
-	if (!CBS_get_u16_length_prefixed(cbs, &dhg))
+	if (!ssl_kex_peer_public_dhe(dh, cbs))
 		goto decode_err;
-	if ((dh->g = BN_bin2bn(CBS_data(&dhg), CBS_len(&dhg), NULL)) == NULL) {
-		SSLerror(s, ERR_R_BN_LIB);
-		goto err;
-	}
-
-	if (!CBS_get_u16_length_prefixed(cbs, &dhpk))
-		goto decode_err;
-	if ((dh->pub_key = BN_bin2bn(CBS_data(&dhpk), CBS_len(&dhpk),
-	    NULL)) == NULL) {
-		SSLerror(s, ERR_R_BN_LIB);
-		goto err;
-	}
 
 	/*
 	 * Check the strength of the DH key just constructed.
-	 * Discard keys weaker than 1024 bits.
+	 * Reject keys weaker than 1024 bits.
 	 */
 	if (DH_size(dh) < 1024 / 8) {
 		SSLerror(s, SSL_R_BAD_DH_P_LENGTH);
@@ -1280,13 +1258,11 @@ ssl3_get_server_kex_dhe(SSL *s, EVP_PKEY **pkey, CBS *cbs)
 	return (1);
 
  decode_err:
-	al = SSL_AD_DECODE_ERROR;
 	SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
-	ssl3_send_alert(s, SSL3_AL_FATAL, al);
+	ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
 
  err:
 	DH_free(dh);
-	BN_CTX_free(bn_ctx);
 
 	return (-1);
 }
@@ -1925,6 +1901,7 @@ ssl3_send_client_kex_rsa(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	unsigned char *enc_pms = NULL;
 	uint16_t max_legacy_version;
 	EVP_PKEY *pkey = NULL;
+	RSA *rsa;
 	int ret = -1;
 	int enc_len;
 	CBB epms;
@@ -1934,8 +1911,7 @@ ssl3_send_client_kex_rsa(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	 */
 
 	pkey = X509_get_pubkey(sess_cert->peer_pkeys[SSL_PKEY_RSA].x509);
-	if (pkey == NULL || pkey->type != EVP_PKEY_RSA ||
-	    pkey->pkey.rsa == NULL) {
+	if (pkey == NULL || (rsa = EVP_PKEY_get0_RSA(pkey)) == NULL) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		goto err;
 	}
@@ -1953,12 +1929,12 @@ ssl3_send_client_kex_rsa(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 	pms[1] = max_legacy_version & 0xff;
 	arc4random_buf(&pms[2], sizeof(pms) - 2);
 
-	if ((enc_pms = malloc(RSA_size(pkey->pkey.rsa))) == NULL) {
+	if ((enc_pms = malloc(RSA_size(rsa))) == NULL) {
 		SSLerror(s, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
 
-	enc_len = RSA_public_encrypt(sizeof(pms), pms, enc_pms, pkey->pkey.rsa,
+	enc_len = RSA_public_encrypt(sizeof(pms), pms, enc_pms, rsa,
 	    RSA_PKCS1_PADDING);
 	if (enc_len <= 0) {
 		SSLerror(s, SSL_R_BAD_RSA_ENCRYPT);
@@ -1988,59 +1964,38 @@ ssl3_send_client_kex_rsa(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 static int
 ssl3_send_client_kex_dhe(SSL *s, SESS_CERT *sess_cert, CBB *cbb)
 {
-	DH *dh_srvr = NULL, *dh_clnt = NULL;
-	unsigned char *key = NULL;
-	int key_size = 0, key_len;
-	unsigned char *data;
+	DH *dh_clnt = NULL;
+	DH *dh_srvr;
+	uint8_t *key = NULL;
+	size_t key_len = 0;
 	int ret = -1;
-	CBB dh_Yc;
 
-	/* Ensure that we have an ephemeral key for DHE. */
-	if (sess_cert->peer_dh_tmp == NULL) {
+	/* Ensure that we have an ephemeral key from the server for DHE. */
+	if ((dh_srvr = sess_cert->peer_dh_tmp) == NULL) {
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
 		SSLerror(s, SSL_R_UNABLE_TO_FIND_DH_PARAMETERS);
 		goto err;
 	}
-	dh_srvr = sess_cert->peer_dh_tmp;
 
-	/* Generate a new random key. */
-	if ((dh_clnt = DHparams_dup(dh_srvr)) == NULL) {
-		SSLerror(s, ERR_R_DH_LIB);
+	if ((dh_clnt = DH_new()) == NULL)
 		goto err;
-	}
-	if (!DH_generate_key(dh_clnt)) {
-		SSLerror(s, ERR_R_DH_LIB);
+
+	if (!ssl_kex_generate_dhe(dh_clnt, dh_srvr))
 		goto err;
-	}
-	if ((key_size = DH_size(dh_clnt)) <= 0) {
-		SSLerror(s, ERR_R_DH_LIB);
+	if (!ssl_kex_public_dhe(dh_clnt, cbb))
 		goto err;
-	}
-	if ((key = malloc(key_size)) == NULL) {
-		SSLerror(s, ERR_R_MALLOC_FAILURE);
+
+	if (!ssl_kex_derive_dhe(dh_clnt, dh_srvr, &key, &key_len))
 		goto err;
-	}
-	if ((key_len = DH_compute_key(key, dh_srvr->pub_key, dh_clnt)) <= 0) {
-		SSLerror(s, ERR_R_DH_LIB);
-		goto err;
-	}
 
 	if (!tls12_derive_master_secret(s, key, key_len))
-		goto err;
-
-	if (!CBB_add_u16_length_prefixed(cbb, &dh_Yc))
-		goto err;
-	if (!CBB_add_space(&dh_Yc, &data, BN_num_bytes(dh_clnt->pub_key)))
-		goto err;
-	BN_bn2bin(dh_clnt->pub_key, data);
-	if (!CBB_flush(cbb))
 		goto err;
 
 	ret = 1;
 
  err:
 	DH_free(dh_clnt);
-	freezero(key, key_size);
+	freezero(key, key_len);
 
 	return (ret);
 }
@@ -2072,6 +2027,7 @@ ssl3_send_client_kex_ecdhe_ecp(SSL *s, SESS_CERT *sc, CBB *cbb)
 
 	if (!ssl_kex_derive_ecdhe_ecp(ecdh, sc->peer_ecdh_tmp, &key, &key_len))
 		goto err;
+
 	if (!tls12_derive_master_secret(s, key, key_len))
 		goto err;
 
@@ -2385,6 +2341,7 @@ static int
 ssl3_send_client_verify_rsa(SSL *s, EVP_PKEY *pkey, CBB *cert_verify)
 {
 	CBB cbb_signature;
+	RSA *rsa;
 	unsigned char data[EVP_MAX_MD_SIZE];
 	unsigned char *signature = NULL;
 	unsigned int signature_len;
@@ -2395,8 +2352,10 @@ ssl3_send_client_verify_rsa(SSL *s, EVP_PKEY *pkey, CBB *cert_verify)
 		goto err;
 	if ((signature = calloc(1, EVP_PKEY_size(pkey))) == NULL)
 		goto err;
-	if (RSA_sign(NID_md5_sha1, data, data_len, signature,
-	    &signature_len, pkey->pkey.rsa) <= 0 ) {
+	if ((rsa = EVP_PKEY_get0_RSA(pkey)) == NULL)
+		goto err;
+	if (RSA_sign(NID_md5_sha1, data, data_len, signature, &signature_len,
+	    rsa) <= 0 ) {
 		SSLerror(s, ERR_R_RSA_LIB);
 		goto err;
 	}
@@ -2418,6 +2377,7 @@ static int
 ssl3_send_client_verify_ec(SSL *s, EVP_PKEY *pkey, CBB *cert_verify)
 {
 	CBB cbb_signature;
+	EC_KEY *eckey;
 	unsigned char data[EVP_MAX_MD_SIZE];
 	unsigned char *signature = NULL;
 	unsigned int signature_len;
@@ -2427,8 +2387,10 @@ ssl3_send_client_verify_ec(SSL *s, EVP_PKEY *pkey, CBB *cert_verify)
 		goto err;
 	if ((signature = calloc(1, EVP_PKEY_size(pkey))) == NULL)
 		goto err;
+	if ((eckey = EVP_PKEY_get0_EC_KEY(pkey)) == NULL)
+		goto err;
 	if (!ECDSA_sign(0, &data[MD5_DIGEST_LENGTH], SHA_DIGEST_LENGTH,
-	    signature, &signature_len, pkey->pkey.ec)) {
+	    signature, &signature_len, eckey)) {
 		SSLerror(s, ERR_R_ECDSA_LIB);
 		goto err;
 	}
@@ -2543,15 +2505,15 @@ ssl3_send_client_verify(SSL *s)
 			if (!ssl3_send_client_verify_sigalgs(s, pkey, sigalg,
 			    &cert_verify))
 				goto err;
-		} else if (pkey->type == EVP_PKEY_RSA) {
+		} else if (EVP_PKEY_id(pkey) == EVP_PKEY_RSA) {
 			if (!ssl3_send_client_verify_rsa(s, pkey, &cert_verify))
 				goto err;
-		} else if (pkey->type == EVP_PKEY_EC) {
+		} else if (EVP_PKEY_id(pkey) == EVP_PKEY_EC) {
 			if (!ssl3_send_client_verify_ec(s, pkey, &cert_verify))
 				goto err;
 #ifndef OPENSSL_NO_GOST
-		} else if (pkey->type == NID_id_GostR3410_94 ||
-		    pkey->type == NID_id_GostR3410_2001) {
+		} else if (EVP_PKEY_id(pkey) == NID_id_GostR3410_94 ||
+		    EVP_PKEY_id(pkey) == NID_id_GostR3410_2001) {
 			if (!ssl3_send_client_verify_gost(s, pkey, &cert_verify))
 				goto err;
 #endif

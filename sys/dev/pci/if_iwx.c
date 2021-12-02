@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwx.c,v 1.121 2021/11/19 13:05:19 stsp Exp $	*/
+/*	$OpenBSD: if_iwx.c,v 1.125 2021/11/25 14:51:26 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014, 2016 genua gmbh <info@genua.de>
@@ -1377,6 +1377,11 @@ iwx_read_firmware(struct iwx_softc *sc)
 		case IWX_UCODE_TLV_TYPE_HCMD:
 		case IWX_UCODE_TLV_TYPE_REGIONS:
 		case IWX_UCODE_TLV_TYPE_TRIGGERS:
+		case IWX_UCODE_TLV_TYPE_CONF_SET:
+			break;
+
+		/* undocumented TLV found in iwx-cc-a0-67 image */
+		case 0x100000b:
 			break;
 
 		default:
@@ -3264,7 +3269,7 @@ iwx_ampdu_rx_start(struct ieee80211com *ic, struct ieee80211_node *ni,
 	struct iwx_softc *sc = IC2IFP(ic)->if_softc;
 
 	if (sc->sc_rx_ba_sessions >= IWX_MAX_RX_BA_SESSIONS ||
-	    tid > IWX_MAX_TID_COUNT)
+	    tid >= IWX_MAX_TID_COUNT)
 		return ENOSPC;
 
 	if (sc->ba_rx.start_tidmask & (1 << tid))
@@ -3286,7 +3291,7 @@ iwx_ampdu_rx_stop(struct ieee80211com *ic, struct ieee80211_node *ni,
 {
 	struct iwx_softc *sc = IC2IFP(ic)->if_softc;
 
-	if (tid > IWX_MAX_TID_COUNT || sc->ba_rx.stop_tidmask & (1 << tid))
+	if (tid >= IWX_MAX_TID_COUNT || sc->ba_rx.stop_tidmask & (1 << tid))
 		return;
 
 	sc->ba_rx.stop_tidmask = (1 << tid);
@@ -4202,6 +4207,9 @@ iwx_rx_reorder(struct iwx_softc *sc, struct mbuf *m, int chanidx,
 	if (rxba == NULL || tid != rxba->tid || rxba->sta_id != IWX_STATION_ID)
 		return 0;
 
+	if (rxba->timeout != 0)
+		getmicrouptime(&rxba->last_rx);
+
 	/* Bypass A-MPDU re-ordering in net80211. */
 	rxi->rxi_flags |= IEEE80211_RXI_AMPDU_DONE;
 
@@ -4552,8 +4560,6 @@ iwx_rx_tx_cmd(struct iwx_softc *sc, struct iwx_rx_packet *pkt,
 	bus_dmamap_sync(sc->sc_dmat, data->map, 0, IWX_RBUF_SIZE,
 	    BUS_DMASYNC_POSTREAD);
 
-	sc->sc_tx_timer = 0;
-
 	/* Sanity checks. */
 	if (sizeof(*tx_resp) > len)
 		return;
@@ -4562,6 +4568,8 @@ iwx_rx_tx_cmd(struct iwx_softc *sc, struct iwx_rx_packet *pkt,
 	if (qid >= IWX_FIRST_AGG_TX_QUEUE && sizeof(*tx_resp) + sizeof(ssn) +
 	    tx_resp->frame_count * sizeof(tx_resp->status) > len)
 		return;
+
+	sc->sc_tx_timer[qid] = 0;
 
 	if (tx_resp->frame_count > 1) /* A-MPDU */
 		return;
@@ -4658,7 +4666,7 @@ iwx_rx_compressed_ba(struct iwx_softc *sc, struct iwx_rx_packet *pkt,
 		idx = le16toh(ba_tfd->tfd_index);
 		if (idx >= IWX_TX_RING_COUNT)
 			continue;
-		sc->sc_tx_timer = 0;
+		sc->sc_tx_timer[qid] = 0;
 		iwx_txq_advance(sc, ring, idx);
 		iwx_clear_oactive(sc, ring);
 	}
@@ -5432,6 +5440,9 @@ iwx_tx(struct iwx_softc *sc, struct mbuf *m, struct ieee80211_node *ni)
 	if (++ring->queued > IWX_TX_RING_HIMARK) {
 		sc->qfullmsk |= 1 << ring->qid;
 	}
+
+	if (ic->ic_if.if_flags & IFF_UP)
+		sc->sc_tx_timer[ring->qid] = 15;
 
 	return 0;
 }
@@ -7973,10 +7984,8 @@ iwx_start(struct ifnet *ifp)
 			continue;
 		}
 
-		if (ifp->if_flags & IFF_UP) {
-			sc->sc_tx_timer = 15;
+		if (ifp->if_flags & IFF_UP)
 			ifp->if_timer = 1;
-		}
 	}
 
 	return;
@@ -8046,7 +8055,8 @@ iwx_stop(struct ifnet *ifp)
 		struct iwx_rxba_data *rxba = &sc->sc_rxba_data[i];
 		iwx_clear_reorder_buffer(sc, rxba);
 	}
-	ifp->if_timer = sc->sc_tx_timer = 0;
+	memset(sc->sc_tx_timer, 0, sizeof(sc->sc_tx_timer));
+	ifp->if_timer = 0;
 
 	splx(s);
 }
@@ -8055,21 +8065,30 @@ void
 iwx_watchdog(struct ifnet *ifp)
 {
 	struct iwx_softc *sc = ifp->if_softc;
+	int i;
 
 	ifp->if_timer = 0;
-	if (sc->sc_tx_timer > 0) {
-		if (--sc->sc_tx_timer == 0) {
-			printf("%s: device timeout\n", DEVNAME(sc));
-			if (ifp->if_flags & IFF_DEBUG) {
-				iwx_nic_error(sc);
-				iwx_dump_driver_status(sc);
+
+	/*
+	 * We maintain a separate timer for each Tx queue because
+	 * Tx aggregation queues can get "stuck" while other queues
+	 * keep working. The Linux driver uses a similar workaround.
+	 */
+	for (i = 0; i < nitems(sc->sc_tx_timer); i++) {
+		if (sc->sc_tx_timer[i] > 0) {
+			if (--sc->sc_tx_timer[i] == 0) {
+				printf("%s: device timeout\n", DEVNAME(sc));
+				if (ifp->if_flags & IFF_DEBUG) {
+					iwx_nic_error(sc);
+					iwx_dump_driver_status(sc);
+				}
+				if ((sc->sc_flags & IWX_FLAG_SHUTDOWN) == 0)
+					task_add(systq, &sc->init_task);
+				ifp->if_oerrors++;
+				return;
 			}
-			if ((sc->sc_flags & IWX_FLAG_SHUTDOWN) == 0)
-				task_add(systq, &sc->init_task);
-			ifp->if_oerrors++;
-			return;
+			ifp->if_timer = 1;
 		}
-		ifp->if_timer = 1;
 	}
 
 	ieee80211_watchdog(ifp);

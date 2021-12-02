@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.264 2021/11/11 18:08:18 bluhm Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.267 2021/12/02 12:39:15 bluhm Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -173,12 +173,6 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 #endif /* INET6 */
 	} srcsa, dstsa;
 	struct ip6_hdr *ip6 = NULL;
-#ifdef IPSEC
-	struct m_tag *mtag;
-	struct tdb_ident *tdbi;
-	struct tdb *tdb;
-	int error, protoff;
-#endif /* IPSEC */
 	u_int32_t ipsecflowinfo = 0;
 
 	udpstat_inc(udps_ipackets);
@@ -291,6 +285,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 		 * to userland
 		 */
 		if (spi != 0) {
+			int protoff;
+
 			if ((m = *mp = m_pullup(m, skip)) == NULL) {
 				udpstat_inc(udps_hdrops);
 				return IPPROTO_DONE;
@@ -309,7 +305,7 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			    af, IPPROTO_ESP, 1);
 		}
 	}
-#endif
+#endif /* IPSEC */
 
 	switch (af) {
 	case AF_INET:
@@ -503,6 +499,11 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 
 #ifdef IPSEC
 	if (ipsec_in_use) {
+		struct m_tag *mtag;
+		struct tdb_ident *tdbi;
+		struct tdb *tdb;
+		int error;
+
 		mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
 		if (mtag != NULL) {
 			tdbi = (struct tdb_ident *)(mtag + 1);
@@ -510,15 +511,17 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			    &tdbi->dst, tdbi->proto);
 		} else
 			tdb = NULL;
-		ipsp_spd_lookup(m, af, iphlen, &error,
-		    IPSP_DIRECTION_IN, tdb, inp, 0);
+		error = ipsp_spd_lookup(m, af, iphlen, IPSP_DIRECTION_IN,
+		    tdb, inp, NULL, 0);
 		if (error) {
 			udpstat_inc(udps_nosec);
+			tdb_unref(tdb);
 			goto bad;
 		}
 		/* create ipsec options while we know that tdb cannot be modified */
 		if (tdb && tdb->tdb_ids)
 			ipsecflowinfo = tdb->tdb_ids->id_flow;
+		tdb_unref(tdb);
 	}
 #endif /*IPSEC */
 

@@ -34,8 +34,8 @@
 /vfp.c/1.6/Thu Sep  2 14:22:31 2021//
 /sig_machdep.c/1.8/Wed Oct 20 17:29:08 2021//
 /acpi_machdep.c/1.16/Mon Nov 15 19:06:15 2021//
-/conf.c/1.19/Sun Nov 21 20:09:21 2021//
-/cpu.c/1.56/Mon Nov 15 19:06:15 2021//
 /cryptox.c/1.5/Mon Nov 15 19:06:15 2021//
-/pmap.c/1.82/Sun Nov 21 20:09:21 2021//
+/conf.c/1.19/Sun Nov 21 20:15:22 2021//
+/cpu.c/1.59/Thu Dec  2 13:56:26 2021//
+/pmap.c/1.82/Sun Nov 21 20:15:22 2021//
 D

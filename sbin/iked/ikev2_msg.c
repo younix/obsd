@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2_msg.c,v 1.80 2021/09/07 14:06:23 tobhe Exp $	*/
+/*	$OpenBSD: ikev2_msg.c,v 1.84 2021/12/01 16:42:13 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -17,7 +17,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/param.h>	/* roundup */
+#include <sys/types.h>
 #include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/uio.h>
@@ -193,7 +193,8 @@ ikev2_msg_cleanup(struct iked *env, struct iked_message *msg)
 		ibuf_release(msg->msg_nonce);
 		ibuf_release(msg->msg_ke);
 		ibuf_release(msg->msg_auth.id_buf);
-		ibuf_release(msg->msg_id.id_buf);
+		ibuf_release(msg->msg_peerid.id_buf);
+		ibuf_release(msg->msg_localid.id_buf);
 		ibuf_release(msg->msg_cert.id_buf);
 		ibuf_release(msg->msg_cookie);
 		ibuf_release(msg->msg_cookie2);
@@ -206,7 +207,8 @@ ikev2_msg_cleanup(struct iked *env, struct iked_message *msg)
 		msg->msg_nonce = NULL;
 		msg->msg_ke = NULL;
 		msg->msg_auth.id_buf = NULL;
-		msg->msg_id.id_buf = NULL;
+		msg->msg_peerid.id_buf = NULL;
+		msg->msg_localid.id_buf = NULL;
 		msg->msg_cert.id_buf = NULL;
 		msg->msg_cookie = NULL;
 		msg->msg_cookie2 = NULL;
@@ -791,11 +793,11 @@ ikev2_send_encrypted_fragments(struct iked *env, struct iked_sa *sa,
 	struct ikev2_frag_payload	*frag;
 	sa_family_t			 sa_fam;
 	size_t				 ivlen, integrlen, blocklen;
-	size_t 				 max_len, left,  offset=0;
+	size_t				 max_len, left,  offset=0;
 	size_t				 frag_num = 1, frag_total;
 	uint8_t				*data;
 	uint32_t			 msgid;
-	int 				 ret = -1;
+	int				 ret = -1;
 
 	if (sa == NULL ||
 	    sa->sa_encr == NULL ||
@@ -814,7 +816,7 @@ ikev2_send_encrypted_fragments(struct iked *env, struct iked_sa *sa,
 	integrlen = hash_length(sa->sa_integr);
 	max_len = (sa_fam == AF_INET ? IKEV2_MAXLEN_IPV4_FRAG
 	    : IKEV2_MAXLEN_IPV6_FRAG)
-                  - ivlen - blocklen - integrlen;
+	    - ivlen - blocklen - integrlen;
 
 	/* Total number of fragments to send */
 	frag_total = (left / max_len) + 1;
@@ -832,7 +834,7 @@ ikev2_send_encrypted_fragments(struct iked *env, struct iked_sa *sa,
 		/* IKE header */
 		if ((hdr = ikev2_add_header(buf, sa, resp.msg_msgid,
 		    IKEV2_PAYLOAD_SKF, exchange, response ? IKEV2_FLAG_RESPONSE
-		        : 0)) == NULL)
+		    : 0)) == NULL)
 			goto done;
 
 		/* Payload header */
@@ -850,7 +852,7 @@ ikev2_send_encrypted_fragments(struct iked *env, struct iked_sa *sa,
 
 		/* Encrypt message and add as an E payload */
 		data = ibuf_seek(in, offset, 0);
-		if ((e = ibuf_new(data, MIN(left, max_len))) == NULL) {
+		if ((e = ibuf_new(data, MINIMUM(left, max_len))) == NULL) {
 			goto done;
 		}
 
@@ -884,8 +886,8 @@ ikev2_send_encrypted_fragments(struct iked *env, struct iked_sa *sa,
 		if (ikev2_msg_send(env, &resp) == -1)
 			goto done;
 
-		offset += MIN(left, max_len);
-		left -= MIN(left, max_len);
+		offset += MINIMUM(left, max_len);
+		left -= MINIMUM(left, max_len);
 		frag_num++;
 
 		/* MUST be zero after first fragment */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.56 2021/10/24 17:52:28 mpi Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.59 2021/11/26 14:45:13 jsg Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -604,20 +604,19 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 	struct cpu_info *ci;
+#ifdef MULTIPROCESSOR
 	uint64_t mpidr = READ_SPECIALREG(mpidr_el1);
+#endif
 	uint64_t id_aa64mmfr1, sctlr;
 	uint32_t opp;
 
 	KASSERT(faa->fa_nreg > 0);
 
+#ifdef MULTIPROCESSOR
 	if (faa->fa_reg[0].addr == (mpidr & MPIDR_AFF)) {
 		ci = &cpu_info_primary;
-#ifdef MULTIPROCESSOR
 		ci->ci_flags |= CPUF_RUNNING | CPUF_PRESENT | CPUF_PRIMARY;
-#endif
-	}
-#ifdef MULTIPROCESSOR
-	else {
+	} else {
 		ci = malloc(sizeof(*ci), M_DEVBUF, M_WAITOK | M_ZERO);
 		cpu_info[dev->dv_unit] = ci;
 		ci->ci_next = cpu_info_list->ci_next;
@@ -625,6 +624,8 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 		ci->ci_flags |= CPUF_AP;
 		ncpus++;
 	}
+#else
+	ci = &cpu_info_primary;
 #endif
 
 	ci->ci_dev = dev;
@@ -637,11 +638,16 @@ cpu_attach(struct device *parent, struct device *dev, void *aux)
 
 #ifdef MULTIPROCESSOR
 	if (ci->ci_flags & CPUF_AP) {
+		uint64_t midr = READ_SPECIALREG(midr_el1);
 		char buf[32];
 		uint64_t spinup_data = 0;
 		int spinup_method = 0;
 		int timeout = 10000;
 		int len;
+
+		/* XXX SMP on Apple CPUs is busted. */
+		if (CPU_IMPL(midr) == CPU_IMPL_APPLE)
+			ci->ci_smt_id = 1;
 
 		len = OF_getprop(ci->ci_node, "enable-method",
 		    buf, sizeof(buf));

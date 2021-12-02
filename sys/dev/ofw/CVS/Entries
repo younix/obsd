@@ -4,8 +4,6 @@
 /ofw_gpio.c/1.3/Mon Aug 26 09:22:27 2019//
 /ofw_pci.h/1.4/Thu Jun 26 05:42:17 2008//
 /ofw_pinctrl.h/1.2/Sun Aug 21 14:41:51 2016//
-/ofw_power.c/1.1/Wed May  2 15:16:31 2018//
-/ofw_power.h/1.1/Wed May  2 15:16:31 2018//
 /ofw_regulator.h/1.7/Wed Feb 20 07:36:37 2019//
 /ofw_thermal.h/1.2/Thu Jan 23 23:10:04 2020//
 /fdt.h/1.6/Fri Dec 11 17:58:22 2020//
@@ -17,4 +15,6 @@
 /openfirm.h/1.18/Wed Sep  1 16:07:39 2021//
 /ofw_misc.c/1.33/Thu Sep  2 14:22:31 2021//
 /ofw_misc.h/1.21/Thu Sep  2 14:22:31 2021//
+/ofw_power.c/1.2/Thu Dec  2 13:56:29 2021//
+/ofw_power.h/1.2/Thu Dec  2 13:56:29 2021//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: poll_close.c,v 1.1 2021/11/21 06:21:01 visa Exp $	*/
+/*	$OpenBSD: poll_close.c,v 1.3 2021/11/27 15:07:26 visa Exp $	*/
 
 /*
  * Copyright (c) 2021 Visa Hankala
@@ -88,7 +88,7 @@ thread_main(void *arg)
 	memset(pfd, 0, sizeof(pfd));
 	pfd[0].fd = sock[1];
 	pfd[0].events = POLLIN;
-	ret = poll(pfd, 1, 100);
+	ret = poll(pfd, 1, INFTIM);
 	assert(ret == 1);
 	assert(pfd[0].revents & POLLIN);
 
@@ -102,7 +102,7 @@ thread_main(void *arg)
 	memset(pfd, 0, sizeof(pfd));
 	pfd[0].fd = sock[1];
 	pfd[0].events = POLLIN;
-	ret = poll(pfd, 1, 100);
+	ret = poll(pfd, 1, INFTIM);
 	assert(ret == 1);
 	assert(pfd[0].revents & POLLNVAL);
 
@@ -132,7 +132,7 @@ main(void)
 	}
 
 	/* Let the thread settle in poll(). */
-	wait_wchan("kqread");
+	wait_wchan("poll");
 
 	/* Awaken poll(). */
 	write(sock[0], "x", 1);
@@ -153,7 +153,7 @@ main(void)
 	write(barrier[0], "x", 1);
 
 	/* Let the thread settle in poll(). */
-	wait_wchan("kqread");
+	wait_wchan("poll");
 
 	/* Close the fd to awaken poll(). */
 	close(sock[1]);

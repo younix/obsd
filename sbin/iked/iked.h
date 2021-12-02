@@ -1,4 +1,4 @@
-/*	$OpenBSD: iked.h,v 1.195 2021/10/26 17:31:22 tobhe Exp $	*/
+/*	$OpenBSD: iked.h,v 1.201 2021/12/01 16:42:12 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -28,6 +28,10 @@
 
 #include "types.h"
 #include "dh.h"
+
+#define MAXIMUM(a,b) (((a)>(b))?(a):(b))
+#define MINIMUM(a,b) (((a)<(b))?(a):(b))
+#define roundup(x, y)   ((((x)+((y)-1))/(y))*(y))
 
 #ifndef IKED_H
 #define IKED_H
@@ -493,8 +497,8 @@ struct iked_sa {
 	int				 sa_mobike;	/* MOBIKE */
 	int				 sa_frag;	/* fragmentation */
 
-	int			 	 sa_use_transport_mode;	/* peer requested */
-	int			 	 sa_used_transport_mode; /* we enabled */
+	int				 sa_use_transport_mode;	/* peer requested */
+	int				 sa_used_transport_mode; /* we enabled */
 
 	struct iked_timer		 sa_timer;	/* SA timeouts */
 #define IKED_IKE_SA_EXCHANGE_TIMEOUT	 300		/* 5 minutes */
@@ -597,7 +601,8 @@ struct iked_message {
 	uint16_t		 msg_dhgroup;	/* dh group */
 	struct ibuf		*msg_ke;	/* dh key exchange */
 	struct iked_id		 msg_auth;	/* AUTH payload */
-	struct iked_id		 msg_id;
+	struct iked_id		 msg_peerid;
+	struct iked_id		 msg_localid;
 	struct iked_id		 msg_cert;
 	struct ibuf		*msg_cookie;
 	uint16_t		 msg_group;
@@ -1096,16 +1101,16 @@ int	 eap_mschap_success(struct iked *, struct iked_sa *, int);
 int	 eap_challenge_request(struct iked *, struct iked_sa *, int);
 
 /* pfkey.c */
-int	 pfkey_couple(int, struct iked_sas *, int);
-int	 pfkey_flow_add(int fd, struct iked_flow *);
-int	 pfkey_flow_delete(int fd, struct iked_flow *);
-int	 pfkey_sa_init(int, struct iked_childsa *, uint32_t *);
-int	 pfkey_sa_add(int, struct iked_childsa *, struct iked_childsa *);
-int	 pfkey_sa_update_addresses(int, struct iked_childsa *);
-int	 pfkey_sa_delete(int, struct iked_childsa *);
-int	 pfkey_sa_last_used(int, struct iked_childsa *, uint64_t *);
-int	 pfkey_flush(int);
-int	 pfkey_socket(void);
+int	 pfkey_couple(struct iked *, struct iked_sas *, int);
+int	 pfkey_flow_add(struct iked *, struct iked_flow *);
+int	 pfkey_flow_delete(struct iked *, struct iked_flow *);
+int	 pfkey_sa_init(struct iked *, struct iked_childsa *, uint32_t *);
+int	 pfkey_sa_add(struct iked *, struct iked_childsa *, struct iked_childsa *);
+int	 pfkey_sa_update_addresses(struct iked *, struct iked_childsa *);
+int	 pfkey_sa_delete(struct iked *, struct iked_childsa *);
+int	 pfkey_sa_last_used(struct iked *, struct iked_childsa *, uint64_t *);
+int	 pfkey_flush(struct iked *);
+int	 pfkey_socket(struct iked *);
 void	 pfkey_init(struct iked *, int fd);
 
 /* ca.c */

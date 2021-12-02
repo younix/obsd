@@ -73,7 +73,6 @@
 /amlusbphy.c/1.2/Mon Nov 15 19:06:15 2021//
 /axppmic.c/1.11/Mon Nov 15 19:06:15 2021//
 /bcm2835_aux.c/1.7/Mon Nov 15 19:06:15 2021//
-/bcm2835_bsc.c/1.3/Sun Nov 21 20:13:20 2021//
 /bcm2835_dog.c/1.3/Mon Nov 15 19:06:15 2021//
 /bcm2835_rng.c/1.4/Mon Nov 15 19:06:15 2021//
 /bcm2835_temp.c/1.2/Mon Nov 15 19:06:15 2021//
@@ -85,28 +84,21 @@
 /ehci_fdt.c/1.7/Mon Nov 15 19:06:15 2021//
 /exrtc.c/1.4/Mon Nov 15 19:06:15 2021//
 /fanpwr.c/1.5/Mon Nov 15 19:06:15 2021//
-/files.fdt/1.160/Sun Nov 21 20:13:20 2021//
 /fusbtc.c/1.2/Mon Nov 15 19:06:15 2021//
-/gpiokeys.c/1.1/Sun Nov 21 20:09:21 2021//
-/gpioleds.c/1.3/Sun Nov 21 20:09:21 2021//
 /hiclock.c/1.3/Mon Nov 15 19:06:15 2021//
 /hidwusb.c/1.3/Mon Nov 15 19:06:15 2021//
 /hireset.c/1.2/Mon Nov 15 19:06:15 2021//
 /hitemp.c/1.2/Mon Nov 15 19:06:15 2021//
 /if_dwge.c/1.12/Mon Nov 15 19:06:15 2021//
 /if_dwxe.c/1.19/Mon Nov 15 19:06:15 2021//
-/if_fec.c/1.13/Sun Nov 21 20:09:21 2021//
 /if_mvneta.c/1.17/Mon Nov 15 19:06:15 2021//
-/iicmux.c/1.1/Sun Nov 21 11:02:21 2021//
 /imxanatop.c/1.6/Mon Nov 15 19:06:15 2021//
 /imxccm.c/1.27/Mon Nov 15 19:06:15 2021//
-/imxehci.c/1.5/Sun Nov 21 20:09:21 2021//
 /imxesdhc.c/1.17/Mon Nov 15 19:06:15 2021//
 /imxgpc.c/1.10/Mon Nov 15 19:06:15 2021//
 /imxgpio.c/1.6/Mon Nov 15 19:06:15 2021//
 /imxiomuxc.c/1.7/Mon Nov 15 19:06:15 2021//
 /imxrtc.c/1.2/Mon Nov 15 19:06:15 2021//
-/imxspi.c/1.3/Sun Nov 21 20:09:21 2021//
 /imxsrc.c/1.5/Mon Nov 15 19:06:15 2021//
 /imxtmu.c/1.3/Mon Nov 15 19:06:15 2021//
 /imxuart.c/1.12/Mon Nov 15 19:06:15 2021//
@@ -121,7 +113,6 @@
 /mvpinctrl.c/1.9/Mon Nov 15 19:06:15 2021//
 /mvrng.c/1.4/Mon Nov 15 19:06:15 2021//
 /mvrtc.c/1.2/Mon Nov 15 19:06:15 2021//
-/mvspi.c/1.3/Sun Nov 21 20:09:21 2021//
 /mvtemp.c/1.2/Mon Nov 15 19:06:15 2021//
 /mvuart.c/1.4/Mon Nov 15 19:06:15 2021//
 /ohci_fdt.c/1.3/Mon Nov 15 19:06:15 2021//
@@ -147,7 +138,6 @@
 /sdhc_fdt.c/1.18/Mon Nov 15 19:06:15 2021//
 /sfp.c/1.5/Mon Nov 15 19:06:15 2021//
 /simplefb.c/1.14/Mon Nov 15 19:06:15 2021//
-/simplepanel.c/1.6/Sun Nov 21 20:09:21 2021//
 /ssdfb.c/1.12/Mon Nov 15 19:06:15 2021//
 /sxiccmu.c/1.29/Mon Nov 15 19:06:15 2021//
 /sxidog.c/1.3/Mon Nov 15 19:06:15 2021//
@@ -165,4 +155,14 @@
 /syscon.c/1.7/Mon Nov 15 19:06:15 2021//
 /virtio_mmio.c/1.10/Mon Nov 15 19:06:15 2021//
 /xhci_fdt.c/1.18/Mon Nov 15 19:06:15 2021//
+/bcm2835_bsc.c/1.3/Sun Nov 21 20:15:22 2021//
+/files.fdt/1.160/Sun Nov 21 20:15:22 2021//
+/gpiokeys.c/1.1/Sun Nov 21 20:15:22 2021//
+/gpioleds.c/1.3/Sun Nov 21 20:15:22 2021//
+/if_fec.c/1.13/Sun Nov 21 20:15:22 2021//
+/iicmux.c/1.1/Sun Nov 21 20:15:22 2021//
+/imxehci.c/1.5/Sun Nov 21 20:15:22 2021//
+/imxspi.c/1.3/Sun Nov 21 20:15:22 2021//
+/mvspi.c/1.3/Sun Nov 21 20:15:22 2021//
+/simplepanel.c/1.6/Sun Nov 21 20:15:22 2021//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kvm_riscv64.c,v 1.1 2021/04/29 20:00:18 drahn Exp $	*/
+/*	$OpenBSD: kvm_riscv64.c,v 1.3 2021/12/01 21:45:19 deraadt Exp $	*/
 /*
  * Copyright (c) 2006 Miodrag Vallat.
  *
@@ -50,10 +50,8 @@
  * RISCV machine dependent routines for kvm.
  */
 
-#include <sys/param.h>
-#include <sys/core.h>
+#include <sys/types.h>
 #include <sys/kcore.h>
-#include <sys/vnode.h>
 
 #include <unistd.h>
 #include <stdlib.h>

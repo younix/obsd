@@ -34,7 +34,6 @@
 /rcsparse.c/1.13/Thu Oct 13 20:51:25 2016//
 /rcsparse.h/1.1/Fri Oct 15 08:44:12 2010//
 /release.c/1.43/Thu Jun  1 08:08:24 2017//
-/remote.c/1.33/Fri Jun 28 13:35:00 2019//
 /remote.h/1.38/Mon Aug 28 19:33:20 2017//
 /remove.c/1.84/Thu Jun  1 08:08:24 2017//
 /repository.c/1.26/Fri Jun 28 13:35:00 2019//
@@ -66,4 +65,5 @@
 /diff.c/1.164/Mon Nov 15 19:06:15 2021//
 /file.c/1.275/Mon Nov 15 19:06:15 2021//
 /init.c/1.42/Mon Nov 15 19:06:15 2021//
+/remote.c/1.34/Thu Dec  2 13:56:31 2021//
 D

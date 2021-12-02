@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwxreg.h,v 1.31 2021/09/23 15:34:00 stsp Exp $	*/
+/*	$OpenBSD: if_iwxreg.h,v 1.33 2021/11/25 14:51:26 stsp Exp $	*/
 
 /*-
  * Based on BSD-licensed source modules in the Linux iwlwifi driver,
@@ -1243,7 +1243,8 @@ struct iwx_ucode_header {
 #define IWX_UCODE_TLV_TYPE_HCMD			(IWX_UCODE_TLV_DEBUG_BASE + 2)
 #define IWX_UCODE_TLV_TYPE_REGIONS		(IWX_UCODE_TLV_DEBUG_BASE + 3)
 #define IWX_UCODE_TLV_TYPE_TRIGGERS		(IWX_UCODE_TLV_DEBUG_BASE + 4)
-#define IWX_UCODE_TLV_DEBUG_MAX IWX_UCODE_TLV_TYPE_TRIGGERS
+#define IWX_UCODE_TLV_TYPE_CONF_SET		(IWX_UCODE_TLV_DEBUG_BASE + 5)
+#define IWX_UCODE_TLV_DEBUG_MAX IWX_UCODE_TLV_TYPE_CONF_SET
 
 
 struct iwx_ucode_tlv {
@@ -1420,6 +1421,7 @@ struct iwx_gen3_bc_tbl {
 #define IWX_MAX_TID_COUNT	8
 #define IWX_FIRST_AGG_TX_QUEUE	(IWX_DQA_MGMT_QUEUE + 1)
 #define IWX_LAST_AGG_TX_QUEUE	(IWX_FIRST_AGG_TX_QUEUE + IWX_MAX_TID_COUNT - 1)
+#define IWX_NUM_TX_QUEUES	(IWX_LAST_AGG_TX_QUEUE + 1)
 
 /**
  * Max Tx window size is the max number of contiguous TFDs that the scheduler

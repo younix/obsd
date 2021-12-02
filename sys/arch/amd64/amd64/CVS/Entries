@@ -60,8 +60,8 @@
 /machdep.c/1.275/Wed Oct 20 17:29:08 2021//
 /pmap.c/1.148/Wed Oct 20 17:29:08 2021//
 /aesni.c/1.53/Mon Nov 15 19:06:15 2021//
-/conf.c/1.74/Sun Nov 21 20:09:21 2021//
-/identcpu.c/1.121/Sun Nov 21 20:09:21 2021//
 /via.c/1.37/Mon Nov 15 19:06:15 2021//
-/vmm.c/1.294/Sun Nov 21 20:09:21 2021//
+/conf.c/1.74/Sun Nov 21 20:15:22 2021//
+/identcpu.c/1.121/Sun Nov 21 20:15:22 2021//
+/vmm.c/1.296/Thu Dec  2 13:56:26 2021//
 D
