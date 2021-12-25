@@ -69,7 +69,7 @@ void	dologout(int);
 void	fatal(char *);
 int	ftpd_pclose(FILE *, pid_t);
 FILE   *ftpd_ls(const char *, pid_t *);
-int     get_line(char *, int, FILE *);
+int     get_line(char *, int);
 void	ftpdlogwtmp(char *, char *, char *);
 void	lreply(int, const char *, ...);
 void	makedir(char *);
