@@ -22,16 +22,16 @@
 /gcc.landisk/1.17/Thu Sep  2 14:22:29 2021//
 /gcc.luna88k/1.17/Thu Sep  2 14:22:29 2021//
 /gcc.sparc64/1.17/Thu Sep  2 14:22:29 2021//
-/clang.amd64/1.39/Wed Oct 20 17:27:55 2021//
-/clang.arm64/1.32/Wed Oct 20 17:27:55 2021//
-/clang.armv7/1.32/Wed Oct 20 17:27:55 2021//
-/clang.i386/1.39/Wed Oct 20 17:27:55 2021//
-/clang.loongson/1.22/Wed Oct 20 17:27:55 2021//
-/clang.macppc/1.17/Wed Oct 20 17:27:55 2021//
-/clang.octeon/1.22/Wed Oct 20 17:27:55 2021//
-/clang.powerpc64/1.12/Wed Oct 20 17:27:55 2021//
-/clang.riscv64/1.4/Wed Oct 20 17:27:55 2021//
-/clang.sparc64/1.25/Wed Oct 20 17:27:55 2021//
 /md.riscv64/1.5/Wed Oct 20 17:27:55 2021//
-/mi/1.1584/Thu Dec  2 13:55:28 2021//
+/clang.amd64/1.40/Sun Jan  2 13:09:40 2022//
+/clang.arm64/1.33/Sun Jan  2 13:09:40 2022//
+/clang.armv7/1.33/Sun Jan  2 13:09:40 2022//
+/clang.i386/1.40/Sun Jan  2 13:09:40 2022//
+/clang.loongson/1.23/Sun Jan  2 13:09:40 2022//
+/clang.macppc/1.18/Sun Jan  2 13:09:40 2022//
+/clang.octeon/1.23/Sun Jan  2 13:09:40 2022//
+/clang.powerpc64/1.13/Sun Jan  2 13:09:40 2022//
+/clang.riscv64/1.6/Sun Jan  2 13:09:40 2022//
+/clang.sparc64/1.26/Sun Jan  2 13:09:40 2022//
+/mi/1.1591/Sun Jan  2 13:09:40 2022//
 D

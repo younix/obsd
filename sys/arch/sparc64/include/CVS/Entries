@@ -1,7 +1,6 @@
 /_float.h/1.1/Tue Jun 26 16:12:45 2012//
 /_types.h/1.23/Mon Mar  5 01:15:25 2018//
 /apmvar.h/1.7/Tue Jan 22 02:36:30 2019//
-/asm.h/1.13/Thu Jun 29 17:36:16 2017//
 /atomic.h/1.15/Tue Jul  4 09:00:12 2017//
 /autoconf.h/1.18/Thu Jun 26 05:42:13 2008//
 /boot_flag.h/1.7/Mon May 25 15:31:59 2020//
@@ -56,4 +55,5 @@
 /cpu.h/1.98/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.22/Thu Sep  2 14:22:31 2021//
 /vmparam.h/1.33/Thu Sep  2 14:22:31 2021//
+/asm.h/1.14/Sun Jan  2 13:11:06 2022//
 D

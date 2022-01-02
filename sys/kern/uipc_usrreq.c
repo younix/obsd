@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_usrreq.c,v 1.158 2021/11/17 22:56:19 mvs Exp $	*/
+/*	$OpenBSD: uipc_usrreq.c,v 1.161 2021/12/29 07:15:13 anton Exp $	*/
 /*	$NetBSD: uipc_usrreq.c,v 1.18 1996/02/09 19:00:50 christos Exp $	*/
 
 /*
@@ -56,6 +56,11 @@
 #include <sys/sysctl.h>
 #include <sys/lock.h>
 
+#include "kcov.h"
+#if NKCOV > 0
+#include <sys/kcov.h>
+#endif
+
 /*
  * Locks used to protect global data and struct members:
  *      I       immutable after creation
@@ -85,7 +90,8 @@ struct	unp_deferral {
 
 void	uipc_setaddr(const struct unpcb *, struct mbuf *);
 void	unp_discard(struct fdpass *, int);
-void	unp_mark(struct fdpass *, int);
+void	unp_remove_gcrefs(struct fdpass *, int);
+void	unp_restore_gcrefs(struct fdpass *, int);
 void	unp_scan(struct mbuf *, void (*)(struct fdpass *, int));
 int	unp_nam2sun(struct mbuf *, struct sockaddr_un **, size_t *);
 
@@ -960,8 +966,11 @@ restart:
 
 		fp = rp->fp;
 		rp++;
-		if ((unp = fptounp(fp)) != NULL)
-			atomic_dec_long(&unp->unp_msgcount);
+		if ((unp = fptounp(fp)) != NULL) {
+			rw_enter_write(&unp_gc_lock);
+			unp->unp_msgcount--;
+			rw_exit_write(&unp_gc_lock);
+		}
 	}
 
 	mtx_enter(&unp_rights_mtx);
@@ -1081,12 +1090,21 @@ morespace:
 			error = EINVAL;
 			goto fail;
 		}
+#if NKCOV > 0
+		/* kcov descriptors cannot be copied */
+		if (fp->f_type == DTYPE_VNODE && kcov_vnode(fp->f_data)) {
+			error = EINVAL;
+			goto fail;
+		}
+#endif
 		rp->fp = fp;
 		rp->flags = fdp->fd_ofileflags[fd] & UF_PLEDGED;
 		rp--;
 		if ((unp = fptounp(fp)) != NULL) {
-			atomic_inc_long(&unp->unp_msgcount);
+			rw_enter_write(&unp_gc_lock);
+			unp->unp_msgcount++;
 			unp->unp_file = fp;
+			rw_exit_write(&unp_gc_lock);
 		}
 	}
 	fdpunlock(fdp);
@@ -1099,8 +1117,11 @@ fail:
 	for ( ; i > 0; i--) {
 		rp++;
 		fp = rp->fp;
-		if ((unp = fptounp(fp)) != NULL)
-			atomic_dec_long(&unp->unp_msgcount);
+		if ((unp = fptounp(fp)) != NULL) {
+			rw_enter_write(&unp_gc_lock);
+			unp->unp_msgcount--;
+			rw_exit_write(&unp_gc_lock);
+		}
 		FRELE(fp, p);
 	}
 
@@ -1136,8 +1157,11 @@ unp_gc(void *arg __unused)
 			fp = defer->ud_fp[i].fp;
 			if (fp == NULL)
 				continue;
-			if ((unp = fptounp(fp)) != NULL)
-				atomic_dec_long(&unp->unp_msgcount);
+			if ((unp = fptounp(fp)) != NULL) {
+				rw_enter_write(&unp_gc_lock);
+				unp->unp_msgcount--;
+				rw_exit_write(&unp_gc_lock);
+			}
 			mtx_enter(&unp_rights_mtx);
 			unp_rights--;
 			mtx_leave(&unp_rights_mtx);
@@ -1151,61 +1175,71 @@ unp_gc(void *arg __unused)
 	}
 	rw_exit_write(&unp_df_lock);
 
-	rw_enter_write(&unp_gc_lock);
-	unp_defer = 0;
-	LIST_FOREACH(unp, &unp_head, unp_link)
-		unp->unp_gcflags = 0;
-	do {
-		nunref = 0;
-		LIST_FOREACH(unp, &unp_head, unp_link) {
-			fp = unp->unp_file;
-			if (unp->unp_gcflags & UNP_GCDEFER) {
-				/*
-				 * This socket is referenced by another
-				 * socket which is known to be live,
-				 * so it's certainly live.
-				 */
-				unp->unp_gcflags &= ~UNP_GCDEFER;
-				unp_defer--;
-			} else if (unp->unp_gcflags & UNP_GCMARK) {
-				/* marked as live in previous pass */
-				continue;
-			} else if (fp == NULL) {
-				/* not being passed, so can't be in loop */
-			} else if (fp->f_count == 0) {
-				/*
-				 * Already being closed, let normal close
-				 * path take its course
-				 */
-			} else {
-				/*
-				 * Unreferenced by other sockets so far,
-				 * so if all the references (f_count) are
-				 * from passing (unp_msgcount) then this
-				 * socket is prospectively dead
-				 */
-				if (fp->f_count == unp->unp_msgcount) {
-					nunref++;
-					unp->unp_gcflags |= UNP_GCDEAD;
-					continue;
-				}
-			}
+	nunref = 0;
 
-			/*
-			 * This is the first time we've seen this socket on
-			 * the mark pass and known it has a live reference,
-			 * so mark it, then scan its receive buffer for
-			 * sockets and note them as deferred (== referenced,
-			 * but not yet marked).
-			 */
-			unp->unp_gcflags |= UNP_GCMARK;
+	rw_enter_write(&unp_gc_lock);
+
+	/*
+	 * Determine sockets which may be prospectively dead. Such
+	 * sockets have their `unp_msgcount' equal to the `f_count'.
+	 * If `unp_msgcount' is 0, the socket has not been passed
+	 * and can't be unreferenced.
+	 */
+	LIST_FOREACH(unp, &unp_head, unp_link) {
+		unp->unp_gcflags = 0;
+
+		if (unp->unp_msgcount == 0)
+			continue;
+		if ((fp = unp->unp_file) == NULL)
+			continue;
+		if (fp->f_count == unp->unp_msgcount) {
+			unp->unp_gcflags |= UNP_GCDEAD;
+			unp->unp_gcrefs = unp->unp_msgcount;
+			nunref++;
+		}
+	}
+
+	/*
+	 * Scan all sockets previously marked as dead. Remove
+	 * the `unp_gcrefs' reference each socket holds on any
+	 * dead socket in its buffer.
+	 */
+	LIST_FOREACH(unp, &unp_head, unp_link) {
+		if ((unp->unp_gcflags & UNP_GCDEAD) == 0)
+			continue;
+		so = unp->unp_socket;
+		solock(so);
+		unp_scan(so->so_rcv.sb_mb, unp_remove_gcrefs);
+		sounlock(so, SL_LOCKED);
+	}
+
+	/*
+	 * If the dead socket has `unp_gcrefs' reference counter
+	 * greater than 0, it can't be unreferenced. Mark it as
+	 * alive and increment the `unp_gcrefs' reference for each
+	 * dead socket within its buffer. Repeat this until we
+	 * have no new alive sockets found.
+	 */
+	do {
+		unp_defer = 0;
+
+		LIST_FOREACH(unp, &unp_head, unp_link) {
+			if ((unp->unp_gcflags & UNP_GCDEAD) == 0)
+				continue;
+			if (unp->unp_gcrefs == 0)
+				continue;
+
+			unp->unp_gcflags &= ~UNP_GCDEAD;
 
 			so = unp->unp_socket;
 			solock(so);
-			unp_scan(so->so_rcv.sb_mb, unp_mark);
+			unp_scan(so->so_rcv.sb_mb, unp_restore_gcrefs);
 			sounlock(so, SL_LOCKED);
+
+			KASSERT(nunref > 0);
+			nunref--;
 		}
-	} while (unp_defer);
+	} while (unp_defer > 0);
 
 	/*
 	 * If there are any unreferenced sockets, then for each dispose
@@ -1227,6 +1261,7 @@ unp_gc(void *arg __unused)
 			}
 		}
 	}
+
 	unp_gcing = 0;
 unlock:
 	rw_exit_write(&unp_gc_lock);
@@ -1270,31 +1305,6 @@ unp_scan(struct mbuf *m0, void (*op)(struct fdpass *, int))
 }
 
 void
-unp_mark(struct fdpass *rp, int nfds)
-{
-	struct unpcb *unp;
-	int i;
-
-	rw_assert_wrlock(&unp_gc_lock);
-
-	for (i = 0; i < nfds; i++) {
-		if (rp[i].fp == NULL)
-			continue;
-
-		unp = fptounp(rp[i].fp);
-		if (unp == NULL)
-			continue;
-
-		if (unp->unp_gcflags & (UNP_GCMARK|UNP_GCDEFER))
-			continue;
-
-		unp_defer++;
-		unp->unp_gcflags |= UNP_GCDEFER;
-		unp->unp_gcflags &= ~UNP_GCDEAD;
-	}
-}
-
-void
 unp_discard(struct fdpass *rp, int nfds)
 {
 	struct unp_deferral *defer;
@@ -1310,6 +1320,46 @@ unp_discard(struct fdpass *rp, int nfds)
 	rw_exit_write(&unp_df_lock);
 
 	task_add(systqmp, &unp_gc_task);
+}
+
+void
+unp_remove_gcrefs(struct fdpass *rp, int nfds)
+{
+	struct unpcb *unp;
+	int i;
+
+	rw_assert_wrlock(&unp_gc_lock);
+
+	for (i = 0; i < nfds; i++) {
+		if (rp[i].fp == NULL)
+			continue;
+		if ((unp = fptounp(rp[i].fp)) == NULL)
+			continue;
+		if (unp->unp_gcflags & UNP_GCDEAD) {
+			KASSERT(unp->unp_gcrefs > 0);
+			unp->unp_gcrefs--;
+		}
+	}
+}
+
+void
+unp_restore_gcrefs(struct fdpass *rp, int nfds)
+{
+	struct unpcb *unp;
+	int i;
+
+	rw_assert_wrlock(&unp_gc_lock);
+
+	for (i = 0; i < nfds; i++) {
+		if (rp[i].fp == NULL)
+			continue;
+		if ((unp = fptounp(rp[i].fp)) == NULL)
+			continue;
+		if (unp->unp_gcflags & UNP_GCDEAD) {
+			unp->unp_gcrefs++;
+			unp_defer++;
+		}
+	}
 }
 
 int

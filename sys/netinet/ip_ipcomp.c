@@ -1,4 +1,4 @@
-/* $OpenBSD: ip_ipcomp.c,v 1.88 2021/11/21 16:17:48 mvs Exp $ */
+/* $OpenBSD: ip_ipcomp.c,v 1.91 2021/12/23 12:21:48 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Jean-Jacques Bernard-Gundol (jj@wabbitt.org)
@@ -171,13 +171,11 @@ ipcomp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	crp->crp_buf = (caddr_t)m;
 	crp->crp_sid = tdb->tdb_cryptoid;
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);
@@ -193,7 +191,7 @@ ipcomp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	/* update the counters */
 	ibytes = m->m_pkthdr.len - (skip + hlen);
 	tdb->tdb_cur_bytes += ibytes;
-	tdb->tdb_ibytes += ibytes;
+	tdbstat_add(tdb, tdb_ibytes, ibytes);
 	ipcompstat_add(ipcomps_ibytes, ibytes);
 
 	/* Hard expiration */
@@ -205,11 +203,15 @@ ipcomp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 		goto drop;
 	}
 	/* Notify on soft expiration */
+	mtx_enter(&tdb->tdb_mtx);
 	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
 	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;	/* Turn off checking */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 
 	/* In case it's not done already, adjust the size of the mbuf chain */
 	m->m_pkthdr.len = clen + hlen + skip;
@@ -393,12 +395,18 @@ ipcomp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 		error = EINVAL;
 		goto drop;
 	}
+
 	/* Soft byte expiration */
+	mtx_enter(&tdb->tdb_mtx);
 	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
 	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;	/* Turn off checking */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
+
 	/*
 	 * Loop through mbuf chain; if we find a readonly mbuf,
 	 * copy the packet.
@@ -449,13 +457,11 @@ ipcomp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	crp->crp_buf = (caddr_t)m;
 	crp->crp_sid = tdb->tdb_cryptoid;
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);

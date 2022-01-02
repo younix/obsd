@@ -1,4 +1,4 @@
-/* $OpenBSD: tpm.c,v 1.13 2021/10/23 16:39:03 dv Exp $ */
+/* $OpenBSD: tpm.c,v 1.15 2021/12/21 20:53:46 kettenis Exp $ */
 
 /*
  * Minimal interface to Trusted Platform Module chips implementing the
@@ -254,6 +254,8 @@ tpm_match(struct device *parent, void *match, void *aux)
 	struct acpi_attach_args	*aa = aux;
 	struct cfdata		*cf = match;
 
+	if (aa->aaa_naddr < 1)
+		return 0;
 	return (acpi_matchhids(aa, tpm_hids, cf->cf_driver->cd_name));
 }
 
@@ -285,7 +287,7 @@ tpm_attach(struct device *parent, struct device *self, void *aux)
 			sc->sc_tpm_mode = TPM_CRB;
 			break;
 		default:
-			printf(": unsupported TPM2 start method\n");
+			printf(": unsupported TPM2 start method %d\n", start_method);
 			return;
 		}
 	}
@@ -297,11 +299,6 @@ tpm_attach(struct device *parent, struct device *self, void *aux)
 	if ((sta & (STA_PRESENT | STA_ENABLED | STA_DEV_OK)) !=
 	    (STA_PRESENT | STA_ENABLED | STA_DEV_OK)) {
 		printf(": not enabled\n");
-		return;
-	}
-
-	if (aaa->aaa_naddr < 1) {
-		printf(": no registers\n");
 		return;
 	}
 

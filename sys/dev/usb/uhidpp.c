@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhidpp.c,v 1.19 2021/11/17 06:22:14 anton Exp $	*/
+/*	$OpenBSD: uhidpp.c,v 1.23 2021/12/23 12:14:15 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>
@@ -202,7 +202,6 @@ struct uhidpp_device {
 		struct ksensor b_sens[UHIDPP_NSENSORS];
 		uint8_t b_feature_idx;
 		uint8_t b_level;
-		uint8_t b_next_level;
 		uint8_t b_status;
 		uint8_t b_nlevels;
 		uint8_t b_rechargeable;
@@ -233,7 +232,6 @@ struct uhidpp_softc {
 	struct uhidpp_report *sc_req;	/* [m] synchronous request buffer */
 	struct uhidpp_report *sc_resp;	/* [m] synchronous response buffer */
 	u_int sc_resp_state;		/* [m] synchronous response state */
-
 };
 
 int uhidpp_match(struct device *, void *, void *);
@@ -254,7 +252,7 @@ int uhidpp_is_notification(struct uhidpp_softc *, struct uhidpp_report *);
 
 static int uhidpp_has_sensors(struct uhidpp_softc *);
 
-int hidpp_get_protocol_version(struct uhidpp_softc  *, uint8_t, uint8_t *,
+int hidpp_get_protocol_version(struct uhidpp_softc *, uint8_t, uint8_t *,
     uint8_t *);
 
 int hidpp10_get_name(struct uhidpp_softc *, uint8_t, char *, size_t);
@@ -269,14 +267,14 @@ int hidpp20_feature_get_count(struct uhidpp_softc *, uint8_t, uint8_t,
 int hidpp20_feature_get_id(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
     uint16_t *, uint8_t *);
 int hidpp20_battery_get_level_status(struct uhidpp_softc *, uint8_t, uint8_t,
-    uint8_t *, uint8_t *, uint8_t *);
+    uint8_t *, uint8_t *);
 int hidpp20_battery_get_capability(struct uhidpp_softc *, uint8_t, uint8_t,
     uint8_t *, uint8_t *);
 int hidpp20_battery_status_is_charging(uint8_t);
 
 int hidpp_send_validate(uint8_t, int);
-int hidpp_send_rap_report(struct uhidpp_softc *, uint8_t, uint8_t,
-    uint8_t, uint8_t, uint8_t *, int, struct uhidpp_report *);
+int hidpp_send_rap_report(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
+    uint8_t, uint8_t *, int, struct uhidpp_report *);
 int hidpp_send_fap_report(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
     uint8_t, uint8_t *, int, struct uhidpp_report *);
 int hidpp_send_report(struct uhidpp_softc *, uint8_t, struct uhidpp_report *,
@@ -308,7 +306,7 @@ uhidpp_match(struct device *parent, void *match, void *aux)
 		return UMATCH_NONE;
 
 	if (usb_lookup(uhidpp_devs,
-		    uha->uaa->vendor, uha->uaa->product) == NULL)
+	    uha->uaa->vendor, uha->uaa->product) == NULL)
 		return UMATCH_NONE;
 
 	uhidev_get_report_desc(uha->parent, &desc, &descsiz);
@@ -330,8 +328,8 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 	struct uhidpp_softc *sc = (struct uhidpp_softc *)self;
 	struct uhidev_attach_arg *uha = (struct uhidev_attach_arg *)aux;
 	struct usb_attach_arg *uaa = uha->uaa;
-	int error, i;
 	int npaired = 0;
+	int error, i;
 
 	sc->sc_hdev.sc_intr = uhidpp_intr;
 	sc->sc_hdev.sc_udev = uaa->device;
@@ -366,12 +364,14 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 	error = uhidev_set_report_dev(sc->sc_hdev.sc_parent, &sc->sc_hdev,
 	    HIDPP_REPORT_ID_SHORT);
 	if (error) {
+		mtx_leave(&sc->sc_mtx);
 		printf(" short report error %d\n", error);
 		return;
 	}
 	error = uhidev_set_report_dev(sc->sc_hdev.sc_parent, &sc->sc_hdev,
 	    HIDPP_REPORT_ID_LONG);
 	if (error) {
+		mtx_leave(&sc->sc_mtx);
 		printf(" long report error %d\n", error);
 		return;
 	}
@@ -609,7 +609,6 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 			    "error=%d\n", __func__, dev->d_id, error);
 			return;
 		}
-
 	} else {
 		return;
 	}
@@ -669,8 +668,7 @@ uhidpp_device_refresh(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 
 		error = hidpp20_battery_get_level_status(sc, dev->d_id,
 		    dev->d_battery.b_feature_idx,
-		    &dev->d_battery.b_level, &dev->d_battery.b_next_level,
-		    &dev->d_battery.b_status);
+		    &dev->d_battery.b_level, &dev->d_battery.b_status);
 		if (error) {
 			DPRINTF("%s: battery status failure: device_id=%d, "
 			    "error=%d\n",
@@ -822,7 +820,6 @@ uhidpp_consume_notification(struct uhidpp_softc *sc, struct uhidpp_report *rep)
 	return 0;
 }
 
-
 /*
  * Returns non-zero if the given report is a notification. Otherwise, it must be
  * a response.
@@ -842,7 +839,7 @@ uhidpp_is_notification(struct uhidpp_softc *sc, struct uhidpp_report *rep)
 
 	/* An error must always be a response. */
 	if ((rep->rap.sub_id == HIDPP_ERROR ||
-		    rep->fap.feature_idx == HIDPP20_ERROR) &&
+	    rep->fap.feature_idx == HIDPP20_ERROR) &&
 	    rep->fap.funcidx_swid == sc->sc_req->fap.feature_idx &&
 	    rep->fap.params[0] == sc->sc_req->fap.funcidx_swid)
 		return 0;
@@ -857,7 +854,7 @@ uhidpp_has_sensors(struct uhidpp_softc *sc)
 }
 
 int
-hidpp_get_protocol_version(struct uhidpp_softc  *sc, uint8_t device_id,
+hidpp_get_protocol_version(struct uhidpp_softc *sc, uint8_t device_id,
     uint8_t *major, uint8_t *minor)
 {
 	struct uhidpp_report resp;
@@ -1071,7 +1068,7 @@ hidpp20_feature_get_id(struct uhidpp_softc *sc, uint8_t device_id,
 
 int
 hidpp20_battery_get_level_status(struct uhidpp_softc *sc, uint8_t device_id,
-    uint8_t feature_idx, uint8_t *level, uint8_t *next_level, uint8_t *status)
+    uint8_t feature_idx, uint8_t *level, uint8_t *status)
 {
 	struct uhidpp_report resp;
 	int error;
@@ -1086,7 +1083,7 @@ hidpp20_battery_get_level_status(struct uhidpp_softc *sc, uint8_t device_id,
 		return error;
 
 	*level = resp.fap.params[0];
-	*next_level = resp.fap.params[1];
+	/* next_level = resp.fap.params[1]; */
 	*status = resp.fap.params[2];
 
 	/*
@@ -1205,7 +1202,8 @@ int
 hidpp_send_report(struct uhidpp_softc *sc, uint8_t report_id,
     struct uhidpp_report *req, struct uhidpp_report *resp)
 {
-	int error, len, n;
+	int error = 0;
+	int len, n;
 
 	MUTEX_ASSERT_LOCKED(&sc->sc_mtx);
 

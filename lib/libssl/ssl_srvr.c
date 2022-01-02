@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.126 2021/11/29 16:03:56 jsing Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.129 2021/12/26 15:10:59 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1309,43 +1309,38 @@ ssl3_send_server_done(SSL *s)
 static int
 ssl3_send_server_kex_dhe(SSL *s, CBB *cbb)
 {
-	DH *dh = NULL, *dhp;
+	DH *dh = NULL;
 	int al;
 
+	if ((dh = DH_new()) == NULL)
+		goto err;
+
 	if (s->cert->dh_tmp_auto != 0) {
-		if ((dhp = ssl_get_auto_dh(s)) == NULL) {
+		size_t key_bits;
+
+		if ((key_bits = ssl_dhe_params_auto_key_bits(s)) == 0) {
 			al = SSL_AD_INTERNAL_ERROR;
 			SSLerror(s, ERR_R_INTERNAL_ERROR);
 			goto fatal_err;
 		}
-	} else
-		dhp = s->cert->dh_tmp;
 
-	if (dhp == NULL && s->cert->dh_tmp_cb != NULL)
-		dhp = s->cert->dh_tmp_cb(s, 0,
-		    SSL_C_PKEYLENGTH(S3I(s)->hs.cipher));
+		if (!ssl_kex_generate_dhe_params_auto(dh, key_bits))
+			goto err;
+	} else {
+		DH *dh_params = s->cert->dh_tmp;
 
-	if (dhp == NULL) {
-		al = SSL_AD_HANDSHAKE_FAILURE;
-		SSLerror(s, SSL_R_MISSING_TMP_DH_KEY);
-		goto fatal_err;
-	}
+		if (dh_params == NULL && s->cert->dh_tmp_cb != NULL)
+			dh_params = s->cert->dh_tmp_cb(s, 0,
+			    SSL_C_PKEYLENGTH(S3I(s)->hs.cipher));
 
-	if (S3I(s)->tmp.dh != NULL) {
-		SSLerror(s, ERR_R_INTERNAL_ERROR);
-		goto err;
-	}
+		if (dh_params == NULL) {
+			al = SSL_AD_HANDSHAKE_FAILURE;
+			SSLerror(s, SSL_R_MISSING_TMP_DH_KEY);
+			goto fatal_err;
+		}
 
-	if (s->cert->dh_tmp_auto != 0) {
-		dh = dhp;
-	} else if ((dh = DHparams_dup(dhp)) == NULL) {
-		SSLerror(s, ERR_R_DH_LIB);
-		goto err;
-	}
-	S3I(s)->tmp.dh = dh;
-	if (!DH_generate_key(dh)) {
-		SSLerror(s, ERR_R_DH_LIB);
-		goto err;
+		if (!ssl_kex_generate_dhe(dh, dh_params))
+			goto err;
 	}
 
 	if (!ssl_kex_params_dhe(dh, cbb))
@@ -1353,12 +1348,20 @@ ssl3_send_server_kex_dhe(SSL *s, CBB *cbb)
 	if (!ssl_kex_public_dhe(dh, cbb))
 		goto err;
 
-	return (1);
+	if (S3I(s)->tmp.dh != NULL) {
+		SSLerror(s, ERR_R_INTERNAL_ERROR);
+		goto err;
+	}
+	S3I(s)->tmp.dh = dh;
+
+	return 1;
 
  fatal_err:
 	ssl3_send_alert(s, SSL3_AL_FATAL, al);
  err:
-	return (-1);
+	DH_free(dh);
+
+	return -1;
 }
 
 static int
@@ -1493,7 +1496,7 @@ ssl3_send_server_key_exchange(SSL *s)
 	size_t params_len;
 	const EVP_MD *md = NULL;
 	unsigned long type;
-	EVP_MD_CTX md_ctx;
+	EVP_MD_CTX *md_ctx = NULL;
 	EVP_PKEY_CTX *pctx;
 	EVP_PKEY *pkey;
 	int al;
@@ -1501,7 +1504,8 @@ ssl3_send_server_key_exchange(SSL *s)
 	memset(&cbb, 0, sizeof(cbb));
 	memset(&cbb_params, 0, sizeof(cbb_params));
 
-	EVP_MD_CTX_init(&md_ctx);
+	if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+		goto err;
 
 	if (S3I(s)->hs.state == SSL3_ST_SW_KEY_EXCH_A) {
 
@@ -1549,7 +1553,7 @@ ssl3_send_server_key_exchange(SSL *s)
 				}
 			}
 
-			if (!EVP_DigestSignInit(&md_ctx, &pctx, md, NULL, pkey)) {
+			if (!EVP_DigestSignInit(md_ctx, &pctx, md, NULL, pkey)) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
@@ -1560,21 +1564,21 @@ ssl3_send_server_key_exchange(SSL *s)
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
-			if (!EVP_DigestSignUpdate(&md_ctx, s->s3->client_random,
+			if (!EVP_DigestSignUpdate(md_ctx, s->s3->client_random,
 			    SSL3_RANDOM_SIZE)) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
-			if (!EVP_DigestSignUpdate(&md_ctx, s->s3->server_random,
+			if (!EVP_DigestSignUpdate(md_ctx, s->s3->server_random,
 			    SSL3_RANDOM_SIZE)) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
-			if (!EVP_DigestSignUpdate(&md_ctx, params, params_len)) {
+			if (!EVP_DigestSignUpdate(md_ctx, params, params_len)) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
-			if (!EVP_DigestSignFinal(&md_ctx, NULL, &signature_len) ||
+			if (!EVP_DigestSignFinal(md_ctx, NULL, &signature_len) ||
 			    !signature_len) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
@@ -1583,7 +1587,7 @@ ssl3_send_server_key_exchange(SSL *s)
 				SSLerror(s, ERR_R_MALLOC_FAILURE);
 				goto err;
 			}
-			if (!EVP_DigestSignFinal(&md_ctx, signature, &signature_len)) {
+			if (!EVP_DigestSignFinal(md_ctx, signature, &signature_len)) {
 				SSLerror(s, ERR_R_EVP_LIB);
 				goto err;
 			}
@@ -1602,7 +1606,7 @@ ssl3_send_server_key_exchange(SSL *s)
 		S3I(s)->hs.state = SSL3_ST_SW_KEY_EXCH_B;
 	}
 
-	EVP_MD_CTX_cleanup(&md_ctx);
+	EVP_MD_CTX_free(md_ctx);
 	free(params);
 	free(signature);
 
@@ -1613,7 +1617,7 @@ ssl3_send_server_key_exchange(SSL *s)
  err:
 	CBB_cleanup(&cbb_params);
 	CBB_cleanup(&cbb);
-	EVP_MD_CTX_cleanup(&md_ctx);
+	EVP_MD_CTX_free(md_ctx);
 	free(params);
 	free(signature);
 
@@ -1787,53 +1791,35 @@ ssl3_get_client_kex_rsa(SSL *s, CBS *cbs)
 static int
 ssl3_get_client_kex_dhe(SSL *s, CBS *cbs)
 {
-	int key_size = 0;
-	int key_is_invalid, key_len, al;
-	unsigned char *key = NULL;
-	BIGNUM *bn = NULL;
-	CBS dh_Yc;
-	DH *dh;
+	DH *dh_clnt = NULL;
+	DH *dh_srvr;
+	int invalid_key;
+	uint8_t *key = NULL;
+	size_t key_len = 0;
+	int ret = -1;
 
-	if (!CBS_get_u16_length_prefixed(cbs, &dh_Yc))
-		goto decode_err;
-	if (CBS_len(cbs) != 0)
-		goto decode_err;
-
-	if (S3I(s)->tmp.dh == NULL) {
-		al = SSL_AD_HANDSHAKE_FAILURE;
+	if ((dh_srvr = S3I(s)->tmp.dh) == NULL) {
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
 		SSLerror(s, SSL_R_MISSING_TMP_DH_KEY);
-		goto fatal_err;
-	}
-	dh = S3I(s)->tmp.dh;
-
-	if ((bn = BN_bin2bn(CBS_data(&dh_Yc), CBS_len(&dh_Yc), NULL)) == NULL) {
-		SSLerror(s, SSL_R_BN_LIB);
 		goto err;
 	}
 
-	if ((key_size = DH_size(dh)) <= 0) {
-		SSLerror(s, ERR_R_DH_LIB);
+	if ((dh_clnt = DHparams_dup(dh_srvr)) == NULL)
+		goto err;
+
+	if (!ssl_kex_peer_public_dhe(dh_clnt, cbs, &invalid_key)) {
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
+		SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
 		goto err;
 	}
-	if ((key = malloc(key_size)) == NULL) {
-		SSLerror(s, ERR_R_MALLOC_FAILURE);
+	if (invalid_key) {
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
+		SSLerror(s, SSL_R_BAD_DH_PUB_KEY_LENGTH);
 		goto err;
 	}
-	if (!DH_check_pub_key(dh, bn, &key_is_invalid)) {
-		al = SSL_AD_INTERNAL_ERROR;
-		SSLerror(s, ERR_R_DH_LIB);
-		goto fatal_err;
-	}
-	if (key_is_invalid) {
-		al = SSL_AD_ILLEGAL_PARAMETER;
-		SSLerror(s, ERR_R_DH_LIB);
-		goto fatal_err;
-	}
-	if ((key_len = DH_compute_key(key, bn, dh)) <= 0) {
-		al = SSL_AD_INTERNAL_ERROR;
-		SSLerror(s, ERR_R_DH_LIB);
-		goto fatal_err;
-	}
+
+	if (!ssl_kex_derive_dhe(dh_srvr, dh_clnt, &key, &key_len))
+		goto err;
 
 	if (!tls12_derive_master_secret(s, key, key_len))
 		goto err;
@@ -1841,21 +1827,13 @@ ssl3_get_client_kex_dhe(SSL *s, CBS *cbs)
 	DH_free(S3I(s)->tmp.dh);
 	S3I(s)->tmp.dh = NULL;
 
-	freezero(key, key_size);
-	BN_clear_free(bn);
+	ret = 1;
 
-	return (1);
-
- decode_err:
-	al = SSL_AD_DECODE_ERROR;
-	SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
- fatal_err:
-	ssl3_send_alert(s, SSL3_AL_FATAL, al);
  err:
-	freezero(key, key_size);
-	BN_clear_free(bn);
+	freezero(key, key_len);
+	DH_free(dh_clnt);
 
-	return (-1);
+	return ret;
 }
 
 static int
@@ -2084,14 +2062,12 @@ ssl3_get_cert_verify(SSL *s)
 	uint16_t sigalg_value = SIGALG_NONE;
 	EVP_PKEY *pkey = NULL;
 	X509 *peer = NULL;
-	EVP_MD_CTX mctx;
+	EVP_MD_CTX *mctx = NULL;
 	int al, verify;
 	const unsigned char *hdata;
 	size_t hdatalen;
 	int type = 0;
 	int ret;
-
-	EVP_MD_CTX_init(&mctx);
 
 	if ((ret = ssl3_get_message(s, SSL3_ST_SR_CERT_VRFY_A,
 	    SSL3_ST_SR_CERT_VRFY_B, -1, SSL3_RT_MAX_PLAIN_LENGTH)) <= 0)
@@ -2100,6 +2076,9 @@ ssl3_get_cert_verify(SSL *s)
 	ret = 0;
 
 	if (s->internal->init_num < 0)
+		goto err;
+
+	if ((mctx = EVP_MD_CTX_new()) == NULL)
 		goto err;
 
 	CBS_init(&cbs, s->internal->init_msg, s->internal->init_num);
@@ -2172,7 +2151,7 @@ ssl3_get_cert_verify(SSL *s)
 			al = SSL_AD_INTERNAL_ERROR;
 			goto fatal_err;
 		}
-		if (!EVP_DigestVerifyInit(&mctx, &pctx, sigalg->md(),
+		if (!EVP_DigestVerifyInit(mctx, &pctx, sigalg->md(),
 		    NULL, pkey)) {
 			SSLerror(s, ERR_R_EVP_LIB);
 			al = SSL_AD_INTERNAL_ERROR;
@@ -2192,12 +2171,12 @@ ssl3_get_cert_verify(SSL *s)
 			al = SSL_AD_INTERNAL_ERROR;
 			goto fatal_err;
 		}
-		if (!EVP_DigestVerifyUpdate(&mctx, hdata, hdatalen)) {
+		if (!EVP_DigestVerifyUpdate(mctx, hdata, hdatalen)) {
 			SSLerror(s, ERR_R_EVP_LIB);
 			al = SSL_AD_INTERNAL_ERROR;
 			goto fatal_err;
 		}
-		if (EVP_DigestVerifyFinal(&mctx, CBS_data(&signature),
+		if (EVP_DigestVerifyFinal(mctx, CBS_data(&signature),
 		    CBS_len(&signature)) <= 0) {
 			al = SSL_AD_DECRYPT_ERROR;
 			SSLerror(s, SSL_R_BAD_SIGNATURE);
@@ -2266,9 +2245,9 @@ ssl3_get_cert_verify(SSL *s)
 			al = SSL_AD_INTERNAL_ERROR;
 			goto fatal_err;
 		}
-		if (!EVP_DigestInit_ex(&mctx, md, NULL) ||
-		    !EVP_DigestUpdate(&mctx, hdata, hdatalen) ||
-		    !EVP_DigestFinal(&mctx, sigbuf, &siglen) ||
+		if (!EVP_DigestInit_ex(mctx, md, NULL) ||
+		    !EVP_DigestUpdate(mctx, hdata, hdatalen) ||
+		    !EVP_DigestFinal(mctx, sigbuf, &siglen) ||
 		    (EVP_PKEY_verify_init(pctx) <= 0) ||
 		    (EVP_PKEY_CTX_set_signature_md(pctx, md) <= 0) ||
 		    (EVP_PKEY_CTX_ctrl(pctx, -1, EVP_PKEY_OP_VERIFY,
@@ -2306,7 +2285,7 @@ ssl3_get_cert_verify(SSL *s)
  end:
 	tls1_transcript_free(s);
  err:
-	EVP_MD_CTX_cleanup(&mctx);
+	EVP_MD_CTX_free(mctx);
 	EVP_PKEY_free(pkey);
 	return (ret);
 }
@@ -2507,18 +2486,20 @@ ssl3_send_newsession_ticket(SSL *s)
 	unsigned char key_name[16];
 	unsigned char *hmac;
 	unsigned int hlen;
-	EVP_CIPHER_CTX ctx;
-	HMAC_CTX hctx;
+	EVP_CIPHER_CTX *ctx = NULL;
+	HMAC_CTX *hctx = NULL;
 	int len;
 
 	/*
 	 * New Session Ticket - RFC 5077, section 3.3.
 	 */
 
-	EVP_CIPHER_CTX_init(&ctx);
-	HMAC_CTX_init(&hctx);
-
 	memset(&cbb, 0, sizeof(cbb));
+
+	if ((ctx = EVP_CIPHER_CTX_new()) == NULL)
+		goto err;
+	if ((hctx = HMAC_CTX_new()) == NULL)
+		goto err;
 
 	if (S3I(s)->hs.state == SSL3_ST_SW_SESSION_TICKET_A) {
 		if (!ssl3_handshake_msg_start(s, &cbb, &session_ticket,
@@ -2537,15 +2518,13 @@ ssl3_send_newsession_ticket(SSL *s)
 		 */
 		if (tctx->internal->tlsext_ticket_key_cb != NULL) {
 			if (tctx->internal->tlsext_ticket_key_cb(s,
-			    key_name, iv, &ctx, &hctx, 1) < 0) {
-				EVP_CIPHER_CTX_cleanup(&ctx);
+			    key_name, iv, ctx, hctx, 1) < 0)
 				goto err;
-			}
 		} else {
 			arc4random_buf(iv, 16);
-			EVP_EncryptInit_ex(&ctx, EVP_aes_128_cbc(), NULL,
+			EVP_EncryptInit_ex(ctx, EVP_aes_128_cbc(), NULL,
 			    tctx->internal->tlsext_tick_aes_key, iv);
-			HMAC_Init_ex(&hctx, tctx->internal->tlsext_tick_hmac_key,
+			HMAC_Init_ex(hctx, tctx->internal->tlsext_tick_hmac_key,
 			    16, EVP_sha256(), NULL);
 			memcpy(key_name, tctx->internal->tlsext_tick_key_name, 16);
 		}
@@ -2555,11 +2534,11 @@ ssl3_send_newsession_ticket(SSL *s)
 		if ((enc_session = calloc(1, enc_session_max_len)) == NULL)
 			goto err;
 		enc_session_len = 0;
-		if (!EVP_EncryptUpdate(&ctx, enc_session, &len, session,
+		if (!EVP_EncryptUpdate(ctx, enc_session, &len, session,
 		    session_len))
 			goto err;
 		enc_session_len += len;
-		if (!EVP_EncryptFinal_ex(&ctx, enc_session + enc_session_len,
+		if (!EVP_EncryptFinal_ex(ctx, enc_session + enc_session_len,
 		    &len))
 			goto err;
 		enc_session_len += len;
@@ -2568,14 +2547,14 @@ ssl3_send_newsession_ticket(SSL *s)
 			goto err;
 
 		/* Generate the HMAC. */
-		if (!HMAC_Update(&hctx, key_name, sizeof(key_name)))
+		if (!HMAC_Update(hctx, key_name, sizeof(key_name)))
 			goto err;
-		if (!HMAC_Update(&hctx, iv, EVP_CIPHER_CTX_iv_length(&ctx)))
+		if (!HMAC_Update(hctx, iv, EVP_CIPHER_CTX_iv_length(ctx)))
 			goto err;
-		if (!HMAC_Update(&hctx, enc_session, enc_session_len))
+		if (!HMAC_Update(hctx, enc_session, enc_session_len))
 			goto err;
 
-		if ((hmac_len = HMAC_size(&hctx)) <= 0)
+		if ((hmac_len = HMAC_size(hctx)) <= 0)
 			goto err;
 
 		/*
@@ -2592,14 +2571,14 @@ ssl3_send_newsession_ticket(SSL *s)
 			goto err;
 		if (!CBB_add_bytes(&ticket, key_name, sizeof(key_name)))
 			goto err;
-		if (!CBB_add_bytes(&ticket, iv, EVP_CIPHER_CTX_iv_length(&ctx)))
+		if (!CBB_add_bytes(&ticket, iv, EVP_CIPHER_CTX_iv_length(ctx)))
 			goto err;
 		if (!CBB_add_bytes(&ticket, enc_session, enc_session_len))
 			goto err;
 		if (!CBB_add_space(&ticket, &hmac, hmac_len))
 			goto err;
 
-		if (!HMAC_Final(&hctx, hmac, &hlen))
+		if (!HMAC_Final(hctx, hmac, &hlen))
 			goto err;
 		if (hlen != hmac_len)
 			goto err;
@@ -2610,8 +2589,8 @@ ssl3_send_newsession_ticket(SSL *s)
 		S3I(s)->hs.state = SSL3_ST_SW_SESSION_TICKET_B;
 	}
 
-	EVP_CIPHER_CTX_cleanup(&ctx);
-	HMAC_CTX_cleanup(&hctx);
+	EVP_CIPHER_CTX_free(ctx);
+	HMAC_CTX_free(hctx);
 	freezero(session, session_len);
 	free(enc_session);
 
@@ -2620,8 +2599,8 @@ ssl3_send_newsession_ticket(SSL *s)
 
  err:
 	CBB_cleanup(&cbb);
-	EVP_CIPHER_CTX_cleanup(&ctx);
-	HMAC_CTX_cleanup(&hctx);
+	EVP_CIPHER_CTX_free(ctx);
+	HMAC_CTX_free(hctx);
 	freezero(session, session_len);
 	free(enc_session);
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmm.c,v 1.296 2021/11/29 15:55:36 dv Exp $	*/
+/*	$OpenBSD: vmm.c,v 1.300 2022/01/02 05:00:28 jsg Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -1004,8 +1004,10 @@ vmx_mprotect_ept(vm_map_t vm_map, paddr_t sgpa, paddr_t egpa, int prot)
 				    __func__, ret, (uint64_t)addr);
 
 			pte = vmx_pmap_find_pte_ept(pmap, addr);
-			if (pte == NULL)
+			if (pte == NULL) {
+				KERNEL_UNLOCK();
 				return EFAULT;
+			}
 		}
 
 		if (prot & PROT_READ)
@@ -1455,7 +1457,7 @@ vm_create_check_mem_ranges(struct vm_create_params *vcp)
 			return (0);
 
 		/*
-		 * Make sure that guest physcal memory ranges do not overlap
+		 * Make sure that guest physical memory ranges do not overlap
 		 * and that they are ascending.
 		 */
 		if (i > 0 && pvmr->vmr_gpa + pvmr->vmr_size > vmr->vmr_gpa)
@@ -3028,12 +3030,22 @@ vcpu_reset_regs_vmx(struct vcpu *vcpu, struct vcpu_reg_state *vrs)
 	    IA32_VMX_ACTIVATE_SECONDARY_CONTROLS, 1)) {
 		if (vcpu_vmx_check_cap(vcpu, IA32_VMX_PROCBASED2_CTLS,
 		    IA32_VMX_ENABLE_VPID, 1)) {
-			if (vmm_alloc_vpid(&vpid)) {
+
+			/* We may sleep during allocation, so reload VMCS. */
+			vcpu->vc_last_pcpu = curcpu();
+			ret = vmm_alloc_vpid(&vpid);
+			if (vcpu_reload_vmcs_vmx(vcpu)) {
+				printf("%s: failed to reload vmcs\n", __func__);
+				ret = EINVAL;
+				goto exit;
+			}
+			if (ret) {
 				DPRINTF("%s: could not allocate VPID\n",
 				    __func__);
 				ret = EINVAL;
 				goto exit;
 			}
+
 			if (vmwrite(VMCS_GUEST_VPID, vpid)) {
 				DPRINTF("%s: error setting guest VPID\n",
 				    __func__);
@@ -4076,11 +4088,11 @@ vcpu_vmx_compute_ctrl(uint64_t ctrlval, uint16_t ctrl, uint32_t want1,
  * after allocating a sufficiently large buffer.
  *
  * Parameters:
- *  vip: information structure identifying the VM to queery
+ *  vip: information structure identifying the VM to query
  *
  * Return values:
  *  0: the operation succeeded
- *  ENOMEM: memory allocation error during processng
+ *  ENOMEM: memory allocation error during processing
  *  EFAULT: error copying data to user process
  */
 int
@@ -4694,7 +4706,7 @@ vcpu_run_vmx(struct vcpu *vcpu, struct vm_run_params *vrp)
 			return (EINVAL);
 		}
 
-		/* Interruptbility state 0x3 covers NMIs and STI */
+		/* Interruptibility state 0x3 covers NMIs and STI */
 		if (!(int_st & 0x3) && vcpu->vc_irqready) {
 			eii = (irq & 0xFF);
 			eii |= (1ULL << 31);	/* Valid */
@@ -5294,7 +5306,7 @@ vmx_handle_exit(struct vcpu *vcpu)
 			return (EINVAL);
 		}
 
-		/* Interruptibilty state 0x3 covers NMIs and STI */
+		/* Interruptibility state 0x3 covers NMIs and STI */
 		istate &= ~0x3;
 
 		if (vmwrite(VMCS_GUEST_INTERRUPTIBILITY_ST,
@@ -5549,7 +5561,7 @@ svm_handle_np_fault(struct vcpu *vcpu)
  *
  * Return Values:
  *  0: if successful
- *  EINVAL: if fault type could not be determined
+ *  EINVAL: if fault type could not be determined or VMCS reload fails
  *  EAGAIN: if a protection fault occurred, ie writing to a read-only page
  *  errno: if uvm_fault(9) fails to wire in the page
  */
@@ -5569,10 +5581,14 @@ vmx_fault_page(struct vcpu *vcpu, paddr_t gpa)
 		return (EAGAIN);
 	}
 
-	KERNEL_LOCK();
+	/* We may sleep during uvm_fault(9), so reload VMCS. */
+	vcpu->vc_last_pcpu = curcpu();
 	ret = uvm_fault(vcpu->vc_parent->vm_map, gpa, VM_FAULT_WIRE,
 	    PROT_READ | PROT_WRITE | PROT_EXEC);
-	KERNEL_UNLOCK();
+	if (vcpu_reload_vmcs_vmx(vcpu)) {
+		printf("%s: failed to reload vmcs\n", __func__);
+		return (EINVAL);
+	}
 
 	if (ret)
 		printf("%s: uvm_fault returns %d, GPA=0x%llx, rip=0x%llx\n",
@@ -5962,7 +5978,16 @@ vmx_load_pdptes(struct vcpu *vcpu)
 
 	ret = 0;
 
-	cr3_host_virt = (vaddr_t)km_alloc(PAGE_SIZE, &kv_any, &kp_none, &kd_waitok);
+	/* We may sleep during km_alloc(9), so reload VMCS. */
+	vcpu->vc_last_pcpu = curcpu();
+	cr3_host_virt = (vaddr_t)km_alloc(PAGE_SIZE, &kv_any, &kp_none,
+	    &kd_waitok);
+	if (vcpu_reload_vmcs_vmx(vcpu)) {
+		printf("%s: failed to reload vmcs\n", __func__);
+		ret = EINVAL;
+		goto exit;
+	}
+
 	if (!cr3_host_virt) {
 		printf("%s: can't allocate address for guest CR3 mapping\n",
 		    __func__);
@@ -5998,7 +6023,15 @@ vmx_load_pdptes(struct vcpu *vcpu)
 
 exit:
 	pmap_kremove(cr3_host_virt, PAGE_SIZE);
+
+	/* km_free(9) might sleep, so we need to reload VMCS. */
+	vcpu->vc_last_pcpu = curcpu();
 	km_free((void *)cr3_host_virt, PAGE_SIZE, &kv_any, &kp_none);
+	if (vcpu_reload_vmcs_vmx(vcpu)) {
+		printf("%s: failed to reload vmcs after km_free\n", __func__);
+		ret = EINVAL;
+	}
+
 	return (ret);
 }
 
@@ -6626,7 +6659,7 @@ svm_handle_msr(struct vcpu *vcpu)
 			*rdx = (vcpu->vc_shadow_pat >> 32);
 			break;
 		case MSR_DE_CFG:
-			/* LFENCE seralizing bit is set by host */
+			/* LFENCE serializing bit is set by host */
 			*rax = DE_CFG_SERIALIZE_LFENCE;
 			*rdx = 0;
 			break;
@@ -6663,10 +6696,16 @@ int
 vmm_handle_cpuid(struct vcpu *vcpu)
 {
 	uint64_t insn_length, cr4;
-	uint64_t *rax, *rbx, *rcx, *rdx, cpuid_limit;
+	uint64_t *rax, *rbx, *rcx, *rdx;
 	struct vmcb *vmcb;
 	uint32_t eax, ebx, ecx, edx;
 	struct vmx_msr_store *msr_store;
+	int vmm_cpuid_level;
+
+	/* what's the cpuid level we support/advertise? */
+	vmm_cpuid_level = cpuid_level;
+	if (vmm_cpuid_level < 0x15 && tsc_is_invariant)
+		vmm_cpuid_level = 0x15;
 
 	if (vmm_softc->mode == VMM_MODE_VMX ||
 	    vmm_softc->mode == VMM_MODE_EPT) {
@@ -6682,10 +6721,17 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 		}
 
 		rax = &vcpu->vc_gueststate.vg_rax;
+
+		/*
+		 * "CPUID leaves above 02H and below 80000000H are only
+		 * visible when IA32_MISC_ENABLE MSR has bit 22 set to its
+		 * default value 0"
+		 */
 		msr_store =
 		    (struct vmx_msr_store *)vcpu->vc_vmx_msr_exit_save_va;
-		cpuid_limit = msr_store[VCPU_REGS_MISC_ENABLE].vms_data &
-		    MISC_ENABLE_LIMIT_CPUID_MAXVAL;
+		if (msr_store[VCPU_REGS_MISC_ENABLE].vms_data &
+		    MISC_ENABLE_LIMIT_CPUID_MAXVAL)
+			vmm_cpuid_level = 0x02;
 	} else {
 		/* XXX: validate insn_length 2 */
 		insn_length = 2;
@@ -6704,45 +6750,29 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 	 *  value for basic or extended function for that processor then the
 	 *  data for the highest basic information leaf is returned."
 	 *
-	 * This means if rax is between cpuid_level and 0x40000000 (the start
-	 * of the hypervisor info leaves), clamp to cpuid_level. Also, if
-	 * rax is greater than the extended function info, clamp also to
-	 * cpuid_level.
+	 * "When CPUID returns the highest basic leaf information as a result
+	 *  of an invalid input EAX value, any dependence on input ECX value
+	 *  in the basic leaf is honored."
 	 *
-	 * Note that %rax may be overwritten here - that's ok since we are
-	 * going to reassign it a new value (based on the input parameter)
-	 * later anyway.
+	 * This means if rax is between vmm_cpuid_level and 0x40000000 (the start
+	 * of the hypervisor info leaves), clamp to vmm_cpuid_level, but without
+	 * altering subleaf.  Also, if rax is greater than the extended function
+	 * info, clamp also to vmm_cpuid_level.
 	 */
-	if ((*rax > cpuid_level && *rax < 0x40000000) ||
+	if ((*rax > vmm_cpuid_level && *rax < 0x40000000) ||
 	    (*rax > curcpu()->ci_pnfeatset)) {
 		DPRINTF("%s: invalid cpuid input leaf 0x%llx, guest rip="
 		    "0x%llx - resetting to 0x%x\n", __func__, *rax,
 		    vcpu->vc_gueststate.vg_rip - insn_length,
-		    cpuid_level);
-		*rax = cpuid_level;
-	}
-
-	/*
-	 * "CPUID leaves above 02H and below 80000000H are only visible when
-	 * IA32_MISC_ENABLE MSR has bit 22 set to its default value 0"
-	 */
-	if ((vmm_softc->mode == VMM_MODE_VMX || vmm_softc->mode == VMM_MODE_EPT)
-	    && cpuid_limit && (*rax > 0x02 && *rax < 0x80000000)) {
-		*rax = 0;
-		*rbx = 0;
-		*rcx = 0;
-		*rdx = 0;
-		return (0);
+		    vmm_cpuid_level);
+		*rax = vmm_cpuid_level;
 	}
 
 	CPUID_LEAF(*rax, 0, eax, ebx, ecx, edx);
 
 	switch (*rax) {
 	case 0x00:	/* Max level and vendor ID */
-		if (cpuid_level < 0x15 && tsc_is_invariant)
-			*rax = 0x15;
-		else
-			*rax = cpuid_level;
+		*rax = vmm_cpuid_level;
 		*rbx = *((uint32_t *)&cpu_vendor);
 		*rdx = *((uint32_t *)&cpu_vendor + 1);
 		*rcx = *((uint32_t *)&cpu_vendor + 2);
@@ -6883,16 +6913,15 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 		break;
 	case 0x15:
 		if (cpuid_level >= 0x15) {
-			CPUID(0x15, *rax, *rbx, *rcx, *rdx);
-		} else if (tsc_is_invariant) {
+			*rax = eax;
+			*rbx = ebx;
+			*rcx = ecx;
+			*rdx = edx;
+		} else {
+			KASSERT(tsc_is_invariant);
 			*rax = 1;
 			*rbx = 100;
 			*rcx = tsc_frequency / 100;
-			*rdx = 0;
-		} else {
-			*rax = 0;
-			*rbx = 0;
-			*rcx = 0;
 			*rdx = 0;
 		}
 		break;

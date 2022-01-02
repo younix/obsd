@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_event.c,v 1.174 2021/11/29 15:54:04 visa Exp $	*/
+/*	$OpenBSD: kern_event.c,v 1.178 2021/12/25 11:04:58 visa Exp $	*/
 
 /*-
  * Copyright (c) 1999,2000,2001 Jonathan Lemon <jlemon@FreeBSD.org>
@@ -55,6 +55,7 @@
 #include <sys/syscallargs.h>
 #include <sys/time.h>
 #include <sys/timeout.h>
+#include <sys/vnode.h>
 #include <sys/wait.h>
 
 #ifdef DIAGNOSTIC
@@ -584,14 +585,18 @@ int
 filt_seltruemodify(struct kevent *kev, struct knote *kn)
 {
 	knote_modify(kev, kn);
-	return (1);
+	return (kn->kn_fop->f_event(kn, 0));
 }
 
 int
 filt_seltrueprocess(struct knote *kn, struct kevent *kev)
 {
-	knote_submit(kn, kev);
-	return (1);
+	int active;
+
+	active = kn->kn_fop->f_event(kn, 0);
+	if (active)
+		knote_submit(kn, kev);
+	return (active);
 }
 
 /*
@@ -632,6 +637,17 @@ seltrue_kqfilter(dev_t dev, struct knote *kn)
 static int
 filt_dead(struct knote *kn, long hint)
 {
+	if (kn->kn_filter == EVFILT_EXCEPT) {
+		/*
+		 * Do not deliver event because there is no out-of-band data.
+		 * However, let HUP condition pass for poll(2).
+		 */
+		if ((kn->kn_flags & __EV_POLL) == 0) {
+			kn->kn_flags |= EV_DISABLE;
+			return (0);
+		}
+	}
+
 	kn->kn_flags |= (EV_EOF | EV_ONESHOT);
 	if (kn->kn_flags & __EV_POLL)
 		kn->kn_flags |= __EV_HUP;
@@ -1366,6 +1382,36 @@ retry:
 			continue;
 		}
 
+		/*
+		 * Invalidate knotes whose vnodes have been revoked.
+		 * This is a workaround; it is tricky to clear existing
+		 * knotes and prevent new ones from being registered
+		 * with the current revocation mechanism.
+		 */
+		if ((kn->kn_fop->f_flags & FILTEROP_ISFD) &&
+		    kn->kn_fp != NULL &&
+		    kn->kn_fp->f_type == DTYPE_VNODE) {
+			struct vnode *vp = kn->kn_fp->f_data;
+
+			if (__predict_false(vp->v_op == &dead_vops &&
+			    kn->kn_fop != &dead_filtops)) {
+				filter_detach(kn);
+				kn->kn_fop = &dead_filtops;
+
+				/*
+				 * Check if the event should be delivered.
+				 * Use f_event directly because this is
+				 * a special situation.
+				 */
+				if (kn->kn_fop->f_event(kn, 0) == 0) {
+					filter_detach(kn);
+					knote_drop(kn, p);
+					mtx_enter(&kq->kq_lock);
+					continue;
+				}
+			}
+		}
+
 		memset(kevp, 0, sizeof(*kevp));
 		if (filter_process(kn, kevp) == 0) {
 			mtx_enter(&kq->kq_lock);
@@ -1779,7 +1825,7 @@ knote_remove(struct proc *p, struct kqueue *kq, struct knlist *list, int purge)
 		 * This reuses the original knote for delivering the
 		 * notification so as to avoid allocating memory.
 		 */
-		if (!purge && (kn->kn_flags & __EV_POLL) &&
+		if (!purge && (kn->kn_flags & (__EV_POLL | __EV_SELECT)) &&
 		    !(p->p_kq == kq &&
 		      p->p_kq_serial > (unsigned long)kn->kn_udata) &&
 		    kn->kn_fop != &badfd_filtops) {

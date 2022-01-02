@@ -1,5 +1,4 @@
 D/tmp////
-/.lldb-loggings/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /.lldb-pre-post-flight/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /.lldb-pre-post-flight.bad/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /.lldbtest-config/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
@@ -7,5 +6,6 @@ D/tmp////
 /lldbtest-stderr/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /lldbtest-stdout/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /usage-config/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
-/usage-lldb-loggings/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /usage-pre-post-flight/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
+/.lldb-loggings/1.1.1.2/Sun Jan  2 13:09:52 2022/-ko/
+/usage-lldb-loggings/1.1.1.2/Sun Jan  2 13:09:52 2022/-ko/

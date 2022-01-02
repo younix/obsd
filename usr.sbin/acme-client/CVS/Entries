@@ -1,7 +1,6 @@
 /Makefile/1.9/Wed Jun 12 11:09:25 2019//
 /base64.c/1.9/Tue Jan 24 13:32:55 2017//
 /dbg.c/1.4/Tue Sep 13 17:13:37 2016//
-/dnsproc.c/1.11/Sun May 10 15:06:07 2020//
 /http.h/1.8/Fri Jun  7 08:07:52 2019//
 /jsmn.c/1.1/Wed Aug 31 22:01:42 2016//
 /jsmn.h/1.1/Wed Aug 31 22:01:42 2016//
@@ -23,4 +22,5 @@
 /acctproc.c/1.22/Sun Nov 21 20:15:22 2021//
 /key.c/1.3/Sun Nov 21 20:15:22 2021//
 /revokeproc.c/1.19/Thu Dec  2 13:56:33 2021//
+/dnsproc.c/1.12/Sun Jan  2 13:11:13 2022//
 D

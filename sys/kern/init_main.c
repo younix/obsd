@@ -1,4 +1,4 @@
-/*	$OpenBSD: init_main.c,v 1.308 2021/06/30 12:21:02 bluhm Exp $	*/
+/*	$OpenBSD: init_main.c,v 1.314 2022/01/01 07:00:57 jsg Exp $	*/
 /*	$NetBSD: init_main.c,v 1.84.4.1 1996/06/02 09:08:06 mrg Exp $	*/
 
 /*
@@ -115,7 +115,7 @@ extern void stoeplitz_init(void);
 const char	copyright[] =
 "Copyright (c) 1982, 1986, 1989, 1991, 1993\n"
 "\tThe Regents of the University of California.  All rights reserved.\n"
-"Copyright (c) 1995-2021 OpenBSD. All rights reserved.  https://www.OpenBSD.org\n";
+"Copyright (c) 1995-2022 OpenBSD. All rights reserved.  https://www.OpenBSD.org\n";
 
 /* Components of the first process -- never freed. */
 struct	session session0;
@@ -153,32 +153,6 @@ void	taskq_init(void);
 void	timeout_proc_init(void);
 void	pool_gc_pages(void *);
 void	percpu_init(void);
-
-extern char sigcode[], esigcode[], sigcoderet[];
-#ifdef SYSCALL_DEBUG
-extern char *syscallnames[];
-#endif
-
-struct emul emul_native = {
-	"native",
-	NULL,
-	SYS_syscall,
-	SYS_MAXSYSCALL,
-	sysent,
-#ifdef SYSCALL_DEBUG
-	syscallnames,
-#else
-	NULL,
-#endif
-	0,
-	copyargs,
-	setregs,
-	NULL,		/* fixup */
-	NULL,		/* coredump */
-	sigcode,
-	esigcode,
-	sigcoderet
-};
 
 #ifdef DIAGNOSTIC
 int pdevinit_done = 0;
@@ -317,7 +291,6 @@ main(void *framep)
 	atomic_setbits_int(&p->p_flag, P_SYSTEM);
 	p->p_stat = SONPROC;
 	pr->ps_nice = NZERO;
-	pr->ps_emul = &emul_native;
 	strlcpy(pr->ps_comm, "swapper", sizeof(pr->ps_comm));
 
 	/* Init timeouts. */
@@ -436,7 +409,7 @@ main(void *framep)
 	kqueue_init_percpu();
 	uvm_init_percpu();
 
-	/* init exec and emul */
+	/* init exec */
 	init_exec();
 
 	/* Start the scheduler */

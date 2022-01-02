@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_lib.c,v 1.18 2021/10/24 13:51:07 tb Exp $ */
+/* $OpenBSD: evp_lib.c,v 1.21 2021/12/24 12:55:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -62,6 +62,8 @@
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
+
+#include "evp_locl.h"
 
 int
 EVP_CIPHER_param_to_asn1(EVP_CIPHER_CTX *c, ASN1_TYPE *type)
@@ -237,6 +239,23 @@ EVP_CIPHER_CTX_set_app_data(EVP_CIPHER_CTX *ctx, void *data)
 	ctx->app_data = data;
 }
 
+void *
+EVP_CIPHER_CTX_get_cipher_data(const EVP_CIPHER_CTX *ctx)
+{
+	return ctx->cipher_data;
+}
+
+void *
+EVP_CIPHER_CTX_set_cipher_data(EVP_CIPHER_CTX *ctx, void *cipher_data)
+{
+	void *old_cipher_data;
+
+	old_cipher_data = ctx->cipher_data;
+	ctx->cipher_data = cipher_data;
+
+	return old_cipher_data;
+}
+
 int
 EVP_CIPHER_iv_length(const EVP_CIPHER *cipher)
 {
@@ -247,6 +266,12 @@ int
 EVP_CIPHER_CTX_iv_length(const EVP_CIPHER_CTX *ctx)
 {
 	return ctx->cipher->iv_len;
+}
+
+unsigned char *
+EVP_CIPHER_CTX_buf_noconst(EVP_CIPHER_CTX *ctx)
+{
+	return ctx->buf;
 }
 
 int

@@ -1,4 +1,4 @@
-/* $OpenBSD: bn.h,v 1.44 2021/11/18 18:01:08 tb Exp $ */
+/* $OpenBSD: bn.h,v 1.50 2021/12/04 16:11:10 tb Exp $ */
 /* Copyright (C) 1995-1997 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -228,8 +228,14 @@ extern "C" {
 #ifndef OPENSSL_NO_DEPRECATED
 #define BN_FLG_FREE		0x8000	/* used for debugging */
 #endif
+#if defined(LIBRESSL_OPAQUE_BN) || defined(LIBRESSL_CRYPTO_INTERNAL)
+void BN_set_flags(BIGNUM *b, int n);
+int BN_get_flags(const BIGNUM *b, int n);
+void BN_with_flags(BIGNUM *dest, const BIGNUM *src, int flags);
+#else
 #define BN_set_flags(b,n)	((b)->flags|=(n))
 #define BN_get_flags(b,n)	((b)->flags&(n))
+#endif
 
 /* Values for |top| in BN_rand() */
 #define BN_RAND_TOP_ANY    -1
@@ -240,6 +246,7 @@ extern "C" {
 #define BN_RAND_BOTTOM_ANY  0
 #define BN_RAND_BOTTOM_ODD  1
 
+#if !defined(LIBRESSL_OPAQUE_BN) && !defined(LIBRESSL_CRYPTO_INTERNAL)
 /* get a clone of a BIGNUM with changed flags, for *temporary* use only
  * (the two BIGNUMs cannot not be used in parallel!) */
 #define BN_with_flags(dest,b,n)  ((dest)->d=(b)->d, \
@@ -250,7 +257,9 @@ extern "C" {
                                                  |  ((b)->flags & ~BN_FLG_MALLOCED) \
                                                  |  BN_FLG_STATIC_DATA \
                                                  |  (n)))
+#endif
 
+/* Move to bn_lcl.h */
 struct bignum_st {
 	BN_ULONG *d;	/* Pointer to an array of 'BN_BITS2' bit chunks. */
 	int top;	/* Index of last used d +1. */
@@ -260,6 +269,7 @@ struct bignum_st {
 	int flags;
 };
 
+/* Move to bn_lcl.h */
 /* Used for montgomery multiplication */
 struct bn_mont_ctx_st {
 	int ri;        /* number of bits in R */
@@ -272,6 +282,7 @@ struct bn_mont_ctx_st {
 	int flags;
 };
 
+/* Move to bn_lcl.h */
 /* Used for reciprocal division/mod functions
  * It cannot be shared between threads
  */
@@ -283,6 +294,7 @@ struct bn_recp_ctx_st {
 	int flags;
 };
 
+/* Move to bn_lcl.h */
 /* Used for slow "generation" functions. */
 struct bn_gencb_st {
 	unsigned int ver;	/* To handle binary (in)compatibility */
@@ -297,10 +309,19 @@ struct bn_gencb_st {
 
 BN_GENCB *BN_GENCB_new(void);
 void BN_GENCB_free(BN_GENCB *cb);
-void *BN_GENCB_get_arg(BN_GENCB *cb);
 
 /* Wrapper function to make using BN_GENCB easier,  */
 int BN_GENCB_call(BN_GENCB *cb, int a, int b);
+
+#if defined(LIBRESSL_OPAQUE_BN) || defined(LIBRESSL_CRYPTO_INTERNAL)
+/* Populate a BN_GENCB structure with an "old"-style callback */
+void BN_GENCB_set_old(BN_GENCB *gencb, void (*callback)(int, int, void *),
+    void *cb_arg);
+
+/* Populate a BN_GENCB structure with a "new"-style callback */
+void BN_GENCB_set(BN_GENCB *gencb, int (*callback)(int, int, BN_GENCB *),
+    void *cb_arg);
+#else
 /* Macro to populate a BN_GENCB structure with an "old"-style callback */
 #define BN_GENCB_set_old(gencb, callback, cb_arg) { \
 		BN_GENCB *tmp_gencb = (gencb); \
@@ -313,6 +334,9 @@ int BN_GENCB_call(BN_GENCB *cb, int a, int b);
 		tmp_gencb->ver = 2; \
 		tmp_gencb->arg = (cb_arg); \
 		tmp_gencb->cb.cb_2 = (callback); }
+#endif /* !LIBRESSL_CRYPTO_INTERNAL */
+
+void *BN_GENCB_get_arg(BN_GENCB *cb);
 
 #define BN_prime_checks 0 /* default: select number of iterations
 			     based on the size of the number */
@@ -389,10 +413,21 @@ int BN_GENCB_call(BN_GENCB *cb, int a, int b);
 				(b) >=  308 ?  8 : \
 				(b) >=  55  ? 27 : \
 				/* b >= 6 */ 34)
- 
+
 #define BN_num_bytes(a)	((BN_num_bits(a)+7)/8)
 
-/* Note that BN_abs_is_word didn't work reliably for w == 0 until 0.9.8 */
+#if defined(LIBRESSL_OPAQUE_BN) || defined(LIBRESSL_CRYPTO_INTERNAL)
+int BN_abs_is_word(const BIGNUM *a, const BN_ULONG w);
+int BN_is_zero(const BIGNUM *a);
+int BN_is_one(const BIGNUM *a);
+int BN_is_word(const BIGNUM *a, const BN_ULONG w);
+int BN_is_odd(const BIGNUM *a);
+
+#define BN_one(a)	BN_set_word((a), 1)
+
+void BN_zero_ex(BIGNUM *a);
+
+#else
 #define BN_abs_is_word(a,w) ((((a)->top == 1) && ((a)->d[0] == (BN_ULONG)(w))) || \
 				(((w) == 0) && ((a)->top == 0)))
 #define BN_is_zero(a)       ((a)->top == 0)
@@ -407,6 +442,7 @@ int BN_GENCB_call(BN_GENCB *cb, int a, int b);
 		_tmp_bn->top = 0; \
 		_tmp_bn->neg = 0; \
 	} while(0)
+#endif /* LIBRESSL_OPAQUE_BN */
 
 #ifdef OPENSSL_NO_DEPRECATED
 #define BN_zero(a)	BN_zero_ex(a)
@@ -453,11 +489,16 @@ int	BN_sqr(BIGNUM *r, const BIGNUM *a, BN_CTX *ctx);
  * \param  n  0 if the BIGNUM b should be positive and a value != 0 otherwise
  */
 void	BN_set_negative(BIGNUM *b, int n);
+
+#if defined(LIBRESSL_OPAQUE_BN) || defined(LIBRESSL_CRYPTO_INTERNAL)
+int BN_is_negative(const BIGNUM *b);
+#else
 /** BN_is_negative returns 1 if the BIGNUM is negative
  * \param  a  pointer to the BIGNUM object
  * \return 1 if a < 0 and 0 otherwise
  */
 #define BN_is_negative(a) ((a)->neg != 0)
+#endif
 
 #ifndef LIBRESSL_INTERNAL
 int	BN_div(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, const BIGNUM *d,
@@ -572,8 +613,13 @@ BN_MONT_CTX *BN_MONT_CTX_new(void );
 void BN_MONT_CTX_init(BN_MONT_CTX *ctx);
 int BN_mod_mul_montgomery(BIGNUM *r, const BIGNUM *a, const BIGNUM *b,
     BN_MONT_CTX *mont, BN_CTX *ctx);
+#if defined(LIBRESSL_OPAQUE_BN) || defined(LIBRESSL_CRYPTO_INTERNAL)
+int BN_to_montgomery(BIGNUM *r, const BIGNUM *a, BN_MONT_CTX *mont,
+    BN_CTX *ctx);
+#else
 #define BN_to_montgomery(r,a,mont,ctx)	BN_mod_mul_montgomery(\
 	(r),(a),&((mont)->RR),(mont),(ctx))
+#endif
 int BN_from_montgomery(BIGNUM *r, const BIGNUM *a,
     BN_MONT_CTX *mont, BN_CTX *ctx);
 void BN_MONT_CTX_free(BN_MONT_CTX *mont);

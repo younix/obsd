@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ah.c,v 1.168 2021/12/02 12:39:15 bluhm Exp $ */
+/*	$OpenBSD: ip_ah.c,v 1.173 2021/12/23 22:35:11 bluhm Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -537,7 +537,7 @@ ah_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	uint32_t btsx, esn;
 	uint8_t *ptr = NULL;
 	uint8_t hl;
-	int error, rplen, clen;
+	int error, rplen;
 	uint64_t ibytes;
 #ifdef ENCDEBUG
 	char buf[INET6_ADDRSTRLEN];
@@ -608,12 +608,12 @@ ah_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	/* Update the counters. */
 	ibytes = (m->m_pkthdr.len - skip - hl * sizeof(u_int32_t));
 	tdb->tdb_cur_bytes += ibytes;
-	tdb->tdb_ibytes += ibytes;
+	tdbstat_add(tdb, tdb_ibytes, ibytes);
 	ahstat_add(ahs_ibytes, ibytes);
 
 	/* Hard expiration. */
-	if (tdb->tdb_flags & TDBF_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes) {
+	if ((tdb->tdb_flags & TDBF_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes)) {
 		ipsecstat_inc(ipsec_exctdb);
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
 		tdb_delete(tdb);
@@ -621,11 +621,15 @@ ah_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	}
 
 	/* Notify on expiration. */
-	if (tdb->tdb_flags & TDBF_SOFT_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes) {
+	mtx_enter(&tdb->tdb_mtx);
+	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking. */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 
 	/* Get crypto descriptors. */
 	crp = crypto_getreq(1);
@@ -683,21 +687,16 @@ ah_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	crp->crp_buf = (caddr_t)m;
 	crp->crp_sid = tdb->tdb_cryptoid;
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);
 		goto drop;
 	}
-
-	/* Length of data after processing */
-	clen = crp->crp_olen;
 
 	/* Release the crypto descriptors */
 	crypto_freereq(crp);
@@ -864,7 +863,7 @@ ah_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	struct cryptop *crp = NULL;
 	uint64_t replay64;
 	uint16_t iplen;
-	int error, rplen, roff, ilen, olen;
+	int error, rplen, roff;
 	uint8_t *ptr = NULL;
 	uint8_t prot;
 	struct ah *ah;
@@ -952,8 +951,8 @@ ah_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	ahstat_add(ahs_obytes, m->m_pkthdr.len - skip);
 
 	/* Hard expiration. */
-	if (tdb->tdb_flags & TDBF_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes) {
+	if ((tdb->tdb_flags & TDBF_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes)) {
 		ipsecstat_inc(ipsec_exctdb);
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
 		tdb_delete(tdb);
@@ -962,11 +961,15 @@ ah_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	}
 
 	/* Notify on expiration. */
-	if (tdb->tdb_flags & TDBF_SOFT_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes) {
+	mtx_enter(&tdb->tdb_mtx);
+	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES; /* Turn off checking */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 
 	/*
 	 * Loop through mbuf chain; if we find a readonly mbuf,
@@ -1107,21 +1110,16 @@ ah_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	crp->crp_buf = (caddr_t)m;
 	crp->crp_sid = tdb->tdb_cryptoid;
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);
 		goto drop;
 	}
-
-	ilen = crp->crp_ilen;
-	olen = crp->crp_olen;
 
 	/* Release the crypto descriptors */
 	crypto_freereq(crp);

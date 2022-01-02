@@ -1,4 +1,4 @@
-/*	$OpenBSD: trig_test.c,v 1.1 2021/10/22 18:00:23 mbuhl Exp $	*/
+/*	$OpenBSD: trig_test.c,v 1.3 2021/12/13 18:04:28 deraadt Exp $	*/
 /*-
  * Copyright (c) 2008 David Schultz <das@FreeBSD.org>
  * All rights reserved.
@@ -36,10 +36,7 @@
  * available at http://www.cs.berkeley.edu/~wkahan/testpi/ .
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include <sys/param.h>
+#include <sys/types.h>
 
 #include <fenv.h>
 #include <float.h>

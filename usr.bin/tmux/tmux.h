@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1155 2021/11/15 10:58:13 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1157 2021/12/21 13:07:53 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -668,15 +668,15 @@ struct grid_cell_entry {
 
 /* Grid line. */
 struct grid_line {
+	struct grid_cell_entry	*celldata;
 	u_int			 cellused;
 	u_int			 cellsize;
-	struct grid_cell_entry	*celldata;
 
-	u_int			 extdsize;
 	struct grid_extd_entry	*extddata;
+	u_int			 extdsize;
 
 	int			 flags;
-} __packed;
+};
 
 /* Entire grid of cells. */
 struct grid {
@@ -1311,7 +1311,7 @@ struct tty {
 #define TTY_NOCURSOR 0x1
 #define TTY_FREEZE 0x2
 #define TTY_TIMER 0x4
-/* 0x8 unused */
+#define TTY_NOBLOCK 0x8
 #define TTY_STARTED 0x10
 #define TTY_OPENED 0x20
 /* 0x40 unused */

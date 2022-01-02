@@ -1,4 +1,4 @@
-#	$OpenBSD: RAMDISK,v 1.83 2021/03/19 04:30:56 deraadt Exp $
+#	$OpenBSD: RAMDISK,v 1.85 2021/12/26 13:55:36 kettenis Exp $
 
 machine		amd64
 maxusers	4
@@ -34,6 +34,9 @@ acpipci*	at acpi?
 acpiprt*	at acpi?
 acpimadt0	at acpi?
 #acpitz*	at acpi?
+com0		at acpi? addr 0x3f8
+com1		at acpi? addr 0x2f8
+com*		at acpi?
 
 mpbios0		at bios0
 

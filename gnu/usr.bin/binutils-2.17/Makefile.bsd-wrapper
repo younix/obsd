@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile.bsd-wrapper,v 1.24 2021/11/23 10:30:08 robert Exp $
+#	$OpenBSD: Makefile.bsd-wrapper,v 1.26 2021/12/17 17:06:39 jca Exp $
 
 .include <bsd.own.mk>
 
@@ -101,6 +101,7 @@ do-config: .USE
 	sh ${.CURDIR}/configure --prefix=${PREFIX} \
 	    --infodir='$${prefix}/share/info' \
 	    --disable-nls --disable-gdbtk --disable-install-libbfd ${CF} \
+	    --disable-werror \
 	    ${CONFIGTARGET}
 	cd ${.OBJDIR} && \
 	    sed -e 's,SUBDIRS *=,SUBDIRS ?=,' <Makefile >Makefile.tmp && \

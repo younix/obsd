@@ -1,4 +1,4 @@
-# $OpenBSD: RAMDISK,v 1.161 2021/11/22 20:25:50 kettenis Exp $
+# $OpenBSD: RAMDISK,v 1.166 2021/12/29 18:40:48 patrick Exp $
 
 machine		arm64
 maxusers	4
@@ -44,6 +44,8 @@ pci*		at acpipci?
 ahci*		at acpi?
 ccp*		at acpi?		# AMD Cryptographic Co-processor
 com*		at acpi?
+ehci*		at acpi?
+ohci*		at acpi?
 pluart*		at acpi?
 sdhc*		at acpi?
 xhci*		at acpi?
@@ -102,13 +104,17 @@ simplefb*	at fdt?
 wsdisplay*	at simplefb?
 
 # Apple
-apldart*	at fdt?
+apldart*	at fdt? early 1
 apldog*		at fdt? early 1
 apldwusb*	at fdt?
+apliic*		at fdt?
+iic*		at apliic?
 aplintc*	at fdt? early 1
+aplmbox*	at fdt?
 aplpcie*	at fdt?
 pci*		at aplpcie?
 aplpinctrl*	at fdt? early 1
+aplpmgr*	at fdt? early 1
 aplspi*		at fdt?
 aplhidev*	at spi?
 aplkbd*		at aplhidev?

@@ -44,7 +44,6 @@
 /staticv.bt/1.1/Wed Sep  8 13:29:51 2021//
 /staticv.ok/1.1/Wed Sep  8 13:29:51 2021//
 /syntaxerror.bt/1.1/Tue Sep  7 19:20:22 2021//
-/Makefile/1.23/Wed Oct 20 17:29:05 2021//
 /histempty.ok/1.2/Wed Oct 20 17:29:05 2021//
 /mapsyntax.ok/1.2/Wed Oct 20 17:29:05 2021//
 /print.bt/1.2/Wed Oct 20 17:29:05 2021//
@@ -53,4 +52,5 @@
 /str.bt/1.1/Sun Oct  3 22:19:03 2021//
 /str.ok/1.1/Sun Oct  3 22:19:03 2021//
 /syntaxerror.ok/1.2/Wed Oct 20 17:29:05 2021//
+/Makefile/1.25/Sun Jan  2 13:11:00 2022//
 D

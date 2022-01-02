@@ -327,6 +327,7 @@
 ./usr/include/dev/ic/mpuvar.h
 ./usr/include/dev/ic/mtd8xxreg.h
 ./usr/include/dev/ic/mtd8xxvar.h
+./usr/include/dev/ic/mtwreg.h
 ./usr/include/dev/ic/ncr53c9xreg.h
 ./usr/include/dev/ic/ncr53c9xvar.h
 ./usr/include/dev/ic/ne2000reg.h
@@ -767,6 +768,7 @@
 ./usr/include/dev/usb/if_kuereg.h
 ./usr/include/dev/usb/if_kuevar.h
 ./usr/include/dev/usb/if_mosreg.h
+./usr/include/dev/usb/if_mtwvar.h
 ./usr/include/dev/usb/if_muereg.h
 ./usr/include/dev/usb/if_otusreg.h
 ./usr/include/dev/usb/if_ralreg.h
@@ -1761,6 +1763,7 @@
 ./usr/share/man/man3/ASN1_TIME_set.3
 ./usr/share/man/man3/ASN1_TYPE_get.3
 ./usr/share/man/man3/ASN1_UNIVERSALSTRING_to_string.3
+./usr/share/man/man3/ASN1_bn_print.3
 ./usr/share/man/man3/ASN1_generate_nconf.3
 ./usr/share/man/man3/ASN1_get_object.3
 ./usr/share/man/man3/ASN1_item_d2i.3
@@ -1791,6 +1794,7 @@
 ./usr/share/man/man3/BIO_meth_new.3
 ./usr/share/man/man3/BIO_new.3
 ./usr/share/man/man3/BIO_new_CMS.3
+./usr/share/man/man3/BIO_new_NDEF.3
 ./usr/share/man/man3/BIO_printf.3
 ./usr/share/man/man3/BIO_push.3
 ./usr/share/man/man3/BIO_read.3
@@ -1951,6 +1955,9 @@
 ./usr/share/man/man3/MD5.3
 ./usr/share/man/man3/MD5Init.3
 ./usr/share/man/man3/NAME_CONSTRAINTS_new.3
+./usr/share/man/man3/OBJ_NAME_add.3
+./usr/share/man/man3/OBJ_add_sigid.3
+./usr/share/man/man3/OBJ_create.3
 ./usr/share/man/man3/OBJ_nid2obj.3
 ./usr/share/man/man3/OCSP_CRLID_new.3
 ./usr/share/man/man3/OCSP_REQUEST_new.3
@@ -1975,6 +1982,7 @@
 ./usr/share/man/man3/PEM_read.3
 ./usr/share/man/man3/PEM_read_SSL_SESSION.3
 ./usr/share/man/man3/PEM_read_bio_PrivateKey.3
+./usr/share/man/man3/PEM_write_bio_ASN1_stream.3
 ./usr/share/man/man3/PEM_write_bio_CMS_stream.3
 ./usr/share/man/man3/PEM_write_bio_PKCS7_stream.3
 ./usr/share/man/man3/PKCS12_SAFEBAG_new.3
@@ -2028,8 +2036,12 @@
 ./usr/share/man/man3/SHA1.3
 ./usr/share/man/man3/SHA1Init.3
 ./usr/share/man/man3/SHA256Init.3
+./usr/share/man/man3/SMIME_crlf_copy.3
+./usr/share/man/man3/SMIME_read_ASN1.3
 ./usr/share/man/man3/SMIME_read_CMS.3
 ./usr/share/man/man3/SMIME_read_PKCS7.3
+./usr/share/man/man3/SMIME_text.3
+./usr/share/man/man3/SMIME_write_ASN1.3
 ./usr/share/man/man3/SMIME_write_CMS.3
 ./usr/share/man/man3/SMIME_write_PKCS7.3
 ./usr/share/man/man3/SSL_CIPHER_get_name.3
@@ -2627,6 +2639,7 @@
 ./usr/share/man/man3/htonl.3
 ./usr/share/man/man3/hypot.3
 ./usr/share/man/man3/i2a_ASN1_STRING.3
+./usr/share/man/man3/i2d_ASN1_bio_stream.3
 ./usr/share/man/man3/i2d_CMS_bio_stream.3
 ./usr/share/man/man3/i2d_PKCS7_bio_stream.3
 ./usr/share/man/man3/if_indextoname.3

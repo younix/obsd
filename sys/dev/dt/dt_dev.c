@@ -1,4 +1,4 @@
-/*	$OpenBSD: dt_dev.c,v 1.16 2021/10/25 19:51:12 millert Exp $ */
+/*	$OpenBSD: dt_dev.c,v 1.18 2021/12/21 09:35:08 bluhm Exp $ */
 
 /*
  * Copyright (c) 2019 Martin Pieuchot <mpi@openbsd.org>
@@ -141,8 +141,6 @@ dtattach(struct device *parent, struct device *self, void *aux)
 #ifdef DDBPROF
 	dt_nprobes += dt_prov_kprobe_init();
 #endif
-
-	printf("dt: %u probes\n", dt_nprobes);
 }
 
 int
@@ -428,8 +426,6 @@ dt_ioctl_record_stop(struct dt_softc *sc)
 {
 	struct dt_pcb *dp;
 
-	KASSERT(suser(curproc) == 0);
-
 	if (!sc->ds_recording)
 		return;
 
@@ -458,8 +454,6 @@ dt_ioctl_probe_enable(struct dt_softc *sc, struct dtioc_req *dtrq)
 	struct dt_pcb_list plist;
 	struct dt_probe *dtp;
 	int error;
-
-	KASSERT(suser(curproc) == 0);
 
 	if (!dtioc_req_isvalid(dtrq))
 		return EINVAL;
@@ -491,7 +485,6 @@ dt_ioctl_probe_disable(struct dt_softc *sc, struct dtioc_req *dtrq)
 	struct dt_probe *dtp;
 	int error;
 
-	KASSERT(suser(curproc) == 0);
 	if (!dtioc_req_isvalid(dtrq))
 		return EINVAL;
 

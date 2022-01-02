@@ -1,4 +1,4 @@
-/*	$OpenBSD: ldapd.c,v 1.29 2021/07/14 13:33:57 kn Exp $ */
+/*	$OpenBSD: ldapd.c,v 1.31 2021/12/15 11:36:40 jmatthew Exp $ */
 
 /*
  * Copyright (c) 2009, 2010 Martin Hedenfalk <martin@bzero.se>
@@ -243,7 +243,7 @@ main(int argc, char *argv[])
 		err(1, "unveil %s.db", _PATH_LOGIN_CONF);
 	if (unveil(_PATH_AUTHPROGDIR, "x") == -1)
 		err(1, "unveil %s", _PATH_AUTHPROGDIR);
-	if (unveil(datadir, "rw") == -1)
+	if (unveil(datadir, "rwc") == -1)
 		err(1, "unveil %s", datadir);
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
@@ -381,8 +381,8 @@ ldapd_open_request(struct imsgev *iev, struct imsg *imsg)
 	if (imsg->hdr.len != sizeof(*oreq) + IMSG_HEADER_SIZE)
 		fatal("invalid size of open request");
 
-	/* make sure path is null-terminated */
-	oreq->path[PATH_MAX] = '\0';
+	if (oreq->path[PATH_MAX-1] != '\0')
+		fatal("bogus path");
 
 	if (strncmp(oreq->path, datadir, strlen(datadir)) != 0) {
 		log_warnx("refusing to open file %s", oreq->path);

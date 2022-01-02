@@ -1,4 +1,4 @@
-/*      $OpenBSD: chachapoly_test.c,v 1.1 2015/11/03 01:46:08 mikeb Exp $  */
+/*      $OpenBSD: chachapoly_test.c,v 1.3 2021/12/14 06:27:48 deraadt Exp $  */
 
 /*
  * Copyright (c) 2010,2015 Mike Belopuhov <mikeb@openbsd.org>
@@ -17,13 +17,15 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/param.h>
+#include <sys/types.h>
 #include <crypto/chachapoly.h>
 #include <err.h>
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
+
+#define MINIMUM(a, b) (((a) < (b)) ? (a) : (b))
 
 int debug = 0;
 
@@ -328,12 +330,12 @@ dopoly(const unsigned char *key, size_t klen,
 
 	for (i = 0; i < aadlen; i += POLY1305_BLOCK_LEN) {
 		memset(blk, 0, POLY1305_BLOCK_LEN);
-		memcpy(blk, aad + i, MIN(aadlen - i, POLY1305_BLOCK_LEN));
+		memcpy(blk, aad + i, MINIMUM(aadlen - i, POLY1305_BLOCK_LEN));
 		Chacha20_Poly1305_Update(&ctx, blk, POLY1305_BLOCK_LEN);
 	}
 
 	for (i = 0; i < len; i += CHACHA20_BLOCK_LEN) {
-		int dlen = MIN(len - i, CHACHA20_BLOCK_LEN);
+		int dlen = MINIMUM(len - i, CHACHA20_BLOCK_LEN);
 		Chacha20_Poly1305_Update(&ctx, in + i, dlen);
 	}
 

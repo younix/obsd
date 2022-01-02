@@ -1,4 +1,4 @@
-/* $OpenBSD: acpi.c,v 1.401 2021/11/02 02:17:56 deraadt Exp $ */
+/* $OpenBSD: acpi.c,v 1.403 2021/12/16 08:03:17 anton Exp $ */
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  * Copyright (c) 2005 Jordan Hargrave <jordan@openbsd.org>
@@ -3140,7 +3140,6 @@ const char *acpi_isa_hids[] = {
 	"PNP0303",	/* IBM Enhanced Keyboard (101/102-key, PS/2 Mouse) */
 	"PNP0400",	/* Standard LPT Parallel Port */
 	"PNP0401",	/* ECP Parallel Port */
-	"PNP0501",	/* 16550A-compatible COM Serial Port */
 	"PNP0700",	/* PC-class Floppy Disk Controller */
 	"PNP0F03",	/* Microsoft PS/2-style Mouse */
 	"PNP0F13",	/* PS/2 Mouse */
@@ -3272,7 +3271,7 @@ acpi_parse_resources(int crsidx, union acpi_resource *crs, void *arg)
 	case SR_IRQ:
 		aaa->aaa_irq[aaa->aaa_nirq] = ffs(crs->sr_irq.irq_mask) - 1;
 		/* Default is exclusive, active-high, edge triggered. */
-		if (AML_CRSLEN(crs) < 3)
+		if (AML_CRSLEN(crs) < 4)
 			flags = SR_IRQ_MODE;
 		else
 			flags = crs->sr_irq.irq_flags;

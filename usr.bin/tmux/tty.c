@@ -1,4 +1,4 @@
-/* $OpenBSD: tty.c,v 1.412 2021/11/29 11:05:28 nicm Exp $ */
+/* $OpenBSD: tty.c,v 1.415 2021/12/31 11:35:49 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -205,6 +205,11 @@ tty_block_maybe(struct tty *tty)
 	struct client	*c = tty->client;
 	size_t		 size = EVBUFFER_LENGTH(tty->out);
 	struct timeval	 tv = { .tv_usec = TTY_BLOCK_INTERVAL };
+
+	if (size == 0)
+		tty->flags &= ~TTY_NOBLOCK;
+	else if (tty->flags & TTY_NOBLOCK)
+		return (0);
 
 	if (size < TTY_BLOCK_START(tty))
 		return (0);
@@ -786,26 +791,19 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 
 	if ((changed & ALL_MOUSE_MODES) && tty_term_has(term, TTYC_KMOUS)) {
 		/*
-		 * If the mouse modes have changed, clear any that are set and
-		 * apply again. There are differences in how terminals track
-		 * the various bits.
+		 * If the mouse modes have changed, clear then all and apply
+		 * again. There are differences in how terminals track the
+		 * various bits.
 		 */
-		if (tty->mode & MODE_MOUSE_SGR)
-			tty_puts(tty, "\033[?1006l");
-		if (tty->mode & MODE_MOUSE_STANDARD)
-			tty_puts(tty, "\033[?1000l");
-		if (tty->mode & MODE_MOUSE_BUTTON)
-			tty_puts(tty, "\033[?1002l");
-		if (tty->mode & MODE_MOUSE_ALL)
-			tty_puts(tty, "\033[?1003l");
+		tty_puts(tty, "\033[?1006l\033[?1000l\033[?1002l\033[?1003l");
 		if (mode & ALL_MOUSE_MODES)
 			tty_puts(tty, "\033[?1006h");
-		if (mode & MODE_MOUSE_STANDARD)
-			tty_puts(tty, "\033[?1000h");
-		if (mode & MODE_MOUSE_BUTTON)
-			tty_puts(tty, "\033[?1002h");
 		if (mode & MODE_MOUSE_ALL)
-			tty_puts(tty, "\033[?1003h");
+			tty_puts(tty, "\033[?1000h\033[?1002h\033[?1003h");
+		if (mode & MODE_MOUSE_BUTTON)
+			tty_puts(tty, "\033[?1000h\033[?1002h");
+		else if (mode & MODE_MOUSE_STANDARD)
+			tty_puts(tty, "\033[?1000h");
 	}
 	if (changed & MODE_BRACKETPASTE) {
 		if (mode & MODE_BRACKETPASTE)
@@ -937,7 +935,9 @@ tty_update_window_offset(struct window *w)
 	struct client	*c;
 
 	TAILQ_FOREACH(c, &clients, entry) {
-		if (c->session != NULL && c->session->curw->window == w)
+		if (c->session != NULL &&
+		    c->session->curw != NULL &&
+		    c->session->curw->window == w)
 			tty_update_client_offset(c);
 	}
 }
@@ -2086,8 +2086,8 @@ tty_set_selection(struct tty *tty, const char *buf, size_t len)
 	encoded = xmalloc(size);
 
 	b64_ntop(buf, len, encoded, size);
+	tty->flags |= TTY_NOBLOCK;
 	tty_putcode_ptr2(tty, TTYC_MS, "", encoded);
-	tty->client->redraw = EVBUFFER_LENGTH(tty->out);
 
 	free(encoded);
 }
@@ -2095,6 +2095,7 @@ tty_set_selection(struct tty *tty, const char *buf, size_t len)
 void
 tty_cmd_rawstring(struct tty *tty, const struct tty_ctx *ctx)
 {
+	tty->flags |= TTY_NOBLOCK;
 	tty_add(tty, ctx->ptr, ctx->num);
 	tty_invalidate(tty);
 }

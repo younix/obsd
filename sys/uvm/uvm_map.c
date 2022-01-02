@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_map.c,v 1.279 2021/10/24 15:23:52 mpi Exp $	*/
+/*	$OpenBSD: uvm_map.c,v 1.282 2021/12/21 22:21:32 mpi Exp $	*/
 /*	$NetBSD: uvm_map.c,v 1.86 2000/11/27 08:40:03 chs Exp $	*/
 
 /*
@@ -124,6 +124,8 @@ struct vm_map_entry	*uvm_mapent_alloc(struct vm_map*, int);
 void			 uvm_mapent_free(struct vm_map_entry*);
 void			 uvm_unmap_kill_entry(struct vm_map*,
 			    struct vm_map_entry*);
+void			 uvm_unmap_kill_entry_withlock(struct vm_map *,
+			    struct vm_map_entry *, int);
 void			 uvm_unmap_detach_intrsafe(struct uvm_map_deadq *);
 void			 uvm_mapent_mkfree(struct vm_map*,
 			    struct vm_map_entry*, struct vm_map_entry**,
@@ -497,6 +499,28 @@ void
 uvm_map_reference(struct vm_map *map)
 {
 	atomic_inc_int(&map->ref_count);
+}
+
+void
+uvm_map_lock_entry(struct vm_map_entry *entry)
+{
+	if (entry->aref.ar_amap != NULL) {
+		amap_lock(entry->aref.ar_amap);
+	}
+	if (UVM_ET_ISOBJ(entry)) {
+		rw_enter(entry->object.uvm_obj->vmobjlock, RW_WRITE);
+	}
+}
+
+void
+uvm_map_unlock_entry(struct vm_map_entry *entry)
+{
+	if (UVM_ET_ISOBJ(entry)) {
+		rw_exit(entry->object.uvm_obj->vmobjlock);
+	}
+	if (entry->aref.ar_amap != NULL) {
+		amap_unlock(entry->aref.ar_amap);
+	}
 }
 
 /*
@@ -1894,7 +1918,7 @@ uvm_map_inentry(struct proc *p, struct p_inentry *ie, vaddr_t addr,
 		if (!ok) {
 			KERNEL_LOCK();
 			printf(fmt, p->p_p->ps_comm, p->p_p->ps_pid, p->p_tid,
-			    addr, ie->ie_start, ie->ie_end);
+			    addr, ie->ie_start, ie->ie_end-1);
 			p->p_p->ps_acflag |= AMAP;
 			sv.sival_ptr = (void *)PROC_PC(p);
 			trapsignal(p, SIGSEGV, 0, SEGV_ACCERR, sv);
@@ -2101,7 +2125,8 @@ uvm_mapent_mkfree(struct vm_map *map, struct vm_map_entry *entry,
  * Unwire and release referenced amap and object from map entry.
  */
 void
-uvm_unmap_kill_entry(struct vm_map *map, struct vm_map_entry *entry)
+uvm_unmap_kill_entry_withlock(struct vm_map *map, struct vm_map_entry *entry,
+    int needlock)
 {
 	/* Unwire removed map entry. */
 	if (VM_MAPENT_ISWIRED(entry)) {
@@ -2110,6 +2135,9 @@ uvm_unmap_kill_entry(struct vm_map *map, struct vm_map_entry *entry)
 		uvm_fault_unwire_locked(map, entry->start, entry->end);
 		KERNEL_UNLOCK();
 	}
+
+	if (needlock)
+		uvm_map_lock_entry(entry);
 
 	/* Entry-type specific code. */
 	if (UVM_ET_ISHOLE(entry)) {
@@ -2157,17 +2185,19 @@ uvm_unmap_kill_entry(struct vm_map *map, struct vm_map_entry *entry)
 		 */
 		uvm_km_pgremove(entry->object.uvm_obj, entry->start,
 		    entry->end);
-
-		/*
-		 * null out kernel_object reference, we've just
-		 * dropped it
-		 */
-		entry->etype &= ~UVM_ET_OBJ;
-		entry->object.uvm_obj = NULL;  /* to be safe */
 	} else {
 		/* remove mappings the standard way. */
 		pmap_remove(map->pmap, entry->start, entry->end);
 	}
+
+	if (needlock)
+		uvm_map_unlock_entry(entry);
+}
+
+void
+uvm_unmap_kill_entry(struct vm_map *map, struct vm_map_entry *entry)
+{
+	uvm_unmap_kill_entry_withlock(map, entry, 0);
 }
 
 /*
@@ -2227,7 +2257,7 @@ uvm_unmap_remove(struct vm_map *map, vaddr_t start, vaddr_t end,
 			map->sserial++;
 
 		/* Kill entry. */
-		uvm_unmap_kill_entry(map, entry);
+		uvm_unmap_kill_entry_withlock(map, entry, 1);
 
 		/* Update space usage. */
 		if ((map->flags & VM_MAP_ISVMSPACE) &&
@@ -2390,7 +2420,7 @@ uvm_map_pageable_wire(struct vm_map *map, struct vm_map_entry *first,
 			first->wired_count--;
 			if (!VM_MAPENT_ISWIRED(first)) {
 				uvm_fault_unwire_locked(map,
-				    iter->start, iter->end);
+				    first->start, first->end);
 			}
 		}
 
@@ -3420,8 +3450,10 @@ uvm_map_protect(struct vm_map *map, vaddr_t start, vaddr_t end,
 				 */
 				iter->wired_count = 0;
 			}
+			uvm_map_lock_entry(iter);
 			pmap_protect(map->pmap, iter->start, iter->end,
 			    iter->protection & mask);
+			uvm_map_unlock_entry(iter);
 		}
 
 		/*
@@ -3967,11 +3999,13 @@ uvm_mapent_forkcopy(struct vmspace *new_vm, struct vm_map *new_map,
 			 */
 			if (!UVM_ET_ISNEEDSCOPY(old_entry)) {
 				if (old_entry->max_protection & PROT_WRITE) {
+					uvm_map_lock_entry(old_entry);
 					pmap_protect(old_map->pmap,
 					    old_entry->start,
 					    old_entry->end,
 					    old_entry->protection &
 					    ~PROT_WRITE);
+					uvm_map_unlock_entry(old_entry);
 					pmap_update(old_map->pmap);
 				}
 				old_entry->etype |= UVM_ET_NEEDSCOPY;
@@ -4751,9 +4785,11 @@ flush_object:
 		    ((flags & PGO_FREE) == 0 ||
 		     ((entry->max_protection & PROT_WRITE) != 0 &&
 		      (entry->etype & UVM_ET_COPYONWRITE) == 0))) {
+			rw_enter(uobj->vmobjlock, RW_WRITE);
 			rv = uobj->pgops->pgo_flush(uobj,
 			    cp_start - entry->start + entry->offset,
 			    cp_end - entry->start + entry->offset, flags);
+			rw_exit(uobj->vmobjlock);
 
 			if (rv == FALSE)
 				error = EFAULT;

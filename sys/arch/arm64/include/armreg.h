@@ -1,4 +1,4 @@
-/* $OpenBSD: armreg.h,v 1.17 2021/09/02 10:48:52 kettenis Exp $ */
+/* $OpenBSD: armreg.h,v 1.19 2022/01/02 02:26:50 jsg Exp $ */
 /*-
  * Copyright (c) 2013, 2014 Andrew Turner
  * Copyright (c) 2015 The FreeBSD Foundation
@@ -159,7 +159,7 @@
 #define	ESR_ELx_EC_MASK		(0x3f << 26)
 #define	ESR_ELx_EXCEPTION(esr)	(((esr) & ESR_ELx_EC_MASK) >> ESR_ELx_EC_SHIFT)
 #define	 EXCP_UNKNOWN		0x00	/* Unkwn exception */
-#define	 EXCP_FP_SIMD		0x07	/* VFP/SIMD trap */
+#define	 EXCP_FP_SIMD		0x07	/* FP/SIMD trap */
 #define	 EXCP_ILL_STATE		0x0e	/* Illegal execution state */
 #define	 EXCP_SVC		0x15	/* SVC trap */
 #define	 EXCP_MSR		0x18	/* MSR/MRS trap */
@@ -168,7 +168,7 @@
 #define	 EXCP_PC_ALIGN		0x22	/* PC alignment fault */
 #define	 EXCP_DATA_ABORT_L	0x24	/* Data abort, from lower EL */
 #define	 EXCP_DATA_ABORT	0x25	/* Data abort, from same EL */ 
-#define	 EXCP_SP_ALIGN		0x26	/* SP slignment fault */
+#define	 EXCP_SP_ALIGN		0x26	/* SP alignment fault */
 #define	 EXCP_TRAP_FP		0x2c	/* Trapped FP exception */
 #define	 EXCP_SERROR		0x2f	/* SError interrupt */
 #define	 EXCP_SOFTSTP_EL0	0x32	/* Software Step, from lower EL */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.h,v 1.91 2021/11/12 22:20:57 guenther Exp $	*/
+/*	$OpenBSD: exec_elf.h,v 1.94 2021/12/25 01:25:51 guenther Exp $	*/
 /*
  * Copyright (c) 1995, 1996 Erik Theisen.  All rights reserved.
  *
@@ -576,6 +576,19 @@ typedef struct {
 #define DF_1_NODEFLIB	0x00000800
 #define DF_1_NODUMP	0x00001000
 #define DF_1_CONLFAT	0x00002000
+#define DF_1_ENDFILTEE	0x00004000
+#define DF_1_DISPRELDNE	0x00008000
+#define DF_1_DISPRELPND	0x00010000
+#define DF_1_NODIRECT	0x00020000
+#define DF_1_IGNMULDEF	0x00040000
+#define DF_1_NOKSYMS	0x00080000
+#define DF_1_NOHDR	0x00100000
+#define DF_1_EDITED	0x00200000
+#define DF_1_NORELOC	0x00400000
+#define DF_1_SYMINTPOSE	0x00800000
+#define DF_1_GLOBAUDIT	0x01000000
+#define DF_1_SINGLETON	0x02000000
+#define DF_1_PIE	0x08000000
 
 /*
  * Note header
@@ -790,9 +803,17 @@ extern Elf_Dyn		_DYNAMIC[];
 #endif
 
 #ifdef	_KERNEL
+/*
+ * How many entries are in the AuxInfo array we pass to the process?
+ */
+#define	ELF_AUX_ENTRIES	9
+#define	ELF_AUX_WORDS	(sizeof(AuxInfo) * ELF_AUX_ENTRIES / sizeof(char *))
+
 struct exec_package;
 
 int	exec_elf_makecmds(struct proc *, struct exec_package *);
+int	exec_elf_fixup(struct proc *, struct exec_package *);
+int	coredump_elf(struct proc *, void *);
 #endif /* _KERNEL */
 
 #define ELF_TARG_VER	1	/* The ver for which this code is intended */

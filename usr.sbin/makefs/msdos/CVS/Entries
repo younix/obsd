@@ -1,5 +1,4 @@
 /denode.h/1.2/Sat Dec 17 16:43:30 2016//
-/direntry.h/1.1/Tue Oct 18 17:05:30 2016//
 /fat.h/1.1/Tue Oct 18 17:05:30 2016//
 /mkfs_msdos.h/1.6/Sat Dec 17 16:43:30 2016//
 /msdosfs_unicode.c/1.2/Sat Dec 17 16:43:30 2016//
@@ -11,4 +10,5 @@
 /msdosfs_lookup.c/1.4/Wed Oct 20 17:29:19 2021//
 /msdosfs_vfsops.c/1.13/Wed Oct 20 17:29:19 2021//
 /msdosfs_vnops.c/1.9/Wed Oct 20 17:29:19 2021//
+/direntry.h/1.2/Sun Jan  2 13:11:15 2022//
 D

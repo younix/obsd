@@ -4,7 +4,6 @@
 /getdtablesize.3/1.13/Fri Jan 12 04:36:44 2018//
 /getdtablesize.c/1.4/Mon Aug  8 08:05:33 2005//
 /gethostid.3/1.16/Sun Mar  3 18:15:24 2019//
-/getwd.c/1.12/Tue Nov 28 06:55:49 2017//
 /killpg.3/1.14/Sun May  7 21:19:29 2017//
 /killpg.c/1.7/Sun May  7 15:19:32 2017//
 /setpgrp.c/1.6/Mon Aug  8 08:05:33 2005//
@@ -15,4 +14,5 @@
 /sigvec.3/1.35/Mon May 29 11:10:29 2017//
 /gethostid.c/1.9/Sat May  1 08:41:50 2021//
 /sethostid.c/1.10/Sat May  1 08:41:50 2021//
+/getwd.c/1.13/Sun Jan  2 13:10:40 2022//
 D

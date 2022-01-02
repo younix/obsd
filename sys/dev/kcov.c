@@ -1,4 +1,4 @@
-/*	$OpenBSD: kcov.c,v 1.38 2021/07/05 05:50:19 anton Exp $	*/
+/*	$OpenBSD: kcov.c,v 1.44 2021/12/29 07:15:13 anton Exp $	*/
 
 /*
  * Copyright (c) 2018 Anton Lindqvist <anton@openbsd.org>
@@ -25,6 +25,11 @@
 #include <sys/pool.h>
 #include <sys/stdint.h>
 #include <sys/queue.h>
+
+/* kcov_vnode() */
+#include <sys/conf.h>
+#include <sys/vnode.h>
+#include <sys/specdev.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -53,7 +58,7 @@
 struct kcov_dev {
 	int		 kd_state;	/* [M] */
 	int		 kd_mode;	/* [M] */
-	int		 kd_unit;	/* [I] device minor */
+	int		 kd_unit;	/* [I] D_CLONE unique device minor */
 	int		 kd_intr;	/* [M] currently used in interrupt */
 	uintptr_t	*kd_buf;	/* [a] traced coverage */
 	size_t		 kd_nmemb;	/* [I] */
@@ -157,14 +162,10 @@ __sanitizer_cov_trace_pc(void)
  * its corresponding coverage buffer.
  */
 void
-trace_cmp(uint64_t type, uint64_t arg1, uint64_t arg2, uintptr_t pc)
+trace_cmp(struct kcov_dev *kd, uint64_t type, uint64_t arg1, uint64_t arg2,
+    uintptr_t pc)
 {
-	struct kcov_dev *kd;
 	uint64_t idx;
-
-	kd = kd_curproc(KCOV_MODE_TRACE_CMP);
-	if (kd == NULL)
-		return;
 
 	if ((idx = kd_claim(kd, KCOV_STRIDE_TRACE_CMP, 1))) {
 		kd->kd_buf[idx] = type;
@@ -174,67 +175,72 @@ trace_cmp(uint64_t type, uint64_t arg1, uint64_t arg2, uintptr_t pc)
 	}
 }
 
+#define TRACE_CMP(type, arg1, arg2) do {				\
+	struct kcov_dev *kd;						\
+	if ((kd = kd_curproc(KCOV_MODE_TRACE_CMP)) == NULL)		\
+		return;							\
+	trace_cmp(kd, (type), (arg1), (arg2),				\
+	    (uintptr_t)__builtin_return_address(0));			\
+} while (0)
+
 void
 __sanitizer_cov_trace_cmp1(uint8_t arg1, uint8_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(0), arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(0), arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_cmp2(uint16_t arg1, uint16_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(1), arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(1), arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_cmp4(uint32_t arg1, uint32_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(2), arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(2), arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_cmp8(uint64_t arg1, uint64_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(3), arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(3), arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_const_cmp1(uint8_t arg1, uint8_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(0) | KCOV_CMP_CONST, arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(0) | KCOV_CMP_CONST, arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_const_cmp2(uint16_t arg1, uint16_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(1) | KCOV_CMP_CONST, arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(1) | KCOV_CMP_CONST, arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_const_cmp4(uint32_t arg1, uint32_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(2) | KCOV_CMP_CONST, arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(2) | KCOV_CMP_CONST, arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_const_cmp8(uint64_t arg1, uint64_t arg2)
 {
-	trace_cmp(KCOV_CMP_SIZE(3) | KCOV_CMP_CONST, arg1, arg2,
-	    (uintptr_t)__builtin_return_address(0));
+	TRACE_CMP(KCOV_CMP_SIZE(3) | KCOV_CMP_CONST, arg1, arg2);
 }
 
 void
 __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases)
 {
+	struct kcov_dev *kd;
 	uint64_t i, nbits, ncases, type;
 	uintptr_t pc;
+
+	kd = kd_curproc(KCOV_MODE_TRACE_CMP);
+	if (kd == NULL)
+		return;
 
 	pc = (uintptr_t)__builtin_return_address(0);
 	ncases = cases[0];
@@ -259,7 +265,7 @@ __sanitizer_cov_trace_switch(uint64_t val, uint64_t *cases)
 	type |= KCOV_CMP_CONST;
 
 	for (i = 0; i < ncases; i++)
-		trace_cmp(type, cases[i + 2], val, pc);
+		trace_cmp(kd, type, cases[i + 2], val, pc);
 }
 
 void
@@ -289,21 +295,13 @@ kcovopen(dev_t dev, int flag, int mode, struct proc *p)
 {
 	struct kcov_dev *kd;
 
-	mtx_enter(&kcov_mtx);
-
-	if (kd_lookup(minor(dev)) != NULL) {
-		mtx_leave(&kcov_mtx);
-		return (EBUSY);
-	}
-
-	if (kcov_cold)
-		kcov_cold = 0;
-
-	mtx_leave(&kcov_mtx);
 	kd = malloc(sizeof(*kd), M_SUBPROC, M_WAITOK | M_ZERO);
 	kd->kd_unit = minor(dev);
 	mtx_enter(&kcov_mtx);
+	KASSERT(kd_lookup(kd->kd_unit) == NULL);
 	TAILQ_INSERT_TAIL(&kd_list, kd, kd_entry);
+	if (kcov_cold)
+		kcov_cold = 0;
 	mtx_leave(&kcov_mtx);
 	return (0);
 }
@@ -318,7 +316,7 @@ kcovclose(dev_t dev, int flag, int mode, struct proc *p)
 	kd = kd_lookup(minor(dev));
 	if (kd == NULL) {
 		mtx_leave(&kcov_mtx);
-		return (EINVAL);
+		return (ENXIO);
 	}
 
 	if (kd->kd_state == KCOV_STATE_TRACE && kd->kd_kr == NULL) {
@@ -357,8 +355,12 @@ kcovioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		break;
 	case KIOENABLE:
 		/* Only one kcov descriptor can be enabled per thread. */
-		if (p->p_kd != NULL || kd->kd_state != KCOV_STATE_READY) {
+		if (p->p_kd != NULL) {
 			error = EBUSY;
+			break;
+		}
+		if (kd->kd_state != KCOV_STATE_READY) {
+			error = ENXIO;
 			break;
 		}
 		mode = *((int *)data);
@@ -374,9 +376,12 @@ kcovioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 		break;
 	case KIODISABLE:
 		/* Only the enabled thread may disable itself. */
-		if ((p->p_kd != kd && kd->kd_kr == NULL) ||
-		    kd->kd_state != KCOV_STATE_TRACE) {
-			error = EBUSY;
+		if ((p->p_kd != kd && kd->kd_kr == NULL)) {
+			error = EPERM;
+			break;
+		}
+		if (kd->kd_state != KCOV_STATE_TRACE) {
+			error = ENXIO;
 			break;
 		}
 		kd->kd_state = KCOV_STATE_READY;
@@ -447,6 +452,16 @@ kcov_exit(struct proc *p)
 	}
 
 	mtx_leave(&kcov_mtx);
+}
+
+/*
+ * Returns non-zero if the given vnode refers to a kcov device.
+ */
+int
+kcov_vnode(struct vnode *vp)
+{
+	return (vp->v_type == VCHR &&
+	    cdevsw[major(vp->v_rdev)].d_open == kcovopen);
 }
 
 struct kcov_dev *
@@ -553,13 +568,6 @@ kd_curproc(int mode)
 	struct kcov_dev *kd;
 
 	/*
-	 * Do not trace if the kernel has panicked. This could happen if curproc
-	 * had kcov enabled while panicking.
-	 */
-	if (__predict_false(panicstr || db_active))
-		return (NULL);
-
-	/*
 	 * Do not trace before kcovopen() has been called at least once.
 	 * At this point, all secondary CPUs have booted and accessing curcpu()
 	 * is safe.
@@ -570,8 +578,18 @@ kd_curproc(int mode)
 	kd = curproc->p_kd;
 	if (__predict_true(kd == NULL) || kd->kd_mode != mode)
 		return (NULL);
+
+	/*
+	 * Do not trace if the kernel has panicked. This could happen if curproc
+	 * had kcov enabled while panicking.
+	 */
+	if (__predict_false(panicstr || db_active))
+		return (NULL);
+
+	/* Do not trace in interrupt context unless this is a remote section. */
 	if (inintr() && kd->kd_intr == 0)
 		return (NULL);
+
 	return (kd);
 
 }
@@ -768,13 +786,16 @@ kcov_remote_attach(struct kcov_dev *kd, struct kio_remote_attach *arg)
 	MUTEX_ASSERT_LOCKED(&kcov_mtx);
 
 	if (kd->kd_state != KCOV_STATE_READY)
-		return (EBUSY);
+		return (ENXIO);
 
-	if (arg->subsystem == KCOV_REMOTE_COMMON)
+	if (arg->subsystem == KCOV_REMOTE_COMMON) {
 		kr = kcov_remote_register_locked(KCOV_REMOTE_COMMON,
 		    curproc->p_p);
-	if (kr == NULL)
+		if (kr == NULL)
+			return (EBUSY);
+	} else {
 		return (EINVAL);
+	}
 
 	kr->kr_state = KCOV_STATE_READY;
 	kr->kr_kd = kd;

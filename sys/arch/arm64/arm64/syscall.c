@@ -1,4 +1,4 @@
-/* $OpenBSD: syscall.c,v 1.8 2021/05/16 03:30:33 jsg Exp $ */
+/* $OpenBSD: syscall.c,v 1.10 2022/01/01 18:52:36 kettenis Exp $ */
 /*
  * Copyright (c) 2015 Dale Rahn <drahn@dalerahn.com>
  *
@@ -28,8 +28,6 @@
 
 #include <uvm/uvm_extern.h>
 
-#include <machine/vfp.h>
-
 #define MAXARGS 8
 
 void
@@ -43,9 +41,6 @@ svc_handler(trapframe_t *frame)
 
 	uvmexp.syscalls++;
 
-	/* Before enabling interrupts, save FPU state */
-	vfp_save();
-
 	/* Re-enable interrupts if they were enabled previously */
 	if (__predict_true((frame->tf_spsr & I_bit) == 0))
 		intr_enable();
@@ -56,7 +51,6 @@ svc_handler(trapframe_t *frame)
 	code = frame->tf_x[8];
 
 	ap = &frame->tf_x[0];
-	callp = p->p_p->ps_emul->e_sysent;
 
 	switch (code) {	
 	case SYS_syscall:
@@ -69,11 +63,12 @@ svc_handler(trapframe_t *frame)
 		break;
 	}
 
-	if (code < 0 || code >= p->p_p->ps_emul->e_nsysent) {
-		callp += p->p_p->ps_emul->e_nosys;
-	} else {
+	callp = sysent;
+	if (code < 0 || code >= SYS_MAXSYSCALL)
+		callp += SYS_syscall;
+	else
 		callp += code;
-	}
+
 	nargs = callp->sy_argsize / sizeof(register_t);
 	if (nargs <= nap) {
 		args = ap;

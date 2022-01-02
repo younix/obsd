@@ -1,7 +1,4 @@
 D/abi////
-/libc++abi-exceptions.exp/1.1.1.1/Wed Sep  1 16:07:31 2021/-ko/
-/libc++abi-exceptions.sjlj.exp/1.1.1.1/Wed Sep  1 16:07:31 2021/-ko/
-/libc++abi-new-delete.exp/1.1.1.1/Wed Sep  1 16:07:31 2021/-ko/
 /libc++abi.v1.exp/1.1.1.2/Wed Sep  1 16:07:31 2021/-ko/
 /libc++abi.v2.exp/1.1.1.2/Wed Sep  1 16:07:31 2021/-ko/
 /libc++unexp.exp/1.1.1.1/Wed Sep  1 16:07:31 2021/-ko/

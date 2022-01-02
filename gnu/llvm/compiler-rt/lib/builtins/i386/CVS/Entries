@@ -7,7 +7,6 @@
 /floatundidf.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /floatundisf.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /floatundixf.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
-/fp_mode.c/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /lshrdi3.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /moddi3.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /muldi3.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
@@ -15,4 +14,5 @@
 /umoddi3.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /floatdidf.S/1.1.1.2/Wed Sep  1 16:07:31 2021/-ko/
 /floatdixf.S/1.1.1.2/Wed Sep  1 16:07:31 2021/-ko/
+/fp_mode.c/1.1.1.2/Sun Jan  2 13:09:47 2022/-ko/
 D

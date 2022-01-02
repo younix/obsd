@@ -1,4 +1,4 @@
-# $OpenBSD: files.arm64,v 1.46 2021/11/01 09:02:46 kettenis Exp $
+# $OpenBSD: files.arm64,v 1.51 2022/01/01 18:52:37 kettenis Exp $
 
 maxpartitions	16
 maxusers	2 8 128
@@ -25,9 +25,9 @@ file	arch/arm64/arm64/syscall.c
 file	arch/arm64/arm64/sys_machdep.c
 
 file	arch/arm64/arm64/cpu.c
+file	arch/arm64/arm64/fpu.c
 file	arch/arm64/arm64/intr.c
 file	arch/arm64/arm64/softintr.c
-file	arch/arm64/arm64/vfp.c
 file	arch/arm64/arm64/exception.S
 file	arch/arm64/arm64/trampoline.S
 file	arch/arm64/arm64/trap.c
@@ -120,6 +120,9 @@ include "dev/sdmmc/files.sdmmc"
 # Machine-independent FDT drivers
 include "dev/fdt/files.fdt"
 
+define	rtkit
+file	arch/arm64/dev/rtkit.c			rtkit
+
 device	ampintc: fdt
 attach	ampintc at fdt
 device	ampintcmsi
@@ -148,6 +151,10 @@ device	apldwusb: fdt
 attach	apldwusb at fdt
 file	arch/arm64/dev/apldwusb.c		apldwusb
 
+device	apliic: i2cbus
+attach	apliic at fdt
+file	arch/arm64/dev/apliic.c			apliic
+
 device	aplintc
 attach	aplintc at fdt
 file	arch/arm64/dev/aplintc.c		aplintc
@@ -160,6 +167,10 @@ device	aplms: hid, hidms, wsmousedev
 attach	aplms at aplhidev
 file	arch/arm64/dev/aplhidev.c		aplhidev | aplkbd | aplms needs-flag
 
+device	aplmbox
+attach	aplmbox at fdt
+file	arch/arm64/dev/aplmbox.c		aplmbox
+
 device	aplpcie: pcibus
 attach	aplpcie at fdt
 file	arch/arm64/dev/aplpcie.c		aplpcie
@@ -168,8 +179,12 @@ device	aplpinctrl
 attach	aplpinctrl at fdt
 file	arch/arm64/dev/aplpinctrl.c		aplpinctrl
 
+device	aplpmgr
+attach	aplpmgr at fdt
+file	arch/arm64/dev/aplpmgr.c		aplpmgr
+
 # Apple NVME Storage
-device	aplns {}
+device	aplns {}: rtkit
 attach	aplns at fdt
 attach	nvme at aplns with nvme_ans
 file	arch/arm64/dev/aplns.c			aplns | nvme_ans

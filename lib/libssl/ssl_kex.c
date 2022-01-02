@@ -1,6 +1,6 @@
-/* $OpenBSD: ssl_kex.c,v 1.5 2021/11/30 18:17:03 tb Exp $ */
+/* $OpenBSD: ssl_kex.c,v 1.8 2021/12/04 14:03:22 jsing Exp $ */
 /*
- * Copyright (c) 2020 Joel Sing <jsing@openbsd.org>
+ * Copyright (c) 2020, 2021 Joel Sing <jsing@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -17,6 +17,7 @@
 
 #include <stdlib.h>
 
+#include <openssl/bn.h>
 #include <openssl/dh.h>
 #include <openssl/ec.h>
 #include <openssl/ecdh.h>
@@ -24,6 +25,8 @@
 #include <openssl/objects.h>
 
 #include "bytestring.h"
+
+#define DHE_MINIMUM_BITS	1024
 
 int
 ssl_kex_generate_dhe(DH *dh, DH *dh_params)
@@ -38,7 +41,50 @@ ssl_kex_generate_dhe(DH *dh, DH *dh_params)
 
 	if (!DH_set0_pqg(dh, p, NULL, g))
 		goto err;
+	p = NULL;
+	g = NULL;
 
+	if (!DH_generate_key(dh))
+		goto err;
+
+	ret = 1;
+
+ err:
+	BN_free(p);
+	BN_free(g);
+
+	return ret;
+}
+
+int
+ssl_kex_generate_dhe_params_auto(DH *dh, size_t key_bits)
+{
+	BIGNUM *p = NULL, *g = NULL;
+	int ret = 0;
+
+	if (key_bits >= 8192)
+		p = get_rfc3526_prime_8192(NULL);
+	else if (key_bits >= 4096)
+		p = get_rfc3526_prime_4096(NULL);
+	else if (key_bits >= 3072)
+		p = get_rfc3526_prime_3072(NULL);
+	else if (key_bits >= 2048)
+		p = get_rfc3526_prime_2048(NULL);
+	else if (key_bits >= 1536)
+		p = get_rfc3526_prime_1536(NULL);
+	else
+		p = get_rfc2409_prime_1024(NULL);
+
+	if (p == NULL)
+		goto err;
+
+	if ((g = BN_new()) == NULL)
+		goto err;
+	if (!BN_set_word(g, 2))
+		goto err;
+
+	if (!DH_set0_pqg(dh, p, NULL, g))
+		goto err;
 	p = NULL;
 	g = NULL;
 
@@ -110,11 +156,13 @@ ssl_kex_public_dhe(DH *dh, CBB *cbb)
 }
 
 int
-ssl_kex_peer_params_dhe(DH *dh, CBS *cbs)
+ssl_kex_peer_params_dhe(DH *dh, CBS *cbs, int *invalid_params)
 {
-	CBS dh_p, dh_g;
 	BIGNUM *p = NULL, *g = NULL;
+	CBS dh_p, dh_g;
 	int ret = 0;
+
+	*invalid_params = 0;
 
 	if (!CBS_get_u16_length_prefixed(cbs, &dh_p))
 		goto err;
@@ -128,9 +176,13 @@ ssl_kex_peer_params_dhe(DH *dh, CBS *cbs)
 
 	if (!DH_set0_pqg(dh, p, NULL, g))
 		goto err;
-
 	p = NULL;
 	g = NULL;
+
+	/* XXX - consider calling DH_check(). */
+
+	if (DH_bits(dh) < DHE_MINIMUM_BITS)
+		*invalid_params = 1;
 
 	ret = 1;
 
@@ -142,22 +194,30 @@ ssl_kex_peer_params_dhe(DH *dh, CBS *cbs)
 }
 
 int
-ssl_kex_peer_public_dhe(DH *dh, CBS *cbs)
+ssl_kex_peer_public_dhe(DH *dh, CBS *cbs, int *invalid_key)
 {
-	CBS dh_y;
 	BIGNUM *pub_key = NULL;
+	int check_flags;
+	CBS dh_y;
 	int ret = 0;
+
+	*invalid_key = 0;
 
 	if (!CBS_get_u16_length_prefixed(cbs, &dh_y))
 		goto err;
+
 	if ((pub_key = BN_bin2bn(CBS_data(&dh_y), CBS_len(&dh_y),
 	    NULL)) == NULL)
 		goto err;
 
 	if (!DH_set0_key(dh, pub_key, NULL))
 		goto err;
-
 	pub_key = NULL;
+
+	if (!DH_check_pub_key(dh, dh->pub_key, &check_flags))
+		goto err;
+	if (check_flags != 0)
+		*invalid_key = 1;
 
 	ret = 1;
 

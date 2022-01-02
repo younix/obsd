@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_locl.h,v 1.12 2019/10/24 16:36:10 jsing Exp $ */
+/* $OpenBSD: asn1_locl.h,v 1.15 2021/12/25 12:00:22 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -55,6 +55,8 @@
  * Hudson (tjh@cryptsoft.com).
  *
  */
+
+#include "bytestring.h"
 
 __BEGIN_HIDDEN_DECLS
 
@@ -154,5 +156,13 @@ struct x509_crl_method_st {
 
 int UTF8_getc(const unsigned char *str, int len, unsigned long *val);
 int UTF8_putc(unsigned char *str, int len, unsigned long value);
+
+int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb);
+
+int asn1_get_object_cbs(CBS *cbs, int der_mode, uint8_t *out_class,
+    int *out_constructed, uint32_t *out_tag_number, int *out_indefinite,
+    uint32_t *out_length);
+
+int asn1_tag2charwidth(int tag);
 
 __END_HIDDEN_DECLS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipsec_input.c,v 1.195 2021/12/02 12:39:15 bluhm Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.201 2021/12/23 12:21:48 bluhm Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -191,7 +191,6 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 	struct mbuf *m = *mp;
 	union sockaddr_union dst_address;
 	struct tdb *tdbp = NULL;
-	struct ifnet *encif;
 	u_int32_t spi;
 	u_int16_t cpi;
 	int prot;
@@ -310,21 +309,7 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 		goto drop;
 	}
 
-	if (sproto != IPPROTO_IPCOMP) {
-		encif = enc_getif(tdbp->tdb_rdomain_post, tdbp->tdb_tap);
-		if (encif == NULL) {
-			DPRINTF("no enc%u interface for SA %s/%08x/%u",
-			    tdbp->tdb_tap,
-			    ipsp_address(&dst_address, buf, sizeof(buf)),
-			    ntohl(spi), tdbp->tdb_sproto);
-			IPSEC_ISTAT(esps_pdrops, ahs_pdrops, ipcomps_pdrops);
-			goto drop;
-		}
-
-		/* XXX This conflicts with the scoped nature of IPv6 */
-		m->m_pkthdr.ph_ifidx = encif->if_index;
-	}
-
+	KERNEL_LOCK();
 	/* Register first use, setup expiration timer. */
 	if (tdbp->tdb_first_use == 0) {
 		tdbp->tdb_first_use = gettime();
@@ -340,8 +325,7 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 		}
 	}
 
-	tdbp->tdb_ipackets++;
-	tdbp->tdb_ibytes += m->m_pkthdr.len;
+	tdbstat_pkt(tdbp, tdb_ipackets, tdb_ibytes, m->m_pkthdr.len);
 
 	/*
 	 * Call appropriate transform and return -- callback takes care of
@@ -350,16 +334,17 @@ ipsec_common_input(struct mbuf **mp, int skip, int protoff, int af, int sproto,
 	prot = (*(tdbp->tdb_xform->xf_input))(mp, tdbp, skip, protoff);
 	if (prot == IPPROTO_DONE) {
 		ipsecstat_inc(ipsec_idrops);
-		tdbp->tdb_idrops++;
+		tdbstat_inc(tdbp, tdb_idrops);
 	}
 	tdb_unref(tdbp);
+	KERNEL_UNLOCK();
 	return prot;
 
  drop:
 	m_freemp(mp);
 	ipsecstat_inc(ipsec_idrops);
 	if (tdbp != NULL)
-		tdbp->tdb_idrops++;
+		tdbstat_inc(tdbp, tdb_idrops);
 	tdb_unref(tdbp);
 	return IPPROTO_DONE;
 }
@@ -377,9 +362,9 @@ ipsec_common_input_cb(struct mbuf **mp, struct tdb *tdbp, int skip, int protoff)
 #if NBPFILTER > 0
 	struct ifnet *encif;
 #endif
-	struct ip *ip, ipn;
+	struct ip *ip;
 #ifdef INET6
-	struct ip6_hdr *ip6, ip6n;
+	struct ip6_hdr *ip6;
 #endif /* INET6 */
 	struct m_tag *mtag;
 	struct tdb_ident *tdbi;
@@ -408,32 +393,6 @@ ipsec_common_input_cb(struct mbuf **mp, struct tdb *tdbp, int skip, int protoff)
 		ip->ip_sum = 0;
 		ip->ip_sum = in_cksum(m, ip->ip_hl << 2);
 		prot = ip->ip_p;
-
-		/* IP-in-IP encapsulation */
-		if (prot == IPPROTO_IPIP) {
-			if (m->m_pkthdr.len - skip < sizeof(struct ip)) {
-				IPSEC_ISTAT(esps_hdrops, ahs_hdrops,
-				    ipcomps_hdrops);
-				goto baddone;
-			}
-			/* ipn will now contain the inner IPv4 header */
-			m_copydata(m, skip, sizeof(struct ip),
-			    (caddr_t) &ipn);
-		}
-
-#ifdef INET6
-		/* IPv6-in-IP encapsulation. */
-		if (prot == IPPROTO_IPV6) {
-			if (m->m_pkthdr.len - skip < sizeof(struct ip6_hdr)) {
-				IPSEC_ISTAT(esps_hdrops, ahs_hdrops,
-				    ipcomps_hdrops);
-				goto baddone;
-			}
-			/* ip6n will now contain the inner IPv6 header. */
-			m_copydata(m, skip, sizeof(struct ip6_hdr),
-			    (caddr_t) &ip6n);
-		}
-#endif /* INET6 */
 	}
 
 #ifdef INET6
@@ -454,29 +413,6 @@ ipsec_common_input_cb(struct mbuf **mp, struct tdb *tdbp, int skip, int protoff)
 
 		/* Save protocol */
 		m_copydata(m, protoff, 1, (caddr_t) &prot);
-
-		/* IP-in-IP encapsulation */
-		if (prot == IPPROTO_IPIP) {
-			if (m->m_pkthdr.len - skip < sizeof(struct ip)) {
-				IPSEC_ISTAT(esps_hdrops, ahs_hdrops,
-				    ipcomps_hdrops);
-				goto baddone;
-			}
-			/* ipn will now contain the inner IPv4 header */
-			m_copydata(m, skip, sizeof(struct ip), (caddr_t) &ipn);
-		}
-
-		/* IPv6-in-IP encapsulation */
-		if (prot == IPPROTO_IPV6) {
-			if (m->m_pkthdr.len - skip < sizeof(struct ip6_hdr)) {
-				IPSEC_ISTAT(esps_hdrops, ahs_hdrops,
-				    ipcomps_hdrops);
-				goto baddone;
-			}
-			/* ip6n will now contain the inner IPv6 header. */
-			m_copydata(m, skip, sizeof(struct ip6_hdr),
-			    (caddr_t) &ip6n);
-		}
 	}
 #endif /* INET6 */
 
@@ -586,7 +522,7 @@ ipsec_common_input_cb(struct mbuf **mp, struct tdb *tdbp, int skip, int protoff)
 		m->m_flags |= M_TUNNEL;
 
 	ipsecstat_add(ipsec_idecompbytes, m->m_pkthdr.len);
-	tdbp->tdb_idecompbytes += m->m_pkthdr.len;
+	tdbstat_add(tdbp, tdb_idecompbytes, m->m_pkthdr.len);
 
 #if NBPFILTER > 0
 	encif = enc_getif(tdbp->tdb_rdomain_post, tdbp->tdb_tap);
@@ -594,6 +530,10 @@ ipsec_common_input_cb(struct mbuf **mp, struct tdb *tdbp, int skip, int protoff)
 		encif->if_ipackets++;
 		encif->if_ibytes += m->m_pkthdr.len;
 
+		if (sproto != IPPROTO_IPCOMP) {
+			/* XXX This conflicts with the scoped nature of IPv6 */
+			m->m_pkthdr.ph_ifidx = encif->if_index;
+		}
 		if (encif->if_bpf) {
 			struct enchdr hdr;
 
@@ -983,15 +923,16 @@ udpencap_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 
 	first = gettdbbysrcdst_rev(rdomain, 0, su_src, su_dst, IPPROTO_ESP);
 
+	mtx_enter(&tdb_sadb_mtx);
 	for (tdbp = first; tdbp != NULL; tdbp = tdbp->tdb_snext) {
 		if (tdbp->tdb_sproto == IPPROTO_ESP &&
 		    ((tdbp->tdb_flags & (TDBF_INVALID|TDBF_UDPENCAP)) ==
 		    TDBF_UDPENCAP) &&
 		    !memcmp(&tdbp->tdb_dst, &dst, su_dst->sa.sa_len) &&
-		    !memcmp(&tdbp->tdb_src, &src, su_src->sa.sa_len)) {
+		    !memcmp(&tdbp->tdb_src, &src, su_src->sa.sa_len))
 			ipsec_set_mtu(tdbp, mtu);
-		}
 	}
+	mtx_leave(&tdb_sadb_mtx);
 	tdb_unref(first);
 }
 
@@ -1048,7 +989,7 @@ ipsec_protoff(struct mbuf *m, int off, int af)
 			l = (ip6e.ip6e_len + 1) << 3;
 #ifdef DIAGNOSTIC
 		if (l <= 0)
-			panic("ah6_input: l went zero or negative");
+			panic("%s: l went zero or negative", __func__);
 #endif
 
 		nxt = ip6e.ip6e_nxt;

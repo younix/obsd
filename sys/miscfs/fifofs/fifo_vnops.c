@@ -1,4 +1,4 @@
-/*	$OpenBSD: fifo_vnops.c,v 1.85 2021/10/24 11:23:22 mpi Exp $	*/
+/*	$OpenBSD: fifo_vnops.c,v 1.90 2021/12/14 15:53:42 visa Exp $	*/
 /*	$NetBSD: fifo_vnops.c,v 1.18 1996/03/16 23:52:42 christos Exp $	*/
 
 /*
@@ -531,7 +531,7 @@ fifo_kqfilter(void *v)
 	case EVFILT_WRITE:
 		if (!(ap->a_fflag & FWRITE)) {
 			/* Tell upper layer to ask for POLLUP only */
-			if (ap->a_kn->kn_flags & __EV_POLL)
+			if (ap->a_kn->kn_flags & (__EV_POLL | __EV_SELECT))
 				return (EPERM);
 			return (EINVAL);
 		}
@@ -540,6 +540,14 @@ fifo_kqfilter(void *v)
 		sb = &so->so_snd;
 		break;
 	case EVFILT_EXCEPT:
+		if (ap->a_kn->kn_flags & __EV_SELECT) {
+			/* Prevent triggering exceptfds. */
+			return (EPERM);
+		}
+		if ((ap->a_kn->kn_flags & __EV_POLL) == 0) {
+			/* Disallow usage through kevent(2). */
+			return (EINVAL);
+		}
 		ap->a_kn->kn_fop = &fifoexcept_filtops;
 		so = fip->fi_readsock;
 		sb = &so->so_rcv;
@@ -576,10 +584,12 @@ filt_fiforead_common(struct knote *kn, struct socket *so)
 		if (kn->kn_flags & __EV_POLL) {
 			if (so->so_state & SS_ISDISCONNECTED)
 				kn->kn_flags |= __EV_HUP;
+			else
+				kn->kn_flags &= ~__EV_HUP;
 		}
 		rv = 1;
 	} else {
-		kn->kn_flags &= ~EV_EOF;
+		kn->kn_flags &= ~(EV_EOF | __EV_HUP);
 		rv = (kn->kn_data > 0);
 	}
 
@@ -700,13 +710,13 @@ filt_fifoexcept_common(struct knote *kn, struct socket *so)
 
 	soassertlocked(so);
 
-	if (so->so_state & SS_CANTRCVMORE) {
-		kn->kn_flags |= EV_EOF;
-		if (kn->kn_flags & __EV_POLL) {
-			if (so->so_state & SS_ISDISCONNECTED)
-				kn->kn_flags |= __EV_HUP;
+	if (kn->kn_flags & __EV_POLL) {
+		if (so->so_state & SS_ISDISCONNECTED) {
+			kn->kn_flags |= __EV_HUP;
+			rv = 1;
+		} else {
+			kn->kn_flags &= ~__EV_HUP;
 		}
-		rv = 1;
 	}
 
 	return (rv);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: efiacpi.c,v 1.12 2021/06/06 23:56:55 krw Exp $	*/
+/*	$OpenBSD: efiacpi.c,v 1.14 2022/01/02 02:13:33 jsg Exp $	*/
 
 /*
  * Copyright (c) 2018 Mark Kettenis <kettenis@openbsd.org>
@@ -186,7 +186,7 @@ struct acpi_fadt {
 	/*
 	 * Following values only exist when rev > 1
 	 * If the extended addresses exists, they
-	 * must be used in preferense to the non-
+	 * must be used in preference to the non-
 	 * extended values above
 	 */
 	struct acpi_gas	reset_reg;
@@ -227,7 +227,7 @@ struct acpi_gtdt {
 	uint32_t	nonsec_el2_flags;
 	uint64_t	cnt_read_base;
 	uint32_t	platform_timer_count;
-	uint32_t	plaform_timer_offset;
+	uint32_t	platform_timer_offset;
 } __packed;
 
 struct acpi_madt {

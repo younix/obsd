@@ -1,4 +1,4 @@
-/* $OpenBSD: ts.c,v 1.15 2018/02/07 05:47:55 jsing Exp $ */
+/* $OpenBSD: ts.c,v 1.17 2021/12/12 20:22:59 tb Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -547,19 +547,24 @@ create_digest(BIO * input, char *digest, const EVP_MD * md,
 		goto err;
 	if (input) {
 		/* Digest must be computed from an input file. */
-		EVP_MD_CTX md_ctx;
+		EVP_MD_CTX *md_ctx;
 		unsigned char buffer[4096];
 		int length;
 
 		*md_value = malloc(md_value_len);
-		if (*md_value == 0)
+		if (*md_value == NULL)
 			goto err;
 
-		EVP_DigestInit(&md_ctx, md);
+		if ((md_ctx = EVP_MD_CTX_new()) == NULL)
+			goto err;
+
+		EVP_DigestInit(md_ctx, md);
 		while ((length = BIO_read(input, buffer, sizeof(buffer))) > 0) {
-			EVP_DigestUpdate(&md_ctx, buffer, length);
+			EVP_DigestUpdate(md_ctx, buffer, length);
 		}
-		EVP_DigestFinal(&md_ctx, *md_value, NULL);
+		EVP_DigestFinal(md_ctx, *md_value, NULL);
+
+		EVP_MD_CTX_free(md_ctx);
 	} else {
 		/* Digest bytes are specified with digest. */
 		long digest_len;

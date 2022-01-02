@@ -12,9 +12,9 @@ D/openssl11////
 /Makefile.inc/1.16/Thu Dec  2 13:56:24 2021//
 /test-cert.c/1.15/Sun Nov 21 20:15:22 2021//
 /test-gbr.c/1.5/Sun Nov 21 20:15:22 2021//
-/test-http.c/1.6/Sun Nov 21 20:15:22 2021//
 /test-mft.c/1.17/Sun Nov 21 20:15:22 2021//
 /test-roa.c/1.14/Sun Nov 21 20:15:22 2021//
-/test-rrdp.c/1.1/Wed Dec  1 09:03:19 2021//
 /test-tal.c/1.8/Sun Nov 21 20:15:22 2021//
 D/rrdp////
+/test-http.c/1.7/Sun Jan  2 13:11:00 2022//
+/test-rrdp.c/1.2/Sun Jan  2 13:11:00 2022//

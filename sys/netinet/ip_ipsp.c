@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_ipsp.c,v 1.260 2021/12/02 12:39:15 bluhm Exp $	*/
+/*	$OpenBSD: ip_ipsp.c,v 1.267 2021/12/20 15:59:09 mvs Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr),
@@ -242,8 +242,6 @@ reserve_spi(u_int rdomain, u_int32_t sspi, u_int32_t tspi,
 	u_int32_t spi;
 	int nums;
 
-	NET_ASSERT_LOCKED();
-
 	/* Don't accept ranges only encompassing reserved SPIs. */
 	if (sproto != IPPROTO_IPCOMP &&
 	    (tspi < sspi || tspi <= SPI_RESERVED_MAX)) {
@@ -312,11 +310,13 @@ reserve_spi(u_int rdomain, u_int32_t sspi, u_int32_t tspi,
 #ifdef IPSEC
 		/* Setup a "silent" expiration (since TDBF_INVALID's set). */
 		if (ipsec_keep_invalid > 0) {
+			mtx_enter(&tdbp->tdb_mtx);
 			tdbp->tdb_flags |= TDBF_TIMER;
 			tdbp->tdb_exp_timeout = ipsec_keep_invalid;
 			if (timeout_add_sec(&tdbp->tdb_timer_tmo,
 			    ipsec_keep_invalid))
 				tdb_ref(tdbp);
+			mtx_leave(&tdbp->tdb_mtx);
 		}
 #endif
 
@@ -341,6 +341,8 @@ gettdb_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *dst,
 {
 	u_int32_t hashval;
 	struct tdb *tdbp;
+
+	NET_ASSERT_LOCKED();
 
 	mtx_enter(&tdb_sadb_mtx);
 	hashval = tdb_hash(spi, dst, proto);
@@ -373,7 +375,7 @@ gettdbbysrcdst_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *src,
 	mtx_enter(&tdb_sadb_mtx);
 	hashval = tdb_hash(0, src, proto);
 
-	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
+	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext) {
 		if (tdbp->tdb_sproto == proto &&
 		    (spi == 0 || tdbp->tdb_spi == spi) &&
 		    ((!reverse && tdbp->tdb_rdomain == rdomain) ||
@@ -383,7 +385,7 @@ gettdbbysrcdst_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *src,
 		    !memcmp(&tdbp->tdb_dst, dst, dst->sa.sa_len)) &&
 		    !memcmp(&tdbp->tdb_src, src, src->sa.sa_len))
 			break;
-
+	}
 	if (tdbp != NULL) {
 		tdb_ref(tdbp);
 		mtx_leave(&tdb_sadb_mtx);
@@ -394,7 +396,7 @@ gettdbbysrcdst_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *src,
 	su_null.sa.sa_len = sizeof(struct sockaddr);
 	hashval = tdb_hash(0, &su_null, proto);
 
-	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
+	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext) {
 		if (tdbp->tdb_sproto == proto &&
 		    (spi == 0 || tdbp->tdb_spi == spi) &&
 		    ((!reverse && tdbp->tdb_rdomain == rdomain) ||
@@ -404,7 +406,7 @@ gettdbbysrcdst_dir(u_int rdomain, u_int32_t spi, union sockaddr_union *src,
 		    !memcmp(&tdbp->tdb_dst, dst, dst->sa.sa_len)) &&
 		    tdbp->tdb_src.sa.sa_family == AF_UNSPEC)
 			break;
-
+	}
 	tdb_ref(tdbp);
 	mtx_leave(&tdb_sadb_mtx);
 	return tdbp;
@@ -493,7 +495,7 @@ gettdbbysrc(u_int rdomain, union sockaddr_union *src, u_int8_t sproto,
 	mtx_enter(&tdb_sadb_mtx);
 	hashval = tdb_hash(0, src, sproto);
 
-	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext)
+	for (tdbp = tdbsrc[hashval]; tdbp != NULL; tdbp = tdbp->tdb_snext) {
 		if ((tdbp->tdb_sproto == sproto) &&
 		    (tdbp->tdb_rdomain == rdomain) &&
 		    ((tdbp->tdb_flags & TDBF_INVALID) == 0) &&
@@ -503,7 +505,7 @@ gettdbbysrc(u_int rdomain, union sockaddr_union *src, u_int8_t sproto,
 				continue;
 			break;
 		}
-
+	}
 	tdb_ref(tdbp);
 	mtx_leave(&tdb_sadb_mtx);
 	return tdbp;
@@ -624,30 +626,36 @@ tdb_printit(void *addr, int full, int (*pr)(const char *, ...))
 int
 tdb_walk(u_int rdomain, int (*walker)(struct tdb *, void *, int), void *arg)
 {
-	int i, rval = 0;
-	struct tdb *tdbp, *next;
+	SIMPLEQ_HEAD(, tdb) tdblist;
+	struct tdb *tdbp;
+	int i, rval;
 
 	/*
-	 * The walker may aquire the kernel lock.  Grab it here to keep
-	 * the lock order.
+	 * The walker may sleep.  So we cannot hold the tdb_sadb_mtx while
+	 * traversing the tdb_hnext list.  Create a new tdb_walk list with
+	 * exclusive netlock protection.
 	 */
-	KERNEL_LOCK();
+	NET_ASSERT_WLOCKED();
+	SIMPLEQ_INIT(&tdblist);
+
 	mtx_enter(&tdb_sadb_mtx);
 	for (i = 0; i <= tdb_hashmask; i++) {
-		for (tdbp = tdbh[i]; rval == 0 && tdbp != NULL; tdbp = next) {
-			next = tdbp->tdb_hnext;
-
+		for (tdbp = tdbh[i]; tdbp != NULL; tdbp = tdbp->tdb_hnext) {
 			if (rdomain != tdbp->tdb_rdomain)
 				continue;
-
-			if (i == tdb_hashmask && next == NULL)
-				rval = walker(tdbp, (void *)arg, 1);
-			else
-				rval = walker(tdbp, (void *)arg, 0);
+			tdb_ref(tdbp);
+			SIMPLEQ_INSERT_TAIL(&tdblist, tdbp, tdb_walk);
 		}
 	}
 	mtx_leave(&tdb_sadb_mtx);
-	KERNEL_UNLOCK();
+
+	rval = 0;
+	while ((tdbp = SIMPLEQ_FIRST(&tdblist)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(&tdblist, tdb_walk);
+		if (rval == 0)
+			rval = walker(tdbp, arg, SIMPLEQ_EMPTY(&tdblist));
+		tdb_unref(tdbp);
+	}
 
 	return rval;
 }
@@ -700,11 +708,14 @@ tdb_soft_timeout(void *v)
 	struct tdb *tdb = v;
 
 	NET_LOCK();
+	mtx_enter(&tdb->tdb_mtx);
 	if (tdb->tdb_flags & TDBF_SOFT_TIMER) {
+		tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
+		mtx_leave(&tdb->tdb_mtx);
 		/* Soft expirations. */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_TIMER;
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 	/* decrement refcount of the timeout argument */
 	tdb_unref(tdb);
 	NET_UNLOCK();
@@ -716,12 +727,15 @@ tdb_soft_firstuse(void *v)
 	struct tdb *tdb = v;
 
 	NET_LOCK();
+	mtx_enter(&tdb->tdb_mtx);
 	if (tdb->tdb_flags & TDBF_SOFT_FIRSTUSE) {
+		tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
+		mtx_leave(&tdb->tdb_mtx);
 		/* If the TDB hasn't been used, don't renew it. */
 		if (tdb->tdb_first_use != 0)
 			pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_FIRSTUSE;
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 	/* decrement refcount of the timeout argument */
 	tdb_unref(tdb);
 	NET_UNLOCK();
@@ -754,7 +768,6 @@ tdb_rehash(void)
 		free(new_srcaddr, M_TDB, 0);
 		return (ENOMEM);
 	}
-
 
 	for (i = 0; i <= old_hashmask; i++) {
 		for (tdbp = tdbh[i]; tdbp != NULL; tdbp = tdbnp) {
@@ -899,8 +912,7 @@ tdb_unlink_locked(struct tdb *tdbp)
 
 	if (tdbsrc[hashval] == tdbp) {
 		tdbsrc[hashval] = tdbp->tdb_snext;
-	}
-	else {
+	} else {
 		for (tdbpp = tdbsrc[hashval]; tdbpp != NULL;
 		    tdbpp = tdbpp->tdb_snext) {
 			if (tdbpp->tdb_snext == tdbp) {
@@ -919,6 +931,21 @@ tdb_unlink_locked(struct tdb *tdbp)
 		ipsecstat_inc(ipsec_prevtunnels);
 	}
 #endif /* IPSEC */
+}
+
+void
+tdb_cleanspd(struct tdb *tdbp)
+{
+	struct ipsec_policy *ipo;
+
+	mtx_enter(&ipo_tdb_mtx);
+	while ((ipo = TAILQ_FIRST(&tdbp->tdb_policy_head)) != NULL) {
+		TAILQ_REMOVE(&tdbp->tdb_policy_head, ipo, ipo_tdb_next);
+		tdb_unref(ipo->ipo_tdb);
+		ipo->ipo_tdb = NULL;
+		ipo->ipo_last_searched = 0; /* Force a re-search. */
+	}
+	mtx_leave(&ipo_tdb_mtx);
 }
 
 void
@@ -945,6 +972,9 @@ tdb_unbundle(struct tdb *tdbp)
 void
 tdb_deltimeouts(struct tdb *tdbp)
 {
+	mtx_enter(&tdbp->tdb_mtx);
+	tdbp->tdb_flags &= ~(TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE | TDBF_TIMER |
+	    TDBF_SOFT_TIMER);
 	if (timeout_del(&tdbp->tdb_timer_tmo))
 		tdb_unref(tdbp);
 	if (timeout_del(&tdbp->tdb_first_tmo))
@@ -953,6 +983,7 @@ tdb_deltimeouts(struct tdb *tdbp)
 		tdb_unref(tdbp);
 	if (timeout_del(&tdbp->tdb_sfirst_tmo))
 		tdb_unref(tdbp);
+	mtx_leave(&tdbp->tdb_mtx);
 }
 
 struct tdb *
@@ -977,13 +1008,19 @@ tdb_unref(struct tdb *tdb)
 void
 tdb_delete(struct tdb *tdbp)
 {
-	/* keep in sync with pfkeyv2_sa_flush() */
 	NET_ASSERT_LOCKED();
 
-	if (tdbp->tdb_flags & TDBF_DELETED)
+	mtx_enter(&tdbp->tdb_mtx);
+	if (tdbp->tdb_flags & TDBF_DELETED) {
+		mtx_leave(&tdbp->tdb_mtx);
 		return;
+	}
 	tdbp->tdb_flags |= TDBF_DELETED;
+	mtx_leave(&tdbp->tdb_mtx);
 	tdb_unlink(tdbp);
+
+	/* cleanup SPD references */
+	tdb_cleanspd(tdbp);
 	/* release tdb_onext/tdb_inext references */
 	tdb_unbundle(tdbp);
 	/* delete timeouts and release references */
@@ -1000,11 +1037,10 @@ tdb_alloc(u_int rdomain)
 {
 	struct tdb *tdbp;
 
-	NET_ASSERT_LOCKED();
-
 	tdbp = pool_get(&tdb_pool, PR_WAITOK | PR_ZERO);
 
 	refcnt_init(&tdbp->tdb_refcnt);
+	mtx_init(&tdbp->tdb_mtx, IPL_SOFTNET);
 	TAILQ_INIT(&tdbp->tdb_policy_head);
 
 	/* Record establishment time. */
@@ -1013,6 +1049,9 @@ tdb_alloc(u_int rdomain)
 	/* Save routing domain */
 	tdbp->tdb_rdomain = rdomain;
 	tdbp->tdb_rdomain_post = rdomain;
+
+	/* Initialize counters. */
+	tdbp->tdb_counters = counters_alloc(tdb_ncounters);
 
 	/* Initialize timeouts. */
 	timeout_set_proc(&tdbp->tdb_timer_tmo, tdb_timeout, tdbp);
@@ -1026,8 +1065,6 @@ tdb_alloc(u_int rdomain)
 void
 tdb_free(struct tdb *tdbp)
 {
-	struct ipsec_policy *ipo;
-
 	NET_ASSERT_LOCKED();
 
 	if (tdbp->tdb_xform) {
@@ -1040,13 +1077,7 @@ tdb_free(struct tdb *tdbp)
 	pfsync_delete_tdb(tdbp);
 #endif
 
-	/* Cleanup SPD references. */
-	while ((ipo = TAILQ_FIRST(&tdbp->tdb_policy_head)) != NULL) {
-		TAILQ_REMOVE(&tdbp->tdb_policy_head, ipo, ipo_tdb_next);
-		tdb_unref(ipo->ipo_tdb);
-		ipo->ipo_tdb = NULL;
-		ipo->ipo_last_searched = 0; /* Force a re-search. */
-	}
+	KASSERT(TAILQ_EMPTY(&tdbp->tdb_policy_head));
 
 	if (tdbp->tdb_ids) {
 		ipsp_ids_free(tdbp->tdb_ids);
@@ -1060,12 +1091,12 @@ tdb_free(struct tdb *tdbp)
 	}
 #endif
 
+	counters_free(tdbp->tdb_counters, tdb_ncounters);
+
 	KASSERT(tdbp->tdb_onext == NULL);
 	KASSERT(tdbp->tdb_inext == NULL);
 
 	/* Remove expiration timeouts. */
-	tdbp->tdb_flags &= ~(TDBF_FIRSTUSE | TDBF_SOFT_FIRSTUSE | TDBF_TIMER |
-	    TDBF_SOFT_TIMER);
 	KASSERT(timeout_pending(&tdbp->tdb_timer_tmo) == 0);
 	KASSERT(timeout_pending(&tdbp->tdb_first_tmo) == 0);
 	KASSERT(timeout_pending(&tdbp->tdb_stimer_tmo) == 0);

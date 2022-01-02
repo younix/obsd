@@ -1,8 +1,6 @@
-/AMDGPU.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /ARC.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /ARM.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /AVR.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
-/BPF.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /Hexagon.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /Lanai.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /MSP430.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
@@ -13,7 +11,11 @@
 /i386.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /x86_64.def/1.1.1.1/Thu Dec 17 19:39:54 2020/-ko/
 /AArch64.def/1.1.1.2/Wed Sep  1 16:07:33 2021/-ko/
-/PowerPC64.def/1.1.1.2/Wed Sep  1 16:07:33 2021/-ko/
 /RISCV.def/1.1.1.2/Wed Sep  1 16:07:33 2021/-ko/
 /VE.def/1.1.1.1/Wed Sep  1 16:07:33 2021/-ko/
+/AMDGPU.def/1.1.1.2/Sun Jan  2 13:09:59 2022/-ko/
+/BPF.def/1.1.1.2/Sun Jan  2 13:09:59 2022/-ko/
+/CSKY.def/1.1.1.1/Fri Dec 17 12:23:22 2021/-ko/
+/M68k.def/1.1.1.1/Fri Dec 17 12:23:22 2021/-ko/
+/PowerPC64.def/1.1.1.3/Sun Jan  2 13:09:59 2022/-ko/
 D

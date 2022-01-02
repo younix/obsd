@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.505 2021/11/02 08:25:47 patrick Exp $
+#	$OpenBSD: GENERIC,v 1.508 2021/12/26 13:55:36 kettenis Exp $
 #
 # For further information on compiling OpenBSD kernels, see the config(8)
 # man page.
@@ -65,6 +65,11 @@ amdgpio*	at acpi?
 aplgpio*	at acpi?
 bytgpio*	at acpi?
 chvgpio*	at acpi?
+com0		at acpi? addr 0x3f8
+com1		at acpi? addr 0x2f8
+com2		at acpi? addr 0x3e8
+com3		at acpi? addr 0x2e8
+com*		at acpi?
 glkgpio*	at acpi?
 pchgpio*	at acpi?
 sdhc*		at acpi?
@@ -318,6 +323,7 @@ uath*	at uhub?		# Atheros AR5005UG/AR5005UX
 ural*	at uhub?		# Ralink RT2500USB
 rum*	at uhub?		# Ralink RT2501USB/RT2601USB
 run*	at uhub?		# Ralink RT2700U/RT2800U/RT3000U
+#mtw*	at uhub?		# MediaTek MT7601U
 otus*	at uhub?		# Atheros AR9001U
 athn*	at uhub?		# Atheros AR9002U
 zyd*	at uhub?		# Zydas ZD1211

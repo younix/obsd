@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_esp.c,v 1.188 2021/11/21 16:17:48 mvs Exp $ */
+/*	$OpenBSD: ip_esp.c,v 1.193 2021/12/23 22:35:11 bluhm Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and
@@ -347,7 +347,7 @@ esp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	struct mbuf *m = *mp, *m1, *mo;
 	struct cryptodesc *crde = NULL, *crda = NULL;
 	struct cryptop *crp = NULL;
-	int plen, alen, hlen, error, clen, roff;
+	int plen, alen, hlen, error, roff;
 	uint32_t btsx, esn;
 #ifdef ENCDEBUG
 	char buf[INET6_ADDRSTRLEN];
@@ -420,7 +420,7 @@ esp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 
 	/* Update the counters */
 	tdb->tdb_cur_bytes += plen;
-	tdb->tdb_ibytes += plen;
+	tdbstat_add(tdb, tdb_ibytes, plen);
 	espstat_add(esps_ibytes, plen);
 
 	/* Hard expiration */
@@ -433,11 +433,15 @@ esp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 	}
 
 	/* Notify on soft expiration */
+	mtx_enter(&tdb->tdb_mtx);
 	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
 	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;       /* Turn off checking */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 
 	/* Get crypto descriptors */
 	crp = crypto_getreq(esph && espx ? 2 : 1);
@@ -498,20 +502,16 @@ esp_input(struct mbuf **mp, struct tdb *tdb, int skip, int protoff)
 			crde->crd_len = plen;
 	}
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);
 		goto drop;
 	}
-
-	clen = crp->crp_olen;
 
 	/* Release the crypto descriptors */
 	crypto_freereq(crp);
@@ -690,7 +690,7 @@ esp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 {
 	const struct enc_xform *espx = tdb->tdb_encalgxform;
 	const struct auth_hash *esph = tdb->tdb_authalgxform;
-	int ilen, olen, hlen, rlen, padding, blks, alen, roff, error;
+	int ilen, hlen, rlen, padding, blks, alen, roff, error;
 	uint64_t replay64;
 	uint32_t replay;
 	struct mbuf *mi, *mo = (struct mbuf *) NULL;
@@ -781,8 +781,8 @@ esp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	espstat_add(esps_obytes, m->m_pkthdr.len - skip);
 
 	/* Hard byte expiration. */
-	if (tdb->tdb_flags & TDBF_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes) {
+	if ((tdb->tdb_flags & TDBF_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_exp_bytes)) {
 		ipsecstat_inc(ipsec_exctdb);
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_HARD);
 		tdb_delete(tdb);
@@ -791,11 +791,15 @@ esp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 	}
 
 	/* Soft byte expiration. */
-	if (tdb->tdb_flags & TDBF_SOFT_BYTES &&
-	    tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes) {
+	mtx_enter(&tdb->tdb_mtx);
+	if ((tdb->tdb_flags & TDBF_SOFT_BYTES) &&
+	    (tdb->tdb_cur_bytes >= tdb->tdb_soft_bytes)) {
+		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;  /* Turn off checking */
+		mtx_leave(&tdb->tdb_mtx);
+		/* may sleep in solock() for the pfkey socket */
 		pfkeyv2_expire(tdb, SADB_EXT_LIFETIME_SOFT);
-		tdb->tdb_flags &= ~TDBF_SOFT_BYTES;    /* Turn off checking. */
-	}
+	} else
+		mtx_leave(&tdb->tdb_mtx);
 
 	/*
 	 * Loop through mbuf chain; if we find a readonly mbuf,
@@ -942,21 +946,16 @@ esp_output(struct mbuf *m, struct tdb *tdb, int skip, int protoff)
 			crda->crd_len = m->m_pkthdr.len - (skip + alen);
 	}
 
-	KERNEL_LOCK();
 	while ((error = crypto_invoke(crp)) == EAGAIN) {
 		/* Reset the session ID */
 		if (tdb->tdb_cryptoid != 0)
 			tdb->tdb_cryptoid = crp->crp_sid;
 	}
-	KERNEL_UNLOCK();
 	if (error) {
 		DPRINTF("crypto error %d", error);
 		ipsecstat_inc(ipsec_noxform);
 		goto drop;
 	}
-
-	ilen = crp->crp_ilen;
-	olen = crp->crp_olen;
 
 	/* Release the crypto descriptors */
 	crypto_freereq(crp);

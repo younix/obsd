@@ -15,3 +15,5 @@ D/diagtool////
 D/driver////
 D/libclang////
 D/scan-build////
+D/apinotes-test////
+D/clang-repl////

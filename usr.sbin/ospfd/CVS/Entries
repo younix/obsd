@@ -6,7 +6,6 @@
 /in_cksum.c/1.7/Sun Jul 20 20:27:19 2014//
 /iso_cksum.c/1.5/Fri Feb  3 12:51:12 2006//
 /log.c/1.12/Tue Mar 21 12:06:56 2017//
-/log.h/1.10/Tue Jan 24 04:24:25 2017//
 /logmsg.c/1.1/Fri Sep  2 14:04:25 2016//
 /name2id.c/1.2/Tue Jun 19 16:45:15 2007//
 /ospf.h/1.23/Thu Jan 17 09:14:15 2013//
@@ -32,4 +31,5 @@
 /lsupdate.c/1.50/Sun Nov 21 20:15:22 2021//
 /neighbor.c/1.50/Sun Nov 21 20:15:22 2021//
 /packet.c/1.36/Sun Nov 21 20:15:22 2021//
+/log.h/1.11/Sun Jan  2 13:11:15 2022//
 D

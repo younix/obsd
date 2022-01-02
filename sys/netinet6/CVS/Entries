@@ -7,7 +7,6 @@
 /mld6.h/1.2/Mon Mar 22 21:29:22 2010//
 /mld6_var.h/1.6/Fri Apr 18 06:42:20 2008//
 /nd6.h/1.76/Sat Mar 28 16:15:45 2020//
-/nd6_nbr.c/1.129/Fri Nov 29 16:41:02 2019//
 /nd6_rtr.c/1.167/Fri Jun 21 17:11:43 2019//
 /raw_ip6.h/1.4/Thu Feb  9 15:23:35 2017//
 /route6.c/1.21/Fri Apr 14 20:46:31 2017//
@@ -20,15 +19,16 @@
 /in6_pcb.c/1.112/Wed Sep  1 16:07:40 2021//
 /in6_src.c/1.85/Wed Sep  1 16:07:40 2021//
 /ip6_id.c/1.16/Wed Sep  1 16:07:40 2021//
-/ip6_mroute.c/1.126/Wed Sep  1 16:07:40 2021//
 /ip6protosw.h/1.14/Wed Sep  1 16:07:40 2021//
 /udp6_output.c/1.57/Wed Sep  1 16:07:40 2021//
 /icmp6.c/1.236/Thu Sep  2 14:22:32 2021//
 /in6.h/1.109/Thu Sep  2 14:22:32 2021//
-/ip6_input.c/1.237/Thu Sep  2 14:22:32 2021//
 /in6_proto.c/1.106/Mon Nov 15 19:06:15 2021//
-/ip6_forward.c/1.103/Thu Dec  2 13:56:31 2021//
-/ip6_output.c/1.262/Thu Dec  2 13:56:31 2021//
 /ip6_var.h/1.89/Thu Dec  2 13:56:31 2021//
 /nd6.c/1.236/Sun Nov 21 20:15:22 2021//
+/ip6_forward.c/1.104/Sun Jan  2 13:11:10 2022//
+/ip6_input.c/1.238/Sun Jan  2 13:11:10 2022//
+/ip6_mroute.c/1.127/Sun Jan  2 13:11:10 2022//
+/ip6_output.c/1.265/Sun Jan  2 13:11:10 2022//
+/nd6_nbr.c/1.130/Sun Jan  2 13:11:10 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cd9660_vnops.c,v 1.90 2021/10/02 08:51:41 semarie Exp $	*/
+/*	$OpenBSD: cd9660_vnops.c,v 1.92 2021/12/12 09:14:59 visa Exp $	*/
 /*	$NetBSD: cd9660_vnops.c,v 1.42 1997/10/16 23:56:57 christos Exp $	*/
 
 /*-
@@ -746,7 +746,7 @@ cd9660_strategy(void *v)
 	}
 	vp = ip->i_devvp;
 	bp->b_dev = vp->v_rdev;
-	(vp->v_op->vop_strategy)(ap);
+	VOP_STRATEGY(vp, bp);
 	return (0);
 }
 
@@ -1017,7 +1017,7 @@ filt_cd9660read(struct knote *kn, long hint)
 		return (1);
 	}
 
-	if (kn->kn_flags & __EV_POLL)
+	if (kn->kn_flags & (__EV_POLL | __EV_SELECT))
 		return (1);
 
 	return (kn->kn_data != 0);

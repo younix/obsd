@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfmvar.h,v 1.25 2021/10/23 12:48:17 kettenis Exp $ */
+/* $OpenBSD: bwfmvar.h,v 1.28 2021/12/27 13:54:39 patrick Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -37,6 +37,7 @@
 #define BRCM_CC_4350_CHIP_ID		0x4350
 #define BRCM_CC_43525_CHIP_ID		43525
 #define BRCM_CC_4354_CHIP_ID		0x4354
+#define BRCM_CC_4355_CHIP_ID		0x4355
 #define BRCM_CC_4356_CHIP_ID		0x4356
 #define BRCM_CC_43566_CHIP_ID		43566
 #define BRCM_CC_43567_CHIP_ID		43567
@@ -45,11 +46,18 @@
 #define BRCM_CC_4358_CHIP_ID		0x4358
 #define BRCM_CC_4359_CHIP_ID		0x4359
 #define BRCM_CC_43602_CHIP_ID		43602
+#define BRCM_CC_4364_CHIP_ID		0x4364
 #define BRCM_CC_4365_CHIP_ID		0x4365
 #define BRCM_CC_4366_CHIP_ID		0x4366
+#define BRCM_CC_43664_CHIP_ID		43664
+#define BRCM_CC_43666_CHIP_ID		43666
 #define BRCM_CC_4371_CHIP_ID		0x4371
+#define BRCM_CC_4377_CHIP_ID		0x4377
 #define BRCM_CC_4378_CHIP_ID		0x4378
+#define BRCM_CC_4387_CHIP_ID		0x4387
 #define CY_CC_4373_CHIP_ID		0x4373
+#define CY_CC_43012_CHIP_ID		43012
+#define CY_CC_43752_CHIP_ID		43752
 
 /* Defaults */
 #define BWFM_DEFAULT_SCAN_CHANNEL_TIME	40
@@ -130,6 +138,10 @@ struct bwfm_cmd_flowring_create {
 	int			 prio;
 };
 
+struct bwfm_cmd_flowring_delete {
+	int			 flowid;
+};
+
 struct bwfm_host_cmd_ring {
 #define BWFM_HOST_CMD_RING_COUNT	32
 	struct bwfm_host_cmd	 cmd[BWFM_HOST_CMD_RING_COUNT];
@@ -174,6 +186,10 @@ struct bwfm_softc {
 
 	u_char			*sc_clm;
 	size_t			 sc_clmsize;
+	u_char			*sc_txcap;
+	size_t			 sc_txcapsize;
+	u_char			*sc_cal;
+	size_t			 sc_calsize;
 	int			 sc_key_tasks;
 };
 

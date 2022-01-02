@@ -1,5 +1,4 @@
 /crtbegin.c/1.26/Wed Jan  9 16:42:38 2019//
-/crtbeginS.c/1.20/Wed Jan  9 16:42:38 2019//
 /crtend.c/1.12/Sat Jan 21 00:45:13 2017//
 /crtendS.c/1.10/Sat Jan 21 00:45:13 2017//
 /extern.h/1.5/Fri May 10 13:29:21 2019//
@@ -20,3 +19,4 @@ D/riscv64////
 /Makefile/1.36/Sun Nov 21 20:15:22 2021//
 /boot.h/1.32/Sun Nov 21 20:15:22 2021//
 /crt0.c/1.16/Sun Nov 21 20:15:22 2021//
+/crtbeginS.c/1.21/Sun Jan  2 13:10:40 2022//

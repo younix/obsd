@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.154 2021/10/07 08:21:22 claudio Exp $	*/
+/*	$OpenBSD: trap.c,v 1.156 2021/12/23 18:50:32 guenther Exp $	*/
 
 /*
  * Copyright (c) 1998-2004 Michael Shalayeff
@@ -762,9 +762,9 @@ void	syscall(struct trapframe *frame);
 void
 syscall(struct trapframe *frame)
 {
-	register struct proc *p = curproc;
-	register const struct sysent *callp;
-	int retq, nsys, code, argsize, argoff, error;
+	struct proc *p = curproc;
+	const struct sysent *callp;
+	int retq, code, argsize, argoff, error;
 	register_t args[8], rval[2];
 #ifdef DIAGNOSTIC
 	int oldcpl = curcpu()->ci_cpl;
@@ -776,8 +776,6 @@ syscall(struct trapframe *frame)
 		panic("syscall");
 
 	p->p_md.md_regs = frame;
-	nsys = p->p_p->ps_emul->e_nsysent;
-	callp = p->p_p->ps_emul->e_sysent;
 
 	argoff = 4; retq = 0;
 	switch (code = frame->tf_t1) {
@@ -789,8 +787,6 @@ syscall(struct trapframe *frame)
 		argoff = 3;
 		break;
 	case SYS___syscall:
-		if (callp != sysent)
-			break;
 		/*
 		 * this works, because quads get magically swapped
 		 * due to the args being laid backwards on the stack
@@ -810,8 +806,9 @@ syscall(struct trapframe *frame)
 		break;
 	}
 
-	if (code < 0 || code >= nsys)
-		callp += p->p_p->ps_emul->e_nosys;	/* bad syscall # */
+	callp = sysent;
+	if (code < 0 || code >= SYS_MAXSYSCALL)
+		callp += SYS_syscall;
 	else
 		callp += code;
 
@@ -852,6 +849,17 @@ syscall(struct trapframe *frame)
 		case SYS_pwrite:	i = 4;	break;
 		case SYS_mquery:
 		case SYS_mmap:		i = 6;	break;
+#ifdef SYS_pad_lseek
+		case SYS_pad_lseek:	retq = 0;
+		case SYS_pad_truncate:
+		case SYS_pad_ftruncate:	i = 2;	break;
+		case SYS_pad_preadv:
+		case SYS_pad_pwritev:
+		case SYS_pad_pread:
+		case SYS_pad_pwrite:	i = 4;	break;
+		case SYS_pad_mquery:
+		case SYS_pad_mmap:	i = 6;	break;
+#endif
 		}
 
 		if (i) {

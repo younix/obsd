@@ -41,9 +41,9 @@
 /sys_machdep.c/1.7/Thu Jun 26 05:42:08 2008//
 /vm_machdep.c/1.47/Thu Aug 17 20:50:51 2017//
 /cpu.c/1.44/Fri Dec 11 17:58:22 2020//
-/trap.c/1.99/Sat May  1 08:41:51 2021//
 /clock.c/1.25/Wed Sep  1 16:07:38 2021//
 /pmap.c/1.87/Wed Sep  1 16:07:38 2021//
 /machdep.c/1.196/Wed Oct 20 17:29:07 2021//
 /conf.c/1.90/Sun Nov 21 20:15:22 2021//
+/trap.c/1.100/Sun Jan  2 13:11:02 2022//
 D

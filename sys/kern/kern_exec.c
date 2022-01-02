@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_exec.c,v 1.223 2021/03/16 16:32:22 deraadt Exp $	*/
+/*	$OpenBSD: kern_exec.c,v 1.228 2021/12/09 00:26:10 guenther Exp $	*/
 /*	$NetBSD: kern_exec.c,v 1.75 1996/02/09 18:59:28 christos Exp $	*/
 
 /*-
@@ -47,6 +47,7 @@
 #include <sys/file.h>
 #include <sys/acct.h>
 #include <sys/exec.h>
+#include <sys/exec_elf.h>
 #include <sys/ktrace.h>
 #include <sys/resourcevar.h>
 #include <sys/wait.h>
@@ -66,6 +67,7 @@
 
 #include <sys/timetc.h>
 
+struct uvm_object *sigobject;		/* shared sigcode object */
 struct uvm_object *timekeep_object;
 struct timekeep *timekeep;
 
@@ -79,7 +81,7 @@ const struct kmem_va_mode kv_exec = {
 /*
  * Map the shared signal code.
  */
-int exec_sigcode_map(struct process *, struct emul *);
+int exec_sigcode_map(struct process *);
 
 /*
  * Map the shared timekeep page.
@@ -268,7 +270,6 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	char *stack;
 	struct ps_strings arginfo;
 	struct vmspace *vm;
-	extern struct emul emul_native;
 	struct vnode *otvp;
 
 	/* get other threads to stop */
@@ -294,10 +295,10 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	pack.ep_hdrvalid = 0;
 	pack.ep_ndp = &nid;
 	pack.ep_interp = NULL;
-	pack.ep_emul_arg = NULL;
+	pack.ep_args = NULL;
+	pack.ep_auxinfo = NULL;
 	VMCMDSET_INIT(&pack.ep_vmcmds);
 	pack.ep_vap = &attr;
-	pack.ep_emul = &emul_native;
 	pack.ep_flags = 0;
 
 	/* see if we can run it. */
@@ -415,7 +416,7 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	}
 
 	/* Now check if args & environ fit into new stack */
-	len = ((argc + envc + 2 + pack.ep_emul->e_arglen) * sizeof(char *) +
+	len = ((argc + envc + 2 + ELF_AUX_WORDS) * sizeof(char *) +
 	    sizeof(long) + dp + sgap + sizeof(struct ps_strings)) - argp;
 
 	len = (len + _STACKALIGNBYTES) &~ _STACKALIGNBYTES;
@@ -490,7 +491,7 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	stack = (char *)(vm->vm_minsaddr - len);
 #endif
 	/* Now copy argc, args & environ to new stack */
-	if (!(*pack.ep_emul->e_copyargs)(&pack, &arginfo, stack, argp))
+	if (!copyargs(&pack, &arginfo, stack, argp))
 		goto exec_abort;
 
 	/* copy out the process's ps_strings structure */
@@ -673,23 +674,21 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	 */
 	KNOTE(&pr->ps_klist, NOTE_EXEC);
 
-	/* map the process's timekeep page, needs to be before e_fixup */
+	/* map the process's timekeep page, needs to be before exec_elf_fixup */
 	if (exec_timekeep_map(pr))
 		goto free_pack_abort;
 
 	/* setup new registers and do misc. setup. */
-	if (pack.ep_emul->e_fixup != NULL) {
-		if ((*pack.ep_emul->e_fixup)(p, &pack) != 0)
-			goto free_pack_abort;
-	}
+	if (exec_elf_fixup(p, &pack) != 0)
+		goto free_pack_abort;
 #ifdef MACHINE_STACK_GROWS_UP
-	(*pack.ep_emul->e_setregs)(p, &pack, (u_long)stack + slen, retval);
+	setregs(p, &pack, (u_long)stack + slen, retval);
 #else
-	(*pack.ep_emul->e_setregs)(p, &pack, (u_long)stack, retval);
+	setregs(p, &pack, (u_long)stack, retval);
 #endif
 
 	/* map the process's signal trampoline code */
-	if (exec_sigcode_map(pr, pack.ep_emul))
+	if (exec_sigcode_map(pr))
 		goto free_pack_abort;
 
 #ifdef __HAVE_EXEC_MD_MAP
@@ -712,9 +711,6 @@ sys_execve(struct proc *p, void *v, register_t *retval)
 	else
 		atomic_clearbits_int(&p->p_p->ps_flags, PS_WXNEEDED);
 
-	/* update ps_emul, the old value is no longer needed */
-	pr->ps_emul = pack.ep_emul;
-
 	atomic_clearbits_int(&pr->ps_flags, PS_INEXEC);
 	single_thread_clear(p, P_SUSPSIG);
 
@@ -732,8 +728,7 @@ bad:
 	}
 	if (pack.ep_interp != NULL)
 		pool_put(&namei_pool, pack.ep_interp);
-	if (pack.ep_emul_arg != NULL)
-		free(pack.ep_emul_arg, M_TEMP, pack.ep_emul_argsize);
+	free(pack.ep_args, M_TEMP, sizeof *pack.ep_args);
 	/* close and put the exec'd file */
 	vn_close(pack.ep_vp, FREAD, cred, p);
 	pool_put(&namei_pool, nid.ni_cnd.cn_pnbuf);
@@ -755,8 +750,7 @@ exec_abort:
 	uvm_unmap(&vm->vm_map, VM_MIN_ADDRESS, VM_MAXUSER_ADDRESS);
 	if (pack.ep_interp != NULL)
 		pool_put(&namei_pool, pack.ep_interp);
-	if (pack.ep_emul_arg != NULL)
-		free(pack.ep_emul_arg, M_TEMP, pack.ep_emul_argsize);
+	free(pack.ep_args, M_TEMP, sizeof *pack.ep_args);
 	pool_put(&namei_pool, nid.ni_cnd.cn_pnbuf);
 	vn_close(pack.ep_vp, FREAD, cred, p);
 	km_free(argp, NCARGS, &kv_exec, &kp_pageable);
@@ -772,7 +766,7 @@ free_pack_abort:
 }
 
 
-void *
+int
 copyargs(struct exec_package *pack, struct ps_strings *arginfo, void *stack,
     void *argp)
 {
@@ -784,9 +778,9 @@ copyargs(struct exec_package *pack, struct ps_strings *arginfo, void *stack,
 	int envc = arginfo->ps_nenvstr;
 
 	if (copyout(&argc, cpp++, sizeof(argc)))
-		return (NULL);
+		return (0);
 
-	dp = (char *) (cpp + argc + envc + 2 + pack->ep_emul->e_arglen);
+	dp = (char *) (cpp + argc + envc + 2 + ELF_AUX_WORDS);
 	sp = argp;
 
 	/* XXX don't copy them out, remap them! */
@@ -795,33 +789,38 @@ copyargs(struct exec_package *pack, struct ps_strings *arginfo, void *stack,
 	for (; --argc >= 0; sp += len, dp += len)
 		if (copyout(&dp, cpp++, sizeof(dp)) ||
 		    copyoutstr(sp, dp, ARG_MAX, &len))
-			return (NULL);
+			return (0);
 
 	if (copyout(&nullp, cpp++, sizeof(nullp)))
-		return (NULL);
+		return (0);
 
 	arginfo->ps_envstr = cpp; /* remember location of envp for later */
 
 	for (; --envc >= 0; sp += len, dp += len)
 		if (copyout(&dp, cpp++, sizeof(dp)) ||
 		    copyoutstr(sp, dp, ARG_MAX, &len))
-			return (NULL);
+			return (0);
 
 	if (copyout(&nullp, cpp++, sizeof(nullp)))
-		return (NULL);
+		return (0);
 
-	return (cpp);
+	/* if this process needs auxinfo, note where to place it */
+	if (pack->ep_args != NULL)
+		pack->ep_auxinfo = cpp;
+
+	return (1);
 }
 
 int
-exec_sigcode_map(struct process *pr, struct emul *e)
+exec_sigcode_map(struct process *pr)
 {
+	extern char sigcode[], esigcode[], sigcoderet[];
 	vsize_t sz;
 
-	sz = (vaddr_t)e->e_esigcode - (vaddr_t)e->e_sigcode;
+	sz = (vaddr_t)esigcode - (vaddr_t)sigcode;
 
 	/*
-	 * If we don't have a sigobject for this emulation, create one.
+	 * If we don't have a sigobject yet, create one.
 	 *
 	 * sigobject is an anonymous memory object (just like SYSV shared
 	 * memory) that we keep a permanent reference to and that we map
@@ -831,20 +830,20 @@ exec_sigcode_map(struct process *pr, struct emul *e)
 	 * Then we map it with PROT_READ|PROT_EXEC into the process just
 	 * the way sys_mmap would map it.
 	 */
-	if (e->e_sigobject == NULL) {
+	if (sigobject == NULL) {
 		extern int sigfillsiz;
 		extern u_char sigfill[];
 		size_t off, left;
 		vaddr_t va;
 		int r;
 
-		e->e_sigobject = uao_create(sz, 0);
-		uao_reference(e->e_sigobject);	/* permanent reference */
+		sigobject = uao_create(sz, 0);
+		uao_reference(sigobject);	/* permanent reference */
 
-		if ((r = uvm_map(kernel_map, &va, round_page(sz), e->e_sigobject,
+		if ((r = uvm_map(kernel_map, &va, round_page(sz), sigobject,
 		    0, 0, UVM_MAPFLAG(PROT_READ | PROT_WRITE, PROT_READ | PROT_WRITE,
 		    MAP_INHERIT_SHARE, MADV_RANDOM, 0)))) {
-			uao_detach(e->e_sigobject);
+			uao_detach(sigobject);
 			return (ENOMEM);
 		}
 
@@ -854,23 +853,22 @@ exec_sigcode_map(struct process *pr, struct emul *e)
 			memcpy((caddr_t)va + off, sigfill, chunk);
 			left -= chunk;
 		}
-		memcpy((caddr_t)va, e->e_sigcode, sz);
+		memcpy((caddr_t)va, sigcode, sz);
 		uvm_unmap(kernel_map, va, va + round_page(sz));
 	}
 
 	pr->ps_sigcode = 0; /* no hint */
-	uao_reference(e->e_sigobject);
+	uao_reference(sigobject);
 	if (uvm_map(&pr->ps_vmspace->vm_map, &pr->ps_sigcode, round_page(sz),
-	    e->e_sigobject, 0, 0, UVM_MAPFLAG(PROT_READ | PROT_EXEC,
+	    sigobject, 0, 0, UVM_MAPFLAG(PROT_READ | PROT_EXEC,
 	    PROT_READ | PROT_WRITE | PROT_EXEC, MAP_INHERIT_COPY,
 	    MADV_RANDOM, UVM_FLAG_COPYONW | UVM_FLAG_SYSCALL))) {
-		uao_detach(e->e_sigobject);
+		uao_detach(sigobject);
 		return (ENOMEM);
 	}
 
 	/* Calculate PC at point of sigreturn entry */
-	pr->ps_sigcoderet = pr->ps_sigcode +
-	    (pr->ps_emul->e_esigret - pr->ps_emul->e_sigcode);
+	pr->ps_sigcoderet = pr->ps_sigcode + (sigcoderet - sigcode);
 
 	return (0);
 }
@@ -881,8 +879,7 @@ exec_timekeep_map(struct process *pr)
 	size_t timekeep_sz = round_page(sizeof(struct timekeep));
 
 	/*
-	 * Similar to the sigcode object, except that there is a single
-	 * timekeep object, and not one per emulation.
+	 * Similar to the sigcode object
 	 */
 	if (timekeep_object == NULL) {
 		vaddr_t va = 0;

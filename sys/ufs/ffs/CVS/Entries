@@ -1,6 +1,5 @@
 /ffs_balloc.c/1.45/Fri Jul 19 00:24:31 2019//
 /ffs_extern.h/1.45/Mon Jan 20 23:21:56 2020//
-/ffs_inode.c/1.80/Thu Jul 25 01:43:21 2019//
 /ffs_softdep_stub.c/1.18/Tue Jun 11 16:42:18 2013//
 /ffs_tables.c/1.6/Sun Jul  3 18:23:10 2011//
 /softdep.h/1.18/Sun Apr  1 12:02:00 2018//
@@ -10,4 +9,5 @@
 /ffs_subr.c/1.34/Wed Oct 20 17:29:15 2021//
 /ffs_vfsops.c/1.192/Wed Oct 20 17:29:15 2021//
 /ffs_vnops.c/1.99/Wed Oct 20 17:29:15 2021//
+/ffs_inode.c/1.81/Sun Jan  2 13:11:10 2022//
 D

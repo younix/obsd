@@ -19,7 +19,6 @@ D/llvm-diff////
 D/llvm-dis////
 D/llvm-dwarfdump////
 D/llvm-dwp////
-D/llvm-elfabi////
 D/llvm-exegesis////
 D/llvm-extract////
 D/llvm-ifs////
@@ -60,3 +59,9 @@ D/yaml2obj////
 /binutils_symlinks.gni/1.1.1.1/Thu Dec 17 19:39:57 2020/-ko/
 D/llvm-gsymutil////
 D/llvm-ml////
+D/llvm-libtool-darwin////
+D/llvm-profgen////
+D/llvm-sim////
+D/llvm-stress////
+D/llvm-tapi-diff////
+D/split-file////

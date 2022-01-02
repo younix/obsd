@@ -73,7 +73,6 @@
 /hack.trap.c/1.9/Sat Jan  9 18:33:15 2016//
 /hack.tty.c/1.16/Fri Jun 28 13:32:52 2019//
 /hack.u_init.c/1.11/Sat Jan  9 18:33:15 2016//
-/hack.unix.c/1.20/Sun Sep 11 14:21:17 2016//
 /hack.vault.c/1.8/Sat Jan  9 18:33:15 2016//
 /hack.version.c/1.7/Sat Jan  9 18:33:15 2016//
 /hack.wield.c/1.7/Sat Jan  9 18:33:15 2016//
@@ -88,4 +87,5 @@
 /rumors/1.1.1.1/Wed Oct 18 08:49:03 1995//
 /hack.mklev.c/1.9/Wed Sep  1 16:07:30 2021//
 /help/1.2/Wed Sep  1 16:07:30 2021//
+/hack.unix.c/1.21/Sun Jan  2 13:09:41 2022//
 D

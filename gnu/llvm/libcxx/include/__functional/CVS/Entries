@@ -1,0 +1,26 @@
+/binary_function.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/binary_negate.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/bind.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/bind_front.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/binder1st.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/binder2nd.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/default_searcher.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/function.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/hash.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/identity.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/invoke.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/is_transparent.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/mem_fn.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/mem_fun_ref.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/not_fn.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/operations.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/perfect_forward.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/pointer_to_binary_function.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/pointer_to_unary_function.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/ranges_operations.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/reference_wrapper.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/unary_function.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/unary_negate.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/unwrap_ref.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+/weak_result_type.h/1.1.1.1/Fri Dec 17 12:26:14 2021/-ko/
+D

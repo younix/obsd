@@ -1,4 +1,4 @@
-/*	$OpenBSD: ieee80211_node.c,v 1.188 2021/11/03 11:52:59 krw Exp $	*/
+/*	$OpenBSD: ieee80211_node.c,v 1.190 2021/12/07 20:06:38 stsp Exp $	*/
 /*	$NetBSD: ieee80211_node.c,v 1.14 2004/05/09 09:18:47 dyoung Exp $	*/
 
 /*-
@@ -73,6 +73,8 @@ void ieee80211_node_set_timeouts(struct ieee80211_node *);
 void ieee80211_setup_node(struct ieee80211com *, struct ieee80211_node *,
     const u_int8_t *);
 struct ieee80211_node *ieee80211_alloc_node_helper(struct ieee80211com *);
+void ieee80211_node_free_unref_cb(struct ieee80211_node *);
+void ieee80211_node_tx_flushed(struct ieee80211com *, struct ieee80211_node *);
 void ieee80211_node_switch_bss(struct ieee80211com *, struct ieee80211_node *);
 void ieee80211_node_addba_request(struct ieee80211_node *, int);
 void ieee80211_node_addba_request_ac_be_to(void *);
@@ -87,6 +89,8 @@ void ieee80211_node_join_11g(struct ieee80211com *, struct ieee80211_node *);
 void ieee80211_node_leave_ht(struct ieee80211com *, struct ieee80211_node *);
 void ieee80211_node_leave_rsn(struct ieee80211com *, struct ieee80211_node *);
 void ieee80211_node_leave_11g(struct ieee80211com *, struct ieee80211_node *);
+void ieee80211_node_leave_pwrsave(struct ieee80211com *,
+    struct ieee80211_node *);
 void ieee80211_inact_timeout(void *);
 void ieee80211_node_cache_timeout(void *);
 #endif
@@ -1165,6 +1169,75 @@ struct ieee80211_node_switch_bss_arg {
 	u_int8_t sel_macaddr[IEEE80211_ADDR_LEN];
 };
 
+void
+ieee80211_node_free_unref_cb(struct ieee80211_node *ni)
+{
+	free(ni->ni_unref_arg, M_DEVBUF, ni->ni_unref_arg_size);
+
+	/* Guard against accidental reuse. */
+	ni->ni_unref_cb = NULL;
+	ni->ni_unref_arg = NULL;
+	ni->ni_unref_arg_size = 0;
+}
+
+/* Implements ni->ni_unref_cb(). */
+void
+ieee80211_node_tx_stopped(struct ieee80211com *ic,
+    struct ieee80211_node *ni)
+{
+	splassert(IPL_NET);
+
+	if ((ic->ic_flags & IEEE80211_F_BGSCAN) == 0)
+		return;
+
+	/* 
+	 * Install a callback which will switch us to the new AP once
+	 * the de-auth frame has been processed by hardware.
+	 * Pass on the existing ni->ni_unref_arg argument.
+	 */
+	ic->ic_bss->ni_unref_cb = ieee80211_node_switch_bss;
+
+	/* 
+	 * All data frames queued to hardware have been flushed and
+	 * A-MPDU Tx has been stopped. We are now going to switch APs.
+	 * Queue a de-auth frame addressed at our current AP.
+	 */
+	if (IEEE80211_SEND_MGMT(ic, ic->ic_bss,
+	    IEEE80211_FC0_SUBTYPE_DEAUTH,
+	    IEEE80211_REASON_AUTH_LEAVE) != 0) {
+		ic->ic_flags &= ~IEEE80211_F_BGSCAN;
+		ieee80211_node_free_unref_cb(ni);
+		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
+		return;
+	}
+
+	/* F_BGSCAN flag gets cleared in ieee80211_node_join_bss(). */
+}
+
+/* Implements ni->ni_unref_cb(). */
+void
+ieee80211_node_tx_flushed(struct ieee80211com *ic, struct ieee80211_node *ni)
+{
+	splassert(IPL_NET);
+
+	if ((ic->ic_flags & IEEE80211_F_BGSCAN) == 0)
+		return;
+
+	/* All data frames queued to hardware have been flushed. */
+	if (ic->ic_caps & IEEE80211_C_TX_AMPDU) {
+		/* 
+		 * Install a callback which will switch us to the
+		 * new AP once Tx agg sessions have been stopped,
+		 * which involves sending a DELBA frame.
+		 * Pass on the existing ni->ni_unref_arg argument.
+		 */
+		ic->ic_bss->ni_unref_cb = ieee80211_node_tx_stopped;
+		ieee80211_stop_ampdu_tx(ic, ic->ic_bss,
+		    IEEE80211_FC0_SUBTYPE_DEAUTH);
+	} else
+		ieee80211_node_tx_stopped(ic, ni);
+}
+
 /* Implements ni->ni_unref_cb(). */
 void
 ieee80211_node_switch_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
@@ -1175,16 +1248,14 @@ ieee80211_node_switch_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
 
 	splassert(IPL_NET);
 
-	if ((ic->ic_flags & IEEE80211_F_BGSCAN) == 0) {
-		free(sba, M_DEVBUF, sizeof(*sba));
+	if ((ic->ic_flags & IEEE80211_F_BGSCAN) == 0)
 		return;
-	}
 
 	ic->ic_xflags &= ~IEEE80211_F_TX_MGMT_ONLY;
 
 	selbs = ieee80211_find_node(ic, sba->sel_macaddr);
 	if (selbs == NULL) {
-		free(sba, M_DEVBUF, sizeof(*sba));
+		ieee80211_node_free_unref_cb(ni);
 		ic->ic_flags &= ~IEEE80211_F_BGSCAN;
 		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 		return;
@@ -1192,7 +1263,7 @@ ieee80211_node_switch_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
 
 	curbs = ieee80211_find_node(ic, sba->cur_macaddr);
 	if (curbs == NULL) {
-		free(sba, M_DEVBUF, sizeof(*sba));
+		ieee80211_node_free_unref_cb(ni);
 		ic->ic_flags &= ~IEEE80211_F_BGSCAN;
 		ieee80211_new_state(ic, IEEE80211_S_SCAN, -1);
 		return;
@@ -1206,7 +1277,11 @@ ieee80211_node_switch_bss(struct ieee80211com *ic, struct ieee80211_node *ni)
 		    ieee80211_chan2ieee(ic, selbs->ni_chan));
 	}
 	ieee80211_node_newstate(curbs, IEEE80211_STA_CACHE);
-	ieee80211_node_join_bss(ic, selbs); /* frees arg and ic->ic_bss */
+	/*
+	 * ieee80211_node_join_bss() frees arg and ic->ic_bss via
+	 * ic->ic_node_copy() in ieee80211_node_cleanup().
+	 */
+	ieee80211_node_join_bss(ic, selbs);
 }
 
 void
@@ -1487,32 +1562,32 @@ ieee80211_end_scan(struct ifnet *ifp)
 
 		ic->ic_bgscan_fail = 0;
 
-		/* 
-		 * We are going to switch APs. Stop A-MPDU Tx and
-		 * queue a de-auth frame addressed to our current AP.
-		 */
-		 ieee80211_stop_ampdu_tx(ic, ic->ic_bss,
-		    IEEE80211_FC0_SUBTYPE_DEAUTH); 
-		if (IEEE80211_SEND_MGMT(ic, ic->ic_bss,
-		    IEEE80211_FC0_SUBTYPE_DEAUTH,
-		    IEEE80211_REASON_AUTH_LEAVE) != 0) {
-			ic->ic_flags &= ~IEEE80211_F_BGSCAN;
-			free(arg, M_DEVBUF, sizeof(*arg));
-			return;
-		}
-
 		/* Prevent dispatch of additional data frames to hardware. */
 		ic->ic_xflags |= IEEE80211_F_TX_MGMT_ONLY;
+
+		IEEE80211_ADDR_COPY(arg->cur_macaddr, curbs->ni_macaddr);
+		IEEE80211_ADDR_COPY(arg->sel_macaddr, selbs->ni_macaddr);
+
+		if (ic->ic_bgscan_done) {
+			/*
+			 * The driver will flush its queues and allow roaming
+			 * to proceed once queues have been flushed.
+			 * On failure the driver will move back to SCAN state.
+			 */
+			ic->ic_bgscan_done(ic, arg, sizeof(*arg));
+			return;
+		}
 
 		/* 
 		 * Install a callback which will switch us to the new AP once
 		 * all dispatched frames have been processed by hardware.
 		 */
-		IEEE80211_ADDR_COPY(arg->cur_macaddr, curbs->ni_macaddr);
-		IEEE80211_ADDR_COPY(arg->sel_macaddr, selbs->ni_macaddr);
 		ic->ic_bss->ni_unref_arg = arg;
 		ic->ic_bss->ni_unref_arg_size = sizeof(*arg);
-		ic->ic_bss->ni_unref_cb = ieee80211_node_switch_bss;
+		if (ic->ic_bss->ni_refcnt > 0)
+			ic->ic_bss->ni_unref_cb = ieee80211_node_tx_flushed;
+		else
+			ieee80211_node_tx_flushed(ic, ni);
 		/* F_BGSCAN flag gets cleared in ieee80211_node_join_bss(). */
 		return;
 	} else if (selbs == NULL)
@@ -1611,14 +1686,10 @@ ieee80211_node_cleanup(struct ieee80211com *ic, struct ieee80211_node *ni)
 		ni->ni_rsnie = NULL;
 	}
 	ieee80211_ba_del(ni);
-	ni->ni_unref_cb = NULL;
-	free(ni->ni_unref_arg, M_DEVBUF, ni->ni_unref_arg_size);
-	ni->ni_unref_arg = NULL;
-	ni->ni_unref_arg_size = 0;
-
 #ifndef IEEE80211_STA_ONLY
 	mq_purge(&ni->ni_savedq);
 #endif
+	ieee80211_node_free_unref_cb(ni);
 }
 
 void
@@ -1979,6 +2050,18 @@ ieee80211_find_node_for_beacon(struct ieee80211com *ic,
 }
 
 void
+ieee80211_node_tx_ba_clear(struct ieee80211_node *ni, int tid)
+{
+	struct ieee80211_tx_ba *ba = &ni->ni_tx_ba[tid];
+
+	if (ba->ba_state != IEEE80211_BA_INIT) {
+		if (timeout_pending(&ba->ba_to))
+			timeout_del(&ba->ba_to);
+		ba->ba_state = IEEE80211_BA_INIT;
+	}
+}
+
+void
 ieee80211_ba_del(struct ieee80211_node *ni)
 {
 	int tid;
@@ -1994,14 +2077,8 @@ ieee80211_ba_del(struct ieee80211_node *ni)
 		}
 	}
 
-	for (tid = 0; tid < nitems(ni->ni_tx_ba); tid++) {
-		struct ieee80211_tx_ba *ba = &ni->ni_tx_ba[tid];
-		if (ba->ba_state != IEEE80211_BA_INIT) {
-			if (timeout_pending(&ba->ba_to))
-				timeout_del(&ba->ba_to);
-			ba->ba_state = IEEE80211_BA_INIT;
-		}
-	}
+	for (tid = 0; tid < nitems(ni->ni_tx_ba); tid++)
+		ieee80211_node_tx_ba_clear(ni, tid);
 
 	timeout_del(&ni->ni_addba_req_to[EDCA_AC_BE]);
 	timeout_del(&ni->ni_addba_req_to[EDCA_AC_BK]);
@@ -2040,17 +2117,18 @@ void
 ieee80211_release_node(struct ieee80211com *ic, struct ieee80211_node *ni)
 {
 	int s;
+	void (*ni_unref_cb)(struct ieee80211com *, struct ieee80211_node *);
 
 	DPRINTF(("%s refcnt %u\n", ether_sprintf(ni->ni_macaddr),
 	    ni->ni_refcnt));
 	s = splnet();
 	if (ieee80211_node_decref(ni) == 0) {
 		if (ni->ni_unref_cb) {
-			(*ni->ni_unref_cb)(ic, ni);
+			/* The callback may set ni->ni_unref_cb again. */
+			ni_unref_cb = ni->ni_unref_cb;
 			ni->ni_unref_cb = NULL;
  			/* Freed by callback if necessary: */
-			ni->ni_unref_arg = NULL;
-			ni->ni_unref_arg_size = 0;
+			(*ni_unref_cb)(ic, ni);
 		}
 	    	if (ni->ni_state == IEEE80211_STA_COLLECT)
 			ieee80211_free_node(ic, ni);
@@ -2790,6 +2868,39 @@ ieee80211_node_leave_11g(struct ieee80211com *ic, struct ieee80211_node *ni)
 	}
 }
 
+void
+ieee80211_node_leave_pwrsave(struct ieee80211com *ic,
+    struct ieee80211_node *ni)
+{
+	struct mbuf_queue keep = MBUF_QUEUE_INITIALIZER(IFQ_MAXLEN, IPL_NET);
+	struct mbuf *m;
+
+	if (ni->ni_pwrsave == IEEE80211_PS_DOZE)
+		ni->ni_pwrsave = IEEE80211_PS_AWAKE;
+
+	if (mq_len(&ni->ni_savedq) > 0) {
+		if (ic->ic_set_tim != NULL)
+			(*ic->ic_set_tim)(ic, ni->ni_associd, 0);
+	}
+	while ((m = mq_dequeue(&ni->ni_savedq)) != NULL) {
+		if (ni->ni_refcnt > 0)
+			ieee80211_node_decref(ni);
+		m_freem(m);
+	}
+
+	/* Purge frames queued for transmission during DTIM. */
+	while ((m = mq_dequeue(&ic->ic_pwrsaveq)) != NULL) {
+		if (m->m_pkthdr.ph_cookie == ni) {
+			if (ni->ni_refcnt > 0)
+				ieee80211_node_decref(ni);
+			m_freem(m);
+		} else
+			mq_enqueue(&keep, m);
+	}
+	while ((m = mq_dequeue(&keep)) != NULL)
+		mq_enqueue(&ic->ic_pwrsaveq, m);
+}
+
 /*
  * Handle bookkeeping for station deauthentication/disassociation
  * when operating as an ap.
@@ -2811,13 +2922,7 @@ ieee80211_node_leave(struct ieee80211com *ic, struct ieee80211_node *ni)
 		return;
 	}
 
-	if (ni->ni_pwrsave == IEEE80211_PS_DOZE)
-		ni->ni_pwrsave = IEEE80211_PS_AWAKE;
-
-	if (mq_purge(&ni->ni_savedq) > 0) {
-		if (ic->ic_set_tim != NULL)
-			(*ic->ic_set_tim)(ic, ni->ni_associd, 0);
-	}
+	ieee80211_node_leave_pwrsave(ic, ni);
 
 	if (ic->ic_flags & IEEE80211_F_RSNON)
 		ieee80211_node_leave_rsn(ic, ni);

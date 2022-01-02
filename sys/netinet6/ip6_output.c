@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip6_output.c,v 1.262 2021/12/01 12:51:09 bluhm Exp $	*/
+/*	$OpenBSD: ip6_output.c,v 1.265 2021/12/23 12:21:48 bluhm Exp $	*/
 /*	$KAME: ip6_output.c,v 1.172 2001/03/25 09:55:56 itojun Exp $	*/
 
 /*
@@ -220,7 +220,7 @@ ip6_output(struct mbuf *m, struct ip6_pktopts *opt, struct route_in6 *ro,
 	}
 
 #ifdef IPSEC
-	if (ipsec_in_use || inp) {
+	if (ipsec_in_use || inp != NULL) {
 		error = ip6_output_ipsec_lookup(m, inp, &tdb);
 		if (error) {
 			/*
@@ -433,7 +433,7 @@ reroute:
 	}
 
 #ifdef IPSEC
-	if (tdb) {
+	if (tdb != NULL) {
 		/*
 		 * XXX what should we do if ip6_hlim == 0 and the
 		 * packet gets tunneled?
@@ -762,12 +762,15 @@ reroute:
 		ip6stat_inc(ip6s_fragmented);
 
 done:
-	if_put(ifp);
 	if (ro == &ip6route && ro->ro_rt) {
 		rtfree(ro->ro_rt);
 	} else if (ro_pmtu == &ip6route && ro_pmtu->ro_rt) {
 		rtfree(ro_pmtu->ro_rt);
 	}
+	if_put(ifp);
+#ifdef IPSEC
+	tdb_unref(tdb);
+#endif /* IPSEC */
 	return (error);
 
 freehdrs:
@@ -2770,6 +2773,7 @@ ip6_output_ipsec_lookup(struct mbuf *m, struct inpcb *inp, struct tdb **tdbout)
 		    !memcmp(&tdbi->dst, &tdb->tdb_dst,
 		    sizeof(union sockaddr_union))) {
 			/* no IPsec needed */
+			tdb_unref(tdb);
 			*tdbout = NULL;
 			return 0;
 		}
@@ -2871,7 +2875,7 @@ ip6_output_ipsec_send(struct tdb *tdb, struct mbuf *m, struct route_in6 *ro,
 		    rtableid, transportmode);
 		if (error) {
 			ipsecstat_inc(ipsec_odrops);
-			tdb->tdb_odrops++;
+			tdbstat_inc(tdb, tdb_odrops);
 			m_freem(m);
 			return error;
 		}
@@ -2890,10 +2894,12 @@ ip6_output_ipsec_send(struct tdb *tdb, struct mbuf *m, struct route_in6 *ro,
 	m->m_flags &= ~(M_BCAST | M_MCAST);
 
 	/* Callee frees mbuf */
+	KERNEL_LOCK();
 	error = ipsp_process_packet(m, tdb, AF_INET6, tunalready);
+	KERNEL_UNLOCK();
 	if (error) {
 		ipsecstat_inc(ipsec_odrops);
-		tdb->tdb_odrops++;
+		tdbstat_inc(tdb, tdb_odrops);
 	}
 	if (ip_mtudisc && error == EMSGSIZE)
 		ip6_output_ipsec_pmtu_update(tdb, ro, &dst, ifidx, rtableid, 0);

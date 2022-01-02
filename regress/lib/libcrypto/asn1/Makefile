@@ -1,11 +1,15 @@
-#	$OpenBSD: Makefile,v 1.7 2021/11/30 07:34:29 jsing Exp $
+#	$OpenBSD: Makefile,v 1.12 2021/12/24 08:31:55 jsing Exp $
 
 TESTS = \
+	asn1api \
+	asn1basic \
+	asn1complex \
 	asn1evp \
 	asn1string_copy \
 	asn1time \
 	asn1x509 \
-	rfc5280time
+	rfc5280time \
+	string_table
 
 PROGS = ${TESTS}
 
@@ -19,6 +23,7 @@ CFLAGS+=	-DLIBRESSL_INTERNAL -Wall -Wundef -Werror
 
 all_tests: ${TESTS}
 	@for test in $>; do \
+		echo "\n======== $$test ========"; \
 		./$$test; \
 	done
 

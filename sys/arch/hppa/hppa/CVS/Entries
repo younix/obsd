@@ -20,6 +20,6 @@
 /mainbus.c/1.89/Wed Sep  1 16:07:38 2021//
 /machdep.c/1.265/Wed Oct 20 17:29:09 2021//
 /pmap.c/1.177/Wed Oct 20 17:29:09 2021//
-/trap.c/1.154/Wed Oct 20 17:29:09 2021//
 /conf.c/1.72/Sun Nov 21 20:15:22 2021//
+/trap.c/1.156/Sun Jan  2 13:11:04 2022//
 D

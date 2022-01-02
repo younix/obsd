@@ -1,4 +1,4 @@
-/*	$OpenBSD: tty.c,v 1.170 2021/10/24 00:02:25 jsg Exp $	*/
+/*	$OpenBSD: tty.c,v 1.173 2021/12/15 15:30:47 visa Exp $	*/
 /*	$NetBSD: tty.c,v 1.68.4.2 1996/06/06 16:04:52 thorpej Exp $	*/
 
 /*-
@@ -78,6 +78,7 @@ int	filt_ttyread(struct knote *kn, long hint);
 void 	filt_ttyrdetach(struct knote *kn);
 int	filt_ttywrite(struct knote *kn, long hint);
 void 	filt_ttywdetach(struct knote *kn);
+int	filt_ttyexcept(struct knote *kn, long hint);
 void	ttystats_init(struct itty **, int *, size_t *);
 int	ttywait_nsec(struct tty *, uint64_t);
 int	ttysleep_nsec(struct tty *, void *, int, char *, uint64_t);
@@ -1110,6 +1111,13 @@ const struct filterops ttywrite_filtops = {
 	.f_event	= filt_ttywrite,
 };
 
+const struct filterops ttyexcept_filtops = {
+	.f_flags	= FILTEROP_ISFD,
+	.f_attach	= NULL,
+	.f_detach	= filt_ttyrdetach,
+	.f_event	= filt_ttyexcept,
+};
+
 int
 ttkqfilter(dev_t dev, struct knote *kn)
 {
@@ -1125,6 +1133,18 @@ ttkqfilter(dev_t dev, struct knote *kn)
 	case EVFILT_WRITE:
 		klist = &tp->t_wsel.si_note;
 		kn->kn_fop = &ttywrite_filtops;
+		break;
+	case EVFILT_EXCEPT:
+		if (kn->kn_flags & __EV_SELECT) {
+			/* Prevent triggering exceptfds. */
+			return (EPERM);
+		}
+		if ((kn->kn_flags & __EV_POLL) == 0) {
+			/* Disallow usage through kevent(2). */
+			return (EINVAL);
+		}
+		klist = &tp->t_rsel.si_note;
+		kn->kn_fop = &ttyexcept_filtops;
 		break;
 	default:
 		return (EINVAL);
@@ -1154,18 +1174,21 @@ int
 filt_ttyread(struct knote *kn, long hint)
 {
 	struct tty *tp = kn->kn_hook;
-	int s;
+	int active, s;
 
 	s = spltty();
 	kn->kn_data = ttnread(tp);
-	splx(s);
+	active = (kn->kn_data > 0);
 	if (!ISSET(tp->t_cflag, CLOCAL) && !ISSET(tp->t_state, TS_CARR_ON)) {
 		kn->kn_flags |= EV_EOF;
 		if (kn->kn_flags & __EV_POLL)
 			kn->kn_flags |= __EV_HUP;
-		return (1);
+		active = 1;
+	} else {
+		kn->kn_flags &= ~(EV_EOF | __EV_HUP);
 	}
-	return (kn->kn_data > 0);
+	splx(s);
+	return (active);
 }
 
 void
@@ -1183,13 +1206,45 @@ int
 filt_ttywrite(struct knote *kn, long hint)
 {
 	struct tty *tp = kn->kn_hook;
-	int canwrite, s;
+	int active, s;
 
 	s = spltty();
 	kn->kn_data = tp->t_outq.c_cn - tp->t_outq.c_cc;
-	canwrite = (tp->t_outq.c_cc <= tp->t_lowat);
+	active = (tp->t_outq.c_cc <= tp->t_lowat);
+
+	/* Write-side HUP condition is only for poll(2) and select(2). */
+	if (kn->kn_flags & (__EV_POLL | __EV_SELECT)) {
+		if (!ISSET(tp->t_cflag, CLOCAL) &&
+		    !ISSET(tp->t_state, TS_CARR_ON)) {
+			kn->kn_flags |= __EV_HUP;
+			active = 1;
+		} else {
+			kn->kn_flags &= ~__EV_HUP;
+		}
+	}
 	splx(s);
-	return (canwrite);
+	return (active);
+}
+
+int
+filt_ttyexcept(struct knote *kn, long hint)
+{
+	struct tty *tp = kn->kn_hook;
+	int active = 0;
+	int s;
+
+	s = spltty();
+	if (kn->kn_flags & __EV_POLL) {
+		if (!ISSET(tp->t_cflag, CLOCAL) &&
+		    !ISSET(tp->t_state, TS_CARR_ON)) {
+			kn->kn_flags |= __EV_HUP;
+			active = 1;
+		} else {
+			kn->kn_flags &= ~__EV_HUP;
+		}
+	}
+	splx(s);
+	return (active);
 }
 
 static int
@@ -1901,7 +1956,7 @@ ttyrub(int c, struct tty *tp)
 {
 	u_char *cp;
 	int savecol;
-	int tabc, s;
+	int tabc, s, cc;
 
 	if (!ISSET(tp->t_lflag, ECHO) || ISSET(tp->t_lflag, EXTPROC))
 		return 0;
@@ -1937,8 +1992,8 @@ ttyrub(int c, struct tty *tp)
 				SET(tp->t_state, TS_CNTTB);
 				SET(tp->t_lflag, FLUSHO);
 				tp->t_column = tp->t_rocol;
-				for (cp = firstc(&tp->t_rawq, &tabc); cp;
-				    cp = nextc(&tp->t_rawq, cp, &tabc))
+				for (cp = firstc(&tp->t_rawq, &tabc, &cc); cp;
+				    cp = nextc(&tp->t_rawq, cp, &tabc, &cc))
 					ttyecho(tabc, tp);
 				CLR(tp->t_lflag, FLUSHO);
 				CLR(tp->t_state, TS_CNTTB);
@@ -1995,7 +2050,7 @@ int
 ttyretype(struct tty *tp)
 {
 	u_char *cp;
-	int s, c;
+	int s, c, cc;
 
 	/* Echo the reprint character. */
 	if (tp->t_cc[VREPRINT] != _POSIX_VDISABLE)
@@ -2004,9 +2059,11 @@ ttyretype(struct tty *tp)
 	(void)ttyoutput('\n', tp);
 
 	s = spltty();
-	for (cp = firstc(&tp->t_canq, &c); cp; cp = nextc(&tp->t_canq, cp, &c))
+	for (cp = firstc(&tp->t_canq, &c, &cc); cp;
+	    cp = nextc(&tp->t_canq, cp, &c, &cc))
 		ttyecho(c, tp);
-	for (cp = firstc(&tp->t_rawq, &c); cp; cp = nextc(&tp->t_rawq, cp, &c))
+	for (cp = firstc(&tp->t_rawq, &c, &cc); cp;
+	    cp = nextc(&tp->t_rawq, cp, &c, &cc))
 		ttyecho(c, tp);
 	CLR(tp->t_state, TS_ERASE);
 	splx(s);

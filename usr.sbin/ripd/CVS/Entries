@@ -2,7 +2,6 @@
 /auth.c/1.12/Thu Dec 19 16:47:14 2019//
 /carp.c/1.3/Wed Sep 30 12:22:03 2009//
 /kroute.c/1.34/Wed Dec 11 21:04:59 2019//
-/log.h/1.6/Fri Sep  2 14:07:52 2016//
 /logmsg.c/1.1/Fri Sep  2 14:07:52 2016//
 /message.c/1.15/Sun Dec 15 20:51:39 2019//
 /name2id.c/1.1/Mon Jan  8 13:01:10 2007//
@@ -24,4 +23,5 @@
 /ripe.h/1.14/Wed Sep  1 16:07:41 2021//
 /ripd.c/1.36/Tue Sep 14 08:17:42 2021//
 /parse.y/1.48/Wed Oct 20 17:29:20 2021//
+/log.h/1.7/Sun Jan  2 13:11:16 2022//
 D

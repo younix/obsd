@@ -323,7 +323,6 @@
 /athn.c/1.111/Wed Sep  1 16:07:39 2021//
 /athnvar.h/1.42/Wed Sep  1 16:07:39 2021//
 /ax88190.c/1.9/Wed Sep  1 16:07:39 2021//
-/bwfmreg.h/1.21/Wed Sep  1 16:07:39 2021//
 /bwi.c/1.131/Wed Sep  1 16:07:39 2021//
 /cac.c/1.74/Wed Sep  1 16:07:39 2021//
 /com.c/1.174/Thu Sep  2 08:41:58 2021//
@@ -358,8 +357,10 @@
 /twe.c/1.66/Thu Sep  2 14:22:31 2021//
 /vga.c/1.74/Thu Sep  2 14:22:31 2021//
 /ar5008.c/1.69/Wed Oct 20 17:29:11 2021//
-/bwfm.c/1.91/Mon Nov 15 19:06:15 2021//
-/bwfmvar.h/1.25/Mon Nov 15 19:06:15 2021//
 /dwiic.c/1.13/Sun Nov 21 20:15:22 2021//
 /tea5757.c/1.4/Thu Dec  2 13:56:29 2021//
+/bwfm.c/1.97/Sun Jan  2 13:11:06 2022//
+/bwfmreg.h/1.24/Sun Jan  2 13:11:06 2022//
+/bwfmvar.h/1.28/Sun Jan  2 13:11:06 2022//
+/mtwreg.h/1.1/Mon Dec 20 13:59:02 2021//
 D

@@ -1,32 +1,76 @@
+/*	$OpenBSD: ct_local.h,v 1.8 2021/12/20 17:19:19 jsing Exp $ */
 /*
- * Copyright 2015-2016 The OpenSSL Project Authors. All Rights Reserved.
+ * Written by Rob Percival (robpercival@google.com) for the OpenSSL project.
+ */
+/* ====================================================================
+ * Copyright (c) 2016 The OpenSSL Project.  All rights reserved.
  *
- * Licensed under the OpenSSL license (the "License").  You may not use
- * this file except in compliance with the License.  You can obtain a copy
- * in the file LICENSE in the source distribution or at
- * https://www.openssl.org/source/license.html
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. All advertising materials mentioning features or use of this
+ *    software must display the following acknowledgment:
+ *    "This product includes software developed by the OpenSSL Project
+ *    for use in the OpenSSL Toolkit. (http://www.OpenSSL.org/)"
+ *
+ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For written permission, please contact
+ *    licensing@OpenSSL.org.
+ *
+ * 5. Products derived from this software may not be called "OpenSSL"
+ *    nor may "OpenSSL" appear in their names without prior written
+ *    permission of the OpenSSL Project.
+ *
+ * 6. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by the OpenSSL Project
+ *    for use in the OpenSSL Toolkit (http://www.OpenSSL.org/)"
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
+ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
+ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
+ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
+ * OF THE POSSIBILITY OF SUCH DAMAGE.
+ * ====================================================================
  */
 
 #include <stddef.h>
+
 #include <openssl/ct.h>
 #include <openssl/evp.h>
+#include <openssl/safestack.h>
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
-#include <openssl/safestack.h>
 
-/*
- * From RFC6962: opaque SerializedSCT<1..2^16-1>; struct { SerializedSCT
- * sct_list <1..2^16-1>; } SignedCertificateTimestampList;
- */
+#include "bytestring.h"
+
+/* Number of bytes in an SCT v1 LogID - see RFC 6962 section 3.2. */
+#define CT_V1_LOG_ID_LEN	32
+
+/* Maximum size of an SCT - see RFC 6962 section 3.3. */
 #define MAX_SCT_SIZE            65535
 #define MAX_SCT_LIST_SIZE       MAX_SCT_SIZE
 
 /*
- * Macros to read and write integers in network-byte order.
+ * Macros to write integers in network-byte order.
  */
-
-#define n2s(c,s)        ((s=(((unsigned int)((c)[0]))<< 8)| \
-                            (((unsigned int)((c)[1]))    )),c+=2)
 
 #define s2n(s,c)        ((c[0]=(unsigned char)(((s)>> 8)&0xff), \
                           c[1]=(unsigned char)(((s)    )&0xff)),c+=2)
@@ -34,15 +78,6 @@
 #define l2n3(l,c)       ((c[0]=(unsigned char)(((l)>>16)&0xff), \
                           c[1]=(unsigned char)(((l)>> 8)&0xff), \
                           c[2]=(unsigned char)(((l)    )&0xff)),c+=3)
-
-#define n2l8(c,l)       (l =((uint64_t)(*((c)++)))<<56, \
-                         l|=((uint64_t)(*((c)++)))<<48, \
-                         l|=((uint64_t)(*((c)++)))<<40, \
-                         l|=((uint64_t)(*((c)++)))<<32, \
-                         l|=((uint64_t)(*((c)++)))<<24, \
-                         l|=((uint64_t)(*((c)++)))<<16, \
-                         l|=((uint64_t)(*((c)++)))<< 8, \
-                         l|=((uint64_t)(*((c)++))))
 
 #define l2n8(l,c)       (*((c)++)=(unsigned char)(((l)>>56)&0xff), \
                          *((c)++)=(unsigned char)(((l)>>48)&0xff), \
@@ -199,25 +234,25 @@ int SCT_signature_is_complete(const SCT *sct);
  */
 
 /*
-* Serialize (to TLS format) an |sct| signature and write it to |out|.
-* If |out| is null, no signature will be output but the length will be returned.
-* If |out| points to a null pointer, a string will be allocated to hold the
-* TLS-format signature. It is the responsibility of the caller to free it.
-* If |out| points to an allocated string, the signature will be written to it.
-* The length of the signature in TLS format will be returned.
-*/
+ * Serialize (to TLS format) an |sct| signature and write it to |out|.
+ * If |out| is null, no signature will be output but the length will be returned.
+ * If |out| points to a null pointer, a string will be allocated to hold the
+ * TLS-format signature. It is the responsibility of the caller to free it.
+ * If |out| points to an allocated string, the signature will be written to it.
+ * The length of the signature in TLS format will be returned.
+ */
 int i2o_SCT_signature(const SCT *sct, unsigned char **out);
 
 /*
-* Parses an SCT signature in TLS format and populates the |sct| with it.
-* |in| should be a pointer to a string containing the TLS-format signature.
-* |in| will be advanced to the end of the signature if parsing succeeds.
-* |len| should be the length of the signature in |in|.
-* Returns the number of bytes parsed, or a negative integer if an error occurs.
-* If an error occurs, the SCT's signature NID may be updated whilst the
-* signature field itself remains unset.
-*/
-int o2i_SCT_signature(SCT *sct, const unsigned char **in, size_t len);
+ * Parses an SCT signature in TLS format and populates the |sct| with it.
+ * |in| should be a pointer to a string containing the TLS-format signature.
+ * |in| will be advanced to the end of the signature if parsing succeeds.
+ * |len| should be the length of the signature in |in|.
+ * Returns the number of bytes parsed, or a negative integer if an error occurs.
+ * If an error occurs, the SCT's signature NID may be updated whilst the
+ * signature field itself remains unset.
+ */
+int o2i_SCT_signature(SCT *sct, CBS *cbs);
 
 /*
  * Handlers for Certificate Transparency X509v3/OCSP extensions

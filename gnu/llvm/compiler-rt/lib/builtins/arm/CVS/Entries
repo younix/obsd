@@ -39,7 +39,6 @@
 /floatsisfvfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /floatunssidfvfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /floatunssisfvfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
-/fp_mode.c/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /gedf2vfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /gesf2vfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /gtdf2vfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
@@ -92,4 +91,5 @@
 /umodsi3.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /unorddf2vfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
 /unordsf2vfp.S/1.1.1.1/Thu Dec 17 19:39:50 2020/-ko/
+/fp_mode.c/1.1.1.2/Sun Jan  2 13:09:47 2022/-ko/
 D

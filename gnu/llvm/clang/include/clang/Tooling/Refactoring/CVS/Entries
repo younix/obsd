@@ -1,8 +1,6 @@
 D/Extract////
 D/Rename////
-/RecursiveSymbolVisitor.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringAction.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
-/RefactoringActionRule.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringActionRuleRequirements.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringActionRules.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringActionRulesInternal.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
@@ -10,7 +8,10 @@ D/Rename////
 /RefactoringOption.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringOptionVisitor.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /RefactoringResultConsumer.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
-/RefactoringRuleContext.h/1.1.1.1/Thu Dec 17 19:39:49 2020/-ko/
 /ASTSelection.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /AtomicChange.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
 /RefactoringOptions.h/1.1.1.2/Wed Sep  1 16:07:30 2021/-ko/
+/Lookup.h/1.1.1.1/Fri Dec 17 12:24:35 2021/-ko/
+/RecursiveSymbolVisitor.h/1.1.1.2/Sun Jan  2 13:09:44 2022/-ko/
+/RefactoringActionRule.h/1.1.1.2/Sun Jan  2 13:09:44 2022/-ko/
+/RefactoringRuleContext.h/1.1.1.2/Sun Jan  2 13:09:44 2022/-ko/

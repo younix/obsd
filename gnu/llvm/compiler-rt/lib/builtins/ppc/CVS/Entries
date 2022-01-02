@@ -1,6 +1,5 @@
 /DD.h/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /atomic_lock_free.c/1.1/Thu Dec 17 19:39:51 2020//
-/divtc3.c/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /fixtfdi.c/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /fixtfti.c/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /fixunstfdi.c/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
@@ -15,4 +14,6 @@
 /multc3.c/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /restFP.S/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
 /saveFP.S/1.1.1.1/Thu Dec 17 19:39:51 2020/-ko/
+/atomic.exp/1.1.1.1/Fri Dec 17 12:26:53 2021/-ko/
+/divtc3.c/1.1.1.2/Sun Jan  2 13:09:48 2022/-ko/
 D

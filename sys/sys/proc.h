@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.316 2021/11/26 04:42:13 visa Exp $	*/
+/*	$OpenBSD: proc.h,v 1.323 2021/12/10 05:34:42 guenther Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -86,37 +86,6 @@ struct	pgrp {
 };
 
 /*
- * One structure allocated per emulation.
- */
-struct exec_package;
-struct proc;
-struct ps_strings;
-struct uvm_object;
-union sigval;
-
-struct	emul {
-	char	e_name[8];		/* Symbolic name */
-	int	*e_errno;		/* Errno array */
-	int	e_nosys;		/* Offset of the nosys() syscall */
-	int	e_nsysent;		/* Number of system call entries */
-	struct sysent *e_sysent;	/* System call array */
-	char	**e_syscallnames;	/* System call name array */
-	int	e_arglen;		/* Extra argument size in words */
-					/* Copy arguments on the stack */
-	void	*(*e_copyargs)(struct exec_package *, struct ps_strings *,
-				    void *, void *);
-					/* Set registers before execution */
-	void	(*e_setregs)(struct proc *, struct exec_package *,
-				  u_long, register_t *);
-	int	(*e_fixup)(struct proc *, struct exec_package *);
-	int	(*e_coredump)(struct proc *, void *cookie);
-	char	*e_sigcode;		/* Start of sigcode */
-	char	*e_esigcode;		/* End of sigcode */
-	char	*e_esigret;		/* sigaction RET position */
-	struct uvm_object *e_sigobject;	/* shared sigcode object */
-};
-
-/*
  * time usage: accumulated times in ticks
  * Once a second, each thread's immediate counts (p_[usi]ticks) are
  * accumulated into these.
@@ -143,6 +112,7 @@ struct tusage {
 #ifdef __need_process
 struct futex;
 LIST_HEAD(futex_list, futex);
+struct proc;
 struct tslpentry;
 TAILQ_HEAD(tslpqueue, tslpentry);
 struct unveil;
@@ -241,7 +211,6 @@ struct process {
 #define	ps_startcopy	ps_limit
 	struct	plimit *ps_limit;	/* [m,R] Process limits. */
 	struct	pgrp *ps_pgrp;		/* Pointer to process group. */
-	struct	emul *ps_emul;		/* Emulation information */
 
 	char	ps_comm[MAXCOMLEN+1];
 

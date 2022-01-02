@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_fork.c,v 1.236 2021/06/19 02:05:33 cheloha Exp $	*/
+/*	$OpenBSD: kern_fork.c,v 1.238 2021/12/10 05:34:42 guenther Exp $	*/
 /*	$NetBSD: kern_fork.c,v 1.29 1996/02/09 18:59:34 christos Exp $	*/
 
 /*

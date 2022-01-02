@@ -29,11 +29,11 @@
 /emul.c/1.26/Thu Dec 17 19:39:58 2020//
 /locore.s/1.190/Thu Dec 17 19:39:58 2020//
 /intr.c/1.62/Sun Aug 29 08:01:52 2021//
-/trap.c/1.109/Wed Sep  1 16:07:39 2021//
 /db_interface.c/1.56/Thu Sep  2 14:22:31 2021//
 /machdep.c/1.200/Wed Oct 20 17:29:11 2021//
 /autoconf.c/1.140/Mon Nov 15 19:06:15 2021//
 /clock.c/1.71/Mon Nov 15 19:06:15 2021//
 /cpu.c/1.73/Mon Nov 15 19:06:15 2021//
 /conf.c/1.86/Sun Nov 21 20:15:22 2021//
+/trap.c/1.110/Sun Jan  2 13:11:06 2022//
 D

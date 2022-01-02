@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_iwmvar.h,v 1.72 2021/11/27 11:22:26 stsp Exp $	*/
+/*	$OpenBSD: if_iwmvar.h,v 1.74 2021/12/20 15:08:10 stsp Exp $	*/
 
 /*
  * Copyright (c) 2014 genua mbh <info@genua.de>
@@ -580,7 +580,8 @@ struct iwm_softc {
 	bus_size_t sc_fwdmasegsz;
 	size_t sc_nvm_max_section_size;
 	struct iwm_fw_info sc_fw;
-	int sc_fw_phy_config;
+	uint32_t sc_fw_phy_config;
+	uint32_t sc_extra_phy_config;
 	struct iwm_tlv_calib_ctrl sc_default_calib[IWM_UCODE_TYPE_MAX];
 
 	struct iwm_nvm_data sc_nvm;
@@ -591,6 +592,10 @@ struct iwm_softc {
 	int sc_tx_timer[IWM_MAX_QUEUES];
 	int sc_rx_ba_sessions;
 	int tx_ba_queue_mask;
+
+	struct task bgscan_done_task;
+	struct ieee80211_node_switch_bss_arg *bgscan_unref_arg;
+	size_t	bgscan_unref_arg_size;
 
 	int sc_scan_last_antenna;
 

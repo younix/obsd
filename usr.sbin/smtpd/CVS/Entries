@@ -1,7 +1,6 @@
 /Makefile/1.18/Thu May 24 11:38:24 2018//
 /dict.h/1.1/Sun Dec 23 16:06:24 2018//
 /log.c/1.20/Tue Mar 21 12:06:56 2017//
-/log.h/1.8/Thu Apr 26 20:57:59 2018//
 /mail.lmtp.8/1.1/Tue Feb 14 15:16:34 2017//
 /mail.mboxfile.8/1.1/Wed Jul 25 10:19:28 2018//
 /mail.mda.8/1.1/Wed Aug  9 07:56:10 2017//
@@ -107,3 +106,4 @@ D/smtpd////
 /table_db.c/1.25/Wed Oct 20 17:29:20 2021//
 /smtpd-filters.7/1.8/Sun Nov 21 20:15:22 2021//
 /smtpd.conf.5/1.262/Sun Nov 21 20:15:22 2021//
+/log.h/1.9/Sun Jan  2 13:11:16 2022//

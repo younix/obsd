@@ -36,3 +36,12 @@ D/shtest-keyword-parse-errors////
 D/shtest-recursive-substitution////
 D/test_retry_attempts////
 D/unparsed-requirements////
+D/ignore-fail////
+D/lld-features////
+D/reorder////
+D/standalone-tests////
+D/standalone-tests-with-excludes////
+D/standalone-tests-with-suffixes////
+D/use-llvm-tool////
+D/use-llvm-tool-required////
+D/xfail-cl////

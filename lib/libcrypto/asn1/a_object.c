@@ -1,4 +1,4 @@
-/* $OpenBSD: a_object.c,v 1.32 2021/05/01 13:16:30 tb Exp $ */
+/* $OpenBSD: a_object.c,v 1.36 2021/12/25 13:17:48 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,10 +61,66 @@
 #include <string.h>
 
 #include <openssl/asn1.h>
+#include <openssl/asn1t.h>
 #include <openssl/bn.h>
 #include <openssl/err.h>
 #include <openssl/buffer.h>
 #include <openssl/objects.h>
+
+const ASN1_ITEM ASN1_OBJECT_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = V_ASN1_OBJECT,
+	.sname = "ASN1_OBJECT",
+};
+
+ASN1_OBJECT *
+ASN1_OBJECT_new(void)
+{
+	ASN1_OBJECT *a;
+
+	if ((a = calloc(1, sizeof(ASN1_OBJECT))) == NULL) {
+		ASN1error(ERR_R_MALLOC_FAILURE);
+		return (NULL);
+	}
+	a->flags = ASN1_OBJECT_FLAG_DYNAMIC;
+
+	return a;
+}
+
+void
+ASN1_OBJECT_free(ASN1_OBJECT *a)
+{
+	if (a == NULL)
+		return;
+	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC_STRINGS) {
+		free((void *)a->sn);
+		free((void *)a->ln);
+		a->sn = a->ln = NULL;
+	}
+	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC_DATA) {
+		freezero((void *)a->data, a->length);
+		a->data = NULL;
+		a->length = 0;
+	}
+	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC)
+		free(a);
+}
+
+ASN1_OBJECT *
+ASN1_OBJECT_create(int nid, unsigned char *data, int len,
+    const char *sn, const char *ln)
+{
+	ASN1_OBJECT o;
+
+	o.sn = sn;
+	o.ln = ln;
+	o.data = data;
+	o.nid = nid;
+	o.length = len;
+	o.flags = ASN1_OBJECT_FLAG_DYNAMIC | ASN1_OBJECT_FLAG_DYNAMIC_STRINGS |
+	    ASN1_OBJECT_FLAG_DYNAMIC_DATA;
+	return (OBJ_dup(&o));
+}
 
 int
 i2d_ASN1_OBJECT(const ASN1_OBJECT *a, unsigned char **pp)
@@ -205,7 +261,7 @@ a2d_ASN1_OBJECT(unsigned char *out, int olen, const char *buf, int num)
 	BN_free(bl);
 	return (len);
 
-err:
+ err:
 	if (tmp != ftmp)
 		free(tmp);
 	BN_free(bl);
@@ -270,7 +326,7 @@ d2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp, long length)
 		*pp = p;
 	return ret;
 
-err:
+ err:
 	ASN1error(i);
 	return (NULL);
 }
@@ -345,62 +401,8 @@ c2i_ASN1_OBJECT(ASN1_OBJECT **a, const unsigned char **pp, long len)
 	*pp = p;
 	return (ret);
 
-err:
+ err:
 	if (a == NULL || ret != *a)
 		ASN1_OBJECT_free(ret);
 	return (NULL);
-}
-
-ASN1_OBJECT *
-ASN1_OBJECT_new(void)
-{
-	ASN1_OBJECT *ret;
-
-	ret = malloc(sizeof(ASN1_OBJECT));
-	if (ret == NULL) {
-		ASN1error(ERR_R_MALLOC_FAILURE);
-		return (NULL);
-	}
-	ret->length = 0;
-	ret->data = NULL;
-	ret->nid = 0;
-	ret->sn = NULL;
-	ret->ln = NULL;
-	ret->flags = ASN1_OBJECT_FLAG_DYNAMIC;
-	return (ret);
-}
-
-void
-ASN1_OBJECT_free(ASN1_OBJECT *a)
-{
-	if (a == NULL)
-		return;
-	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC_STRINGS) {
-		free((void *)a->sn);
-		free((void *)a->ln);
-		a->sn = a->ln = NULL;
-	}
-	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC_DATA) {
-		freezero((void *)a->data, a->length);
-		a->data = NULL;
-		a->length = 0;
-	}
-	if (a->flags & ASN1_OBJECT_FLAG_DYNAMIC)
-		free(a);
-}
-
-ASN1_OBJECT *
-ASN1_OBJECT_create(int nid, unsigned char *data, int len,
-    const char *sn, const char *ln)
-{
-	ASN1_OBJECT o;
-
-	o.sn = sn;
-	o.ln = ln;
-	o.data = data;
-	o.nid = nid;
-	o.length = len;
-	o.flags = ASN1_OBJECT_FLAG_DYNAMIC | ASN1_OBJECT_FLAG_DYNAMIC_STRINGS |
-	    ASN1_OBJECT_FLAG_DYNAMIC_DATA;
-	return (OBJ_dup(&o));
 }

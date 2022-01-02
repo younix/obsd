@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.c,v 1.225 2021/12/01 22:34:31 bluhm Exp $ */
+/* $OpenBSD: pfkeyv2.c,v 1.229 2021/12/19 23:30:08 bluhm Exp $ */
 
 /*
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
@@ -800,6 +800,8 @@ pfkeyv2_get(struct tdb *tdb, void **headers, void **buffer, int *lenp,
 	int rval, i;
 	void *p;
 
+	NET_ASSERT_LOCKED();
+
 	/* Find how much space we need */
 	i = sizeof(struct sadb_sa) + sizeof(struct sadb_lifetime) +
 	    sizeof(struct sadb_x_counter);
@@ -1042,18 +1044,8 @@ int
 pfkeyv2_sa_flush(struct tdb *tdb, void *satype_vp, int last)
 {
 	if (!(*((u_int8_t *) satype_vp)) ||
-	    tdb->tdb_satype == *((u_int8_t *) satype_vp)) {
-		/* keep in sync with tdb_delete() */
-		NET_ASSERT_LOCKED();
-
-		if (tdb->tdb_flags & TDBF_DELETED)
-			return (0);
-		tdb->tdb_flags |= TDBF_DELETED;
-		tdb_unlink_locked(tdb);
-		tdb_unbundle(tdb);
-		tdb_deltimeouts(tdb);
-		tdb_unref(tdb);
-	}
+	    tdb->tdb_satype == *((u_int8_t *) satype_vp))
+		tdb_delete(tdb);
 	return (0);
 }
 
@@ -2012,12 +2004,15 @@ pfkeyv2_send(struct socket *so, void *message, int len)
 				(caddr_t)&ipo->ipo_mask, rnh,
 				ipo->ipo_nodes, 0)) == NULL) {
 				/* Remove from linked list of policies on TDB */
+				mtx_enter(&ipo_tdb_mtx);
 				if (ipo->ipo_tdb != NULL) {
 					TAILQ_REMOVE(
 					    &ipo->ipo_tdb->tdb_policy_head,
 					    ipo, ipo_tdb_next);
 					tdb_unref(ipo->ipo_tdb);
+					ipo->ipo_tdb = NULL;
 				}
+				mtx_leave(&ipo_tdb_mtx);
 				if (ipo->ipo_ids)
 					ipsp_ids_free(ipo->ipo_ids);
 				pool_put(&ipsec_policy_pool, ipo);
@@ -2357,6 +2352,8 @@ pfkeyv2_expire(struct tdb *tdb, u_int16_t type)
 	struct sadb_msg *smsg;
 	int rval = 0;
 	int i;
+
+	NET_ASSERT_LOCKED();
 
 	switch (tdb->tdb_sproto) {
 	case IPPROTO_AH:

@@ -1,11 +1,11 @@
-/*	$OpenBSD: setresgid.c,v 1.1 2014/08/27 07:36:14 blambert Exp $	*/
+/*	$OpenBSD: setresgid.c,v 1.3 2021/12/15 18:42:38 anton Exp $	*/
 /*
  *	Written by Bret Stephen Lambert <blambert@openbsd.org> 2014
  *	Public Domain.
  */
 
 #include <sys/types.h>
-#include <sys/param.h>
+#include <sys/signal.h>
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/wait.h>
