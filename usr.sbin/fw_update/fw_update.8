@@ -1,4 +1,4 @@
-.\" $OpenBSD: fw_update.1,v 1.5 2020/07/24 16:40:47 jmc Exp $
+.\" $OpenBSD: fw_update.8,v 1.2 2022/01/06 19:27:01 afresh1 Exp $
 .\"
 .\" Copyright (c) 2011 Alexander Hall <alexander@beard.se>
 .\"
@@ -14,17 +14,17 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: July 24 2020 $
-.Dt FW_UPDATE 1
+.Dd $Mdocdate: January 6 2022 $
+.Dt FW_UPDATE 8
 .Os
 .Sh NAME
 .Nm fw_update
 .Nd install non-free firmware packages
 .Sh SYNOPSIS
 .Nm
-.Op Fl adinv
+.Op Fl adFnv
 .Op Fl p Ar path
-.Op Ar driver ...
+.Op Ar driver | file ...
 .Sh DESCRIPTION
 The
 .Nm
@@ -51,6 +51,9 @@ Install or update firmware for all drivers.
 It is an error to specify this option with any
 .Ar driver
 arguments.
+This is enabled by default unless drivers, files or
+.Fl d
+are specified.
 .It Fl d
 Delete firmware for
 .Ar driver .
@@ -59,9 +62,13 @@ a driver.
 If used in conjunction with
 .Fl a ,
 delete firmware for all drivers.
-.It Fl i
-Display information about firmware which is installed or missing, and whether
-it appears to be required by a driver.
+.It Fl F
+Download drivers only.
+By default downloads to the current directory.
+Secifying a URL with
+.Fl p
+downloads from that URL,
+specifying a path downloads to that directory.
 .It Fl n
 Dry run.
 Do not actually install or update any firmware packages;
@@ -81,6 +88,21 @@ Firmware is downloaded from release-specific directories at
 The files are in the format required by
 .Xr pkg_add 1 ,
 but direct use of pkg_add is discouraged.
+.Sh ENVIRONMENT
+.Bl -tag -width DESTDIRXXX
+.It Ev DESTDIR
+The root of the system to install into.
+.El
+.Sh FILES
+.Bl -tag -width Ds
+.It Pa ${DESTDIR}/usr/share/misc/firmware_patterns
+A list of patterns used to detect needed firmware from the
+.Xr dmesg 8 .
+.It Pa ${DESTDIR}/etc/signify/openbsd-XX-fw.pub
+Used with
+.Xr signify 1
+to verify downloaded firmware files.
+.El
 .Sh SEE ALSO
 .Xr pkg_add 1 ,
 .Xr dmesg 8
@@ -90,5 +112,7 @@ The
 .Nm
 program was designed by
 .An Alexander Hall Aq Mt alexander@beard.se ;
-the current code was written by
+it was then replaced with a perl version by
 .An Marc Espie Aq Mt espie@openbsd.org .
+It was rewritten to be able to be run from the installer by
+.An Andrew Hewus Fresh Aq Mt afresh1@openbsd.org .

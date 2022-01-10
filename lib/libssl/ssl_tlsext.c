@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_tlsext.c,v 1.101 2021/11/01 16:37:17 jsing Exp $ */
+/* $OpenBSD: ssl_tlsext.c,v 1.105 2022/01/06 18:23:56 jsing Exp $ */
 /*
  * Copyright (c) 2016, 2017, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2017 Doug Hogan <doug@openbsd.org>
@@ -1455,13 +1455,17 @@ tlsext_keyshare_client_needs(SSL *s, uint16_t msg_type)
 int
 tlsext_keyshare_client_build(SSL *s, uint16_t msg_type, CBB *cbb)
 {
-	CBB client_shares;
+	CBB client_shares, key_exchange;
 
 	if (!CBB_add_u16_length_prefixed(cbb, &client_shares))
 		return 0;
 
-	if (!tls13_key_share_public(S3I(s)->hs.tls13.key_share,
-	    &client_shares))
+	if (!CBB_add_u16(&client_shares,
+	    tls_key_share_group(S3I(s)->hs.key_share)))
+		return 0;
+	if (!CBB_add_u16_length_prefixed(&client_shares, &key_exchange))
+		return 0;
+	if (!tls_key_share_public(S3I(s)->hs.key_share, &key_exchange))
 		return 0;
 
 	if (!CBB_flush(cbb))
@@ -1498,7 +1502,7 @@ tlsext_keyshare_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 		 */
 		if (S3I(s)->hs.our_max_tls_version < TLS1_3_VERSION)
 			continue;
-		if (S3I(s)->hs.tls13.key_share != NULL)
+		if (S3I(s)->hs.key_share != NULL)
 			continue;
 
 		/* XXX - consider implementing server preference. */
@@ -1506,11 +1510,10 @@ tlsext_keyshare_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 			continue;
 
 		/* Decode and store the selected key share. */
-		S3I(s)->hs.tls13.key_share = tls13_key_share_new(group);
-		if (S3I(s)->hs.tls13.key_share == NULL)
+		if ((S3I(s)->hs.key_share = tls_key_share_new(group)) == NULL)
 			goto err;
-		if (!tls13_key_share_peer_public(S3I(s)->hs.tls13.key_share,
-		    group, &key_exchange))
+		if (!tls_key_share_peer_public(S3I(s)->hs.key_share,
+		    &key_exchange, NULL))
 			goto err;
 	}
 
@@ -1531,6 +1534,8 @@ tlsext_keyshare_server_needs(SSL *s, uint16_t msg_type)
 int
 tlsext_keyshare_server_build(SSL *s, uint16_t msg_type, CBB *cbb)
 {
+	CBB key_exchange;
+
 	/* In the case of a HRR, we only send the server selected group. */
 	if (S3I(s)->hs.tls13.hrr) {
 		if (S3I(s)->hs.tls13.server_group == 0)
@@ -1538,10 +1543,17 @@ tlsext_keyshare_server_build(SSL *s, uint16_t msg_type, CBB *cbb)
 		return CBB_add_u16(cbb, S3I(s)->hs.tls13.server_group);
 	}
 
-	if (S3I(s)->hs.tls13.key_share == NULL)
+	if (S3I(s)->hs.key_share == NULL)
 		return 0;
 
-	if (!tls13_key_share_public(S3I(s)->hs.tls13.key_share, cbb))
+	if (!CBB_add_u16(cbb, tls_key_share_group(S3I(s)->hs.key_share)))
+		return 0;
+	if (!CBB_add_u16_length_prefixed(cbb, &key_exchange))
+		return 0;
+	if (!tls_key_share_public(S3I(s)->hs.key_share, &key_exchange))
+		return 0;
+
+	if (!CBB_flush(cbb))
 		return 0;
 
 	return 1;
@@ -1555,11 +1567,13 @@ tlsext_keyshare_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 
 	/* Unpack server share. */
 	if (!CBS_get_u16(cbs, &group))
-		goto err;
+		return 0;
 
 	if (CBS_len(cbs) == 0) {
-		/* HRR does not include an actual key share. */
-		/* XXX - we should know that we are in a HRR... */
+		/* HRR does not include an actual key share, only the group. */
+		if (msg_type != SSL_TLSEXT_MSG_HRR)
+			return 0;
+
 		S3I(s)->hs.tls13.server_group = group;
 		return 1;
 	}
@@ -1567,18 +1581,15 @@ tlsext_keyshare_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	if (!CBS_get_u16_length_prefixed(cbs, &key_exchange))
 		return 0;
 
-	if (S3I(s)->hs.tls13.key_share == NULL)
+	if (S3I(s)->hs.key_share == NULL)
+		return 0;
+	if (tls_key_share_group(S3I(s)->hs.key_share) != group)
+		return 0;
+	if (!tls_key_share_peer_public(S3I(s)->hs.key_share,
+	    &key_exchange, NULL))
 		return 0;
 
-	if (!tls13_key_share_peer_public(S3I(s)->hs.tls13.key_share,
-	    group, &key_exchange))
-		goto err;
-
 	return 1;
-
- err:
-	*alert = SSL_AD_DECODE_ERROR;
-	return 0;
 }
 
 /*

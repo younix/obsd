@@ -31,7 +31,6 @@
 /openpromio.h/1.1/Tue Jul  5 12:53:40 2016//
 /param.h/1.5/Thu Aug  9 12:19:32 2018//
 /pcb.h/1.1/Mon Sep 20 06:32:30 2010//
-/pci_machdep.h/1.10/Mon Jun 18 13:54:03 2018//
 /pmap.h/1.1/Mon Sep 20 06:32:30 2010//
 /proc.h/1.1/Mon Sep 20 06:32:30 2010//
 /profile.h/1.1/Mon Sep 20 06:32:30 2010//
@@ -52,4 +51,5 @@
 /octeonreg.h/1.11/Fri Dec 11 17:58:22 2020//
 /timetc.h/1.2/Fri Dec 11 17:58:22 2020//
 /octeonvar.h/1.53/Wed Sep  1 16:07:38 2021//
+/pci_machdep.h/1.12/Mon Jan 10 09:38:27 2022//
 D

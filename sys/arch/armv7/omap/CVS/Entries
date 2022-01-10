@@ -24,7 +24,6 @@
 /edma.c/1.8/Mon Nov 15 19:06:15 2021//
 /gptimer.c/1.15/Mon Nov 15 19:06:15 2021//
 /if_cpsw.c/1.52/Mon Nov 15 19:06:15 2021//
-/intc.c/1.11/Mon Nov 15 19:06:15 2021//
 /nxphdmi.c/1.8/Mon Nov 15 19:06:15 2021//
 /omap.c/1.24/Mon Nov 15 19:06:15 2021//
 /omapid.c/1.5/Mon Nov 15 19:06:15 2021//
@@ -38,4 +37,5 @@
 /omwugen.c/1.2/Mon Nov 15 19:06:15 2021//
 /prcm.c/1.18/Mon Nov 15 19:06:15 2021//
 /ti_iic.c/1.15/Mon Nov 15 19:06:15 2021//
+/intc.c/1.12/Mon Jan 10 09:38:25 2022//
 D

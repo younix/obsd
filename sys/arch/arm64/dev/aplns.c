@@ -1,4 +1,4 @@
-/*	$OpenBSD: aplns.c,v 1.7 2021/12/19 23:47:24 kettenis Exp $ */
+/*	$OpenBSD: aplns.c,v 1.10 2022/01/10 09:07:28 kettenis Exp $ */
 /*
  * Copyright (c) 2014, 2021 David Gwynne <dlg@openbsd.org>
  *
@@ -98,7 +98,8 @@ aplns_match(struct device *parent, void *match, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 
-	return (OF_is_compatible(faa->fa_node, "apple,nvme-m1"));
+	return (OF_is_compatible(faa->fa_node, "apple,nvme-m1") ||
+	    OF_is_compatible(faa->fa_node, "apple,nvme-ans2"));
 }
 
 void
@@ -116,7 +117,7 @@ struct nvme_ans_softc {
 	bus_space_tag_t		 asc_iot;
 	bus_space_handle_t	 asc_ioh;
 
-	struct mbox_channel	*asc_mbox;
+	struct rtkit_state	*asc_rtkit;
 	struct nvme_dmamem	*asc_nvmmu;
 };
 
@@ -163,7 +164,8 @@ nvme_ans_match(struct device *parent, void *match, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 
-	return (OF_is_compatible(faa->fa_node, "apple,nvme-m1"));
+	return (OF_is_compatible(faa->fa_node, "apple,nvme-m1") ||
+	    OF_is_compatible(faa->fa_node, "apple,nvme-ans2"));
 }
 
 void
@@ -203,8 +205,8 @@ nvme_ans_attach(struct device *parent, struct device *self, void *aux)
 		goto unmap;
 	}
 
-	asc->asc_mbox = mbox_channel(faa->fa_node, NULL, NULL);
-	if (asc->asc_mbox == NULL) {
+	asc->asc_rtkit = rtkit_init(faa->fa_node, NULL);
+	if (asc->asc_rtkit == NULL) {
 		printf(": can't map mailbox channel\n");
 		goto disestablish;
 	}
@@ -215,7 +217,7 @@ nvme_ans_attach(struct device *parent, struct device *self, void *aux)
 
 	status = bus_space_read_4(sc->sc_iot, sc->sc_ioh, ANS_BOOT_STATUS);
 	if (status != ANS_BOOT_STATUS_OK)
-		rtkit_init(asc->asc_mbox);
+		rtkit_boot(asc->asc_rtkit);
 
 	status = bus_space_read_4(sc->sc_iot, sc->sc_ioh, ANS_BOOT_STATUS);
 	if (status != ANS_BOOT_STATUS_OK) {

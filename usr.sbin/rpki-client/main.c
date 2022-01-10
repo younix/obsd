@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.170 2021/12/29 11:37:57 claudio Exp $ */
+/*	$OpenBSD: main.c,v 1.172 2022/01/06 16:06:30 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -131,12 +131,6 @@ static void
 entity_write_req(const struct entity *ent)
 {
 	struct ibuf *b;
-
-	if (filepath_add(&fpt, ent->file) == 0) {
-		warnx("%s: File already visited", ent->file);
-		entity_queue--;
-		return;
-	}
 
 	b = io_new_buffer();
 	io_simple_buffer(b, &ent->type, sizeof(ent->type));
@@ -467,6 +461,7 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 	struct cert	*cert;
 	struct mft	*mft;
 	struct roa	*roa;
+	char		*file;
 	int		 c;
 
 	/*
@@ -476,6 +471,14 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 	 * We follow that up with whether the resources didn't parse.
 	 */
 	io_read_buf(b, &type, sizeof(type));
+	io_read_str(b, &file);
+
+	if (filepath_add(&fpt, file) == 0) {
+		warnx("%s: File already visited", file);
+		free(file);
+		entity_queue--;
+		return;
+	}
 
 	switch (type) {
 	case RTYPE_TAL:
@@ -515,9 +518,10 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 			break;
 		}
 		mft = mft_read(b);
-		if (mft->stale)
+		if (!mft->stale)
+			queue_add_from_mft_set(mft);
+		else
 			st->mfts_stale++;
-		queue_add_from_mft_set(mft);
 		mft_free(mft);
 		break;
 	case RTYPE_CRL:
@@ -544,6 +548,7 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 		errx(1, "unknown entity type %d", type);
 	}
 
+	free(file);
 	entity_queue--;
 }
 

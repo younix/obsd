@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.280 2021/12/04 14:03:22 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.284 2022/01/09 15:53:52 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -883,20 +883,14 @@ SSL_get_peer_certificate(const SSL *s)
 STACK_OF(X509) *
 SSL_get_peer_cert_chain(const SSL *s)
 {
-	STACK_OF(X509)	*r;
-
-	if ((s == NULL) || (s->session == NULL) ||
-	    (s->session->sess_cert == NULL))
-		r = NULL;
-	else
-		r = s->session->sess_cert->cert_chain;
+	if (s == NULL || s->session == NULL)
+		return NULL;
 
 	/*
 	 * If we are a client, cert_chain includes the peer's own
-	 * certificate;
-	 * if we are a server, it does not.
+	 * certificate; if we are a server, it does not.
 	 */
-	return (r);
+	return s->session->cert_chain;
 }
 
 STACK_OF(X509) *
@@ -912,7 +906,7 @@ SSL_get0_verified_chain(const SSL *s)
 int
 SSL_copy_session_id(SSL *t, const SSL *f)
 {
-	CERT	*tmp;
+	SSL_CERT *tmp;
 
 	/* Do we need to do SSL locking? */
 	if (!SSL_set_session(t, SSL_get_session(f)))
@@ -2187,10 +2181,10 @@ SSL_CTX_set_verify_depth(SSL_CTX *ctx, int depth)
 }
 
 void
-ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
+ssl_set_cert_masks(SSL_CERT *c, const SSL_CIPHER *cipher)
 {
 	unsigned long mask_a, mask_k;
-	CERT_PKEY *cpk;
+	SSL_CERT_PKEY *cpk;
 
 	if (c == NULL)
 		return;
@@ -2198,7 +2192,8 @@ ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
 	mask_a = SSL_aNULL | SSL_aTLS1_3;
 	mask_k = SSL_kECDHE | SSL_kTLS1_3;
 
-	if (c->dh_tmp != NULL || c->dh_tmp_cb != NULL || c->dh_tmp_auto != 0)
+	if (c->dhe_params != NULL || c->dhe_params_cb != NULL ||
+	    c->dhe_params_auto != 0)
 		mask_k |= SSL_kDHE;
 
 	cpk = &(c->pkeys[SSL_PKEY_ECC]);
@@ -2240,10 +2235,10 @@ ssl_using_ecc_cipher(SSL *s)
 }
 
 int
-ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s)
+ssl_check_srvr_ecc_cert_and_alg(SSL *s, X509 *x)
 {
-	const SSL_CIPHER	*cs = S3I(s)->hs.cipher;
-	unsigned long		 alg_a;
+	const SSL_CIPHER *cs = S3I(s)->hs.cipher;
+	unsigned long alg_a;
 
 	alg_a = cs->algorithm_auth;
 
@@ -2258,12 +2253,12 @@ ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s)
 	return (1);
 }
 
-CERT_PKEY *
+SSL_CERT_PKEY *
 ssl_get_server_send_pkey(const SSL *s)
 {
-	unsigned long	 alg_a;
-	CERT		*c;
-	int		 i;
+	unsigned long alg_a;
+	SSL_CERT *c;
+	int i;
 
 	c = s->cert;
 	ssl_set_cert_masks(c, S3I(s)->hs.cipher);
@@ -2290,9 +2285,9 @@ ssl_get_sign_pkey(SSL *s, const SSL_CIPHER *cipher, const EVP_MD **pmd,
 {
 	const struct ssl_sigalg *sigalg = NULL;
 	EVP_PKEY *pkey = NULL;
-	unsigned long	 alg_a;
-	CERT		*c;
-	int		 idx = -1;
+	unsigned long alg_a;
+	SSL_CERT *c;
+	int idx = -1;
 
 	alg_a = cipher->algorithm_auth;
 	c = s->cert;
@@ -2321,10 +2316,10 @@ ssl_get_sign_pkey(SSL *s, const SSL_CIPHER *cipher, const EVP_MD **pmd,
 size_t
 ssl_dhe_params_auto_key_bits(SSL *s)
 {
-	CERT_PKEY *cpk;
+	SSL_CERT_PKEY *cpk;
 	int key_bits;
 
-	if (s->cert->dh_tmp_auto == 2) {
+	if (s->cert->dhe_params_auto == 2) {
 		key_bits = 1024;
 	} else if (S3I(s)->hs.cipher->algorithm_auth & SSL_aNULL) {
 		key_bits = 1024;
@@ -2973,7 +2968,7 @@ SSL_get_SSL_CTX(const SSL *ssl)
 SSL_CTX *
 SSL_set_SSL_CTX(SSL *ssl, SSL_CTX* ctx)
 {
-	CERT *new_cert;
+	SSL_CERT *new_cert;
 
 	if (ctx == NULL)
 		ctx = ssl->initial_ctx;

@@ -1,4 +1,4 @@
-/* $OpenBSD: evp.h,v 1.90 2021/12/24 12:55:04 tb Exp $ */
+/* $OpenBSD: evp.h,v 1.92 2022/01/09 15:15:25 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -497,6 +497,10 @@ unsigned long EVP_MD_flags(const EVP_MD *md);
 
 const EVP_MD *EVP_MD_CTX_md(const EVP_MD_CTX *ctx);
 void *EVP_MD_CTX_md_data(const EVP_MD_CTX *ctx);
+#if defined(LIBRESSL_CRYPTO_INTERANL) || defined(LIBRESSL_NEXT_API)
+EVP_PKEY_CTX *EVP_MD_CTX_pkey_ctx(const EVP_MD_CTX *ctx);
+void EVP_MD_CTX_set_pkey_ctx(EVP_MD_CTX *ctx, EVP_PKEY_CTX *pctx);
+#endif
 #define EVP_MD_CTX_size(e)		EVP_MD_size(EVP_MD_CTX_md(e))
 #define EVP_MD_CTX_block_size(e)	EVP_MD_block_size(EVP_MD_CTX_md(e))
 #define EVP_MD_CTX_type(e)		EVP_MD_type(EVP_MD_CTX_md(e))
@@ -1331,7 +1335,17 @@ typedef struct evp_aead_ctx_st {
  * should be used. */
 #define EVP_AEAD_DEFAULT_TAG_LENGTH 0
 
-/* EVP_AEAD_init initializes the context for the given AEAD algorithm.
+#if defined(LIBRESSL_CRYPTO_INTERANL) || defined(LIBRESSL_NEXT_API)
+/* EVP_AEAD_CTX_new allocates a new context for use with EVP_AEAD_CTX_init.
+ * It can be cleaned up for reuse with EVP_AEAD_CTX_cleanup and must be freed
+ * with EVP_AEAD_CTX_free. */
+EVP_AEAD_CTX *EVP_AEAD_CTX_new(void);
+
+/* EVP_AEAD_CTX_free releases all memory owned by the context. */
+void EVP_AEAD_CTX_free(EVP_AEAD_CTX *ctx);
+#endif
+
+/* EVP_AEAD_CTX_init initializes the context for the given AEAD algorithm.
  * The implementation argument may be NULL to choose the default implementation.
  * Authentication tags may be truncated by passing a tag length. A tag length
  * of zero indicates the default tag length should be used. */

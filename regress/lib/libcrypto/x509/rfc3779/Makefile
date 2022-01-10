@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.3 2021/12/24 14:00:11 tb Exp $
+#	$OpenBSD: Makefile,v 1.5 2022/01/07 17:17:02 tb Exp $
 
 .include "../../Makefile.inc"
 

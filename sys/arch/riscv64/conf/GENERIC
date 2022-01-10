@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.30 2021/11/30 02:13:55 deraadt Exp $
+#	$OpenBSD: GENERIC,v 1.32 2022/01/05 03:32:44 visa Exp $
 #
 # For further information on compiling OpenBSD kernels, see the config(8)
 # man page.
@@ -44,7 +44,10 @@ intc0		at cpu0
 # NS16550 compatible serial ports
 com*		at fdt?
 
-# SiFive SOCs
+# PolarFire SoCs
+mpfclock*	at fdt? early 1
+
+# SiFive SoCs
 sfclock*	at fdt? early 1 # PRCI
 sfcc*		at fdt? early 1	# L2 Cache Controller
 sfuart*		at fdt?

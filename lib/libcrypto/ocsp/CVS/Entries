@@ -1,11 +1,12 @@
-/ocsp_asn.c/1.9/Fri Nov  4 18:35:30 2016//
 /ocsp_err.c/1.8/Sun Jan 29 17:49:23 2017//
 /ocsp_ht.c/1.25/Sun May 13 10:42:03 2018//
-/ocsp_lib.c/1.23/Fri Aug 24 20:03:21 2018//
-/ocsp_prn.c/1.8/Thu Jul 16 02:16:19 2015//
 /ocsp.h/1.18/Sun Nov 21 20:15:22 2021//
-/ocsp_cl.c/1.20/Thu Dec  2 13:56:07 2021//
-/ocsp_ext.c/1.19/Sun Nov 21 20:15:22 2021//
-/ocsp_srv.c/1.11/Sun Nov 21 20:15:22 2021//
-/ocsp_vfy.c/1.19/Thu Dec  2 13:56:07 2021//
+/ocsp_asn.c/1.10/Mon Jan 10 09:38:09 2022//
+/ocsp_cl.c/1.21/Mon Jan 10 09:38:09 2022//
+/ocsp_ext.c/1.20/Mon Jan 10 09:38:09 2022//
+/ocsp_lib.c/1.24/Mon Jan 10 09:38:09 2022//
+/ocsp_local.h/1.1/Fri Jan  7 09:45:52 2022//
+/ocsp_prn.c/1.9/Mon Jan 10 09:38:09 2022//
+/ocsp_srv.c/1.12/Mon Jan 10 09:38:09 2022//
+/ocsp_vfy.c/1.20/Mon Jan 10 09:38:09 2022//
 D

@@ -1,4 +1,4 @@
-#	$OpenBSD: test-exec.sh,v 1.87 2021/09/01 00:50:27 dtucker Exp $
+#	$OpenBSD: test-exec.sh,v 1.89 2022/01/06 22:14:25 dtucker Exp $
 #	Placed in the Public Domain.
 
 #SUDO=sudo
@@ -146,6 +146,7 @@ fi
 SSHLOGWRAP=$OBJ/ssh-log-wrapper.sh
 cat >$SSHLOGWRAP <<EOD
 #!/bin/sh
+echo "Executing: ${SSH} \$@" >>${TEST_SSH_LOGFILE}
 for i in "\$@";do shift;case "\$i" in -q):;; *) set -- "\$@" "\$i";;esac;done
 exec ${SSH} -E${TEST_SSH_LOGFILE} "\$@"
 EOD
@@ -366,7 +367,6 @@ Host *
 	UserKnownHostsFile	$OBJ/known_hosts
 	PubkeyAuthentication	yes
 	ChallengeResponseAuthentication	no
-	HostbasedAuthentication	no
 	PasswordAuthentication	no
 	BatchMode		yes
 	StrictHostKeyChecking	yes

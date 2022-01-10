@@ -55,7 +55,6 @@
 /ioapic.c/1.42/Tue Sep 14 08:17:31 2021//
 /k1x-pstate.c/1.13/Thu Sep  2 14:22:31 2021//
 /lapic.c/1.48/Thu Sep  2 14:22:31 2021//
-/locore.s/1.193/Tue Sep 14 08:17:31 2021//
 /pmap.c/1.217/Tue Sep 14 08:17:31 2021//
 /machdep.c/1.646/Wed Oct 20 17:29:09 2021//
 /via.c/1.50/Mon Nov 15 19:06:15 2021//
@@ -64,4 +63,5 @@
 /locore0.S/1.5/Sun Jan  2 13:11:04 2022//
 /pmapae.c/1.66/Sun Jan  2 13:11:04 2022//
 /trap.c/1.156/Sun Jan  2 13:11:04 2022//
+/locore.s/1.194/Mon Jan 10 09:38:26 2022//
 D

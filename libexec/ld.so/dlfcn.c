@@ -1,4 +1,4 @@
-/*	$OpenBSD: dlfcn.c,v 1.108 2021/10/07 14:47:32 jcs Exp $ */
+/*	$OpenBSD: dlfcn.c,v 1.110 2022/01/08 17:28:49 deraadt Exp $ */
 
 /*
  * Copyright (c) 1998 Per Fogelstrom, Opsycon AB
@@ -29,15 +29,14 @@
 #define _DYN_LOADER
 
 #include <sys/types.h>
-#include <nlist.h>
 #include <link.h>
 #include <dlfcn.h>
 #include <unistd.h>
 
 #include "syscall.h"
-#include "archdep.h"
+#include "util.h"
 #include "resolve.h"
-#include "sod.h"
+#include "archdep.h"
 
 int _dl_errno;
 static int _dl_tracelib;

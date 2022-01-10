@@ -10,11 +10,11 @@
 /wscons_machdep.c/1.6/Wed Jan 23 16:37:56 2008//
 /mainbus.c/1.26/Thu Dec 17 19:39:58 2020//
 /locore.S/1.58/Sat May  1 08:41:51 2021//
-/ofwreal.S/1.7/Sat May  1 08:41:51 2021//
 /openprom.c/1.5/Sat May  1 08:41:51 2021//
 /clock.c/1.48/Wed Sep  1 16:07:38 2021//
 /ofw_machdep.c/1.64/Wed Sep  1 16:07:38 2021//
 /cpu.c/1.84/Thu Sep  2 14:22:31 2021//
 /conf.c/1.74/Sun Nov 21 20:15:22 2021//
 /machdep.c/1.195/Sun Jan  2 13:11:04 2022//
+/ofwreal.S/1.8/Mon Jan 10 09:38:26 2022//
 D

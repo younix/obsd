@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_server.c,v 1.89 2021/12/26 14:59:52 jsing Exp $ */
+/* $OpenBSD: tls13_server.c,v 1.93 2022/01/08 12:59:59 jsing Exp $ */
 /*
  * Copyright (c) 2019, 2020 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
@@ -295,7 +295,7 @@ tls13_client_hello_recv(struct tls13_ctx *ctx, CBS *cbs)
 	 * has been enabled. This would probably mean using either an
 	 * INITIAL | WITHOUT_HRR state, or another intermediate state.
 	 */
-	if (ctx->hs->tls13.key_share != NULL)
+	if (ctx->hs->key_share != NULL)
 		ctx->handshake_stage.hs_type |= NEGOTIATED | WITHOUT_HRR;
 
 	/* XXX - check this is the correct point */
@@ -360,8 +360,8 @@ tls13_server_engage_record_protection(struct tls13_ctx *ctx)
 	SSL *s = ctx->ssl;
 	int ret = 0;
 
-	if (!tls13_key_share_derive(ctx->hs->tls13.key_share,
-	    &shared_key, &shared_key_len))
+	if (!tls_key_share_derive(ctx->hs->key_share, &shared_key,
+	    &shared_key_len))
 		goto err;
 
 	s->session->cipher = ctx->hs->cipher;
@@ -425,7 +425,7 @@ tls13_server_hello_retry_request_send(struct tls13_ctx *ctx, CBB *cbb)
 	if (!tls13_synthetic_handshake_message(ctx))
 		return 0;
 
-	if (ctx->hs->tls13.key_share != NULL)
+	if (ctx->hs->key_share != NULL)
 		return 0;
 	if ((nid = tls1_get_shared_curve(ctx->ssl)) == NID_undef)
 		return 0;
@@ -485,9 +485,9 @@ tls13_servername_process(struct tls13_ctx *ctx)
 int
 tls13_server_hello_send(struct tls13_ctx *ctx, CBB *cbb)
 {
-	if (ctx->hs->tls13.key_share == NULL)
+	if (ctx->hs->key_share == NULL)
 		return 0;
-	if (!tls13_key_share_generate(ctx->hs->tls13.key_share))
+	if (!tls_key_share_generate(ctx->hs->key_share))
 		return 0;
 	if (!tls13_servername_process(ctx))
 		return 0;
@@ -545,7 +545,7 @@ tls13_server_certificate_request_send(struct tls13_ctx *ctx, CBB *cbb)
 }
 
 static int
-tls13_server_check_certificate(struct tls13_ctx *ctx, CERT_PKEY *cpk,
+tls13_server_check_certificate(struct tls13_ctx *ctx, SSL_CERT_PKEY *cpk,
     int *ok, const struct ssl_sigalg **out_sigalg)
 {
 	const struct ssl_sigalg *sigalg;
@@ -575,12 +575,12 @@ tls13_server_check_certificate(struct tls13_ctx *ctx, CERT_PKEY *cpk,
 }
 
 static int
-tls13_server_select_certificate(struct tls13_ctx *ctx, CERT_PKEY **out_cpk,
+tls13_server_select_certificate(struct tls13_ctx *ctx, SSL_CERT_PKEY **out_cpk,
     const struct ssl_sigalg **out_sigalg)
 {
 	SSL *s = ctx->ssl;
 	const struct ssl_sigalg *sigalg;
-	CERT_PKEY *cpk;
+	SSL_CERT_PKEY *cpk;
 	int cert_ok;
 
 	*out_cpk = NULL;
@@ -616,7 +616,7 @@ tls13_server_certificate_send(struct tls13_ctx *ctx, CBB *cbb)
 	const struct ssl_sigalg *sigalg;
 	X509_STORE_CTX *xsc = NULL;
 	STACK_OF(X509) *chain;
-	CERT_PKEY *cpk;
+	SSL_CERT_PKEY *cpk;
 	X509 *cert;
 	int i, ret = 0;
 
@@ -697,7 +697,7 @@ tls13_server_certificate_verify_send(struct tls13_ctx *ctx, CBB *cbb)
 	EVP_MD_CTX *mdctx = NULL;
 	EVP_PKEY_CTX *pctx;
 	EVP_PKEY *pkey;
-	const CERT_PKEY *cpk;
+	const SSL_CERT_PKEY *cpk;
 	CBB sig_cbb;
 	int ret = 0;
 
@@ -921,21 +921,19 @@ tls13_client_certificate_recv(struct tls13_ctx *ctx, CBS *cbs)
 	if ((cert_idx = ssl_cert_type(cert, pkey)) < 0)
 		goto err;
 
-	ssl_sess_cert_free(s->session->sess_cert);
-	if ((s->session->sess_cert = ssl_sess_cert_new()) == NULL)
-		goto err;
-
-	s->session->sess_cert->cert_chain = certs;
+	sk_X509_pop_free(s->session->cert_chain, X509_free);
+	s->session->cert_chain = certs;
 	certs = NULL;
 
 	X509_up_ref(cert);
-	s->session->sess_cert->peer_pkeys[cert_idx].x509 = cert;
-	s->session->sess_cert->peer_key = &(s->session->sess_cert->peer_pkeys[cert_idx]);
-
-	X509_free(s->session->peer);
+	X509_free(s->session->peer_pkeys[cert_idx].x509);
+	s->session->peer_pkeys[cert_idx].x509 = cert;
+	s->session->peer_key = &s->session->peer_pkeys[cert_idx];
 
 	X509_up_ref(cert);
+	X509_free(s->session->peer);
 	s->session->peer = cert;
+
 	s->session->verify_result = s->verify_result;
 
 	ctx->handshake_stage.hs_type |= WITH_CCV;

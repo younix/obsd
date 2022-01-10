@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.219 2021/11/02 13:59:29 tb Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.224 2022/01/08 12:43:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1565,11 +1565,8 @@ ssl3_free(SSL *s)
 	ssl3_release_write_buffer(s);
 	freezero(S3I(s)->hs.sigalgs, S3I(s)->hs.sigalgs_len);
 
-	DH_free(S3I(s)->tmp.dh);
-	EC_KEY_free(S3I(s)->tmp.ecdh);
-	freezero(S3I(s)->tmp.x25519, X25519_KEY_LENGTH);
+	tls_key_share_free(S3I(s)->hs.key_share);
 
-	tls13_key_share_free(S3I(s)->hs.tls13.key_share);
 	tls13_secrets_destroy(S3I(s)->hs.tls13.secrets);
 	freezero(S3I(s)->hs.tls13.cookie, S3I(s)->hs.tls13.cookie_len);
 	tls13_clienthello_hash_clear(&S3I(s)->hs.tls13);
@@ -1600,20 +1597,12 @@ ssl3_clear(SSL *s)
 	sk_X509_pop_free(s->internal->verified_chain, X509_free);
 	s->internal->verified_chain = NULL;
 
-	DH_free(S3I(s)->tmp.dh);
-	S3I(s)->tmp.dh = NULL;
-	EC_KEY_free(S3I(s)->tmp.ecdh);
-	S3I(s)->tmp.ecdh = NULL;
-	S3I(s)->tmp.ecdh_nid = NID_undef;
-	freezero(S3I(s)->tmp.x25519, X25519_KEY_LENGTH);
-	S3I(s)->tmp.x25519 = NULL;
-
 	freezero(S3I(s)->hs.sigalgs, S3I(s)->hs.sigalgs_len);
 	S3I(s)->hs.sigalgs = NULL;
 	S3I(s)->hs.sigalgs_len = 0;
 
-	tls13_key_share_free(S3I(s)->hs.tls13.key_share);
-	S3I(s)->hs.tls13.key_share = NULL;
+	tls_key_share_free(S3I(s)->hs.key_share);
+	S3I(s)->hs.key_share = NULL;
 
 	tls13_secrets_destroy(S3I(s)->hs.tls13.secrets);
 	S3I(s)->hs.tls13.secrets = NULL;
@@ -1664,35 +1653,17 @@ long
 _SSL_get_peer_tmp_key(SSL *s, EVP_PKEY **key)
 {
 	EVP_PKEY *pkey = NULL;
-	SESS_CERT *sc;
 	int ret = 0;
 
 	*key = NULL;
 
-	if (s->session == NULL || s->session->sess_cert == NULL)
-		return 0;
-
-	sc = s->session->sess_cert;
+	if (S3I(s)->hs.key_share == NULL)
+		goto err;
 
 	if ((pkey = EVP_PKEY_new()) == NULL)
-		return 0;
-
-	if (sc->peer_dh_tmp != NULL) {
-		if (!EVP_PKEY_set1_DH(pkey, sc->peer_dh_tmp))
-			goto err;
-	} else if (sc->peer_ecdh_tmp) {
-		if (!EVP_PKEY_set1_EC_KEY(pkey, sc->peer_ecdh_tmp))
-			goto err;
-	} else if (sc->peer_x25519_tmp != NULL) {
-		if (!ssl_kex_dummy_ecdhe_x25519(pkey))
-			goto err;
-	} else if (S3I(s)->hs.tls13.key_share != NULL) {
-		if (!tls13_key_share_peer_pkey(S3I(s)->hs.tls13.key_share,
-		    pkey))
-			goto err;
-	} else {
 		goto err;
-	}
+	if (!tls_key_share_peer_pkey(S3I(s)->hs.key_share, pkey))
+		goto err;
 
 	*key = pkey;
 	pkey = NULL;
@@ -1737,20 +1708,20 @@ _SSL_total_renegotiations(SSL *s)
 static int
 _SSL_set_tmp_dh(SSL *s, DH *dh)
 {
-	DH *dh_tmp;
+	DH *dhe_params;
 
 	if (dh == NULL) {
 		SSLerror(s, ERR_R_PASSED_NULL_PARAMETER);
 		return 0;
 	}
 
-	if ((dh_tmp = DHparams_dup(dh)) == NULL) {
+	if ((dhe_params = DHparams_dup(dh)) == NULL) {
 		SSLerror(s, ERR_R_DH_LIB);
 		return 0;
 	}
 
-	DH_free(s->cert->dh_tmp);
-	s->cert->dh_tmp = dh_tmp;
+	DH_free(s->cert->dhe_params);
+	s->cert->dhe_params = dhe_params;
 
 	return 1;
 }
@@ -1758,7 +1729,7 @@ _SSL_set_tmp_dh(SSL *s, DH *dh)
 static int
 _SSL_set_dh_auto(SSL *s, int state)
 {
-	s->cert->dh_tmp_auto = state;
+	s->cert->dhe_params_auto = state;
 	return 1;
 }
 
@@ -2151,7 +2122,7 @@ ssl3_callback_ctrl(SSL *s, int cmd, void (*fp)(void))
 		return 0;
 
 	case SSL_CTRL_SET_TMP_DH_CB:
-		s->cert->dh_tmp_cb = (DH *(*)(SSL *, int, int))fp;
+		s->cert->dhe_params_cb = (DH *(*)(SSL *, int, int))fp;
 		return 1;
 
 	case SSL_CTRL_SET_TMP_ECDH_CB:
@@ -2169,15 +2140,20 @@ ssl3_callback_ctrl(SSL *s, int cmd, void (*fp)(void))
 static int
 _SSL_CTX_set_tmp_dh(SSL_CTX *ctx, DH *dh)
 {
-	DH *dh_tmp;
+	DH *dhe_params;
 
-	if ((dh_tmp = DHparams_dup(dh)) == NULL) {
+	if (dh == NULL) {
+		SSLerrorx(ERR_R_PASSED_NULL_PARAMETER);
+		return 0;
+	}
+
+	if ((dhe_params = DHparams_dup(dh)) == NULL) {
 		SSLerrorx(ERR_R_DH_LIB);
 		return 0;
 	}
 
-	DH_free(ctx->internal->cert->dh_tmp);
-	ctx->internal->cert->dh_tmp = dh_tmp;
+	DH_free(ctx->internal->cert->dhe_params);
+	ctx->internal->cert->dhe_params = dhe_params;
 
 	return 1;
 }
@@ -2185,7 +2161,7 @@ _SSL_CTX_set_tmp_dh(SSL_CTX *ctx, DH *dh)
 static int
 _SSL_CTX_set_dh_auto(SSL_CTX *ctx, int state)
 {
-	ctx->internal->cert->dh_tmp_auto = state;
+	ctx->internal->cert->dhe_params_auto = state;
 	return 1;
 }
 
@@ -2472,7 +2448,7 @@ ssl3_ctx_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 		return 0;
 
 	case SSL_CTRL_SET_TMP_DH_CB:
-		ctx->internal->cert->dh_tmp_cb =
+		ctx->internal->cert->dhe_params_cb =
 		    (DH *(*)(SSL *, int, int))fp;
 		return 1;
 
@@ -2510,7 +2486,7 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 	SSL_CIPHER *c, *ret = NULL;
 	int can_use_ecc;
 	int i, ii, ok;
-	CERT *cert;
+	SSL_CERT *cert;
 
 	/* Let's see which ciphers we can support */
 	cert = s->cert;

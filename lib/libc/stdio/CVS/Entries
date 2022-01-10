@@ -43,8 +43,6 @@
 /fseek.c/1.13/Fri Jun 28 13:32:42 2019//
 /fsetpos.c/1.8/Wed Sep 21 04:38:56 2016//
 /ftell.c/1.11/Mon Aug 31 02:53:57 2015//
-/funopen.3/1.18/Wed Nov  4 21:30:13 2015//
-/funopen.c/1.9/Mon Aug 31 02:53:57 2015//
 /fvwrite.c/1.20/Fri Mar 17 16:06:33 2017//
 /fvwrite.h/1.7/Thu Aug 27 04:37:09 2015//
 /fwalk.c/1.12/Mon May 23 00:21:48 2016//
@@ -136,4 +134,6 @@
 /getwchar.c/1.3/Mon Nov 15 19:06:15 2021//
 /ferror.3/1.11/Sun Nov 21 20:15:22 2021//
 /findfp.c/1.20/Thu Dec  2 13:56:06 2021//
+/funopen.3/1.19/Mon Jan 10 09:38:08 2022//
+/funopen.c/1.10/Mon Jan 10 09:38:08 2022//
 D

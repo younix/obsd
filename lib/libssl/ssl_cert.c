@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_cert.c,v 1.88 2021/11/29 18:36:27 tb Exp $ */
+/* $OpenBSD: ssl_cert.c,v 1.93 2022/01/08 12:59:58 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -158,12 +158,12 @@ SSL_get_ex_data_X509_STORE_CTX_idx(void)
 	return ssl_x509_store_ctx_idx;
 }
 
-CERT *
+SSL_CERT *
 ssl_cert_new(void)
 {
-	CERT *ret;
+	SSL_CERT *ret;
 
-	ret = calloc(1, sizeof(CERT));
+	ret = calloc(1, sizeof(SSL_CERT));
 	if (ret == NULL) {
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
 		return (NULL);
@@ -173,13 +173,13 @@ ssl_cert_new(void)
 	return (ret);
 }
 
-CERT *
-ssl_cert_dup(CERT *cert)
+SSL_CERT *
+ssl_cert_dup(SSL_CERT *cert)
 {
-	CERT *ret;
+	SSL_CERT *ret;
 	int i;
 
-	ret = calloc(1, sizeof(CERT));
+	ret = calloc(1, sizeof(SSL_CERT));
 	if (ret == NULL) {
 		SSLerrorx(ERR_R_MALLOC_FAILURE);
 		return (NULL);
@@ -195,31 +195,15 @@ ssl_cert_dup(CERT *cert)
 	ret->mask_k = cert->mask_k;
 	ret->mask_a = cert->mask_a;
 
-	if (cert->dh_tmp != NULL) {
-		ret->dh_tmp = DHparams_dup(cert->dh_tmp);
-		if (ret->dh_tmp == NULL) {
+	if (cert->dhe_params != NULL) {
+		ret->dhe_params = DHparams_dup(cert->dhe_params);
+		if (ret->dhe_params == NULL) {
 			SSLerrorx(ERR_R_DH_LIB);
 			goto err;
 		}
-		if (cert->dh_tmp->priv_key) {
-			BIGNUM *b = BN_dup(cert->dh_tmp->priv_key);
-			if (!b) {
-				SSLerrorx(ERR_R_BN_LIB);
-				goto err;
-			}
-			ret->dh_tmp->priv_key = b;
-		}
-		if (cert->dh_tmp->pub_key) {
-			BIGNUM *b = BN_dup(cert->dh_tmp->pub_key);
-			if (!b) {
-				SSLerrorx(ERR_R_BN_LIB);
-				goto err;
-			}
-			ret->dh_tmp->pub_key = b;
-		}
 	}
-	ret->dh_tmp_cb = cert->dh_tmp_cb;
-	ret->dh_tmp_auto = cert->dh_tmp_auto;
+	ret->dhe_params_cb = cert->dhe_params_cb;
+	ret->dhe_params_auto = cert->dhe_params_auto;
 
 	for (i = 0; i < SSL_PKEY_NUM; i++) {
 		if (cert->pkeys[i].x509 != NULL) {
@@ -272,7 +256,7 @@ ssl_cert_dup(CERT *cert)
 	return (ret);
 
  err:
-	DH_free(ret->dh_tmp);
+	DH_free(ret->dhe_params);
 
 	for (i = 0; i < SSL_PKEY_NUM; i++) {
 		X509_free(ret->pkeys[i].x509);
@@ -285,7 +269,7 @@ ssl_cert_dup(CERT *cert)
 
 
 void
-ssl_cert_free(CERT *c)
+ssl_cert_free(SSL_CERT *c)
 {
 	int i;
 
@@ -296,7 +280,7 @@ ssl_cert_free(CERT *c)
 	if (i > 0)
 		return;
 
-	DH_free(c->dh_tmp);
+	DH_free(c->dhe_params);
 
 	for (i = 0; i < SSL_PKEY_NUM; i++) {
 		X509_free(c->pkeys[i].x509);
@@ -308,7 +292,7 @@ ssl_cert_free(CERT *c)
 }
 
 int
-ssl_cert_set0_chain(CERT *c, STACK_OF(X509) *chain)
+ssl_cert_set0_chain(SSL_CERT *c, STACK_OF(X509) *chain)
 {
 	if (c->key == NULL)
 		return 0;
@@ -320,7 +304,7 @@ ssl_cert_set0_chain(CERT *c, STACK_OF(X509) *chain)
 }
 
 int
-ssl_cert_set1_chain(CERT *c, STACK_OF(X509) *chain)
+ssl_cert_set1_chain(SSL_CERT *c, STACK_OF(X509) *chain)
 {
 	STACK_OF(X509) *new_chain = NULL;
 
@@ -337,7 +321,7 @@ ssl_cert_set1_chain(CERT *c, STACK_OF(X509) *chain)
 }
 
 int
-ssl_cert_add0_chain_cert(CERT *c, X509 *cert)
+ssl_cert_add0_chain_cert(SSL_CERT *c, X509 *cert)
 {
 	if (c->key == NULL)
 		return 0;
@@ -353,7 +337,7 @@ ssl_cert_add0_chain_cert(CERT *c, X509 *cert)
 }
 
 int
-ssl_cert_add1_chain_cert(CERT *c, X509 *cert)
+ssl_cert_add1_chain_cert(SSL_CERT *c, X509 *cert)
 {
 	if (!ssl_cert_add0_chain_cert(c, cert))
 		return 0;
@@ -361,45 +345,6 @@ ssl_cert_add1_chain_cert(CERT *c, X509 *cert)
 	X509_up_ref(cert);
 
 	return 1;
-}
-
-SESS_CERT *
-ssl_sess_cert_new(void)
-{
-	SESS_CERT *ret;
-
-	ret = calloc(1, sizeof *ret);
-	if (ret == NULL) {
-		SSLerrorx(ERR_R_MALLOC_FAILURE);
-		return NULL;
-	}
-	ret->peer_key = &(ret->peer_pkeys[SSL_PKEY_RSA]);
-	ret->references = 1;
-
-	return ret;
-}
-
-void
-ssl_sess_cert_free(SESS_CERT *sc)
-{
-	int i;
-
-	if (sc == NULL)
-		return;
-
-	i = CRYPTO_add(&sc->references, -1, CRYPTO_LOCK_SSL_SESS_CERT);
-	if (i > 0)
-		return;
-
-	sk_X509_pop_free(sc->cert_chain, X509_free);
-	for (i = 0; i < SSL_PKEY_NUM; i++)
-		X509_free(sc->peer_pkeys[i].x509);
-
-	DH_free(sc->peer_dh_tmp);
-	EC_KEY_free(sc->peer_ecdh_tmp);
-	free(sc->peer_x25519_tmp);
-
-	free(sc);
 }
 
 int

@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $OpenBSD: snmpd.sh,v 1.15 2021/09/07 10:09:28 martijn Exp $
+# $OpenBSD: snmpd.sh,v 1.17 2022/01/07 10:20:11 martijn Exp $
 #/*
 # * Copyright (c) Rob Pierce <rob@openbsd.org>
 # *
@@ -367,7 +367,7 @@ then
 	echo "Printing of UTF-8 replacement character failed"
 	FAILED=1
 fi
-broken="$(LC_ALL=C eval $snmp_command)"
+broken="$(eval LC_ALL=C $snmp_command)"
 if [ "$broken" != "br?ken" ]
 then
 	echo "Printing of question mark in C locale failed"

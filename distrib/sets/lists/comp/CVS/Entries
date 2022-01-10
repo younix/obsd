@@ -11,7 +11,6 @@
 /gcc.macppc/1.16/Wed Sep  1 16:07:30 2021//
 /gcc.octeon/1.16/Wed Sep  1 16:07:30 2021//
 /md.amd64/1.112/Wed Sep  1 16:07:30 2021//
-/md.arm64/1.15/Wed Sep  1 16:07:30 2021//
 /md.landisk/1.67/Wed Sep  1 16:07:30 2021//
 /md.loongson/1.51/Wed Sep  1 16:07:30 2021//
 /md.macppc/1.130/Wed Sep  1 16:07:30 2021//
@@ -33,5 +32,6 @@
 /clang.powerpc64/1.13/Sun Jan  2 13:09:40 2022//
 /clang.riscv64/1.6/Sun Jan  2 13:09:40 2022//
 /clang.sparc64/1.26/Sun Jan  2 13:09:40 2022//
-/mi/1.1591/Sun Jan  2 13:09:40 2022//
+/md.arm64/1.16/Mon Jan 10 09:37:27 2022//
+/mi/1.1592/Mon Jan 10 09:37:27 2022//
 D

@@ -1,6 +1,7 @@
-/c_rle.c/1.8/Mon Nov  3 16:58:28 2014//
-/c_zlib.c/1.20/Sat Mar 17 16:20:01 2018//
 /comp.h/1.8/Mon Nov  3 16:58:28 2014//
-/comp_err.c/1.10/Sun Jan 29 17:49:22 2017//
-/comp_lib.c/1.8/Mon Nov  3 16:58:28 2014//
+/c_rle.c/1.9/Mon Jan 10 09:38:08 2022//
+/c_zlib.c/1.21/Mon Jan 10 09:38:08 2022//
+/comp_err.c/1.11/Mon Jan 10 09:38:08 2022//
+/comp_lib.c/1.9/Mon Jan 10 09:38:08 2022//
+/comp_local.h/1.1/Sun Jan  9 23:50:10 2022//
 D

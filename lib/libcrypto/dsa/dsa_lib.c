@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_lib.c,v 1.29 2018/04/14 07:09:21 tb Exp $ */
+/* $OpenBSD: dsa_lib.c,v 1.33 2022/01/07 09:35:36 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -73,6 +73,9 @@
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
 #endif
+
+#include "dh_local.h"
+#include "dsa_locl.h"
 
 static const DSA_METHOD *default_DSA_method = NULL;
 
@@ -361,6 +364,36 @@ DSA_set0_key(DSA *d, BIGNUM *pub_key, BIGNUM *priv_key)
 	return 1;
 }
 
+const BIGNUM *
+DSA_get0_p(const DSA *d)
+{
+	return d->p;
+}
+
+const BIGNUM *
+DSA_get0_q(const DSA *d)
+{
+	return d->q;
+}
+
+const BIGNUM *
+DSA_get0_g(const DSA *d)
+{
+	return d->g;
+}
+
+const BIGNUM *
+DSA_get0_pub_key(const DSA *d)
+{
+	return d->pub_key;
+}
+
+const BIGNUM *
+DSA_get0_priv_key(const DSA *d)
+{
+	return d->priv_key;
+}
+
 void
 DSA_clear_flags(DSA *d, int flags)
 {
@@ -383,4 +416,10 @@ ENGINE *
 DSA_get0_engine(DSA *d)
 {
 	return d->engine;
+}
+
+int
+DSA_bits(const DSA *dsa)
+{
+	return BN_num_bits(dsa->p);
 }

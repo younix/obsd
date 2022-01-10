@@ -1,4 +1,4 @@
-# $OpenBSD: files.arm64,v 1.51 2022/01/01 18:52:37 kettenis Exp $
+# $OpenBSD: files.arm64,v 1.53 2022/01/10 09:07:28 kettenis Exp $
 
 maxpartitions	16
 maxusers	2 8 128
@@ -147,10 +147,6 @@ device	apldog
 attach	apldog at fdt
 file	arch/arm64/dev/apldog.c			apldog
 
-device	apldwusb: fdt
-attach	apldwusb at fdt
-file	arch/arm64/dev/apldwusb.c		apldwusb
-
 device	apliic: i2cbus
 attach	apliic at fdt
 file	arch/arm64/dev/apliic.c			apliic
@@ -188,6 +184,10 @@ device	aplns {}: rtkit
 attach	aplns at fdt
 attach	nvme at aplns with nvme_ans
 file	arch/arm64/dev/aplns.c			aplns | nvme_ans
+
+device	aplsmc
+attach	aplsmc at fdt
+file	arch/arm64/dev/aplsmc.c			aplsmc
 
 define	spmi {}
 device	aplpmu
