@@ -41,7 +41,6 @@
 /codepatch.c/1.5/Thu Dec 17 19:39:58 2020//
 /db_disasm.c/1.24/Thu Dec 17 19:39:58 2020//
 /db_mp.c/1.13/Thu Dec 17 19:39:58 2020//
-/hibernate_machdep.c/1.56/Thu Dec 17 19:39:58 2020//
 /ipifuncs.c/1.33/Thu Dec 17 19:39:58 2020//
 /softintr.c/1.8/Thu Dec 17 19:39:58 2020//
 /db_memrw.c/1.18/Sat May  1 08:41:51 2021//
@@ -64,4 +63,5 @@
 /pmapae.c/1.66/Sun Jan  2 13:11:04 2022//
 /trap.c/1.156/Sun Jan  2 13:11:04 2022//
 /locore.s/1.194/Mon Jan 10 09:38:26 2022//
+/hibernate_machdep.c/1.58/Mon Jan 24 14:23:36 2022//
 D

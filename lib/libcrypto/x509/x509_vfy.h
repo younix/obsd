@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_vfy.h,v 1.48 2022/01/05 20:18:19 tb Exp $ */
+/* $OpenBSD: x509_vfy.h,v 1.50 2022/01/14 07:53:45 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -274,7 +274,6 @@ X509_OBJECT *X509_OBJECT_retrieve_by_subject(STACK_OF(X509_OBJECT) *h,
 X509_OBJECT *X509_OBJECT_retrieve_match(STACK_OF(X509_OBJECT) *h, X509_OBJECT *x);
 int X509_OBJECT_up_ref_count(X509_OBJECT *a);
 X509_LOOKUP_TYPE X509_OBJECT_get_type(const X509_OBJECT *a);
-void X509_OBJECT_free_contents(X509_OBJECT *a);
 X509 *X509_OBJECT_get0_X509(const X509_OBJECT *xo);
 X509_CRL *X509_OBJECT_get0_X509_CRL(X509_OBJECT *xo);
 
@@ -297,11 +296,9 @@ int X509_STORE_set_trust(X509_STORE *ctx, int trust);
 int X509_STORE_set1_param(X509_STORE *ctx, X509_VERIFY_PARAM *pm);
 X509_VERIFY_PARAM *X509_STORE_get0_param(X509_STORE *ctx);
 
-#if defined(LIBRESSL_NEXT_API) || defined(LIBRESSL_CRYPTO_INTERNAL)
 typedef int (*X509_STORE_CTX_verify_cb)(int, X509_STORE_CTX *);
 
 X509_STORE_CTX_verify_cb X509_STORE_get_verify_cb(X509_STORE *);
-#endif
 
 void X509_STORE_set_verify_cb(X509_STORE *ctx,
     int (*verify_cb)(int, X509_STORE_CTX *));
@@ -398,12 +395,10 @@ int (*X509_STORE_CTX_get_verify_cb(X509_STORE_CTX *ctx))(int, X509_STORE_CTX *);
 void X509_STORE_CTX_set_verify_cb(X509_STORE_CTX *ctx,
 				  int (*verify_cb)(int, X509_STORE_CTX *));
 
-#if defined(LIBRESSL_NEXT_API) || defined(LIBRESSL_CRYPTO_INTERNAL)
 typedef int (*X509_STORE_CTX_verify_fn)(X509_STORE_CTX *);
 
 void X509_STORE_set_verify(X509_STORE *ctx, X509_STORE_CTX_verify_fn verify);
 X509_STORE_CTX_verify_fn X509_STORE_get_verify(X509_STORE *ctx);
-#endif
 #define X509_STORE_set_verify_func(ctx, func) \
     X509_STORE_set_verify((ctx), (func))
 

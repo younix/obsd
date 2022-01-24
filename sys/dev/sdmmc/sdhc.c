@@ -1,4 +1,4 @@
-/*	$OpenBSD: sdhc.c,v 1.71 2021/09/11 22:42:12 mglocker Exp $	*/
+/*	$OpenBSD: sdhc.c,v 1.73 2022/01/19 10:51:04 patrick Exp $	*/
 
 /*
  * Copyright (c) 2006 Uwe Stuehler <uwe@openbsd.org>
@@ -238,10 +238,12 @@ sdhc_write_2(struct sdhc_host *hp, bus_size_t offset, uint16_t value)
  */
 int
 sdhc_host_found(struct sdhc_softc *sc, bus_space_tag_t iot,
-    bus_space_handle_t ioh, bus_size_t iosize, int usedma, u_int32_t caps)
+    bus_space_handle_t ioh, bus_size_t iosize, int usedma, uint64_t capmask,
+    uint64_t capset)
 {
 	struct sdmmcbus_attach_args saa;
 	struct sdhc_host *hp;
+	uint32_t caps;
 	int error = 1;
 	int max_clock;
 
@@ -267,8 +269,9 @@ sdhc_host_found(struct sdhc_softc *sc, bus_space_tag_t iot,
 	(void)sdhc_host_reset(hp);
 
 	/* Determine host capabilities. */
-	if (caps == 0)
-		caps = HREAD4(hp, SDHC_CAPABILITIES);
+	caps = HREAD4(hp, SDHC_CAPABILITIES);
+	caps &= ~capmask;
+	caps |= capset;
 
 	/* Use DMA if the host system and the controller support it. */
 	if (usedma && ISSET(caps, SDHC_ADMA2_SUPP)) {
@@ -404,6 +407,8 @@ sdhc_host_found(struct sdhc_softc *sc, bus_space_tag_t iot,
 
 	if (SDHC_SPEC_VERSION(hp->version) >= SDHC_SPEC_V3) {
 		uint32_t caps2 = HREAD4(hp, SDHC_CAPABILITIES2);
+		caps2 &= ~(capmask >> 32);
+		caps2 |= capset >> 32;
 
 		if (ISSET(caps, SDHC_8BIT_MODE_SUPP))
 			saa.caps |= SMC_CAPS_8BIT_MODE;
@@ -411,9 +416,6 @@ sdhc_host_found(struct sdhc_softc *sc, bus_space_tag_t iot,
 		if (ISSET(caps2, SDHC_DDR50_SUPP))
 			saa.caps |= SMC_CAPS_MMC_DDR52;
 	}
-
-	if (ISSET(sc->sc_flags, SDHC_F_NODDR50))
-		saa.caps &= ~SMC_CAPS_MMC_DDR52;
 
 	if (ISSET(sc->sc_flags, SDHC_F_NONREMOVABLE))
 		saa.caps |= SMC_CAPS_NONREMOVABLE;
@@ -633,15 +635,21 @@ sdhc_bus_power(sdmmc_chipset_handle_t sch, u_int32_t ocr)
 static int
 sdhc_clock_divisor(struct sdhc_host *hp, u_int freq)
 {
-	int max_div = SDHC_SDCLK_DIV_MAX;
 	int div;
 
-	if (SDHC_SPEC_VERSION(hp->version) >= SDHC_SPEC_V3)
-		max_div = SDHC_SDCLK_DIV_MAX_V3;
+	if (SDHC_SPEC_VERSION(hp->version) >= SDHC_SPEC_V3) {
+		if (hp->clkbase <= freq)
+			return 0;
 
-	for (div = 1; div <= max_div; div *= 2)
-		if ((hp->clkbase / div) <= freq)
-			return (div / 2);
+		for (div = 2; div <= SDHC_SDCLK_DIV_MAX_V3; div += 2)
+			if ((hp->clkbase / div) <= freq)
+				return (div / 2);
+	} else {
+		for (div = 1; div <= SDHC_SDCLK_DIV_MAX; div *= 2)
+			if ((hp->clkbase / div) <= freq)
+				return (div / 2);
+	}
+
 	/* No divisor found. */
 	return -1;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_locl.h,v 1.15 2021/12/25 12:00:22 jsing Exp $ */
+/* $OpenBSD: asn1_locl.h,v 1.20 2022/01/14 08:53:53 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -65,6 +65,20 @@ __BEGIN_HIDDEN_DECLS
 ASN1_TYPE *ASN1_TYPE_pack_sequence(const ASN1_ITEM *it, void *s, ASN1_TYPE **t);
 void *ASN1_TYPE_unpack_sequence(const ASN1_ITEM *it, const ASN1_TYPE *t);
 
+/* These are used internally in the ASN1_OBJECT to keep track of
+ * whether the names and data need to be free()ed */
+#define ASN1_OBJECT_FLAG_DYNAMIC	 0x01	/* internal use */
+#define ASN1_OBJECT_FLAG_CRITICAL	 0x02	/* critical x509v3 object id */
+#define ASN1_OBJECT_FLAG_DYNAMIC_STRINGS 0x04	/* internal use */
+#define ASN1_OBJECT_FLAG_DYNAMIC_DATA	 0x08	/* internal use */
+struct asn1_object_st {
+	const char *sn, *ln;
+	int nid;
+	int length;
+	const unsigned char *data;	/* data remains const after init */
+	int flags;	/* Should we free this one */
+} /* ASN1_OBJECT */;
+
 /* ASN1 print context structure */
 
 struct asn1_pctx_st {
@@ -124,6 +138,9 @@ struct evp_pkey_asn1_method_st {
 	int (*item_sign)(EVP_MD_CTX *ctx, const ASN1_ITEM *it, void *asn,
 	    X509_ALGOR *alg1, X509_ALGOR *alg2, ASN1_BIT_STRING *sig);
 
+	int (*pkey_check)(const EVP_PKEY *pk);
+	int (*pkey_public_check)(const EVP_PKEY *pk);
+	int (*pkey_param_check)(const EVP_PKEY *pk);
 } /* EVP_PKEY_ASN1_METHOD */;
 
 /* Method to handle CRL access.
@@ -143,6 +160,25 @@ struct x509_crl_method_st {
 	    ASN1_INTEGER *ser, X509_NAME *issuer);
 	int (*crl_verify)(X509_CRL *crl, EVP_PKEY *pk);
 };
+
+int asn1_ex_c2i(ASN1_VALUE **pval, const unsigned char *cont, int len, int utype, char *free_cont, const ASN1_ITEM *it);
+
+int asn1_get_choice_selector(ASN1_VALUE **pval, const ASN1_ITEM *it);
+int asn1_set_choice_selector(ASN1_VALUE **pval, int value, const ASN1_ITEM *it);
+
+ASN1_VALUE ** asn1_get_field_ptr(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt);
+
+const ASN1_TEMPLATE *asn1_do_adb(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt, int nullerr);
+
+int asn1_do_lock(ASN1_VALUE **pval, int op, const ASN1_ITEM *it);
+
+void asn1_enc_init(ASN1_VALUE **pval, const ASN1_ITEM *it);
+void asn1_enc_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
+int asn1_enc_restore(int *len, unsigned char **out, ASN1_VALUE **pval, const ASN1_ITEM *it);
+int asn1_enc_save(ASN1_VALUE **pval, const unsigned char *in, int inlen, const ASN1_ITEM *it);
+
+int i2d_ASN1_BOOLEAN(int a, unsigned char **pp);
+int d2i_ASN1_BOOLEAN(int *a, const unsigned char **pp, long length);
 
 /*
  * Unicode codepoint constants

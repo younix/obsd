@@ -1,4 +1,4 @@
-/*	$OpenBSD: cms.c,v 1.11 2021/10/26 10:52:49 claudio Exp $ */
+/*	$OpenBSD: cms.c,v 1.13 2022/01/18 16:24:55 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *

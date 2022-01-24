@@ -105,7 +105,6 @@
 /format-draw.c/1.25/Mon Nov 15 19:06:15 2021//
 /format.c/1.299/Mon Nov 15 19:06:15 2021//
 /job.c/1.66/Mon Nov 15 19:06:15 2021//
-/popup.c/1.42/Mon Nov 15 19:06:15 2021//
 /screen-write.c/1.205/Mon Nov 15 19:06:15 2021//
 /arguments.c/1.52/Sun Nov 21 20:15:22 2021//
 /cmd-confirm-before.c/1.52/Sun Nov 21 20:15:22 2021//
@@ -128,4 +127,5 @@
 /tty.c/1.415/Sun Jan  2 13:11:12 2022//
 /window-copy.c/1.332/Sun Jan  2 13:11:12 2022//
 /resize.c/1.49/Mon Jan 10 09:38:33 2022//
+/popup.c/1.43/Mon Jan 24 14:23:45 2022//
 D

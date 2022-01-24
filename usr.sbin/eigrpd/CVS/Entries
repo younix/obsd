@@ -11,7 +11,6 @@
 /printconf.c/1.6/Fri Sep  2 16:44:33 2016//
 /query.c/1.5/Fri Sep  2 16:46:29 2016//
 /rde.h/1.12/Fri Sep  2 16:46:29 2016//
-/rde_dual.c/1.28/Fri Sep  2 16:44:33 2016//
 /reply.c/1.5/Fri Sep  2 16:46:29 2016//
 /rtp.c/1.7/Fri Sep  2 16:44:33 2016//
 /update.c/1.6/Fri Sep  2 16:46:29 2016//
@@ -28,4 +27,5 @@
 /eigrpd.h/1.27/Sun Nov 21 20:15:22 2021//
 /tlv.c/1.16/Sun Nov 21 20:15:22 2021//
 /log.h/1.6/Sun Jan  2 13:11:14 2022//
+/rde_dual.c/1.29/Mon Jan 24 14:23:46 2022//
 D

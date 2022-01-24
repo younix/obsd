@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmm.c,v 1.300 2022/01/02 05:00:28 jsg Exp $	*/
+/*	$OpenBSD: vmm.c,v 1.302 2022/01/19 19:39:42 guenther Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -3926,6 +3926,8 @@ vcpu_vmx_compute_ctrl(uint64_t ctrlval, uint16_t ctrl, uint32_t want1,
 {
 	int i, set, clear;
 
+	*out = 0;
+
 	/*
 	 * The Intel SDM gives three formulae for determining which bits to
 	 * set/clear for a given control and desired functionality. Formula
@@ -6768,7 +6770,11 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 		*rax = vmm_cpuid_level;
 	}
 
-	CPUID_LEAF(*rax, 0, eax, ebx, ecx, edx);
+	/* we fake up values in the range (cpuid_level, vmm_cpuid_level] */
+	if (*rax <= cpuid_level || *rax > 0x80000000)
+		CPUID_LEAF(*rax, *rcx, eax, ebx, ecx, edx);
+	else
+		eax = ebx = ecx = edx = 0;
 
 	switch (*rax) {
 	case 0x00:	/* Max level and vendor ID */
@@ -6807,18 +6813,10 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 		*rdx = 0;
 		break;
 	case 0x04: 	/* Deterministic cache info */
-		if (*rcx == 0) {
-			*rax = eax & VMM_CPUID4_CACHE_TOPOLOGY_MASK;
-			*rbx = ebx;
-			*rcx = ecx;
-			*rdx = edx;
-		} else {
-			CPUID_LEAF(*rax, *rcx, eax, ebx, ecx, edx);
-			*rax = eax & VMM_CPUID4_CACHE_TOPOLOGY_MASK;
-			*rbx = ebx;
-			*rcx = ecx;
-			*rdx = edx;
-		}
+		*rax = eax & VMM_CPUID4_CACHE_TOPOLOGY_MASK;
+		*rbx = ebx;
+		*rcx = ecx;
+		*rdx = edx;
 		break;
 	case 0x05:	/* MONITOR/MWAIT (not supported) */
 		DPRINTF("%s: function 0x05 (monitor/mwait) not supported\n",
@@ -6888,7 +6886,6 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 			*rcx = 0;
 			*rdx = 0;
 		} else {
-			CPUID_LEAF(*rax, *rcx, eax, ebx, ecx, edx);
 			*rax = eax;
 			*rbx = ebx;
 			*rcx = ecx;
@@ -6987,13 +6984,17 @@ vmm_handle_cpuid(struct vcpu *vcpu)
 		*rdx = curcpu()->ci_extcacheinfo[3];
 		break;
 	case 0x80000007:	/* apmi */
-		CPUID(0x80000007, *rax, *rbx, *rcx, *rdx);
+		*rax = eax;
+		*rbx = ebx;
+		*rcx = ecx;
+		*rdx = edx;
 		break;
 	case 0x80000008:	/* Phys bits info and topology (AMD) */
-		CPUID(0x80000008, *rax, *rbx, *rcx, *rdx);
-		*rbx &= VMM_AMDSPEC_EBX_MASK;
+		*rax = eax;
+		*rbx = ebx & VMM_AMDSPEC_EBX_MASK;
 		/* Reset %rcx (topology) */
 		*rcx = 0;
+		*rdx = edx;
 		break;
 	default:
 		DPRINTF("%s: unsupported rax=0x%llx\n", __func__, *rax);

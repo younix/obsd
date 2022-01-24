@@ -1,4 +1,4 @@
-/*	$OpenBSD: mft.c,v 1.43 2022/01/06 16:06:30 claudio Exp $ */
+/*	$OpenBSD: mft.c,v 1.50 2022/01/22 09:18:48 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -16,11 +16,11 @@
  */
 
 #include <assert.h>
+#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdint.h>
-#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -40,7 +40,7 @@ struct	parse {
 	struct mft	*res; /* result object */
 };
 
-static ASN1_OBJECT    *mft_oid;
+extern ASN1_OBJECT    *mft_oid;
 
 static const char *
 gentime2str(const ASN1_GENERALIZEDTIME *time)
@@ -122,6 +122,66 @@ check_validity(const ASN1_GENERALIZEDTIME *from,
 }
 
 /*
+ * Determine rtype corresponding to file extension. Returns RTYPE_INVALID
+ * on error or unkown extension.
+ */
+enum rtype
+rtype_from_file_extension(const char *fn)
+{
+	size_t	 sz;
+
+	sz = strlen(fn);
+	if (sz < 5)
+		return RTYPE_INVALID;
+
+	if (strcasecmp(fn + sz - 4, ".tal") == 0)
+		return RTYPE_TAL;
+	if (strcasecmp(fn + sz - 4, ".cer") == 0)
+		return RTYPE_CER;
+	if (strcasecmp(fn + sz - 4, ".crl") == 0)
+		return RTYPE_CRL;
+	if (strcasecmp(fn + sz - 4, ".mft") == 0)
+		return RTYPE_MFT;
+	if (strcasecmp(fn + sz - 4, ".roa") == 0)
+		return RTYPE_ROA;
+	if (strcasecmp(fn + sz - 4, ".gbr") == 0)
+		return RTYPE_GBR;
+
+	return RTYPE_INVALID;
+}
+
+/*
+ * Validate that a filename listed on a Manifest only contains characters
+ * permitted in draft-ietf-sidrops-6486bis section 4.2.2 and check that
+ * it's a CER, CRL, GBR or a ROA.
+ * Returns corresponding rtype or RTYPE_INVALID on error.
+ */
+enum rtype
+rtype_from_mftfile(const char *fn)
+{
+	const unsigned char	*c;
+	enum rtype		 type;
+
+	for (c = fn; *c != '\0'; ++c)
+		if (!isalnum(*c) && *c != '-' && *c != '_' && *c != '.')
+			return RTYPE_INVALID;
+
+	if (strchr(fn, '.') != strrchr(fn, '.'))
+		return RTYPE_INVALID;
+
+	type = rtype_from_file_extension(fn);
+	switch (type) {
+	case RTYPE_CER:
+	case RTYPE_CRL:
+	case RTYPE_GBR:
+	case RTYPE_ROA:
+		return type;
+	default:
+		return RTYPE_INVALID;
+	}
+}
+
+/*
  * Parse an individual "FileAndHash", RFC 6486, sec. 4.2.
  * Return zero on failure, non-zero on success.
  */
@@ -131,6 +191,7 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	ASN1_SEQUENCE_ANY	*seq;
 	const ASN1_TYPE		*file, *hash;
 	char			*fn = NULL;
+	enum rtype		 type;
 	const unsigned char	*d = os->data;
 	size_t			 dsz = os->length;
 	int			 rc = 0;
@@ -161,7 +222,7 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	if (fn == NULL)
 		err(1, NULL);
 
-	if (!valid_filename(fn)) {
+	if ((type = rtype_from_mftfile(fn)) == RTYPE_INVALID) {
 		warnx("%s: invalid filename: %s", p->fn, fn);
 		goto out;
 	}
@@ -187,6 +248,7 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	fent = &p->res->files[p->res->filesz++];
 
 	fent->file = fn;
+	fent->type = type;
 	fn = NULL;
 	memcpy(fent->hash, hash->value.bit_string->data, SHA256_DIGEST_LENGTH);
 
@@ -419,21 +481,12 @@ mft_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	memset(&p, 0, sizeof(struct parse));
 	p.fn = fn;
 
-	if (mft_oid == NULL) {
-		mft_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.26", 1);
-		if (mft_oid == NULL)
-			errx(1, "OBJ_txt2obj for %s failed",
-			    "1.2.840.113549.1.9.16.1.26");
-	}
-
 	cms = cms_parse_validate(x509, fn, der, len, mft_oid, &cmsz);
 	if (cms == NULL)
 		return NULL;
 	assert(*x509 != NULL);
 
 	if ((p.res = calloc(1, sizeof(struct mft))) == NULL)
-		err(1, NULL);
-	if ((p.res->file = strdup(fn)) == NULL)
 		err(1, NULL);
 
 	p.res->aia = x509_get_aia(*x509, fn);
@@ -461,44 +514,6 @@ out:
 }
 
 /*
- * Check all files and their hashes in a MFT structure.
- * Return zero on failure, non-zero on success.
- */
-int
-mft_check(const char *fn, struct mft *p)
-{
-	size_t	i;
-	int	rc = 1;
-	char	*cp, *h, *path = NULL;
-
-	/* Check hash of file now, but first build path for it */
-	cp = strrchr(fn, '/');
-	assert(cp != NULL);
-	assert(cp - fn < INT_MAX);
-
-	for (i = 0; i < p->filesz; i++) {
-		const struct mftfile *m = &p->files[i];
-		if (!valid_filename(m->file)) {
-			if (base64_encode(m->hash, sizeof(m->hash), &h) == -1)
-				errx(1, "base64_encode failed in %s", __func__);
-			warnx("%s: unsupported filename for %s", fn, h);
-			free(h);
-			continue;
-		}
-		if (asprintf(&path, "%.*s/%s", (int)(cp - fn), fn,
-		    m->file) == -1)
-			err(1, NULL);
-		if (!valid_filehash(path, m->hash, sizeof(m->hash))) {
-			warnx("%s: bad message digest for %s", fn, m->file);
-			rc = 0;
-		}
-		free(path);
-	}
-
-	return rc;
-}
-
-/*
  * Free an MFT pointer.
  * Safe to call with NULL.
  */
@@ -517,7 +532,7 @@ mft_free(struct mft *p)
 	free(p->aia);
 	free(p->aki);
 	free(p->ski);
-	free(p->file);
+	free(p->path);
 	free(p->files);
 	free(p->seqnum);
 	free(p);
@@ -532,18 +547,21 @@ mft_buffer(struct ibuf *b, const struct mft *p)
 {
 	size_t		 i;
 
-	io_simple_buffer(b, &p->stale, sizeof(int));
-	io_str_buffer(b, p->file);
-	io_simple_buffer(b, &p->filesz, sizeof(size_t));
-
-	for (i = 0; i < p->filesz; i++) {
-		io_str_buffer(b, p->files[i].file);
-		io_simple_buffer(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
-	}
+	io_simple_buffer(b, &p->stale, sizeof(p->stale));
+	io_simple_buffer(b, &p->repoid, sizeof(p->repoid));
+	io_str_buffer(b, p->path);
 
 	io_str_buffer(b, p->aia);
 	io_str_buffer(b, p->aki);
 	io_str_buffer(b, p->ski);
+
+	io_simple_buffer(b, &p->filesz, sizeof(size_t));
+	for (i = 0; i < p->filesz; i++) {
+		io_str_buffer(b, p->files[i].file);
+		io_simple_buffer(b, &p->files[i].type,
+		    sizeof(p->files[i].type));
+		io_simple_buffer(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
+	}
 }
 
 /*
@@ -559,23 +577,24 @@ mft_read(struct ibuf *b)
 	if ((p = calloc(1, sizeof(struct mft))) == NULL)
 		err(1, NULL);
 
-	io_read_buf(b, &p->stale, sizeof(int));
-	io_read_str(b, &p->file);
-	io_read_buf(b, &p->filesz, sizeof(size_t));
-
-	assert(p->file);
-	if ((p->files = calloc(p->filesz, sizeof(struct mftfile))) == NULL)
-		err(1, NULL);
-
-	for (i = 0; i < p->filesz; i++) {
-		io_read_str(b, &p->files[i].file);
-		io_read_buf(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
-	}
+	io_read_buf(b, &p->stale, sizeof(p->stale));
+	io_read_buf(b, &p->repoid, sizeof(p->repoid));
+	io_read_str(b, &p->path);
 
 	io_read_str(b, &p->aia);
 	io_read_str(b, &p->aki);
 	io_read_str(b, &p->ski);
 	assert(p->aia && p->aki && p->ski);
+
+	io_read_buf(b, &p->filesz, sizeof(size_t));
+	if ((p->files = calloc(p->filesz, sizeof(struct mftfile))) == NULL)
+		err(1, NULL);
+
+	for (i = 0; i < p->filesz; i++) {
+		io_read_str(b, &p->files[i].file);
+		io_read_buf(b, &p->files[i].type, sizeof(p->files[i].type));
+		io_read_buf(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
+	}
 
 	return p;
 }

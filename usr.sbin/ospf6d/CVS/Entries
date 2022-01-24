@@ -21,8 +21,6 @@
 /ospfe.c/1.67/Wed Sep  1 16:07:41 2021//
 /ospfe.h/1.25/Wed Sep  1 16:07:41 2021//
 /packet.c/1.20/Wed Sep  1 16:07:41 2021//
-/rde.c/1.89/Wed Sep  1 16:07:41 2021//
-/ospf6d.c/1.51/Tue Sep 14 08:17:42 2021//
 /parse.y/1.51/Wed Oct 20 17:29:20 2021//
 /database.c/1.21/Sun Nov 21 20:15:22 2021//
 /kroute.c/1.66/Sun Nov 21 20:15:22 2021//
@@ -31,4 +29,6 @@
 /lsupdate.c/1.21/Sun Nov 21 20:15:22 2021//
 /neighbor.c/1.18/Sun Nov 21 20:15:22 2021//
 /log.h/1.13/Sun Jan  2 13:11:15 2022//
+/ospf6d.c/1.52/Mon Jan 24 14:23:47 2022//
+/rde.c/1.90/Mon Jan 24 14:23:47 2022//
 D

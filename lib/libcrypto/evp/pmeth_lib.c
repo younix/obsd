@@ -1,4 +1,4 @@
-/* $OpenBSD: pmeth_lib.c,v 1.18 2021/12/03 14:19:57 tb Exp $ */
+/* $OpenBSD: pmeth_lib.c,v 1.20 2022/01/10 12:10:26 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -581,4 +581,24 @@ EVP_PKEY_meth_set_ctrl(EVP_PKEY_METHOD *pmeth,
 {
 	pmeth->ctrl = ctrl;
 	pmeth->ctrl_str = ctrl_str;
+}
+
+void
+EVP_PKEY_meth_set_check(EVP_PKEY_METHOD *pmeth, int (*check)(EVP_PKEY *pkey))
+{
+	pmeth->check = check;
+}
+
+void
+EVP_PKEY_meth_set_public_check(EVP_PKEY_METHOD *pmeth,
+    int (*public_check)(EVP_PKEY *pkey))
+{
+	pmeth->public_check = public_check;
+}
+
+void
+EVP_PKEY_meth_set_param_check(EVP_PKEY_METHOD *pmeth,
+    int (*param_check)(EVP_PKEY *pkey))
+{
+	pmeth->param_check = param_check;
 }

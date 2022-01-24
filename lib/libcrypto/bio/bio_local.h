@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_local.h,v 1.1 2022/01/07 09:02:17 tb Exp $ */
+/* $OpenBSD: bio_local.h,v 1.3 2022/01/14 08:40:57 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -60,6 +60,63 @@
 #define HEADER_BIO_LOCAL_H
 
 __BEGIN_HIDDEN_DECLS
+
+struct bio_method_st {
+	int type;
+	const char *name;
+	int (*bwrite)(BIO *, const char *, int);
+	int (*bread)(BIO *, char *, int);
+	int (*bputs)(BIO *, const char *);
+	int (*bgets)(BIO *, char *, int);
+	long (*ctrl)(BIO *, int, long, void *);
+	int (*create)(BIO *);
+	int (*destroy)(BIO *);
+	long (*callback_ctrl)(BIO *, int, BIO_info_cb *);
+} /* BIO_METHOD */;
+
+struct bio_st {
+	const BIO_METHOD *method;
+	BIO_callback_fn callback;
+	BIO_callback_fn_ex callback_ex;
+	char *cb_arg; /* first argument for the callback */
+
+	int init;
+	int shutdown;
+	int flags;	/* extra storage */
+	int retry_reason;
+	int num;
+	void *ptr;
+	struct bio_st *next_bio;	/* used by filter BIOs */
+	struct bio_st *prev_bio;	/* used by filter BIOs */
+	int references;
+	unsigned long num_read;
+	unsigned long num_write;
+
+	CRYPTO_EX_DATA ex_data;
+} /* BIO */;
+
+typedef struct bio_f_buffer_ctx_struct {
+	/* Buffers are setup like this:
+	 *
+	 * <---------------------- size ----------------------->
+	 * +---------------------------------------------------+
+	 * | consumed | remaining          | free space        |
+	 * +---------------------------------------------------+
+	 * <-- off --><------- len ------->
+	 */
+
+	/* BIO *bio; */ /* this is now in the BIO struct */
+	int ibuf_size;	/* how big is the input buffer */
+	int obuf_size;	/* how big is the output buffer */
+
+	char *ibuf;	/* the char array */
+	int ibuf_len;	/* how many bytes are in it */
+	int ibuf_off;	/* write/read offset */
+
+	char *obuf;	/* the char array */
+	int obuf_len;	/* how many bytes are in it */
+	int obuf_off;	/* write/read offset */
+} BIO_F_BUFFER_CTX;
 
 __END_HIDDEN_DECLS
 

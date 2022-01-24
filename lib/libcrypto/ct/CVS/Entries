@@ -6,9 +6,9 @@
 /ct_oct.c/1.8/Sun Jan  2 13:10:41 2022//
 /ct_policy.c/1.5/Sun Jan  2 13:10:41 2022//
 /ct_prn.c/1.6/Sun Jan  2 13:10:42 2022//
-/ct_sct.c/1.7/Sun Jan  2 13:10:42 2022//
 /ct_sct_ctx.c/1.5/Sun Jan  2 13:10:42 2022//
 /ct_x509v3.c/1.6/Sun Jan  2 13:10:42 2022//
 /cterr.h/1.5/Sun Jan  2 13:10:42 2022//
 /ct_vfy.c/1.6/Mon Jan 10 09:38:09 2022//
+/ct_sct.c/1.8/Mon Jan 24 14:23:15 2022//
 D

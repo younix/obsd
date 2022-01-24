@@ -7,8 +7,6 @@
 /getnameinfo.c/1.2/Sat Dec 15 15:16:12 2018//
 /getnetnamadr.c/1.2/Sat Dec 15 15:16:12 2018//
 /getrrsetbyname.c/1.2/Sat Dec 15 15:16:12 2018//
-/res_mkquery.c/1.2/Sat Dec 15 15:16:12 2018//
-/res_query.c/1.3/Sat Dec 15 15:16:12 2018//
 /threads.c/1.1.1.1/Fri Jul 13 17:49:53 2012//
 D/getaddrinfo////
 D/gethostnamadr////
@@ -18,3 +16,5 @@ D/getrrsetbyname////
 D/res_mkquery////
 D/res_query////
 D/threads////
+/res_mkquery.c/1.3/Mon Jan 24 14:23:18 2022//
+/res_query.c/1.4/Mon Jan 24 14:23:18 2022//

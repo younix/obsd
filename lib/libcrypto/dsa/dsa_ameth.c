@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_ameth.c,v 1.30 2022/01/07 09:35:36 tb Exp $ */
+/* $OpenBSD: dsa_ameth.c,v 1.32 2022/01/15 04:02:37 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -133,47 +133,46 @@ static int
 dsa_pub_encode(X509_PUBKEY *pk, const EVP_PKEY *pkey)
 {
 	DSA *dsa;
-	void *pval = NULL;
-	int ptype;
+	ASN1_INTEGER *pubint = NULL;
+	ASN1_STRING *str = NULL;
+	int ptype = V_ASN1_UNDEF;
 	unsigned char *penc = NULL;
 	int penclen;
 
 	dsa = pkey->pkey.dsa;
 	if (pkey->save_parameters && dsa->p && dsa->q && dsa->g) {
-		ASN1_STRING *str;
-
-		str = ASN1_STRING_new();
-		if (str == NULL) {
+		if ((str = ASN1_STRING_new()) == NULL) {
 			DSAerror(ERR_R_MALLOC_FAILURE);
 			goto err;
 		}
 		str->length = i2d_DSAparams(dsa, &str->data);
 		if (str->length <= 0) {
 			DSAerror(ERR_R_MALLOC_FAILURE);
-			ASN1_STRING_free(str);
 			goto err;
 		}
-		pval = str;
 		ptype = V_ASN1_SEQUENCE;
-	} else
-		ptype = V_ASN1_UNDEF;
+	}
 
-	dsa->write_params = 0;
+	if ((pubint = BN_to_ASN1_INTEGER(dsa->pub_key, NULL)) == NULL) {
+		DSAerror(ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
 
-	penclen = i2d_DSAPublicKey(dsa, &penc);
+	penclen = i2d_ASN1_INTEGER(pubint, &penc);
+	ASN1_INTEGER_free(pubint);
 
 	if (penclen <= 0) {
 		DSAerror(ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
 
-	if (X509_PUBKEY_set0_param(pk, OBJ_nid2obj(EVP_PKEY_DSA), ptype, pval,
+	if (X509_PUBKEY_set0_param(pk, OBJ_nid2obj(EVP_PKEY_DSA), ptype, str,
 	    penc, penclen))
 		return 1;
 
-err:
+ err:
 	free(penc);
-	ASN1_STRING_free(pval);
+	ASN1_STRING_free(str);
 
 	return 0;
 }

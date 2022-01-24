@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpe.c,v 1.78 2021/10/21 14:33:13 martijn Exp $	*/
+/*	$OpenBSD: snmpe.c,v 1.82 2022/01/19 11:00:56 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>
@@ -37,11 +37,12 @@
 #include <unistd.h>
 #include <pwd.h>
 
+#include "application.h"
 #include "snmpd.h"
+#include "snmpe.h"
 #include "mib.h"
 
 void	 snmpe_init(struct privsep *, struct privsep_proc *, void *);
-const char *snmpe_pdutype2string(enum snmp_pdutype);
 int	 snmpe_parse(struct snmp_message *);
 void	 snmpe_tryparse(int, struct snmp_message *);
 int	 snmpe_parsevarbinds(struct snmp_message *);
@@ -53,7 +54,6 @@ void	 snmpe_writecb(int fd, short, void *);
 void	 snmpe_acceptcb(int fd, short, void *);
 void	 snmpe_prepare_read(struct snmp_message *, int);
 int	 snmpe_encode(struct snmp_message *);
-void	 snmp_msgfree(struct snmp_message *);
 
 struct imsgev	*iev_parent;
 static const struct timeval	snmpe_tcp_timeout = { 10, 0 }; /* 10s */
@@ -99,6 +99,7 @@ snmpe_init(struct privsep *ps, struct privsep_proc *p, void *arg)
 	kr_init();
 	timer_init();
 	usm_generate_keys();
+	appl_init();
 
 	/* listen for incoming SNMP UDP/TCP messages */
 	TAILQ_FOREACH(h, &env->sc_addresses, entry) {
@@ -137,6 +138,7 @@ snmpe_shutdown(void)
 		close(h->fd);
 	}
 	kr_shutdown();
+	appl_shutdown();
 }
 
 int
@@ -427,6 +429,11 @@ badversion:
 		goto fail;
 	}
 
+	for (a = msg->sm_varbind; a != NULL; a = a->be_next) {
+		if (ober_scanf_elements(a, "{oS$}", NULL) == -1)
+			goto parsefail;
+	}
+
 	msg->sm_request = req;
 	msg->sm_error = errval;
 	msg->sm_errorindex = erridx;
@@ -466,6 +473,13 @@ snmpe_parsevarbinds(struct snmp_message *msg)
 	char			 buf[BUFSIZ];
 	struct ber_oid		 o;
 	int			 i;
+
+	appl_processpdu(msg, msg->sm_ctxname, msg->sm_version, msg->sm_pdu);
+	return 0;
+	/*
+	 * Leave code here for now so it's easier to switch back in case of
+	 * issues.
+	 */
 
 	msg->sm_errstr = "invalid varbind element";
 
@@ -811,7 +825,26 @@ snmpe_dispatchmsg(struct snmp_message *msg)
 	/* XXX Do proper error handling */
 	(void) snmpe_parsevarbinds(msg);
 
+	return;
+	/*
+	 * Leave code here for now so it's easier to switch back in case of
+	 * issues.
+	 */
 	/* respond directly */
+	msg->sm_pdutype = SNMP_C_RESPONSE;
+	snmpe_response(msg);
+}
+
+void
+snmpe_send(struct snmp_message *msg, enum snmp_pdutype type, int32_t requestid,
+    int32_t error, uint32_t index, struct ber_element *varbindlist)
+{
+	msg->sm_request = requestid;
+	msg->sm_pdutype = type;
+	msg->sm_error = error;
+	msg->sm_errorindex = index;
+	msg->sm_varbindresp = varbindlist;
+
 	msg->sm_pdutype = SNMP_C_RESPONSE;
 	snmpe_response(msg);
 }

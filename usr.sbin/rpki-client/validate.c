@@ -1,4 +1,4 @@
-/*	$OpenBSD: validate.c,v 1.23 2021/12/26 12:32:28 tb Exp $ */
+/*	$OpenBSD: validate.c,v 1.28 2022/01/23 09:19:13 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -143,16 +143,11 @@ valid_ta(const char *fn, struct auth_tree *auths, const struct cert *cert)
  * Returns 1 if valid, 0 otherwise.
  */
 int
-valid_cert(const char *fn, struct auth_tree *auths, const struct cert *cert)
+valid_cert(const char *fn, struct auth *a, const struct cert *cert)
 {
-	struct auth	*a;
 	size_t		 i;
 	uint32_t	 min, max;
 	char		 buf1[64], buf2[64];
-
-	a = valid_ski_aki(fn, auths, cert->ski, cert->aki);
-	if (a == NULL)
-		return 0;
 
 	for (i = 0; i < cert->asz; i++) {
 		if (cert->as[i].type == CERT_AS_INHERIT) {
@@ -207,17 +202,10 @@ valid_cert(const char *fn, struct auth_tree *auths, const struct cert *cert)
  * Returns 1 if valid, 0 otherwise.
  */
 int
-valid_roa(const char *fn, struct auth_tree *auths, struct roa *roa)
+valid_roa(const char *fn, struct auth *a, struct roa *roa)
 {
-	struct auth	*a;
 	size_t	 i;
 	char	 buf[64];
-
-	a = valid_ski_aki(fn, auths, roa->ski, roa->aki);
-	if (a == NULL)
-		return 0;
-
-	roa->talid = a->cert->talid;
 
 	for (i = 0; i < roa->ipsz; i++) {
 		if (valid_ip(a, roa->ips[i].afi, roa->ips[i].min,
@@ -234,64 +222,30 @@ valid_roa(const char *fn, struct auth_tree *auths, struct roa *roa)
 }
 
 /*
- * Validate a filename listed on a Manifest.
- * draft-ietf-sidrops-6486bis section 4.2.2
- * Returns 1 if filename is valid, otherwise 0.
- */
-int
-valid_filename(const char *fn)
-{
-	size_t			 sz;
-	const unsigned char	*c;
-
-	sz = strlen(fn);
-	if (sz < 5)
-		return 0;
-
-	for (c = fn; *c != '\0'; ++c)
-		if (!isalnum(*c) && *c != '-' && *c != '_' && *c != '.')
-			return 0;
-
-	if (strchr(fn, '.') != strrchr(fn, '.'))
-		return 0;
-
-	if (strcasecmp(fn + sz - 4, ".cer") == 0)
-		return 1;
-	if (strcasecmp(fn + sz - 4, ".crl") == 0)
-		return 1;
-	if (strcasecmp(fn + sz - 4, ".gbr") == 0)
-		return 1;
-	if (strcasecmp(fn + sz - 4, ".roa") == 0)
-		return 1;
-
-	return 0;
-}
-
-/*
  * Validate a file by verifying the SHA256 hash of that file.
- * Returns 1 if valid, 0 otherwise.
+ * The file to check is passed as a file descriptor.
+ * Returns 1 if hash matched, 0 otherwise. Closes fd when done.
  */
 int
-valid_filehash(const char *fn, const char *hash, size_t hlen)
+valid_filehash(int fd, const char *hash, size_t hlen)
 {
 	SHA256_CTX ctx;
 	char	filehash[SHA256_DIGEST_LENGTH];
 	char	buffer[8192];
 	ssize_t	nr;
-	int	fd;
 
 	if (hlen != sizeof(filehash))
 		errx(1, "bad hash size");
 
-	if ((fd = open(fn, O_RDONLY)) == -1)
+	if (fd == -1)
 		return 0;
 
 	SHA256_Init(&ctx);
 	while ((nr = read(fd, buffer, sizeof(buffer))) > 0)
 		SHA256_Update(&ctx, buffer, nr);
 	close(fd);
-
 	SHA256_Final(filehash, &ctx);
+
 	if (memcmp(hash, filehash, sizeof(filehash)) != 0)
 		return 0;
 

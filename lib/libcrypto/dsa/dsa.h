@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa.h,v 1.33 2022/01/05 20:52:14 tb Exp $ */
+/* $OpenBSD: dsa.h,v 1.35 2022/01/14 08:27:23 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -109,69 +109,7 @@
 extern "C" {
 #endif
 
-/* Already defined in ossl_typ.h */
-/* typedef struct dsa_st DSA; */
-/* typedef struct dsa_method DSA_METHOD; */
-
-typedef struct DSA_SIG_st
-	{
-	BIGNUM *r;
-	BIGNUM *s;
-	} DSA_SIG;
-
-struct dsa_method
-	{
-	const char *name;
-	DSA_SIG * (*dsa_do_sign)(const unsigned char *dgst, int dlen, DSA *dsa);
-	int (*dsa_sign_setup)(DSA *dsa, BN_CTX *ctx_in, BIGNUM **kinvp,
-								BIGNUM **rp);
-	int (*dsa_do_verify)(const unsigned char *dgst, int dgst_len,
-			     DSA_SIG *sig, DSA *dsa);
-	int (*dsa_mod_exp)(DSA *dsa, BIGNUM *rr, BIGNUM *a1, BIGNUM *p1,
-			BIGNUM *a2, BIGNUM *p2, BIGNUM *m, BN_CTX *ctx,
-			BN_MONT_CTX *in_mont);
-	int (*bn_mod_exp)(DSA *dsa, BIGNUM *r, BIGNUM *a, const BIGNUM *p,
-				const BIGNUM *m, BN_CTX *ctx,
-				BN_MONT_CTX *m_ctx); /* Can be null */
-	int (*init)(DSA *dsa);
-	int (*finish)(DSA *dsa);
-	int flags;
-	char *app_data;
-	/* If this is non-NULL, it is used to generate DSA parameters */
-	int (*dsa_paramgen)(DSA *dsa, int bits,
-			const unsigned char *seed, int seed_len,
-			int *counter_ret, unsigned long *h_ret,
-			BN_GENCB *cb);
-	/* If this is non-NULL, it is used to generate DSA keys */
-	int (*dsa_keygen)(DSA *dsa);
-	};
-
-struct dsa_st
-	{
-	/* This first variable is used to pick up errors where
-	 * a DSA is passed instead of of a EVP_PKEY */
-	int pad;
-	long version;
-	int write_params;
-	BIGNUM *p;
-	BIGNUM *q;	/* == 20 */
-	BIGNUM *g;
-
-	BIGNUM *pub_key;  /* y public key */
-	BIGNUM *priv_key; /* x private key */
-
-	BIGNUM *kinv;	/* Signing pre-calc */
-	BIGNUM *r;	/* Signing pre-calc */
-
-	int flags;
-	/* Normally used to cache montgomery values */
-	BN_MONT_CTX *method_mont_p;
-	int references;
-	CRYPTO_EX_DATA ex_data;
-	const DSA_METHOD *meth;
-	/* functional reference if 'meth' is ENGINE-provided */
-	ENGINE *engine;
-	};
+typedef struct DSA_SIG_st DSA_SIG;
 
 DSA *d2i_DSAparams_bio(BIO *bp, DSA **a);
 int i2d_DSAparams_bio(BIO *bp, DSA *a);
@@ -202,9 +140,7 @@ void	DSA_free(DSA *r);
 /* "up" the DSA object's reference count */
 int	DSA_up_ref(DSA *r);
 int	DSA_size(const DSA *);
-#if defined(LIBRESSL_OPAQUE_DSA) || defined(LIBRESSL_CRYPTO_INTERNAL)
 int	DSA_bits(const DSA *d);
-#endif
 	/* next 4 return -1 on error */
 int	DSA_sign_setup( DSA *dsa,BN_CTX *ctx_in,BIGNUM **kinvp,BIGNUM **rp);
 int	DSA_sign(int type,const unsigned char *dgst,int dlen,
@@ -270,13 +206,11 @@ void DSA_get0_pqg(const DSA *d, const BIGNUM **p, const BIGNUM **q,
 int DSA_set0_pqg(DSA *d, BIGNUM *p, BIGNUM *q, BIGNUM *g);
 void DSA_get0_key(const DSA *d, const BIGNUM **pub_key, const BIGNUM **priv_key);
 int DSA_set0_key(DSA *d, BIGNUM *pub_key, BIGNUM *priv_key);
-#if defined(LIBRESSL_OPAQUE_DSA) || defined(LIBRESSL_CRYPTO_INTERNAL)
 const BIGNUM *DSA_get0_p(const DSA *d);
 const BIGNUM *DSA_get0_q(const DSA *d);
 const BIGNUM *DSA_get0_g(const DSA *d);
 const BIGNUM *DSA_get0_pub_key(const DSA *d);
 const BIGNUM *DSA_get0_priv_key(const DSA *d);
-#endif
 void DSA_clear_flags(DSA *d, int flags);
 int DSA_test_flags(const DSA *d, int flags);
 void DSA_set_flags(DSA *d, int flags);

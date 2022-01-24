@@ -1,4 +1,4 @@
-/*	$Id: test-cert.c,v 1.15 2021/10/26 16:59:54 claudio Exp $ */
+/*	$Id: test-cert.c,v 1.17 2022/01/19 08:24:43 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -38,12 +38,12 @@ int
 main(int argc, char *argv[])
 {
 	int		 c, i, verb = 0, ta = 0;
-	X509		*xp = NULL;
 	struct cert	*p;
 
 	ERR_load_crypto_strings();
 	OpenSSL_add_all_ciphers();
 	OpenSSL_add_all_digests();
+	x509_init_oid();
 
 	while ((c = getopt(argc, argv, "tv")) != -1)
 		switch (c) {
@@ -81,7 +81,7 @@ main(int argc, char *argv[])
 				break;
 
 			buf = load_file(cert_path, &len);
-			p = ta_parse(&xp, cert_path, buf, len,
+			p = ta_parse(cert_path, buf, len,
 			    tal->pkey, tal->pkeysz);
 			free(buf);
 			tal_free(tal);
@@ -91,7 +91,6 @@ main(int argc, char *argv[])
 			if (verb)
 				cert_print(p);
 			cert_free(p);
-			X509_free(xp);
 		}
 	} else {
 		for (i = 0; i < argc; i++) {
@@ -99,14 +98,13 @@ main(int argc, char *argv[])
 			size_t		 len;
 
 			buf = load_file(argv[i], &len);
-			p = cert_parse(&xp, argv[i], buf, len);
+			p = cert_parse(argv[i], buf, len);
 			if (p == NULL)
 				break;
 			if (verb)
 				cert_print(p);
 			free(buf);
 			cert_free(p);
-			X509_free(xp);
 		}
 	}
 

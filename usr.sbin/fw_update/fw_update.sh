@@ -1,5 +1,5 @@
 #!/bin/ksh
-#	$OpenBSD: fw_update.sh,v 1.28 2022/01/08 22:32:00 afresh1 Exp $
+#	$OpenBSD: fw_update.sh,v 1.32 2022/01/24 00:47:05 afresh1 Exp $
 #
 # Copyright (c) 2021 Andrew Hewus Fresh <afresh1@openbsd.org>
 #
@@ -35,7 +35,7 @@ FWURL=http://firmware.openbsd.org/firmware/${HTTP_FWDIR}
 FWPUB_KEY=${DESTDIR}/etc/signify/openbsd-${VERSION}-fw.pub
 
 DRYRUN=false
-VERBOSE=false
+integer VERBOSE=0
 DELETE=false
 DOWNLOAD=true
 INSTALL=true
@@ -55,8 +55,7 @@ trap cleanup EXIT
 tmpdir() {
 	local _i=1 _dir
 
-	# If we're not in the installer,
-	# we have mktemp and a more hostile environment.
+	# The installer lacks mktemp(1), do it by hand
 	if [ -x /usr/bin/mktemp ]; then
 		_dir=$( mktemp -d "${1}-XXXXXXXXX" )
 	else
@@ -71,18 +70,20 @@ tmpdir() {
 fetch() {
 	local _src="${FWURL}/${1##*/}" _dst=$1 _user=_file _exit _error=''
 
-	# If we're not in the installer,
-	# we have su(1) and doas(1) is unlikely to be configured.
+	# The installer uses a limited doas(1) as a tiny su(1)
 	set -o monitor # make sure ftp gets its own process group
 	(
-	flags=-VM
-	"$VERBOSE" && flags=-vm
+	_flags=-vm
+	case "$VERBOSE" in
+		0|1) _flags=-VM ;;
+		  2) _flags=-Vm ;;
+	esac
 	if [ -x /usr/bin/su ]; then
 		exec /usr/bin/su -s /bin/ksh "$_user" -c \
-		    "/usr/bin/ftp -N '${0##/}' -D 'Get/Verify' $flags -o- '$_src'" > "$_dst"
+		    "/usr/bin/ftp -N '${0##/}' -D 'Get/Verify' $_flags -o- '$_src'" > "$_dst"
 	else
 		exec /usr/bin/doas -u "$_user" \
-		    /usr/bin/ftp -N "${0##/}" -D 'Get/Verify' $flags -o- "$_src" > "$_dst"
+		    /usr/bin/ftp -N "${0##/}" -D 'Get/Verify' $_flags -o- "$_src" > "$_dst"
 	fi
 	) & FTPPID=$!
 	set +o monitor
@@ -97,7 +98,7 @@ fetch() {
 				SECONDS=0
 				sleep 1
 			else
-				kill -INT -"$FTPPID"
+				kill -INT -"$FTPPID" 2>/dev/null
 				_error=" (timed out)"
 			fi
 		else
@@ -138,9 +139,9 @@ fetch_cfile() {
 
 verify() {
 	[ -e "$CFILE" ] || fetch_cfile || return 1
-	# On the installer we don't get sha256 -C, so fake it.
+	# The installer sha256 lacks -C, do it by hand
 	if ! fgrep -qx "SHA256 (${1##*/}) = $( /bin/sha256 -qb "$1" )" "$CFILE"; then
-		echo "Checksum test for ${1##*/} failed." >&2
+		((VERBOSE != 1)) && echo "Checksum test for ${1##*/} failed." >&2
 		return 1
 	fi
 
@@ -150,8 +151,7 @@ verify() {
 firmware_in_dmesg() {
 	local _d _m _line _dmesgtail _last='' _nl=$( echo )
 
-	# When we're not in the installer, the dmesg.boot can
-	# contain multiple boots, so only look in the last one
+	# The dmesg can contain multiple boots, only look in the last one
 	_dmesgtail="$( echo ; sed -n 'H;/^OpenBSD/h;${g;p;}' /var/run/dmesg.boot )"
 
 	grep -v '^[[:space:]]*#' "$FWPATTERNS" |
@@ -204,24 +204,28 @@ detect_firmware() {
 	set -sA _devices -- $(
 	    firmware_in_dmesg
 	    for _d in $( installed_firmware '*' '-firmware-' '*' ); do
-		echo "$( firmware_devicename "$_d" )"
+		firmware_devicename "$_d"
 	    done
 	)
 
 	[ "${_devices[*]:-}" ] || return 0
 	for _d in "${_devices[@]}"; do
-		[[ $_last = $_d ]] && continue
-		echo $_d
+		[ "$_last" = "$_d" ] && continue
+		echo "$_d"
 		_last="$_d"
 	done
 }
 
 add_firmware () {
-	local _f="${1##*/}" _pkgname
+	local _f="${1##*/}" _m="${2:-Install}" _pkgname
 	FWPKGTMP="$( tmpdir "${DESTDIR}/var/db/pkg/.firmware" )"
-	local flags=-VM
-	"$VERBOSE" && flags=-vm
-	ftp -N "${0##/}" -D "Install" "$flags" -o- "file:${1}" |
+	local _flags=-vm
+	case "$VERBOSE" in
+		0|1) _flags=-VM ;;
+		2|3) _flags=-Vm ;;
+	esac
+
+	ftp -N "${0##/}" -D "$_m" "$_flags" -o- "file:${1}" |
 		tar -s ",^\+,${FWPKGTMP}/+," \
 		    -s ",^firmware,${DESTDIR}/etc/firmware," \
 		    -C / -zxphf - "+*" "firmware/*"
@@ -234,7 +238,6 @@ add_firmware () {
 		return 1
 	fi
 
-	# TODO: Should we mark these so real fw_update can -Drepair?
 	ed -s "${FWPKGTMP}/+CONTENTS" <<EOL
 /^@comment pkgpath/ -1a
 @option manual-installation
@@ -253,7 +256,7 @@ delete_firmware() {
 	local _cwd _pkg="$1" _pkgdir="${DESTDIR}/var/db/pkg"
 
 	# TODO: Check hash for files before deleting
-	"$VERBOSE" && echo "Uninstalling $_pkg"
+	((VERBOSE > 2)) && echo -n "Uninstall $_pkg ..."
 	_cwd="${_pkgdir}/$_pkg"
 
 	if [ ! -e "$_cwd/+CONTENTS" ] ||
@@ -275,12 +278,11 @@ delete_firmware() {
 		esac
 	done < "${_pkgdir}/${_pkg}/+CONTENTS"
 
-	# We specifically rm -f here because not removing files/dirs
-	# is probably not worth failing over.
+	# Use rm -f, not removing files/dirs is probably not worth failing over
 	for _r in "${_remove[@]}" ; do
 		if [ -d "$_r" ]; then
-			# Try hard not to actually remove recursively
-			# without rmdir on the install media.
+			# The installer lacks rmdir,
+			# but we only want to remove empty directories.
 			set +o noglob
 			[ "$_r/*" = "$( echo "$_r"/* )" ] && rm -rf "$_r"
 			set -o noglob
@@ -288,10 +290,14 @@ delete_firmware() {
 			rm -f "$_r"
 		fi
 	done
+
+	((VERBOSE > 2)) && echo " done."
+
+	return 0
 }
 
 usage() {
-	echo "usage: ${0##*/} [-d | -F] [-av] [-p path] [driver | file ...]"
+	echo "usage: ${0##*/} [-adFnv] [-p path] [driver | file ...]"
 	exit 2
 }
 
@@ -305,7 +311,7 @@ do
 	F) OPT_F=true ;;
 	n) DRYRUN=true ;;
 	p) LOCALSRC="$OPTARG" ;;
-	v) VERBOSE=true ;;
+	v) ((++VERBOSE)) ;;
 	:)
 	    echo "${0##*/}: option requires an argument -- -$OPTARG" >&2
 	    usage 2
@@ -357,11 +363,14 @@ fi
 set -sA devices -- "$@"
 
 if "$DELETE"; then
-	[ "$OPT_F" ] && usage 22
+	[ "$OPT_F" ] && echo "Cannot use -F and -d" >&2 && usage 22
+
+	# Show the "Uninstall" message when just deleting not upgrading
+	((VERBOSE)) && VERBOSE=3
 
 	set -A installed
 	if [ "${devices[*]:-}" ]; then
-		"$ALL" && usage 22
+		"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage 22
 
 		set -A installed -- $(
 		    for d in "${devices[@]}"; do
@@ -386,7 +395,7 @@ if "$DELETE"; then
 	if [ "${installed:-}" ]; then
 		for fw in "${installed[@]}"; do
 			if "$DRYRUN"; then
-				echo "Delete $fw"
+				((VERBOSE)) && echo "Delete $fw"
 			else
 				delete_firmware "$fw" || continue
 			fi
@@ -394,7 +403,7 @@ if "$DELETE"; then
 		done
 	fi
 
-	deleted="${deleted:+${deleted#,}}"
+	deleted="${deleted#,}"
 	echo "${0:##*/}: deleted ${deleted:-none}";
 
 	exit
@@ -408,11 +417,11 @@ fi
 CFILE="$LOCALSRC/$CFILE"
 
 if [ "${devices[*]:-}" ]; then
-	"$ALL" && usage 22
+	"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage 22
 else
-	"$VERBOSE" && echo -n "Detecting firmware ..."
+	((VERBOSE > 1)) && echo -n "Detect firmware ..."
 	set -sA devices -- $( detect_firmware )
-	"$VERBOSE" &&
+	((VERBOSE > 1)) &&
 	    { [ "${devices[*]:-}" ] && echo " found." || echo " done." ; }
 fi
 
@@ -424,7 +433,7 @@ kept=''
 for f in "${devices[@]}"; do
 	d="$( firmware_devicename "$f" )"
 
-	verify_existing="$DOWNLOAD"
+	verify_existing=true
 	if [ "$f" = "$d" ]; then
 		f=$( firmware_filename "$d" || true )
 		[ "$f" ] || continue
@@ -433,8 +442,7 @@ for f in "${devices[@]}"; do
 		echo "Cannot download local file $f" >&2
 		exit 2
 	else
-		# If someone specified a filename on the command-line
-		# we don't want to verify it.
+		# Don't verify files specified on the command-line
 		verify_existing=false
 	fi
 
@@ -443,34 +451,52 @@ for f in "${devices[@]}"; do
 	if "$INSTALL" && [ "${installed[*]:-}" ]; then
 		for i in "${installed[@]}"; do
 			if [ "${f##*/}" = "$i.tgz" ]; then
-				"$VERBOSE" && echo "Keep $i"
+				((VERBOSE > 2)) && echo "Keep $i"
 				kept="$kept,$d"
 				continue 2
 			fi
 		done
 	fi
 
-	if [ -e "$f" ]; then
-		if "$DOWNLOAD"; then
-			if "$verify_existing" && ! "$DRYRUN"; then
-				"$VERBOSE" && ! "$INSTALL" &&
-				    echo "Keep/Verify ${f##*/}"
-				verify "$f" || continue
-			else
-				"$VERBOSE" && ! "$INSTALL" &&
-				    echo "Keep ${f##*/}"
-			fi
-			"$INSTALL" || kept="$kept,$d"
-		# else assume it was verified when downloaded
+	pending_status=false
+	if "$verify_existing" && [ -e "$f" ]; then
+		if ((VERBOSE == 1)); then
+		 	echo -n "Verify ${f##*/} ..."
+			pending_status=true
+		elif ((VERBOSE > 1)) && ! "$INSTALL"; then
+		    echo "Keep/Verify ${f##*/}"
 		fi
+
+		if "$DRYRUN" || verify "$f"; then
+ 			"$INSTALL" || kept="$kept,$d"
+		elif "$DOWNLOAD"; then
+			((VERBOSE == 1)) && echo " failed."
+			((VERBOSE > 1)) && echo "Refetching $f"
+			rm -f $f
+		else
+			"$pending_status" && echo " failed."
+			continue
+ 		fi
+	fi
+
+	if [ -e "$f" ]; then
+		"$pending_status" && ! "$INSTALL" && echo " done."
 	elif "$DOWNLOAD"; then
 		if "$DRYRUN"; then
-			"$VERBOSE" && echo "Get/Verify ${f##*/}"
+			((VERBOSE)) && echo "Get/Verify ${f##*/}"
 		else
-			fetch  "$f" || continue
-			verify "$f" || continue
+			if ((VERBOSE == 1)); then
+				echo -n "Get/Verify ${f##*/} ..."
+				pending_status=true
+			fi
+			fetch  "$f" &&
+			verify "$f" || {
+				"$pending_status" && echo " failed."
+				continue
+			}
+			"$pending_status" && ! "$INSTALL" && echo " done."
 		fi
-		"$INSTALL"  || added="$added,$d"
+		"$INSTALL" || added="$added,$d"
 	elif "$INSTALL"; then
 		echo "Cannot install ${f##*/}, not found" >&2
 		continue
@@ -478,24 +504,32 @@ for f in "${devices[@]}"; do
 
 	"$INSTALL" || continue
 
-	removed=false
+	update="Install"
 	if [ "${installed[*]:-}" ]; then
+		update="Update"
 		for i in "${installed[@]}"; do
 			"$DRYRUN" || delete_firmware "$i"
-			removed=true
 		done
 	fi
 
-	"$DRYRUN" || add_firmware "$f"
+	if "$DRYRUN"; then
+		((VERBOSE)) && echo "$update $f"
+	else
+		if ((VERBOSE == 1)) && ! "$pending_status"; then
+			echo -n "Install ${f##*/} ..."
+			pending_status=true
+		fi
+		add_firmware "$f" "$update"
+	fi
 
 	f="${f##*/}"
 	f="${f%.tgz}"
-	if "$removed"; then
-		"$DRYRUN" && echo "Update $f"
-		updated="$updated,$d"
-	else
-		"$DRYRUN" && echo "Install $f"
+	if [ "$update" = Install ]; then
+		"$pending_status" && echo " installed."
 		added="$added,$d"
+	else
+		"$pending_status" && echo " updated."
+		updated="$updated,$d"
 	fi
 done
 

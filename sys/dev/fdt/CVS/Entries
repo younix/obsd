@@ -21,7 +21,6 @@
 /rkdrm.h/1.2/Fri Dec 11 17:58:22 2020//
 /rkdwhdmi.c/1.5/Fri Dec 11 17:58:22 2020//
 /rkiis.c/1.1/Fri Dec 11 17:58:22 2020//
-/rkvop.c/1.4/Fri Dec 11 17:58:22 2020//
 /simpleamp.c/1.1/Fri Dec 11 17:58:22 2020//
 /bcm2711_tmon.c/1.2/Thu Dec 17 19:39:58 2020//
 /bd718x7.c/1.3/Sat May  1 08:41:51 2021//
@@ -46,7 +45,6 @@
 /mvsw.c/1.4/Tue Sep 14 08:17:33 2021//
 /ociic.c/1.2/Thu Sep  2 14:22:31 2021//
 /pciecam.c/1.3/Thu Sep  2 14:22:31 2021//
-/rkdrm.c/1.11/Thu Sep  2 14:22:31 2021//
 /rktcphy.c/1.1/Thu Sep  2 14:22:31 2021//
 /spmivar.h/1.1/Thu Sep  2 14:22:31 2021//
 /gpiocharger.c/1.1/Sat Sep 25 18:40:08 2021//
@@ -69,7 +67,6 @@
 /bcm2835_rng.c/1.4/Mon Nov 15 19:06:15 2021//
 /bcm2835_temp.c/1.2/Mon Nov 15 19:06:15 2021//
 /ccp_fdt.c/1.2/Mon Nov 15 19:06:15 2021//
-/com_fdt.c/1.6/Mon Nov 15 19:06:15 2021//
 /dwdog.c/1.3/Mon Nov 15 19:06:15 2021//
 /dwpcie.c/1.36/Mon Nov 15 19:06:15 2021//
 /exrtc.c/1.4/Mon Nov 15 19:06:15 2021//
@@ -117,14 +114,12 @@
 /rkpinctrl.c/1.7/Mon Nov 15 19:06:15 2021//
 /rkpmic.c/1.9/Mon Nov 15 19:06:15 2021//
 /rkpwm.c/1.4/Mon Nov 15 19:06:15 2021//
-/sdhc_fdt.c/1.18/Mon Nov 15 19:06:15 2021//
 /sfp.c/1.5/Mon Nov 15 19:06:15 2021//
 /ssdfb.c/1.12/Mon Nov 15 19:06:15 2021//
 /sxidog.c/1.3/Mon Nov 15 19:06:15 2021//
 /sximmc.c/1.12/Mon Nov 15 19:06:15 2021//
 /sxipio.c/1.14/Mon Nov 15 19:06:15 2021//
 /sxipwm.c/1.2/Mon Nov 15 19:06:15 2021//
-/sxirsb.c/1.4/Mon Nov 15 19:06:15 2021//
 /sxirtc.c/1.6/Mon Nov 15 19:06:15 2021//
 /sxisid.c/1.4/Mon Nov 15 19:06:15 2021//
 /sxisyscon.c/1.2/Mon Nov 15 19:06:15 2021//
@@ -136,7 +131,6 @@
 /virtio_mmio.c/1.10/Mon Nov 15 19:06:15 2021//
 /xhci_fdt.c/1.18/Mon Nov 15 19:06:15 2021//
 /bcm2835_bsc.c/1.3/Sun Nov 21 20:15:22 2021//
-/files.fdt/1.160/Sun Nov 21 20:15:22 2021//
 /gpiokeys.c/1.1/Sun Nov 21 20:15:22 2021//
 /gpioleds.c/1.3/Sun Nov 21 20:15:22 2021//
 /iicmux.c/1.1/Sun Nov 21 20:15:22 2021//
@@ -165,4 +159,11 @@
 /rkpcie.c/1.16/Mon Jan 10 09:38:28 2022//
 /rktemp.c/1.9/Mon Jan 10 09:38:28 2022//
 /simplefb.c/1.15/Mon Jan 10 09:38:28 2022//
+/cdsdhc.c/1.2/Tue Jan 18 11:36:21 2022//
+/com_fdt.c/1.7/Mon Jan 24 14:23:38 2022//
+/files.fdt/1.161/Mon Jan 24 14:23:38 2022//
+/rkdrm.c/1.12/Mon Jan 24 14:23:38 2022//
+/rkvop.c/1.5/Mon Jan 24 14:23:38 2022//
+/sdhc_fdt.c/1.19/Mon Jan 24 14:23:38 2022//
+/sxirsb.c/1.5/Mon Jan 24 14:23:38 2022//
 D

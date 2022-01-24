@@ -1,4 +1,4 @@
-#	$OpenBSD: agent-restrict.sh,v 1.2 2022/01/04 07:20:33 djm Exp $
+#	$OpenBSD: agent-restrict.sh,v 1.5 2022/01/13 04:53:16 dtucker Exp $
 #	Placed in the Public Domain.
 
 tid="agent restrictions"
@@ -52,6 +52,10 @@ done
 cat $OBJ/ssh_proxy.bak >> $OBJ/ssh_proxy
 cat $OBJ/ssh_proxy.bak >> $OBJ/ssh_proxy_noid
 
+LC_ALL=C
+export LC_ALL
+echo "SetEnv LC_ALL=${LC_ALL}" >> sshd_proxy
+
 verbose "prepare known_hosts"
 rm -f $OBJ/known_hosts
 for h in a b c x ; do
@@ -86,7 +90,7 @@ reset_keys() {
 	trace "reset keys"
 	>$OBJ/authorized_keys_$USER
 	for h in e d c b a; do
-		(printf "restrict,agent-forwarding,command=\"$_command\" ";
+		(printf "%s" "restrict,agent-forwarding,command=\"$_command\" ";
 		 cat $OBJ/user_$h.pub) >> $OBJ/authorized_keys_$USER
 	done
 }
@@ -328,7 +332,7 @@ if test ! -z "\$me" ; then
 	cat \$SSH_USER_AUTH
 fi
 echo AGENT
-$SSHADD -L | grep ^ssh | cut -d" " -f-2 | sort
+$SSHADD -L | egrep "^ssh" | cut -d" " -f-2 | sort
 if test -z "\$next" ; then 
 	touch $OBJ/done
 	echo "FINISH"

@@ -724,7 +724,7 @@
 ./usr/lib/libagentx.so.1.0
 ./usr/lib/libc.so.96.1
 ./usr/lib/libcbor.so.1.0
-./usr/lib/libcrypto.so.48.0
+./usr/lib/libcrypto.so.49.0
 ./usr/lib/libcurses.so.14.0
 ./usr/lib/libedit.so.5.2
 ./usr/lib/libelf.so.3.0
@@ -753,10 +753,10 @@
 ./usr/lib/librpcsvc.so.2.0
 ./usr/lib/libskey.so.6.0
 ./usr/lib/libsndio.so.7.1
-./usr/lib/libssl.so.51.0
+./usr/lib/libssl.so.52.0
 ./usr/lib/libtermcap.so.14.0
 ./usr/lib/libtermlib.so.14.0
-./usr/lib/libtls.so.23.0
+./usr/lib/libtls.so.24.0
 ./usr/lib/libusbhid.so.7.1
 ./usr/lib/libutil.so.16.0
 ./usr/lib/libz.so.6.0
@@ -1112,6 +1112,7 @@
 ./usr/libdata/perl5/OpenBSD/AddCreateDelete.pm
 ./usr/libdata/perl5/OpenBSD/AddDelete.pm
 ./usr/libdata/perl5/OpenBSD/ArcCheck.pm
+./usr/libdata/perl5/OpenBSD/BaseState.pm
 ./usr/libdata/perl5/OpenBSD/CollisionReport.pm
 ./usr/libdata/perl5/OpenBSD/Delete.pm
 ./usr/libdata/perl5/OpenBSD/Dependencies
@@ -2872,6 +2873,7 @@
 ./usr/share/man/man3/loongson
 ./usr/share/man/man3/octeon
 ./usr/share/man/man3p
+./usr/share/man/man3p/OpenBSD::BaseState.3p
 ./usr/share/man/man4
 ./usr/share/man/man4/alpha
 ./usr/share/man/man4/amd64
@@ -2960,7 +2962,7 @@
 ./usr/share/relink/usr
 ./usr/share/relink/usr/lib
 ./usr/share/relink/usr/lib/libc.so.96.1.a
-./usr/share/relink/usr/lib/libcrypto.so.48.0.a
+./usr/share/relink/usr/lib/libcrypto.so.49.0.a
 ./usr/share/relink/usr/libexec
 ./usr/share/relink/usr/libexec/ld.so.a
 ./usr/share/snmp

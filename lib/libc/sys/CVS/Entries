@@ -172,11 +172,9 @@
 /kqueue.2/1.45/Thu Dec  2 13:56:06 2021//
 /ktrace.2/1.39/Thu Dec  2 13:56:06 2021//
 /nfssvc.2/1.24/Thu Dec  2 13:56:06 2021//
-/poll.2/1.38/Thu Dec  2 13:56:06 2021//
 /ptrace.2/1.41/Thu Dec  2 13:56:06 2021//
 /read.2/1.38/Thu Dec  2 13:56:06 2021//
 /recv.2/1.48/Thu Dec  2 13:56:06 2021//
-/select.2/1.44/Sun Nov 21 20:15:22 2021//
 /semctl.2/1.18/Thu Dec  2 13:56:06 2021//
 /shmctl.2/1.19/Thu Dec  2 13:56:06 2021//
 /sigaltstack.2/1.24/Thu Dec  2 13:56:06 2021//
@@ -187,4 +185,6 @@
 /write.2/1.43/Thu Dec  2 13:56:06 2021//
 /Makefile.inc/1.161/Sun Jan  2 13:10:41 2022//
 /gettimeofday.2/1.32/Sun Jan  2 13:10:41 2022//
+/poll.2/1.39/Mon Jan 24 14:23:15 2022//
+/select.2/1.45/Mon Jan 24 14:23:15 2022//
 D

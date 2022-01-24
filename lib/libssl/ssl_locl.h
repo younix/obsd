@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.380 2022/01/09 15:53:52 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.383 2022/01/11 19:03:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -475,8 +475,9 @@ struct ssl_session_st {
 	unsigned int sid_ctx_length;
 	unsigned char sid_ctx[SSL_MAX_SID_CTX_LENGTH];
 
-	/* This is the cert for the other end. */
-	X509 *peer;
+	/* Peer provided leaf (end-entity) certificate. */
+	X509 *peer_cert;
+	int peer_cert_type;
 
 	/* when app_verify_callback accepts a session where the peer's certificate
 	 * is not ok, we must remember the error for session reuse: */
@@ -512,14 +513,6 @@ struct ssl_session_st {
 	int not_resumable;
 
 	STACK_OF(X509) *cert_chain; /* as received from peer */
-
-	/* The 'peer_...' members are used only by clients. */
-	int peer_cert_type;
-
-	/* Obviously we don't have the private keys of these,
-	 * so maybe we shouldn't even use the SSL_CERT_PKEY type here. */
-	SSL_CERT_PKEY *peer_key; /* points to an element of peer_pkeys (never NULL!) */
-	SSL_CERT_PKEY peer_pkeys[SSL_PKEY_NUM];
 
 	size_t tlsext_ecpointformatlist_length;
 	uint8_t *tlsext_ecpointformatlist; /* peer's list */
@@ -1424,8 +1417,10 @@ int ssl_kex_generate_dhe(DH *dh, DH *dh_params);
 int ssl_kex_generate_dhe_params_auto(DH *dh, size_t key_len);
 int ssl_kex_params_dhe(DH *dh, CBB *cbb);
 int ssl_kex_public_dhe(DH *dh, CBB *cbb);
-int ssl_kex_peer_params_dhe(DH *dh, CBS *cbs, int *invalid_params);
-int ssl_kex_peer_public_dhe(DH *dh, CBS *cbs, int *invalid_key);
+int ssl_kex_peer_params_dhe(DH *dh, CBS *cbs, int *decode_error,
+    int *invalid_params);
+int ssl_kex_peer_public_dhe(DH *dh, CBS *cbs, int *decode_error,
+    int *invalid_key);
 int ssl_kex_derive_dhe(DH *dh, DH *dh_peer,
     uint8_t **shared_key, size_t *shared_key_len);
 

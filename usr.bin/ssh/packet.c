@@ -1,4 +1,4 @@
-/* $OpenBSD: packet.c,v 1.304 2022/01/01 01:55:30 jsg Exp $ */
+/* $OpenBSD: packet.c,v 1.307 2022/01/22 00:49:34 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -774,7 +774,7 @@ uncompress_buffer(struct ssh *ssh, struct sshbuf *in, struct sshbuf *out)
 		ssh->state->compression_in_stream.avail_out = sizeof(buf);
 
 		status = inflate(&ssh->state->compression_in_stream,
-		    Z_PARTIAL_FLUSH);
+		    Z_SYNC_FLUSH);
 		switch (status) {
 		case Z_OK:
 			if ((r = sshbuf_put(out, buf, sizeof(buf) -
@@ -1739,10 +1739,9 @@ ssh_packet_read_poll_seqnr(struct ssh *ssh, u_char *typep, u_int32_t *seqnr_p)
 }
 
 /*
- * Buffers the given amount of input characters.  This is intended to be used
- * together with packet_read_poll.
+ * Buffers the supplied input data. This is intended to be used together
+ * with packet_read_poll().
  */
-
 int
 ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 {
@@ -1758,9 +1757,34 @@ ssh_packet_process_incoming(struct ssh *ssh, const char *buf, u_int len)
 		state->packet_discard -= len;
 		return 0;
 	}
-	if ((r = sshbuf_put(ssh->state->input, buf, len)) != 0)
+	if ((r = sshbuf_put(state->input, buf, len)) != 0)
 		return r;
 
+	return 0;
+}
+
+/* Reads and buffers data from the specified fd */
+int
+ssh_packet_process_read(struct ssh *ssh, int fd)
+{
+	struct session_state *state = ssh->state;
+	int r;
+	size_t rlen;
+
+	if ((r = sshbuf_read(fd, state->input, PACKET_MAX_SIZE, &rlen)) != 0)
+		return r;
+
+	if (state->packet_discard) {
+		if ((r = sshbuf_consume_end(state->input, rlen)) != 0)
+			return r;
+		state->keep_alive_timeouts = 0; /* ?? */
+		if (rlen >= state->packet_discard) {
+			if ((r = ssh_packet_stop_discard(ssh)) != 0)
+				return r;
+		}
+		state->packet_discard -= rlen;
+		return 0;
+	}
 	return 0;
 }
 

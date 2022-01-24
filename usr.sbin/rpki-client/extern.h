@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.100 2021/12/29 11:37:57 claudio Exp $ */
+/*	$OpenBSD: extern.h,v 1.114 2022/01/23 12:09:24 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -149,10 +149,27 @@ struct tal {
 };
 
 /*
+ * Resource types specified by the RPKI profiles.
+ * There might be others we don't consider.
+ */
+enum rtype {
+	RTYPE_INVALID,
+	RTYPE_TAL,
+	RTYPE_MFT,
+	RTYPE_ROA,
+	RTYPE_CER,
+	RTYPE_CRL,
+	RTYPE_GBR,
+	RTYPE_REPO,
+	RTYPE_FILE,
+};
+
+/*
  * Files specified in an MFT have their bodies hashed with SHA256.
  */
 struct mftfile {
 	char		*file; /* filename (CER/ROA/CRL, no path) */
+	enum rtype	 type; /* file type as determined by extension */
 	unsigned char	 hash[SHA256_DIGEST_LENGTH]; /* sha256 of body */
 };
 
@@ -162,14 +179,15 @@ struct mftfile {
  * manifest file.
  */
 struct mft {
-	char		*file; /* full path of MFT file */
+	char		*path; /* relative path to directory of the MFT */
 	struct mftfile	*files; /* file and hash */
 	size_t		 filesz; /* number of filenames */
-	int		 stale; /* if a stale manifest */
 	char		*seqnum; /* manifestNumber */
 	char		*aia; /* AIA */
 	char		*aki; /* AKI */
 	char		*ski; /* SKI */
+	unsigned int	 repoid;
+	int		 stale; /* if a stale manifest */
 };
 
 /*
@@ -278,21 +296,7 @@ RB_HEAD(auth_tree, auth);
 RB_PROTOTYPE(auth_tree, auth, entry, authcmp);
 
 struct auth	*auth_find(struct auth_tree *, const char *);
-int		 auth_insert(struct auth_tree *, struct cert *, struct auth *);
-
-/*
- * Resource types specified by the RPKI profiles.
- * There might be others we don't consider.
- */
-enum rtype {
-	RTYPE_EOF = 0,
-	RTYPE_TAL,
-	RTYPE_MFT,
-	RTYPE_ROA,
-	RTYPE_CER,
-	RTYPE_CRL,
-	RTYPE_GBR,
-};
+void		 auth_insert(struct auth_tree *, struct cert *, struct auth *);
 
 enum http_result {
 	HTTP_FAILED,	/* anything else */
@@ -307,10 +311,11 @@ enum rrdp_msg {
 	RRDP_START,
 	RRDP_SESSION,
 	RRDP_FILE,
+	RRDP_CLEAR,
 	RRDP_END,
 	RRDP_HTTP_REQ,
 	RRDP_HTTP_INI,
-	RRDP_HTTP_FIN
+	RRDP_HTTP_FIN,
 };
 
 /*
@@ -337,9 +342,11 @@ enum publish_type {
  */
 struct entity {
 	TAILQ_ENTRY(entity) entries;
-	char		*file;		/* local path to file */
+	char		*path;		/* path relative to repository */
+	char		*file;		/* filename or valid repo path */
 	unsigned char	*data;		/* optional data blob */
 	size_t		 datasz; 	/* length of optional data blob */
+	unsigned int	 repoid;	/* repository identifier */
 	int		 talid;		/* tal identifier */
 	enum rtype	 type;		/* type of entity (not RTYPE_EOF) */
 };
@@ -375,6 +382,7 @@ struct stats {
 	size_t	 vrps; /* total number of vrps */
 	size_t	 uniqs; /* number of unique vrps */
 	size_t	 del_files; /* number of files removed in cleanup */
+	size_t	 extra_files; /* number of superfluous files */
 	size_t	 del_dirs; /* number of directories removed in cleanup */
 	size_t	 brks; /* number of BGPsec Router Key (BRK) certificates */
 	struct timeval	elapsed_time;
@@ -387,6 +395,7 @@ struct msgbuf;
 
 /* global variables */
 extern int verbose;
+extern int filemode;
 extern const char *tals[];
 extern const char *taldescs[];
 extern unsigned int talrepocnt[];
@@ -401,9 +410,8 @@ struct tal	*tal_read(struct ibuf *);
 
 void		 cert_buffer(struct ibuf *, const struct cert *);
 void		 cert_free(struct cert *);
-struct cert	*cert_parse(X509 **, const char *, const unsigned char *,
-		    size_t);
-struct cert	*ta_parse(X509 **, const char *, const unsigned char *, size_t,
+struct cert	*cert_parse(const char *, const unsigned char *, size_t);
+struct cert	*ta_parse(const char *, const unsigned char *, size_t,
 		    const unsigned char *, size_t);
 struct cert	*cert_read(struct ibuf *);
 void		 cert_insert_brks(struct brk_tree *, struct cert *);
@@ -412,8 +420,9 @@ void		 mft_buffer(struct ibuf *, const struct mft *);
 void		 mft_free(struct mft *);
 struct mft	*mft_parse(X509 **, const char *, const unsigned char *,
 		    size_t);
-int		 mft_check(const char *, struct mft *);
 struct mft	*mft_read(struct ibuf *);
+enum rtype	 rtype_from_file_extension(const char *);
+enum rtype	 rtype_from_mftfile(const char *);
 
 void		 roa_buffer(struct ibuf *, const struct roa *);
 void		 roa_free(struct roa *);
@@ -437,11 +446,9 @@ struct auth	*valid_ski_aki(const char *, struct auth_tree *,
 		    const char *, const char *);
 int		 valid_ta(const char *, struct auth_tree *,
 		    const struct cert *);
-int		 valid_cert(const char *, struct auth_tree *,
-		    const struct cert *);
-int		 valid_roa(const char *, struct auth_tree *, struct roa *);
-int		 valid_filename(const char *);
-int		 valid_filehash(const char *, const char *, size_t);
+int		 valid_cert(const char *, struct auth *, const struct cert *);
+int		 valid_roa(const char *, struct auth *, struct roa *);
+int		 valid_filehash(int, const char *, size_t);
 int		 valid_uri(const char *, size_t, const char *);
 int		 valid_origin(const char *, const char *);
 
@@ -497,12 +504,16 @@ void		 proc_rrdp(int);
 
 /* Repository handling */
 int		 filepath_add(struct filepath_tree *, char *);
+void		 rrdp_clear(unsigned int);
 void		 rrdp_save_state(unsigned int, struct rrdp_session *);
 int		 rrdp_handle_file(unsigned int, enum publish_type, char *,
 		    char *, size_t, char *, size_t);
-char		*repo_filename(const struct repo *, const char *);
+char		*repo_basedir(const struct repo *, int);
+unsigned int	 repo_id(const struct repo *);
+const char	*repo_uri(const struct repo *);
 struct repo	*ta_lookup(int, struct tal *);
 struct repo	*repo_lookup(int, const char *, const char *);
+struct repo	*repo_byid(unsigned int);
 int		 repo_queued(struct repo *, struct entity *);
 void		 repo_cleanup(struct filepath_tree *);
 void		 repo_free(void);
@@ -511,14 +522,13 @@ void		 rsync_finish(unsigned int, int);
 void		 http_finish(unsigned int, enum http_result, const char *);
 void		 rrdp_finish(unsigned int, int);
 
-void		 rsync_fetch(unsigned int, const char *, const char *);
+void		 rsync_fetch(unsigned int, const char *, const char *,
+		    const char *);
 void		 http_fetch(unsigned int, const char *, const char *, int);
 void		 rrdp_fetch(unsigned int, const char *, const char *,
 		    struct rrdp_session *);
 void		 rrdp_http_done(unsigned int, enum http_result, const char *);
-
-int		 repo_next_timeout(int);
-void		 repo_check_timeout(void);
+int		 repo_check_timeout(int);
 
 /* Logging (though really used for OpenSSL errors). */
 
@@ -555,6 +565,7 @@ struct ibuf	*io_buf_recvfd(int, struct ibuf **);
 
 /* X509 helpers. */
 
+void		 x509_init_oid(void);
 char		*x509_get_aia(X509 *, const char *);
 char		*x509_get_aki(X509 *, int, const char *);
 char		*x509_get_ski(X509 *, const char *);

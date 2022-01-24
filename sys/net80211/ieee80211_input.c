@@ -1,4 +1,4 @@
-/*	$OpenBSD: ieee80211_input.c,v 1.241 2022/01/05 05:18:25 dlg Exp $	*/
+/*	$OpenBSD: ieee80211_input.c,v 1.243 2022/01/21 15:51:03 stsp Exp $	*/
 
 /*-
  * Copyright (c) 2001 Atsushi Onoe
@@ -1605,10 +1605,10 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 	struct ieee80211_node *ni;
 	const struct ieee80211_frame *wh;
 	const u_int8_t *frm, *efrm;
-	const u_int8_t *tstamp, *ssid, *rates, *xrates, *edcaie, *wmmie;
+	const u_int8_t *tstamp, *ssid, *rates, *xrates, *edcaie, *wmmie, *tim;
 	const u_int8_t *rsnie, *wpaie, *htcaps, *htop;
 	u_int16_t capinfo, bintval;
-	u_int8_t chan, bchan, erp, dtim_count, dtim_period;
+	u_int8_t chan, bchan, erp;
 	int is_new;
 
 	/*
@@ -1646,12 +1646,11 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 	bintval = LE_READ_2(frm); frm += 2;
 	capinfo = LE_READ_2(frm); frm += 2;
 
-	ssid = rates = xrates = edcaie = wmmie = rsnie = wpaie = NULL;
+	ssid = rates = xrates = edcaie = wmmie = rsnie = wpaie = tim = NULL;
 	htcaps = htop = NULL;
 	bchan = ieee80211_chan2ieee(ic, ic->ic_bss->ni_chan);
 	chan = bchan;
 	erp = 0;
-	dtim_count = dtim_period = 0;
 	while (frm + 2 <= efrm) {
 		if (frm + 2 + frm[1] > efrm) {
 			ic->ic_stats.is_rx_elem_toosmall++;
@@ -1694,10 +1693,11 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 			htop = frm;
 			break;
 		case IEEE80211_ELEMID_TIM:
-			if (frm[1] > 3) {
-				dtim_count = frm[2];
-				dtim_period = frm[3];
+			if (frm[1] < 4) {
+				ic->ic_stats.is_rx_elem_toosmall++;
+				break;
 			}
+			tim = frm;
 			break;
 		case IEEE80211_ELEMID_VENDOR:
 			if (frm[1] < 4) {
@@ -1751,36 +1751,6 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 		ic->ic_stats.is_rx_chanmismatch++;
 		return;
 	}
-	/*
-	 * Use mac, channel and rssi so we collect only the
-	 * best potential AP with the equal bssid while scanning.
-	 * Collecting all potential APs may result in bloat of
-	 * the node tree. This call will return NULL if the node
-	 * for this APs does not exist or if the new node is the
-	 * potential better one.
-	 */
-	ni = ieee80211_find_node_for_beacon(ic, wh->i_addr2,
-	    &ic->ic_channels[chan], ssid, rxi->rxi_rssi);
-	if (ni != NULL) {
-		/*
-		 * If we are doing a directed scan for an AP with a hidden SSID
-		 * we must collect the SSID from a probe response to override
-		 * a non-zero-length SSID filled with zeroes that we may have
-		 * received earlier in a beacon.
-		 */
-		if (isprobe && ssid[1] != 0 && ni->ni_essid[0] == '\0') {
-			ni->ni_esslen = ssid[1];
-			memset(ni->ni_essid, 0, sizeof(ni->ni_essid));
-			/* we know that ssid[1] <= IEEE80211_NWID_LEN */
-			memcpy(ni->ni_essid, &ssid[2], ssid[1]);
-		}
-
-		/* Update channel in case AP has switched */
-		if (ic->ic_opmode == IEEE80211_M_STA)
-			ni->ni_chan = rni->ni_chan;
-
-		return;
-	}
 
 #ifdef IEEE80211_DEBUG
 	if (ieee80211_debug > 1 &&
@@ -1810,8 +1780,10 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 	if (htop && !ieee80211_setup_htop(ni, htop + 2, htop[1], 1))
 		htop = NULL; /* invalid HTOP */
 
-	ni->ni_dtimcount = dtim_count;
-	ni->ni_dtimperiod = dtim_period;
+	if (tim) {
+		ni->ni_dtimcount = tim[2];
+		ni->ni_dtimperiod = tim[3];
+	}
 
 	/*
 	 * When operating in station mode, check for state updates
@@ -1888,6 +1860,14 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 			ieee80211_set_shortslottime(ic,
 			    ic->ic_curmode == IEEE80211_MODE_11A ||
 			    (capinfo & IEEE80211_CAPINFO_SHORT_SLOTTIME));
+		}
+
+		if (tim && ic->ic_bss->ni_dtimperiod != ni->ni_dtimperiod) {
+			ic->ic_bss->ni_dtimperiod = ni->ni_dtimperiod;
+			ic->ic_bss->ni_dtimcount = ni->ni_dtimcount;
+
+			if (ic->ic_updatedtim != NULL)
+				ic->ic_updatedtim(ic);
 		}
 
 		/* 
@@ -1977,6 +1957,13 @@ ieee80211_recv_probe_resp(struct ieee80211com *ic, struct mbuf *m,
 		}
 	}
 
+	/*
+	 * Set our SSID if we do not know it yet.
+	 * If we are doing a directed scan for an AP with a hidden SSID
+	 * we must collect the SSID from a probe response to override
+	 * a non-zero-length SSID filled with zeroes that we may have
+	 * received earlier in a beacon.
+	 */
 	if (ssid[1] != 0 && ni->ni_essid[0] == '\0') {
 		ni->ni_esslen = ssid[1];
 		memset(ni->ni_essid, 0, sizeof(ni->ni_essid));

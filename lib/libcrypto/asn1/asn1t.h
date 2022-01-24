@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1t.h,v 1.16 2021/11/30 18:32:55 tb Exp $ */
+/* $OpenBSD: asn1t.h,v 1.19 2022/01/14 08:43:06 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -472,9 +472,7 @@ struct ASN1_TEMPLATE_st {
 	unsigned long flags;		/* Various flags */
 	long tag;			/* tag, not used if no tagging */
 	unsigned long offset;		/* Offset of this field in structure */
-#ifndef NO_ASN1_FIELD_NAMES
 	const char *field_name;		/* Field name */
-#endif
 	ASN1_ITEM_EXP *item;		/* Relevant ASN1_ITEM or ASN1_ADB */
 };
 
@@ -489,7 +487,6 @@ typedef struct ASN1_ADB_st ASN1_ADB;
 struct ASN1_ADB_st {
 	unsigned long flags;	/* Various flags */
 	unsigned long offset;	/* Offset of selector field */
-	STACK_OF(ASN1_ADB_TABLE) **app_items; /* Application defined items */
 	const ASN1_ADB_TABLE *tbl;	/* Table of possible types */
 	long tblcount;		/* Number of entries in tbl */
 	const ASN1_TEMPLATE *default_tt;  /* Type to use if no match */
@@ -600,9 +597,7 @@ struct ASN1_ITEM_st {
 	long tcount;			/* Number of templates if SEQUENCE or CHOICE */
 	const void *funcs;		/* functions that handle this type */
 	long size;			/* Structure size (usually)*/
-#ifndef NO_ASN1_FIELD_NAMES
 	const char *sname;		/* Structure name */
-#endif
 };
 
 /* These are values for the itype field and
@@ -933,22 +928,6 @@ int ASN1_item_ex_d2i(ASN1_VALUE **pval, const unsigned char **in, long len, cons
 int ASN1_item_ex_i2d(ASN1_VALUE **pval, unsigned char **out, const ASN1_ITEM *it, int tag, int aclass);
 int ASN1_template_i2d(ASN1_VALUE **pval, unsigned char **out, const ASN1_TEMPLATE *tt);
 void ASN1_primitive_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
-
-int asn1_ex_c2i(ASN1_VALUE **pval, const unsigned char *cont, int len, int utype, char *free_cont, const ASN1_ITEM *it);
-
-int asn1_get_choice_selector(ASN1_VALUE **pval, const ASN1_ITEM *it);
-int asn1_set_choice_selector(ASN1_VALUE **pval, int value, const ASN1_ITEM *it);
-
-ASN1_VALUE ** asn1_get_field_ptr(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt);
-
-const ASN1_TEMPLATE *asn1_do_adb(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt, int nullerr);
-
-int asn1_do_lock(ASN1_VALUE **pval, int op, const ASN1_ITEM *it);
-
-void asn1_enc_init(ASN1_VALUE **pval, const ASN1_ITEM *it);
-void asn1_enc_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
-int asn1_enc_restore(int *len, unsigned char **out, ASN1_VALUE **pval, const ASN1_ITEM *it);
-int asn1_enc_save(ASN1_VALUE **pval, const unsigned char *in, int inlen, const ASN1_ITEM *it);
 
 #ifdef  __cplusplus
 }

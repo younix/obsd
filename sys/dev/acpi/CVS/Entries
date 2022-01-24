@@ -36,7 +36,6 @@
 /dsdt.h/1.79/Wed Sep  1 16:07:39 2021//
 /acpidmar.c/1.5/Thu Sep  2 14:22:31 2021//
 /acpiac.c/1.34/Sun Nov 21 20:15:22 2021//
-/acpivar.h/1.115/Sun Jan  2 13:11:06 2022//
 /ahci_acpi.c/1.4/Sun Jan  2 13:11:06 2022//
 /amdgpio.c/1.6/Sun Jan  2 13:11:06 2022//
 /aplgpio.c/1.4/Sun Jan  2 13:11:06 2022//
@@ -56,14 +55,15 @@
 /ohci_acpi.c/1.1/Wed Dec 29 18:40:19 2021//
 /pchgpio.c/1.10/Sun Jan  2 13:11:06 2022//
 /pluart_acpi.c/1.5/Sun Jan  2 13:11:06 2022//
-/sdhc_acpi.c/1.19/Sun Jan  2 13:11:06 2022//
 /tpm.c/1.15/Sun Jan  2 13:11:06 2022//
 /xhci_acpi.c/1.5/Sun Jan  2 13:11:06 2022//
 /abl.c/1.4/Mon Jan 10 09:38:28 2022//
-/acpi.c/1.404/Mon Jan 10 09:38:28 2022//
 /acpicpu.c/1.91/Mon Jan 10 09:38:28 2022//
 /acpireg.h/1.58/Mon Jan 10 09:38:28 2022//
 /amd_iommu.h/1.2/Mon Jan 10 09:38:28 2022//
 /atk0110.c/1.18/Mon Jan 10 09:38:28 2022//
 /tipmic.c/1.6/Mon Jan 10 09:38:28 2022//
+/acpi.c/1.405/Mon Jan 24 14:23:38 2022//
+/acpivar.h/1.116/Mon Jan 24 14:23:38 2022//
+/sdhc_acpi.c/1.20/Mon Jan 24 14:23:38 2022//
 D

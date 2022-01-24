@@ -1,4 +1,4 @@
-/* $OpenBSD: dh.h,v 1.29 2022/01/07 09:21:21 tb Exp $ */
+/* $OpenBSD: dh.h,v 1.32 2022/01/14 08:25:44 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -98,55 +98,6 @@
 extern "C" {
 #endif
 
-/* Already defined in ossl_typ.h */
-/* typedef struct dh_st DH; */
-/* typedef struct dh_method DH_METHOD; */
-
-struct dh_method
-	{
-	const char *name;
-	/* Methods here */
-	int (*generate_key)(DH *dh);
-	int (*compute_key)(unsigned char *key,const BIGNUM *pub_key,DH *dh);
-	int (*bn_mod_exp)(const DH *dh, BIGNUM *r, const BIGNUM *a,
-				const BIGNUM *p, const BIGNUM *m, BN_CTX *ctx,
-				BN_MONT_CTX *m_ctx); /* Can be null */
-
-	int (*init)(DH *dh);
-	int (*finish)(DH *dh);
-	int flags;
-	char *app_data;
-	/* If this is non-NULL, it will be used to generate parameters */
-	int (*generate_params)(DH *dh, int prime_len, int generator, BN_GENCB *cb);
-	};
-
-struct dh_st
-	{
-	/* This first argument is used to pick up errors when
-	 * a DH is passed instead of a EVP_PKEY */
-	int pad;
-	int version;
-	BIGNUM *p;
-	BIGNUM *g;
-	long length; /* optional */
-	BIGNUM *pub_key;	/* g^x */
-	BIGNUM *priv_key;	/* x */
-
-	int flags;
-	BN_MONT_CTX *method_mont_p;
-	/* Place holders if we want to do X9.42 DH */
-	BIGNUM *q;
-	BIGNUM *j;
-	unsigned char *seed;
-	int seedlen;
-	BIGNUM *counter;
-
-	int references;
-	CRYPTO_EX_DATA ex_data;
-	const DH_METHOD *meth;
-	ENGINE *engine;
-	};
-
 #define DH_GENERATOR_2		2
 /* #define DH_GENERATOR_3	3 */
 #define DH_GENERATOR_5		5
@@ -199,19 +150,15 @@ void DH_get0_pqg(const DH *dh, const BIGNUM **p, const BIGNUM **q,
 int DH_set0_pqg(DH *dh, BIGNUM *p, BIGNUM *q, BIGNUM *g);
 void DH_get0_key(const DH *dh, const BIGNUM **pub_key, const BIGNUM **priv_key);
 int DH_set0_key(DH *dh, BIGNUM *pub_key, BIGNUM *priv_key);
-#if defined(LIBRESSL_OPAQUE_DH) || defined(LIBRESSL_CRYPTO_INTERNAL)
 const BIGNUM *DH_get0_p(const DH *dh);
 const BIGNUM *DH_get0_q(const DH *dh);
 const BIGNUM *DH_get0_g(const DH *dh);
 const BIGNUM *DH_get0_priv_key(const DH *dh);
 const BIGNUM *DH_get0_pub_key(const DH *dh);
-#endif
 void DH_clear_flags(DH *dh, int flags);
 int DH_test_flags(const DH *dh, int flags);
 void DH_set_flags(DH *dh, int flags);
-#if defined(LIBRESSL_OPAQUE_DH) || defined(LIBRESSL_CRYPTO_INTERNAL)
 long DH_get_length(const DH *dh);
-#endif
 int DH_set_length(DH *dh, long length);
 
 /* Deprecated version */
@@ -288,6 +235,17 @@ void ERR_load_DH_strings(void);
 #define DH_R_NO_PARAMETERS_SET				 107
 #define DH_R_NO_PRIVATE_VALUE				 100
 #define DH_R_PARAMETER_ENCODING_ERROR			 105
+#define DH_R_CHECK_INVALID_J_VALUE			 115
+#define DH_R_CHECK_INVALID_Q_VALUE			 116
+#define DH_R_CHECK_PUBKEY_INVALID			 122
+#define DH_R_CHECK_PUBKEY_TOO_LARGE			 123
+#define DH_R_CHECK_PUBKEY_TOO_SMALL			 124
+#define DH_R_CHECK_P_NOT_PRIME				 117
+#define DH_R_CHECK_P_NOT_SAFE_PRIME			 118
+#define DH_R_CHECK_Q_NOT_PRIME				 119
+#define DH_R_MISSING_PUBKEY				 125
+#define DH_R_NOT_SUITABLE_GENERATOR			 120
+#define DH_R_UNABLE_TO_CHECK_GENERATOR			 121
 
 #ifdef  __cplusplus
 }

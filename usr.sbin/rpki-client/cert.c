@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.49 2021/12/26 12:32:28 tb Exp $ */
+/*	$OpenBSD: cert.c,v 1.53 2022/01/20 16:36:19 claudio Exp $ */
 /*
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -47,20 +47,9 @@ struct	parse {
 	const char	*fn; /* currently-parsed file */
 };
 
-static ASN1_OBJECT	*carepo_oid;	/* 1.3.6.1.5.5.7.48.5 (caRepository) */
-static ASN1_OBJECT	*mft_oid;	/* 1.3.6.1.5.5.7.48.10 (rpkiManifest) */
-static ASN1_OBJECT	*notify_oid;	/* 1.3.6.1.5.5.7.48.13 (rpkiNotify) */
-
-static void
-cert_init_oid(void)
-{
-	if ((carepo_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.5", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.5");
-	if ((mft_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.10", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.10");
-	if ((notify_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.13", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.13");
-}
+extern ASN1_OBJECT	*carepo_oid;	/* 1.3.6.1.5.5.7.48.5 (caRepository) */
+extern ASN1_OBJECT	*manifest_oid;	/* 1.3.6.1.5.5.7.48.10 (rpkiManifest) */
+extern ASN1_OBJECT	*notify_oid;	/* 1.3.6.1.5.5.7.48.13 (rpkiNotify) */
 
 /*
  * Append an IP address structure to our list of results.
@@ -270,12 +259,9 @@ sbgp_sia_resource_entry(struct parse *p,
 	if (!ASN1_frame(p->fn, dsz, &d, &plen, &ptag))
 		goto out;
 
-	if (carepo_oid == NULL)
-		cert_init_oid();
-
 	if (OBJ_cmp(oid, carepo_oid) == 0)
 		rc = sbgp_sia_resource_carepo(p, d, plen);
-	else if (OBJ_cmp(oid, mft_oid) == 0)
+	else if (OBJ_cmp(oid, manifest_oid) == 0)
 		rc = sbgp_sia_resource_mft(p, d, plen);
 	else if (OBJ_cmp(oid, notify_oid) == 0)
 		rc = sbgp_sia_resource_notify(p, d, plen);
@@ -992,8 +978,7 @@ out:
  * is also dereferenced.
  */
 static struct cert *
-cert_parse_inner(X509 **xp, const char *fn, const unsigned char *der,
-    size_t len, int ta)
+cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 {
 	int		 rc = 0, extsz, c;
 	int		 sia_present = 0;
@@ -1002,8 +987,6 @@ cert_parse_inner(X509 **xp, const char *fn, const unsigned char *der,
 	X509_EXTENSION	*ext = NULL;
 	ASN1_OBJECT	*obj;
 	struct parse	 p;
-
-	*xp = NULL;
 
 	/* just fail for empty buffers, the warning was printed elsewhere */
 	if (der == NULL)
@@ -1014,7 +997,7 @@ cert_parse_inner(X509 **xp, const char *fn, const unsigned char *der,
 	if ((p.res = calloc(1, sizeof(struct cert))) == NULL)
 		err(1, NULL);
 
-	if ((x = *xp = d2i_X509(NULL, &der, len)) == NULL) {
+	if ((x = d2i_X509(NULL, &der, len)) == NULL) {
 		cryptowarnx("%s: d2i_X509_bio", p.fn);
 		goto out;
 	}
@@ -1153,9 +1136,6 @@ cert_parse_inner(X509 **xp, const char *fn, const unsigned char *der,
 		goto out;
 	}
 
-	if (X509_up_ref(x) == 0)
-		errx(1, "%s: X509_up_ref failed", __func__);
-
 	p.res->x509 = x;
 
 	rc = 1;
@@ -1163,51 +1143,67 @@ out:
 	if (rc == 0) {
 		cert_free(p.res);
 		X509_free(x);
-		*xp = NULL;
 	}
 	return (rc == 0) ? NULL : p.res;
 }
 
 struct cert *
-cert_parse(X509 **xp, const char *fn, const unsigned char *der, size_t len)
+cert_parse(const char *fn, const unsigned char *der, size_t len)
 {
-	return cert_parse_inner(xp, fn, der, len, 0);
+	return cert_parse_inner(fn, der, len, 0);
 }
 
 struct cert *
-ta_parse(X509 **xp, const char *fn, const unsigned char *der, size_t len,
+ta_parse(const char *fn, const unsigned char *der, size_t len,
     const unsigned char *pkey, size_t pkeysz)
 {
+	ASN1_TIME	*notBefore, *notAfter;
 	EVP_PKEY	*pk = NULL, *opk = NULL;
 	struct cert	*p;
 	int		 rc = 0;
 
-	if ((p = cert_parse_inner(xp, fn, der, len, 1)) == NULL)
+	if ((p = cert_parse_inner(fn, der, len, 1)) == NULL)
 		return NULL;
 
-	if (pkey != NULL) {
-		assert(*xp != NULL);
-		pk = d2i_PUBKEY(NULL, &pkey, pkeysz);
-		assert(pk != NULL);
-
-		if ((opk = X509_get_pubkey(*xp)) == NULL)
-			cryptowarnx("%s: RFC 6487 (trust anchor): "
-			    "missing pubkey", fn);
-		else if (EVP_PKEY_cmp(pk, opk) != 1)
-			cryptowarnx("%s: RFC 6487 (trust anchor): "
-			    "pubkey does not match TAL pubkey", fn);
-		else
-			rc = 1;
-
-		EVP_PKEY_free(pk);
-		EVP_PKEY_free(opk);
+	/* first check pubkey against the one from the TAL */
+	pk = d2i_PUBKEY(NULL, &pkey, pkeysz);
+	if (pk == NULL) {
+		cryptowarnx("%s: RFC 6487 (trust anchor): bad TAL pubkey", fn);
+		goto badcert;
+	}
+	if ((opk = X509_get0_pubkey(p->x509)) == NULL) {
+		cryptowarnx("%s: RFC 6487 (trust anchor): missing pubkey", fn);
+		goto badcert;
+	} else if (EVP_PKEY_cmp(pk, opk) != 1) {
+		cryptowarnx("%s: RFC 6487 (trust anchor): "
+		    "pubkey does not match TAL pubkey", fn);
+		goto badcert;
 	}
 
+	if ((notBefore = X509_get_notBefore(p->x509)) == NULL) {
+		warnx("%s: certificate has invalid notBefore", fn);
+		goto badcert;
+	}
+	if ((notAfter = X509_get_notAfter(p->x509)) == NULL) {
+		warnx("%s: certificate has invalid notAfter", fn);
+		goto badcert;
+	}
+	if (X509_cmp_current_time(notBefore) != -1) {
+		warnx("%s: certificate not yet valid", fn);
+		goto badcert;
+	}
+	if (X509_cmp_current_time(notAfter) != 1)  {
+		warnx("%s: certificate has expired", fn);
+		goto badcert;
+	}
+
+	rc = 1;
+
+badcert:
+	EVP_PKEY_free(pk);
 	if (rc == 0) {
 		cert_free(p);
 		p = NULL;
-		X509_free(*xp);
-		*xp = NULL;
 	}
 
 	return p;
@@ -1319,7 +1315,7 @@ auth_find(struct auth_tree *auths, const char *aki)
 	return RB_FIND(auth_tree, auths, &a);
 }
 
-int
+void
 auth_insert(struct auth_tree *auths, struct cert *cert, struct auth *parent)
 {
 	struct auth *na;
@@ -1333,8 +1329,6 @@ auth_insert(struct auth_tree *auths, struct cert *cert, struct auth *parent)
 
 	if (RB_INSERT(auth_tree, auths, na) != NULL)
 		err(1, "auth tree corrupted");
-
-	return 1;
 }
 
 static inline int

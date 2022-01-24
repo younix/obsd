@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.284 2022/01/09 15:53:52 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.287 2022/01/14 09:10:11 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -596,8 +596,8 @@ SSL_set_bio(SSL *s, BIO *rbio, BIO *wbio)
 	/* If the output buffering BIO is still in place, remove it */
 	if (s->bbio != NULL) {
 		if (s->wbio == s->bbio) {
-			s->wbio = s->wbio->next_bio;
-			s->bbio->next_bio = NULL;
+			s->wbio = BIO_next(s->wbio);
+			BIO_set_next(s->bbio, NULL);
 		}
 	}
 
@@ -865,19 +865,17 @@ SSL_pending(const SSL *s)
 X509 *
 SSL_get_peer_certificate(const SSL *s)
 {
-	X509	*r;
+	X509 *cert;
 
-	if ((s == NULL) || (s->session == NULL))
-		r = NULL;
-	else
-		r = s->session->peer;
+	if (s == NULL || s->session == NULL)
+		return NULL;
 
-	if (r == NULL)
-		return (r);
+	if ((cert = s->session->peer_cert) == NULL)
+		return NULL;
 
-	X509_up_ref(r);
+	X509_up_ref(cert);
 
-	return (r);
+	return cert;
 }
 
 STACK_OF(X509) *

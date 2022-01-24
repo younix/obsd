@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.1983 2022/01/06 06:19:11 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.1985 2022/01/20 13:12:07 jsg Exp 
  */
 
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
@@ -18988,6 +18988,18 @@ static const struct pci_known_product pci_known_products[] = {
 	    "H510 eSPI",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_WM590_ESPI,
+	    "WM590 eSPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_QM580_ESPI,
+	    "QM580 eSPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_HM570_ESPI,
+	    "HM570 eSPI",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_W580_ESPI,
 	    "W580 eSPI",
 	},
@@ -19446,6 +19458,202 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_RKL_GT_6,
 	    "UHD Graphics",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_ESPI,
+	    "Jasper Lake eSPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_P2SB,
+	    "Jasper Lake P2SB",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PMC,
+	    "Jasper Lake PMC",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_SMB,
+	    "Jasper Lake SMBus",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_SPI,
+	    "Jasper Lake SPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_ITH,
+	    "Jasper Lake ITH",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_UART_0,
+	    "Jasper Lake UART",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_UART_1,
+	    "Jasper Lake UART",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_LPSS_SPI_0,
+	    "Jasper Lake SPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_LPSS_SPI_1,
+	    "Jasper Lake SPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_1,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_2,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_3,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_4,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_5,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_6,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_7,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_PCIE_8,
+	    "Jasper Lake PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_EMMC,
+	    "Jasper Lake eMMC",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_4,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_5,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_LPSS_UART_2,
+	    "Jasper Lake UART",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HDA,
+	    "Jasper Lake HD Audio",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_AHCI_1,
+	    "Jasper Lake AHCI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_AHCI_2,
+	    "Jasper Lake AHCI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_RAID_1,
+	    "Jasper Lake RAID",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_RAID_2,
+	    "Jasper Lake RAID",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HECI_1,
+	    "Jasper Lake HECI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HECI_2,
+	    "Jasper Lake HECI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HECI_3,
+	    "Jasper Lake HECI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_0,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_1,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_2,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_I2C_3,
+	    "Jasper Lake I2C",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_XHCI,
+	    "Jasper Lake xHCI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_XDCI,
+	    "Jasper Lake xDCI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_SRAM,
+	    "Jasper Lake Shared SRAM",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_SDXC,
+	    "Jasper Lake SDXC",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_LPSS_SPI_2,
+	    "Jasper Lake SPI",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_DPTF,
+	    "Jasper Lake DPTF",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_GNA,
+	    "Jasper Lake GNA",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_1,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_2,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_IPU,
+	    "Jasper Lake IPU",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_3,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_4,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_5,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_HB_6,
+	    "Jasper Lake Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_TH,
+	    "Jasper Lake TH",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JSL_GT_1,
@@ -21348,6 +21556,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "RCU31L I2O RAID",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_PCIE_0,
+	    "Core 11G PCIE",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_UP4_2C_HB,
 	    "Core 11G Host",
 	},
@@ -21360,6 +21572,14 @@ static const struct pci_known_product pci_known_products[] = {
 	    "Core 11G Host",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_PCIE_1,
+	    "Core 11G PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_PCIE_2,
+	    "Core 11G PCIE",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_PCIE_1,
 	    "Core 11G PCIE",
 	},
@@ -21370,6 +21590,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_SRAM,
 	    "Core 11G SRAM",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_PCIE_3,
+	    "Core 11G PCIE",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_GNA,
@@ -21392,8 +21616,16 @@ static const struct pci_known_product pci_known_products[] = {
 	    "Core 11G xDCI",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_XHCI,
+	    "Core 11G xHCI",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_IPU,
 	    "Core 11G IPU",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_UP3R_4C_HB,
+	    "Core 11G Host",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_TBT_DMA0,
@@ -21401,6 +21633,14 @@ static const struct pci_known_product pci_known_products[] = {
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_TBT_DMA1,
+	    "Core 11G TBT",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_DMA0,
+	    "Core 11G TBT",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_DMA1,
 	    "Core 11G TBT",
 	},
 	{
@@ -21412,6 +21652,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "Core 11G PCIE",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_6C_HB,
+	    "Core 11G Host",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_PCIE_4,
 	    "Core 11G PCIE",
 	},
@@ -21420,8 +21664,32 @@ static const struct pci_known_product pci_known_products[] = {
 	    "Core 11G PCIE",
 	},
 	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_PCIE0,
+	    "Core 11G PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_PCIE1,
+	    "Core 11G PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_PCIE2,
+	    "Core 11G PCIE",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_TBT_PCIE3,
+	    "Core 11G PCIE",
+	},
+	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_NPK,
 	    "Core 11G NPK",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_8C_HB,
+	    "Core 11G Host",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_H_IPU,
+	    "Core 11G IPU",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_TGL_GT2_1,
@@ -23638,6 +23906,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_KINGSTON, PCI_PRODUCT_KINGSTON_A2000,
 	    "A2000",
+	},
+	{
+	    PCI_VENDOR_KIOXIA, PCI_PRODUCT_KIOXIA_BG4,
+	    "BG4",
 	},
 	{
 	    PCI_VENDOR_KTI, PCI_PRODUCT_KTI_KTIE,
@@ -28628,6 +28900,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "RTS525A Card Reader",
 	},
 	{
+	    PCI_VENDOR_REALTEK, PCI_PRODUCT_REALTEK_RTS5260,
+	    "RTS5260 Card Reader",
+	},
+	{
 	    PCI_VENDOR_REALTEK, PCI_PRODUCT_REALTEK_RTL8402,
 	    "RTL8402 Card Reader",
 	},
@@ -32912,6 +33188,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "738",
 	},
 	{
+	    PCI_VENDOR_YMTC, PCI_PRODUCT_YMTC_PC005,
+	    "PC005",
+	},
+	{
 	    PCI_VENDOR_ZEINET, PCI_PRODUCT_ZEINET_1221,
 	    "1221",
 	},
@@ -34146,6 +34426,14 @@ static const struct pci_known_vendor pci_known_vendors[] = {
 	{
 	    PCI_VENDOR_AMPERE,
 	    "Ampere",
+	},
+	{
+	    PCI_VENDOR_KIOXIA,
+	    "Kioxia",
+	},
+	{
+	    PCI_VENDOR_YMTC,
+	    "YMTC",
 	},
 	{
 	    PCI_VENDOR_SSSTC,

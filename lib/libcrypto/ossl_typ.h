@@ -1,4 +1,4 @@
-/* $OpenBSD: ossl_typ.h,v 1.16 2021/12/12 21:35:46 tb Exp $ */
+/* $OpenBSD: ossl_typ.h,v 1.21 2022/01/14 08:59:30 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2001 The OpenSSL Project.  All rights reserved.
  *
@@ -77,6 +77,8 @@ typedef struct asn1_string_st ASN1_STRING;
 typedef int ASN1_BOOLEAN;
 typedef int ASN1_NULL;
 
+typedef struct asn1_object_st ASN1_OBJECT;
+
 typedef struct ASN1_ITEM_st ASN1_ITEM;
 typedef struct asn1_pctx_st ASN1_PCTX;
 
@@ -90,7 +92,11 @@ typedef struct bn_mont_ctx_st BN_MONT_CTX;
 typedef struct bn_recp_ctx_st BN_RECP_CTX;
 typedef struct bn_gencb_st BN_GENCB;
 
+typedef struct bio_st BIO;
 typedef struct buf_mem_st BUF_MEM;
+
+typedef struct comp_ctx_st COMP_CTX;
+typedef struct comp_method_st COMP_METHOD;
 
 typedef struct evp_cipher_st EVP_CIPHER;
 typedef struct evp_cipher_ctx_st EVP_CIPHER_CTX;
@@ -115,6 +121,7 @@ typedef struct dsa_method DSA_METHOD;
 
 typedef struct rsa_st RSA;
 typedef struct rsa_meth_st RSA_METHOD;
+typedef struct rsa_pss_params_st RSA_PSS_PARAMS;
 
 typedef struct rand_meth_st RAND_METHOD;
 
@@ -180,12 +187,10 @@ typedef struct ocsp_req_ctx_st OCSP_REQ_CTX;
 typedef struct ocsp_response_st OCSP_RESPONSE;
 typedef struct ocsp_responder_id_st OCSP_RESPID;
 
-#ifdef LIBRESSL_CRYPTO_INTERNAL
 typedef struct sct_st SCT;
 typedef struct sct_ctx_st SCT_CTX;
 typedef struct ctlog_st CTLOG;
 typedef struct ctlog_store_st CTLOG_STORE;
 typedef struct ct_policy_eval_ctx_st CT_POLICY_EVAL_CTX;
-#endif
 
 #endif /* def HEADER_OPENSSL_TYPES_H */

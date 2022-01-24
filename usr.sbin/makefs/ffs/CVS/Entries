@@ -4,9 +4,9 @@
 /ufs_inode.h/1.4/Sat Dec 17 16:26:46 2016//
 /buf.c/1.7/Wed Oct 20 17:29:19 2021//
 /buf.h/1.5/Wed Oct 20 17:29:19 2021//
-/ffs_alloc.c/1.14/Wed Oct 20 17:29:19 2021//
-/ffs_subr.c/1.5/Wed Oct 20 17:29:19 2021//
 /ffs_tables.c/1.3/Wed Oct 20 17:29:19 2021//
 /mkfs.c/1.14/Wed Oct 20 17:29:19 2021//
 /ufs_bmap.c/1.7/Wed Oct 20 17:29:19 2021//
+/ffs_alloc.c/1.15/Mon Jan 24 14:23:47 2022//
+/ffs_subr.c/1.6/Mon Jan 24 14:23:47 2022//
 D

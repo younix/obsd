@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_tlsext.c,v 1.105 2022/01/06 18:23:56 jsing Exp $ */
+/* $OpenBSD: ssl_tlsext.c,v 1.108 2022/01/11 18:28:41 jsing Exp $ */
 /*
  * Copyright (c) 2016, 2017, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2017 Doug Hogan <doug@openbsd.org>
@@ -1478,16 +1478,17 @@ int
 tlsext_keyshare_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 {
 	CBS client_shares, key_exchange;
+	int decode_error;
 	uint16_t group;
 
 	if (!CBS_get_u16_length_prefixed(cbs, &client_shares))
-		goto err;
+		return 0;
 
 	while (CBS_len(&client_shares) > 0) {
 
 		/* Unpack client share. */
 		if (!CBS_get_u16(&client_shares, &group))
-			goto err;
+			return 0;
 		if (!CBS_get_u16_length_prefixed(&client_shares, &key_exchange))
 			return 0;
 
@@ -1510,18 +1511,19 @@ tlsext_keyshare_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 			continue;
 
 		/* Decode and store the selected key share. */
-		if ((S3I(s)->hs.key_share = tls_key_share_new(group)) == NULL)
-			goto err;
+		if ((S3I(s)->hs.key_share = tls_key_share_new(group)) == NULL) {
+			*alert = SSL_AD_INTERNAL_ERROR;
+			return 0;
+		}
 		if (!tls_key_share_peer_public(S3I(s)->hs.key_share,
-		    &key_exchange, NULL))
-			goto err;
+		    &key_exchange, &decode_error, NULL)) {
+			if (!decode_error)
+				*alert = SSL_AD_INTERNAL_ERROR;
+			return 0;
+		}
 	}
 
 	return 1;
-
- err:
-	*alert = SSL_AD_DECODE_ERROR;
-	return 0;
 }
 
 int
@@ -1563,6 +1565,7 @@ int
 tlsext_keyshare_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 {
 	CBS key_exchange;
+	int decode_error;
 	uint16_t group;
 
 	/* Unpack server share. */
@@ -1581,13 +1584,20 @@ tlsext_keyshare_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	if (!CBS_get_u16_length_prefixed(cbs, &key_exchange))
 		return 0;
 
-	if (S3I(s)->hs.key_share == NULL)
+	if (S3I(s)->hs.key_share == NULL) {
+		*alert = SSL_AD_INTERNAL_ERROR;
 		return 0;
-	if (tls_key_share_group(S3I(s)->hs.key_share) != group)
+	}
+	if (tls_key_share_group(S3I(s)->hs.key_share) != group) {
+		*alert = SSL_AD_INTERNAL_ERROR;
 		return 0;
+	}
 	if (!tls_key_share_peer_public(S3I(s)->hs.key_share,
-	    &key_exchange, NULL))
+	    &key_exchange, &decode_error, NULL)) {
+		if (!decode_error)
+			*alert = SSL_AD_INTERNAL_ERROR;
 		return 0;
+	}
 
 	return 1;
 }

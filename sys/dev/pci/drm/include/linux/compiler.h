@@ -20,7 +20,7 @@
 #define __deprecated
 #define __always_unused	__attribute__((__unused__))
 #define __maybe_unused	__attribute__((__unused__))
-#define __always_inline	__attribute__((__always_inline__))
+#define __always_inline	inline __attribute__((__always_inline__))
 #define noinline	__attribute__((__noinline__))
 #define fallthrough	do {} while (0)
 
@@ -35,10 +35,9 @@
 /* The Linux code doesn't meet our usual standards! */
 #ifdef __clang__
 #pragma clang diagnostic ignored "-Winitializer-overrides"
-#pragma clang diagnostic ignored "-Wtautological-compare"
-#pragma clang diagnostic ignored "-Wunneeded-internal-declaration"
 #pragma clang diagnostic ignored "-Wunused-function"
 #pragma clang diagnostic ignored "-Wunused-variable"
+#pragma clang diagnostic ignored "-Wgnu-variable-sized-type-not-at-end"
 #else
 #pragma GCC diagnostic ignored "-Wformat-zero-length"
 #endif

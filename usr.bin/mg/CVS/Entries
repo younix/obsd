@@ -35,7 +35,6 @@
 /fileio.c/1.108/Wed Sep  1 16:07:40 2021//
 /funmap.c/1.63/Wed Sep  1 16:07:40 2021//
 /grep.c/1.49/Wed Sep  1 16:07:40 2021//
-/interpreter.c/1.32/Wed Sep  1 16:07:40 2021//
 /kbd.c/1.35/Wed Sep  1 16:07:40 2021//
 /keymap.c/1.59/Wed Sep  1 16:07:40 2021//
 /line.c/1.63/Wed Sep  1 16:07:40 2021//
@@ -51,4 +50,5 @@
 /ttykbd.c/1.20/Wed Sep  1 16:07:40 2021//
 /util.c/1.43/Wed Sep  1 16:07:40 2021//
 /yank.c/1.15/Wed Sep  1 16:07:40 2021//
+/interpreter.c/1.33/Mon Jan 24 14:23:44 2022//
 D

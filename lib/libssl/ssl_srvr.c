@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.137 2022/01/09 15:40:13 jsing Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.140 2022/01/11 19:03:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -453,7 +453,7 @@ ssl3_accept(SSL *s)
 			 *   s3_clnt.c accepts this for SSL 3).
 			 */
 			if (!(s->verify_mode & SSL_VERIFY_PEER) ||
-			    ((s->session->peer != NULL) &&
+			    ((s->session->peer_cert != NULL) &&
 			     (s->verify_mode & SSL_VERIFY_CLIENT_ONCE)) ||
 			    ((S3I(s)->hs.cipher->algorithm_auth &
 			     SSL_aNULL) && !(s->verify_mode &
@@ -550,7 +550,7 @@ ssl3_accept(SSL *s)
 			} else if (SSL_USE_SIGALGS(s) || (alg_k & SSL_kGOST)) {
 				S3I(s)->hs.state = SSL3_ST_SR_CERT_VRFY_A;
 				s->internal->init_num = 0;
-				if (!s->session->peer)
+				if (!s->session->peer_cert)
 					break;
 				/*
 				 * Freeze the transcript for use during client
@@ -1701,21 +1701,26 @@ ssl3_get_client_kex_dhe(SSL *s, CBS *cbs)
 {
 	uint8_t *key = NULL;
 	size_t key_len = 0;
-	int invalid_key;
+	int decode_error, invalid_key;
 	int ret = 0;
 
 	if (S3I(s)->hs.key_share == NULL) {
-		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
 		SSLerror(s, SSL_R_MISSING_TMP_DH_KEY);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
 		goto err;
 	}
 
 	if (!tls_key_share_peer_public(S3I(s)->hs.key_share, cbs,
-	    &invalid_key))
+	    &decode_error, &invalid_key)) {
+		if (decode_error) {
+			SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
+			ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
+		}
 		goto err;
+	}
 	if (invalid_key) {
-		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
 		SSLerror(s, SSL_R_BAD_DH_PUB_KEY_LENGTH);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
 		goto err;
 	}
 
@@ -1738,6 +1743,7 @@ ssl3_get_client_kex_ecdhe(SSL *s, CBS *cbs)
 {
 	uint8_t *key = NULL;
 	size_t key_len = 0;
+	int decode_error;
 	CBS public;
 	int ret = 0;
 
@@ -1747,10 +1753,19 @@ ssl3_get_client_kex_ecdhe(SSL *s, CBS *cbs)
 		goto err;
 	}
 
-	if (!CBS_get_u8_length_prefixed(cbs, &public))
+	if (!CBS_get_u8_length_prefixed(cbs, &public)) {
+		SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
 		goto err;
-	if (!tls_key_share_peer_public(S3I(s)->hs.key_share, &public, NULL))
+	}
+	if (!tls_key_share_peer_public(S3I(s)->hs.key_share, &public,
+	    &decode_error, NULL)) {
+		if (decode_error) {
+			SSLerror(s, SSL_R_BAD_PACKET_LENGTH);
+			ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
+		}
 		goto err;
+	}
 
 	if (!tls_key_share_derive(S3I(s)->hs.key_share, &key, &key_len))
 		goto err;
@@ -1792,7 +1807,7 @@ ssl3_get_client_kex_gost(SSL *s, CBS *cbs)
 	 * it is completely valid to use a client certificate for
 	 * authorization only.
 	 */
-	if ((client_pubkey = X509_get0_pubkey(s->session->peer)) != NULL) {
+	if ((client_pubkey = X509_get0_pubkey(s->session->peer_cert)) != NULL) {
 		if (EVP_PKEY_derive_set_peer(pkey_ctx, client_pubkey) <= 0)
 			ERR_clear_error();
 	}
@@ -1890,8 +1905,8 @@ ssl3_get_cert_verify(SSL *s)
 	CBS cbs, signature;
 	const struct ssl_sigalg *sigalg = NULL;
 	uint16_t sigalg_value = SIGALG_NONE;
-	EVP_PKEY *pkey = NULL;
-	X509 *peer = NULL;
+	EVP_PKEY *pkey;
+	X509 *peer_cert = NULL;
 	EVP_MD_CTX *mctx = NULL;
 	int al, verify;
 	const unsigned char *hdata;
@@ -1913,15 +1928,13 @@ ssl3_get_cert_verify(SSL *s)
 
 	CBS_init(&cbs, s->internal->init_msg, s->internal->init_num);
 
-	if (s->session->peer != NULL) {
-		peer = s->session->peer;
-		pkey = X509_get_pubkey(peer);
-		type = X509_certificate_type(peer, pkey);
-	}
+	peer_cert = s->session->peer_cert;
+	pkey = X509_get0_pubkey(peer_cert);
+	type = X509_certificate_type(peer_cert, pkey);
 
 	if (S3I(s)->hs.tls12.message_type != SSL3_MT_CERTIFICATE_VERIFY) {
 		S3I(s)->hs.tls12.reuse_message = 1;
-		if (peer != NULL) {
+		if (peer_cert != NULL) {
 			al = SSL_AD_UNEXPECTED_MESSAGE;
 			SSLerror(s, SSL_R_MISSING_VERIFY_MESSAGE);
 			goto fatal_err;
@@ -1930,7 +1943,7 @@ ssl3_get_cert_verify(SSL *s)
 		goto end;
 	}
 
-	if (peer == NULL) {
+	if (peer_cert == NULL) {
 		SSLerror(s, SSL_R_NO_CLIENT_CERT_RECEIVED);
 		al = SSL_AD_UNEXPECTED_MESSAGE;
 		goto fatal_err;
@@ -2116,7 +2129,7 @@ ssl3_get_cert_verify(SSL *s)
 	tls1_transcript_free(s);
  err:
 	EVP_MD_CTX_free(mctx);
-	EVP_PKEY_free(pkey);
+
 	return (ret);
 }
 
@@ -2225,8 +2238,8 @@ ssl3_get_client_certificate(SSL *s)
 		}
 	}
 
-	X509_free(s->session->peer);
-	s->session->peer = sk_X509_shift(sk);
+	X509_free(s->session->peer_cert);
+	s->session->peer_cert = sk_X509_shift(sk);
 
 	/*
 	 * Inconsistency alert: cert_chain does *not* include the

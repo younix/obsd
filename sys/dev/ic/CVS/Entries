@@ -112,7 +112,6 @@
 /ne2000var.h/1.9/Thu Jun 26 05:42:16 2008//
 /nec765reg.h/1.4/Mon Jun  2 23:28:02 2003//
 /ns16450reg.h/1.3/Mon Jun  2 23:28:02 2003//
-/ns16550reg.h/1.5/Mon Jun  2 23:28:02 2003//
 /nvmereg.h/1.11/Tue Nov 15 12:01:11 2016//
 /oosiopreg.h/1.2/Tue Apr 20 20:21:56 2010//
 /osiopreg.h/1.5/Mon Nov 21 21:52:47 2005//
@@ -214,8 +213,6 @@
 /adwlib.h/1.17/Thu Dec 17 19:39:58 2020//
 /aic79xx_openbsd.h/1.21/Thu Dec 17 19:39:58 2020//
 /aic7xxx_openbsd.h/1.31/Thu Dec 17 19:39:58 2020//
-/comreg.h/1.20/Thu Dec 17 19:39:59 2020//
-/comvar.h/1.58/Thu Dec 17 19:39:59 2020//
 /rtsxreg.h/1.5/Thu Dec 17 19:39:59 2020//
 /adw.c/1.68/Sat May  1 08:41:51 2021//
 /aic79xx_openbsd.c/1.59/Sat May  1 08:41:51 2021//
@@ -244,7 +241,6 @@
 /athn.c/1.111/Wed Sep  1 16:07:39 2021//
 /athnvar.h/1.42/Wed Sep  1 16:07:39 2021//
 /ax88190.c/1.9/Wed Sep  1 16:07:39 2021//
-/com.c/1.174/Thu Sep  2 08:41:58 2021//
 /i82365.c/1.40/Wed Sep  1 16:07:39 2021//
 /mk48txx.c/1.8/Wed Sep  1 16:07:39 2021//
 /rtl80x9.c/1.12/Wed Sep  1 16:07:39 2021//
@@ -255,7 +251,6 @@
 /tcic2var.h/1.5/Wed Sep  1 16:07:39 2021//
 /uha.c/1.40/Wed Sep  1 16:07:39 2021//
 /ahcivar.h/1.11/Thu Sep  2 14:22:31 2021//
-/anxdp.c/1.5/Thu Sep  2 14:22:31 2021//
 /cy.c/1.41/Thu Sep  2 14:22:31 2021//
 /cyreg.h/1.8/Thu Sep  2 14:18:17 2021//
 /dwhdmi.c/1.4/Thu Sep  2 14:22:31 2021//
@@ -355,4 +350,9 @@
 /wd33c93var.h/1.4/Mon Jan 10 09:38:28 2022//
 /wdcvar.h/1.57/Mon Jan 10 09:38:28 2022//
 /xl.c/1.137/Mon Jan 10 09:38:28 2022//
+/anxdp.c/1.6/Mon Jan 24 14:23:38 2022//
+/com.c/1.175/Mon Jan 24 14:23:38 2022//
+/comreg.h/1.21/Mon Jan 24 14:23:38 2022//
+/comvar.h/1.59/Mon Jan 24 14:23:38 2022//
+/ns16550reg.h/1.6/Mon Jan 24 14:23:38 2022//
 D
