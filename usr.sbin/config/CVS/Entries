@@ -13,14 +13,14 @@
 /ukc.h/1.17/Fri Sep  6 21:30:31 2019//
 /util.c/1.18/Sun Oct 16 09:35:40 2016//
 /exec_elf.c/1.18/Mon Nov 15 19:06:15 2021//
-/config.8/1.75/Sun Nov 21 20:15:22 2021//
-/config.h/1.32/Thu Dec  2 13:56:34 2021//
-/gram.y/1.25/Thu Dec  2 13:56:34 2021//
-/hash.c/1.19/Thu Dec  2 13:56:34 2021//
-/main.c/1.63/Sun Nov 21 20:15:22 2021//
-/misc.c/1.11/Sun Nov 21 20:15:22 2021//
-/mkmakefile.c/1.48/Thu Dec  2 13:56:34 2021//
-/mkswap.c/1.19/Thu Dec  2 13:56:34 2021//
-/sem.c/1.38/Thu Dec  2 13:56:34 2021//
-/ukcutil.c/1.26/Sun Nov 21 20:15:22 2021//
+/config.8/1.75/Mon Jan 24 14:35:16 2022//
+/config.h/1.32/Mon Jan 24 14:35:16 2022//
+/gram.y/1.25/Mon Jan 24 14:35:16 2022//
+/hash.c/1.19/Mon Jan 24 14:35:16 2022//
+/main.c/1.63/Mon Jan 24 14:35:16 2022//
+/misc.c/1.11/Mon Jan 24 14:35:16 2022//
+/mkmakefile.c/1.48/Mon Jan 24 14:35:16 2022//
+/mkswap.c/1.19/Mon Jan 24 14:35:16 2022//
+/sem.c/1.38/Mon Jan 24 14:35:16 2022//
+/ukcutil.c/1.26/Mon Jan 24 14:35:16 2022//
 D

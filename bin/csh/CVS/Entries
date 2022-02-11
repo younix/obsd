@@ -16,7 +16,6 @@
 /parse.c/1.15/Wed Oct 24 06:01:03 2018//
 /pathnames.h/1.3/Mon Jun  2 23:32:07 2003//
 /sem.c/1.23/Fri Jun 28 13:34:58 2019//
-/set.c/1.23/Wed Jul  3 03:24:01 2019//
 /str.c/1.22/Tue Sep 18 17:48:22 2018//
 /time.c/1.17/Tue Sep 18 06:56:09 2018//
 D/USD.doc////
@@ -28,4 +27,5 @@ D/USD.doc////
 /file.c/1.40/Sat May  1 08:41:43 2021//
 /csh.1/1.85/Wed Sep  1 16:07:30 2021//
 /func.c/1.40/Thu Sep  2 14:22:29 2021//
-/csh.c/1.48/Mon Jan 10 09:37:26 2022//
+/csh.c/1.49/Fri Feb 11 13:32:34 2022//
+/set.c/1.24/Fri Feb 11 13:32:34 2022//

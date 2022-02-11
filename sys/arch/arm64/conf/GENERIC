@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.222 2022/01/10 09:07:28 kettenis Exp $
+# $OpenBSD: GENERIC,v 1.224 2022/02/09 23:55:33 deraadt Exp $
 #
 # GENERIC machine description file
 #

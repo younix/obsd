@@ -10,7 +10,6 @@
 /disksubr.c/1.72/Tue Feb 28 10:49:37 2017//
 /genassym.cf/1.38/Tue Jun 11 15:23:41 2019//
 /hvcall.S/1.12/Sun Oct 20 16:27:19 2019//
-/in4_cksum.c/1.7/Sun Aug 24 20:06:57 2014//
 /in_cksum.S/1.2/Sun May  1 05:42:43 2005//
 /intreg.h/1.3/Mon Jun  2 23:27:56 2003//
 /ipifuncs.c/1.19/Tue Aug  6 18:06:32 2019//
@@ -33,7 +32,8 @@
 /clock.c/1.71/Mon Nov 15 19:06:15 2021//
 /cpu.c/1.73/Mon Nov 15 19:06:15 2021//
 /conf.c/1.86/Sun Nov 21 20:15:22 2021//
-/trap.c/1.110/Sun Jan  2 13:11:06 2022//
-/locore.s/1.191/Mon Jan 10 09:38:28 2022//
-/pmap.c/1.104/Mon Jan 10 09:38:28 2022//
+/in4_cksum.c/1.8/Fri Feb 11 13:33:50 2022//
+/locore.s/1.191/Mon Jan 24 14:35:14 2022//
+/pmap.c/1.104/Mon Jan 24 14:35:14 2022//
+/trap.c/1.110/Mon Jan 24 14:35:14 2022//
 D

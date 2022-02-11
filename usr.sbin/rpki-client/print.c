@@ -1,4 +1,4 @@
-/*	$OpenBSD: print.c,v 1.3 2021/12/22 09:35:14 claudio Exp $ */
+/*	$OpenBSD: print.c,v 1.5 2022/02/10 17:33:28 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -41,6 +41,19 @@ pretty_key_id(char *hex)
 	}
 	if (i == sizeof(buf))
 		memcpy(buf + sizeof(buf) - 4, "...", 4);
+	return buf;
+}
+
+char *
+time2str(time_t t)
+{
+	static char buf[64];
+	struct tm tm;
+
+	if (gmtime_r(&t, &tm) == NULL)
+		return "could not convert time";
+
+	strftime(buf, sizeof(buf), "%h %d %T %Y %Z", &tm);
 	return buf;
 }
 
@@ -115,6 +128,46 @@ cert_print(const struct cert *p)
 }
 
 void
+crl_print(const struct crl *p)
+{
+	STACK_OF(X509_REVOKED)	*revlist;
+	X509_REVOKED *rev;
+	ASN1_INTEGER *crlnum;
+	int i;
+	char *serial;
+	time_t t;
+
+	printf("Authority key identifier: %s\n", pretty_key_id(p->aki));
+
+	crlnum = X509_CRL_get_ext_d2i(p->x509_crl, NID_crl_number, NULL, NULL);
+	serial = x509_convert_seqnum(__func__, crlnum);
+	if (serial != NULL)
+		printf("CRL Serial Number: %s\n", serial);
+	free(serial);
+	ASN1_INTEGER_free(crlnum);
+
+	printf("CRL valid since: %s\n", time2str(p->issued));
+	printf("CRL valid until: %s\n", time2str(p->expires));
+
+	revlist = X509_CRL_get_REVOKED(p->x509_crl);
+	for (i = 0; i < sk_X509_REVOKED_num(revlist); i++) {
+		if (i == 0)
+			printf("Revoked Certificates:\n");
+		rev = sk_X509_REVOKED_value(revlist, i);
+
+		serial = x509_convert_seqnum(__func__,
+		    X509_REVOKED_get0_serialNumber(rev));
+		x509_get_time(X509_REVOKED_get0_revocationDate(rev), &t);
+		if (serial != NULL)
+			printf("    Serial: %8s   Revocation Date: %s\n",
+			    serial, time2str(t));
+		free(serial);
+	}
+	if (i == 0)
+		printf("No Revoked Certificates\n");
+}
+
+void
 mft_print(const struct mft *p)
 {
 	size_t i;
@@ -139,14 +192,12 @@ roa_print(const struct roa *p)
 {
 	char	 buf[128];
 	size_t	 i;
-	char	 tbuf[21];
 
 	printf("Subject key identifier: %s\n", pretty_key_id(p->ski));
 	printf("Authority key identifier: %s\n", pretty_key_id(p->aki));
 	printf("Authority info access: %s\n", p->aia);
-	strftime(tbuf, sizeof(tbuf), "%FT%TZ", gmtime(&p->expires));
-	printf("ROA valid until: %s\n", tbuf);
-	
+	printf("ROA valid until: %s\n", time2str(p->expires));
+
 	printf("asID: %u\n", p->asid);
 	for (i = 0; i < p->ipsz; i++) {
 		ip_addr_print(&p->ips[i].addr,

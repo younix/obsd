@@ -15,7 +15,7 @@
 /sdmmc_io.c/1.42/Sun Aug 29 08:01:54 2021//
 /sdmmc_scsi.c/1.60/Wed Sep  1 16:07:40 2021//
 /if_bwfm_sdio.c/1.42/Sun Nov 21 20:15:22 2021//
-/sdhc.c/1.73/Mon Jan 24 14:23:42 2022//
-/sdhcvar.h/1.16/Mon Jan 24 14:23:42 2022//
-/sdmmc_mem.c/1.37/Mon Jan 24 14:23:42 2022//
+/sdhc.c/1.73/Mon Jan 24 14:35:16 2022//
+/sdhcvar.h/1.16/Mon Jan 24 14:35:16 2022//
+/sdmmc_mem.c/1.37/Mon Jan 24 14:35:16 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.32 2022/01/18 16:18:22 claudio Exp $ */
+/*	$OpenBSD: x509.c,v 1.36 2022/02/10 17:33:28 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -30,6 +30,7 @@
 
 #include "extern.h"
 
+ASN1_OBJECT	*certpol_oid;	/* id-cp-ipAddr-asNumber cert policy */
 ASN1_OBJECT	*carepo_oid;	/* 1.3.6.1.5.5.7.48.5 (caRepository) */
 ASN1_OBJECT	*manifest_oid;	/* 1.3.6.1.5.5.7.48.10 (rpkiManifest) */
 ASN1_OBJECT	*notify_oid;	/* 1.3.6.1.5.5.7.48.13 (rpkiNotify) */
@@ -42,6 +43,8 @@ void
 x509_init_oid(void)
 {
 
+	if ((certpol_oid = OBJ_txt2obj("1.3.6.1.5.5.7.14.2", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.14.2");
 	if ((carepo_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.5", 1)) == NULL)
 		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.5");
 	if ((manifest_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.10", 1)) == NULL)
@@ -326,23 +329,16 @@ int
 x509_get_expire(X509 *x, const char *fn, time_t *tt)
 {
 	const ASN1_TIME	*at;
-	struct tm	 expires_tm;
-	time_t		 expires;
 
 	at = X509_get0_notAfter(x);
 	if (at == NULL) {
 		warnx("%s: X509_get0_notafter failed", fn);
 		return 0;
 	}
-	memset(&expires_tm, 0, sizeof(expires_tm));
-	if (ASN1_time_parse(at->data, at->length, &expires_tm, 0) == -1) {
+	if (x509_get_time(at, tt) == -1) {
 		warnx("%s: ASN1_time_parse failed", fn);
 		return 0;
 	}
-	if ((expires = mktime(&expires_tm)) == -1)
-		errx(1, "%s: mktime failed", fn);
-
-	*tt = expires;
 	return 1;
 
 }
@@ -350,7 +346,7 @@ x509_get_expire(X509 *x, const char *fn, time_t *tt)
 /*
  * Parse the very specific subset of information in the CRL distribution
  * point extension.
- * See RFC 6487, sectoin 4.8.6 for details.
+ * See RFC 6487, section 4.8.6 for details.
  * Returns NULL on failure, the crl URI on success which has to be freed
  * after use.
  */
@@ -479,4 +475,62 @@ x509_crl_get_aki(X509_CRL *crl, const char *fn)
 out:
 	AUTHORITY_KEYID_free(akid);
 	return res;
+}
+
+/*
+ * Convert passed ASN1_TIME to time_t *t.
+ * Returns 1 on success and 0 on failure.
+ */
+int
+x509_get_time(const ASN1_TIME *at, time_t *t)
+{
+	struct tm	 tm;
+
+	*t = 0;
+	memset(&tm, 0, sizeof(tm));
+	if (ASN1_time_parse(at->data, at->length, &tm, 0) == -1)
+		return 0;
+	if ((*t = mktime(&tm)) == -1)
+		errx(1, "mktime failed");
+	return 1;
+}
+
+/*
+ * Convert an ASN1_INTEGER into a hexstring.
+ * Returned string needs to be freed by the caller.
+ */
+char *
+x509_convert_seqnum(const char *fn, const ASN1_INTEGER *i)
+{
+	BIGNUM	*seqnum = NULL;
+	char	*s = NULL;
+
+	if (i == NULL)
+		goto out;
+
+	seqnum = ASN1_INTEGER_to_BN(i, NULL);
+	if (seqnum == NULL) {
+		warnx("%s: ASN1_INTEGER_to_BN error", fn);
+		goto out;
+	}
+
+	if (BN_is_negative(seqnum)) {
+		warnx("%s: %s: want positive integer, have negative.",
+		    __func__, fn);
+		goto out;
+	}
+
+	if (BN_num_bytes(seqnum) > 20) {
+		warnx("%s: %s: want 20 octets or fewer, have more.",
+		    __func__, fn);
+		goto out;
+	}
+
+	s = BN_bn2hex(seqnum);
+	if (s == NULL)
+		warnx("%s: BN_bn2hex error", fn);
+
+ out:
+	BN_free(seqnum);
+	return s;
 }

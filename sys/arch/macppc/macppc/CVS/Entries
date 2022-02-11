@@ -15,6 +15,6 @@
 /ofw_machdep.c/1.64/Wed Sep  1 16:07:38 2021//
 /cpu.c/1.84/Thu Sep  2 14:22:31 2021//
 /conf.c/1.74/Sun Nov 21 20:15:22 2021//
-/machdep.c/1.195/Sun Jan  2 13:11:04 2022//
-/ofwreal.S/1.8/Mon Jan 10 09:38:26 2022//
+/machdep.c/1.195/Mon Jan 24 14:35:14 2022//
+/ofwreal.S/1.8/Mon Jan 24 14:35:14 2022//
 D

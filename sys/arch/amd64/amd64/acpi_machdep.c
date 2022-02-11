@@ -1,4 +1,4 @@
-/*	$OpenBSD: acpi_machdep.c,v 1.94 2021/03/15 22:44:57 patrick Exp $	*/
+/*	$OpenBSD: acpi_machdep.c,v 1.98 2022/02/11 01:55:12 deraadt Exp $	*/
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  *
@@ -39,7 +39,10 @@
 #include <dev/isa/isareg.h>
 #include <dev/pci/pcivar.h>
 
+#include <machine/apmvar.h>
+
 #include "isa.h"
+#include "wsdisplay.h"
 #include "ioapic.h"
 #include "lapic.h"
 
@@ -52,6 +55,8 @@
 #if NLAPIC > 0
 #include <machine/i82489var.h>
 #endif
+
+#include <dev/wscons/wsdisplayvar.h>
 
 extern u_char acpi_real_mode_resume[], acpi_resume_end[];
 extern u_char acpi_tramp_data_start[], acpi_tramp_data_end[];
@@ -370,17 +375,6 @@ acpi_attach_machdep(struct acpi_softc *sc)
 }
 
 #ifndef SMALL_KERNEL
-
-void
-acpi_sleep_clocks(struct acpi_softc *sc, int state)
-{
-	rtcstop();
-
-#if NLAPIC > 0
-	lapic_disable();
-#endif
-}
-
 /*
  * This function may not have local variables due to a bug between
  * acpi_savecpu() and the resume path.
@@ -388,6 +382,11 @@ acpi_sleep_clocks(struct acpi_softc *sc, int state)
 int
 acpi_sleep_cpu(struct acpi_softc *sc, int state)
 {
+	rtcstop();
+#if NLAPIC > 0
+	lapic_disable();
+#endif
+
 	/*
 	 * ACPI defines two wakeup vectors. One is used for ACPI 1.0
 	 * implementations - it's in the FACS table as wakeup_vector and
@@ -424,17 +423,17 @@ acpi_sleep_cpu(struct acpi_softc *sc, int state)
 				    DEVNAME(sc));
 				return (ECANCELED);
 			}
+
+			/*
+			 * XXX
+			 * Flag to disk drivers that they should "power down" the disk
+			 * when we get to DVACT_POWERDOWN.
+			 */
+			boothowto |= RB_POWERDOWN;
+			config_suspend_all(DVACT_POWERDOWN);
+			boothowto &= ~RB_POWERDOWN;
 		}
 #endif
-
-		/*
-		 * XXX
-		 * Flag to disk drivers that they should "power down" the disk
-		 * when we get to DVACT_POWERDOWN.
-		 */
-		boothowto |= RB_POWERDOWN;
-		config_suspend_all(DVACT_POWERDOWN);
-		boothowto &= ~RB_POWERDOWN;
 
 		acpi_sleep_pm(sc, state);
 		printf("%s: acpi_sleep_pm failed", DEVNAME(sc));
@@ -499,7 +498,7 @@ acpi_resume_cpu(struct acpi_softc *sc, int state)
 
 #ifdef MULTIPROCESSOR
 void
-acpi_sleep_mp(void)
+sleep_mp(void)
 {
 	int i;
 
@@ -522,7 +521,7 @@ acpi_sleep_mp(void)
 }
 
 void
-acpi_resume_mp(void)
+resume_mp(void)
 {
 	void	cpu_start_secondary(struct cpu_info *ci);
 	struct cpu_info *ci;

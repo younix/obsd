@@ -1,16 +1,12 @@
 /bootstrap.c/1.13/Fri Jun 28 13:32:48 2019//
 /sparc64_installboot.h/1.1/Sun Jan 19 02:58:50 2014//
-/util.c/1.14/Wed Jul  3 03:24:03 2019//
 /softraid.c/1.5/Fri Dec 11 17:58:24 2020//
 /sparc64_softraid.c/1.5/Fri Dec 11 17:58:24 2020//
-/Makefile/1.23/Thu Sep  2 14:22:33 2021//
-/armv7_installboot.c/1.11/Thu Sep  2 14:22:33 2021//
 /hppa_installboot.c/1.4/Thu Sep  2 14:22:33 2021//
 /i386_installboot.c/1.40/Thu Sep  2 14:22:33 2021//
 /i386_installboot.h/1.7/Thu Sep  2 14:22:33 2021//
 /installboot.8/1.5/Thu Sep  2 14:22:33 2021//
 /installboot.c/1.14/Thu Sep  2 14:22:33 2021//
-/installboot.h/1.13/Thu Sep  2 14:22:33 2021//
 /landisk_installboot.c/1.10/Thu Sep  2 14:22:33 2021//
 /loongson_installboot.c/1.4/Thu Sep  2 14:22:33 2021//
 /macppc_installboot.c/1.4/Thu Sep  2 14:22:33 2021//
@@ -20,4 +16,8 @@
 /stubs.c/1.5/Thu Sep  2 14:22:33 2021//
 /i386_nlist.c/1.8/Mon Nov 15 19:06:15 2021//
 /i386_softraid.c/1.18/Mon Nov 15 19:06:15 2021//
+/Makefile/1.24/Fri Feb 11 13:34:01 2022//
+/efi_installboot.c/1.2/Thu Feb  3 10:25:14 2022//
+/installboot.h/1.14/Fri Feb 11 13:34:01 2022//
+/util.c/1.16/Fri Feb 11 13:34:01 2022//
 D

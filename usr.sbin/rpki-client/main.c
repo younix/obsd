@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.184 2022/01/23 18:40:55 jmc Exp $ */
+/*	$OpenBSD: main.c,v 1.189 2022/02/10 18:58:46 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -120,6 +120,7 @@ void
 entity_read_req(struct ibuf *b, struct entity *ent)
 {
 	io_read_buf(b, &ent->type, sizeof(ent->type));
+	io_read_buf(b, &ent->location, sizeof(ent->location));
 	io_read_buf(b, &ent->repoid, sizeof(ent->repoid));
 	io_read_buf(b, &ent->talid, sizeof(ent->talid));
 	io_read_str(b, &ent->path);
@@ -138,6 +139,7 @@ entity_write_req(const struct entity *ent)
 
 	b = io_new_buffer();
 	io_simple_buffer(b, &ent->type, sizeof(ent->type));
+	io_simple_buffer(b, &ent->location, sizeof(ent->location));
 	io_simple_buffer(b, &ent->repoid, sizeof(ent->repoid));
 	io_simple_buffer(b, &ent->talid, sizeof(ent->talid));
 	io_str_buffer(b, ent->path);
@@ -151,6 +153,7 @@ entity_write_repo(struct repo *rp)
 {
 	struct ibuf *b;
 	enum rtype type = RTYPE_REPO;
+	enum location loc = DIR_UNKNOWN;
 	unsigned int repoid;
 	char *path, *altpath;
 	int talid = 0;
@@ -160,6 +163,7 @@ entity_write_repo(struct repo *rp)
 	altpath = repo_basedir(rp, 1);
 	b = io_new_buffer();
 	io_simple_buffer(b, &type, sizeof(type));
+	io_simple_buffer(b, &loc, sizeof(loc));
 	io_simple_buffer(b, &repoid, sizeof(repoid));
 	io_simple_buffer(b, &talid, sizeof(talid));
 	io_str_buffer(b, path);
@@ -192,8 +196,8 @@ entityq_flush(struct entityq *q, struct repo *rp)
  * Add the heap-allocated file to the queue for processing.
  */
 static void
-entityq_add(char *path, char *file, enum rtype type, struct repo *rp,
-    unsigned char *data, size_t datasz, int talid)
+entityq_add(char *path, char *file, enum rtype type, enum location loc,
+    struct repo *rp, unsigned char *data, size_t datasz, int talid)
 {
 	struct entity	*p;
 
@@ -201,6 +205,7 @@ entityq_add(char *path, char *file, enum rtype type, struct repo *rp,
 		err(1, NULL);
 
 	p->type = type;
+	p->location = loc;
 	p->talid = talid;
 	p->path = path;
 	if (rp != NULL)
@@ -341,7 +346,7 @@ queue_add_from_mft(const char *path, const struct mftfile *file,
 	if ((nfile = strdup(file->file)) == NULL)
 		err(1, NULL);
 
-	entityq_add(npath, nfile, file->type, rp, NULL, 0, -1);
+	entityq_add(npath, nfile, file->type, file->location, rp, NULL, 0, -1);
 }
 
 /*
@@ -376,7 +381,7 @@ queue_add_from_mft_set(const struct mft *mft, const char *name, struct repo *rp)
 		case RTYPE_CRL:
 			continue;
 		default:
-			logx("%s: unsupported file type: %s", name, f->file);
+			warnx("%s: unsupported file: %s", name, f->file);
 		}
 	}
 }
@@ -387,18 +392,20 @@ queue_add_from_mft_set(const struct mft *mft, const char *name, struct repo *rp)
 static void
 queue_add_file(const char *file, enum rtype type, int talid)
 {
-	unsigned char	*buf;
+	unsigned char	*buf = NULL;
 	char		*nfile;
-	size_t		 len;
+	size_t		 len = 0;
 
-	buf = load_file(file, &len);
-	if (buf == NULL)
-		err(1, "%s", file);
+	if (!filemode || strncmp(file, "rsync://", strlen("rsync://")) != 0) {
+		buf = load_file(file, &len);
+		if (buf == NULL)
+			err(1, "%s", file);
+	}
 
 	if ((nfile = strdup(file)) == NULL)
 		err(1, NULL);
 	/* Not in a repository, so directly add to queue. */
-	entityq_add(NULL, nfile, type, NULL, buf, len, talid);
+	entityq_add(NULL, nfile, type, DIR_UNKNOWN, NULL, buf, len, talid);
 }
 
 /*
@@ -432,7 +439,8 @@ queue_add_from_tal(struct tal *tal)
 	/* steal the pkey from the tal structure */
 	data = tal->pkey;
 	tal->pkey = NULL;
-	entityq_add(NULL, nfile, RTYPE_CER, repo, data, tal->pkeysz, tal->id);
+	entityq_add(NULL, nfile, RTYPE_CER, DIR_VALID, repo, data,
+	    tal->pkeysz, tal->id);
 }
 
 /*
@@ -475,7 +483,7 @@ queue_add_from_cert(const struct cert *cert)
 			err(1, NULL);
 	}
 
-	entityq_add(npath, nfile, RTYPE_MFT, repo, NULL, 0, -1);
+	entityq_add(npath, nfile, RTYPE_MFT, DIR_UNKNOWN, repo, NULL, 0, -1);
 }
 
 /*
@@ -687,7 +695,8 @@ check_fs_size(int fd, const char *cachedir)
 	if (fstatvfs(fd, &fs) == -1)
 		err(1, "statfs %s", cachedir);
 
-	if (fs.f_bavail < minsize / fs.f_frsize || fs.f_favail < minnode) {
+	if (fs.f_bavail < minsize / fs.f_frsize ||
+	    (fs.f_ffree > 0 && fs.f_favail < minnode)) {
 		fprintf(stderr, "WARNING: rpki-client may need more than "
 		    "the available disk space\n"
 		    "on the file-system holding %s.\n", cachedir);

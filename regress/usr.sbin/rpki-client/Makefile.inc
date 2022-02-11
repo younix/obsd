@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile.inc,v 1.16 2021/12/01 09:03:19 claudio Exp $
+# $OpenBSD: Makefile.inc,v 1.19 2022/02/10 19:16:44 tb Exp $
 
 .PATH:		${.CURDIR}/../../../../usr.sbin/rpki-client
 
@@ -18,7 +18,7 @@ CFLAGS+=	-I${.CURDIR}/.. -I${.CURDIR}/../../../../usr.sbin/rpki-client
 LDADD+=		-lcrypto -lutil
 DPADD+=		${LIBCRYPTO} ${LIBUTIL}
 
-SRCS_test-ip=	test-ip.c ip.c io.c encoding.c print.c
+SRCS_test-ip +=		test-ip.c ip.c io.c encoding.c print.c x509.c
 run-regress-test-ip: test-ip
 	./test-ip
 
@@ -48,7 +48,7 @@ run-regress-test-gbr: test-gbr
 	./test-gbr -v ${.CURDIR}/../gbr/*.gbr
 
 SRCS_test-tal+=	test-tal.c tal.c ip.c io.c log.c validate.c \
-		encoding.c print.c dummy.c
+		encoding.c print.c dummy.c x509.c
 run-regress-test-tal: test-tal
 	./test-tal -v ${.CURDIR}/../tal/*.tal
 
@@ -67,7 +67,7 @@ run-regress-test-rrdp: test-rrdp
 	cmp ${.CURDIR}/../rrdp/rrdp-r2.out rrdp-r2.out
 	
 	./test-rrdp -S 9b3f7e31-4979-ef8c-d818-73e4dadc3e6b -N 13755 \
-	-H 27571e365a4c87b51a03731415ce2118cc268d686db3209ae752f01ba2d74bc5 \
+	-H 7bbab52b9ea9caab08da761d20f74711e139a334777fa4141f0503885d6592d5 \
 	-d < ${.CURDIR}/../rrdp/delta.xml 2>&1 | tee rrdp-r3.out
 	cmp ${.CURDIR}/../rrdp/rrdp-r3.out rrdp-r3.out
 
@@ -83,3 +83,7 @@ run-regress-test-rrdp: test-rrdp
 	./test-rrdp \
 	-n < ${.CURDIR}/../rrdp/billion_lol.xml 2>&1 | tee rrdp-r6.out
 	cmp ${.CURDIR}/../rrdp/rrdp-r6.out rrdp-r6.out
+
+	./test-rrdp \
+	-n < ${.CURDIR}/../rrdp/notification_xmlns.xml 2>&1 | tee rrdp-r7.out
+	cmp ${.CURDIR}/../rrdp/rrdp-r7.out rrdp-r7.out

@@ -3,7 +3,6 @@
 /client.c/1.37/Fri Jun 28 13:35:03 2019//
 /common.c/1.40/Fri Jun 28 13:35:03 2019//
 /config.h/1.13/Wed Jan 21 04:08:37 2015//
-/docmd.c/1.34/Fri Jun 28 13:35:03 2019//
 /expand.c/1.18/Fri Jun 28 13:35:03 2019//
 /gram.y/1.12/Tue Jan 20 09:00:16 2015//
 /lookup.c/1.15/Tue Jan 20 09:00:16 2015//
@@ -17,4 +16,5 @@
 /message.c/1.30/Thu Sep  2 14:22:33 2021//
 /rdist.c/1.32/Thu Sep  2 14:22:33 2021//
 /isexec.c/1.13/Mon Nov 15 19:06:15 2021//
+/docmd.c/1.35/Fri Feb 11 13:33:58 2022//
 D

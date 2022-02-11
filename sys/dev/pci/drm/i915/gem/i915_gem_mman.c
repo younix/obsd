@@ -563,6 +563,9 @@ vm_fault_cpu(struct i915_mmap_offset *mmo, struct uvm_faultinfo *ufi,
 		return VM_PAGER_BAD;
 	}
 
+	if (i915_gem_object_lock_interruptible(obj, NULL))
+		return VM_PAGER_ERROR;
+
 	err = i915_gem_object_pin_pages(obj);
 	if (err)
 		goto out;
@@ -602,6 +605,7 @@ vm_fault_cpu(struct i915_mmap_offset *mmo, struct uvm_faultinfo *ufi,
 	i915_gem_object_unpin_pages(obj);
 
 out:
+	i915_gem_object_unlock(obj);
 	uvmfault_unlockall(ufi, NULL, &obj->base.uobj);
 	return i915_error_to_vmf_fault(err);
 }
@@ -733,11 +737,9 @@ retry:
 	/* Track the mmo associated with the fenced vma */
 	vma->mmo = mmo;
 
-#ifdef notyet
 	if (IS_ACTIVE(CONFIG_DRM_I915_USERFAULT_AUTOSUSPEND))
 		intel_wakeref_auto(&i915->ggtt.userfault_wakeref,
 				   msecs_to_jiffies_timeout(CONFIG_DRM_I915_USERFAULT_AUTOSUSPEND));
-#endif
 
 	if (write) {
 		GEM_BUG_ON(!i915_gem_object_has_pinned_pages(obj));

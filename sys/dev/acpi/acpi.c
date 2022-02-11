@@ -1,4 +1,4 @@
-/* $OpenBSD: acpi.c,v 1.405 2022/01/12 11:18:30 patrick Exp $ */
+/* $OpenBSD: acpi.c,v 1.412 2022/02/10 07:39:20 visa Exp $ */
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  * Copyright (c) 2005 Jordan Hargrave <jordan@openbsd.org>
@@ -21,6 +21,7 @@
 #include <sys/buf.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
+#include <sys/pool.h>
 #include <sys/fcntl.h>
 #include <sys/ioccom.h>
 #include <sys/event.h>
@@ -74,6 +75,8 @@ int	acpi_poll_enabled;
 int	acpi_hasprocfvs;
 int	acpi_haspci;
 
+struct pool acpiwqpool;
+
 #define ACPIEN_RETRIES 15
 
 struct aml_node *acpi_pci_match(struct device *, struct pci_attach_args *);
@@ -110,8 +113,6 @@ void	acpi_enable_onegpe(struct acpi_softc *, int);
 int	acpi_gpe(struct acpi_softc *, int, void *);
 
 void	acpi_enable_rungpes(struct acpi_softc *);
-void	acpi_enable_wakegpes(struct acpi_softc *, int);
-
 
 int	acpi_foundec(struct aml_node *, void *);
 int	acpi_foundsony(struct aml_node *node, void *arg);
@@ -122,8 +123,6 @@ void	acpi_thread(void *);
 void	acpi_create_thread(void *);
 
 #ifndef SMALL_KERNEL
-
-void	acpi_indicator(struct acpi_softc *, int);
 
 void	acpi_init_pm(struct acpi_softc *);
 
@@ -1007,21 +1006,15 @@ acpi_attach_common(struct acpi_softc *sc, paddr_t base)
 	}
 	rsdp = (struct acpi_rsdp *)handle.va;
 
+	pool_init(&acpiwqpool, sizeof(struct acpi_taskq), 0, IPL_BIO, 0,
+	    "acpiwqpl", NULL);
+	pool_setlowat(&acpiwqpool, 16);
+
 	SIMPLEQ_INIT(&sc->sc_tables);
 	SIMPLEQ_INIT(&sc->sc_wakedevs);
 #if NACPIPWRRES > 0
 	SIMPLEQ_INIT(&sc->sc_pwrresdevs);
 #endif /* NACPIPWRRES > 0 */
-
-
-#ifndef SMALL_KERNEL
-	sc->sc_note = malloc(sizeof(struct klist), M_DEVBUF, M_NOWAIT | M_ZERO);
-	if (sc->sc_note == NULL) {
-		printf(": can't allocate memory\n");
-		acpi_unmap(&handle);
-		return;
-	}
-#endif /* SMALL_KERNEL */
 
 	if (acpi_loadtables(sc, rsdp)) {
 		printf(": can't load tables\n");
@@ -1798,9 +1791,11 @@ acpi_addtask(struct acpi_softc *sc, void (*handler)(void *, int),
 	struct acpi_taskq *wq;
 	int s;
 
-	wq = malloc(sizeof(*wq), M_DEVBUF, M_ZERO | M_NOWAIT);
-	if (wq == NULL)
+	wq = pool_get(&acpiwqpool, PR_ZERO | PR_NOWAIT);
+	if (wq == NULL) {
+		printf("unable to create task");
 		return;
+	}
 	wq->handler = handler;
 	wq->arg0 = arg0;
 	wq->arg1 = arg1;
@@ -1829,7 +1824,7 @@ acpi_dotask(struct acpi_softc *sc)
 
 	wq->handler(wq->arg0, wq->arg1);
 
-	free(wq, M_DEVBUF, sizeof(*wq));
+	pool_put(&acpiwqpool, wq);
 
 	/* We did something */
 	return (1);
@@ -1952,8 +1947,9 @@ acpi_sleep_task(void *arg0, int sleepmode)
 {
 	struct acpi_softc *sc = arg0;
 
-	/* System goes to sleep here.. */
-	acpi_sleep_state(sc, sleepmode);
+#ifdef SUSPEND
+	sleep_state(sc, sleepmode);
+#endif
 	/* Tell userland to recheck A/C and battery status */
 	acpi_record_event(sc, APM_POWER_CHANGE);
 }
@@ -2034,7 +2030,7 @@ acpi_pbtn_task(void *arg0, int dummy)
 		break;
 #ifndef SMALL_KERNEL
 	case 2:
-		acpi_addtask(sc, acpi_sleep_task, sc, ACPI_SLEEP_SUSPEND);
+		acpi_addtask(sc, acpi_sleep_task, sc, SLEEP_SUSPEND);
 		break;
 #endif
 	}
@@ -2092,21 +2088,9 @@ acpi_interrupt(void *arg)
 
 				/* Signal this GPE */
 				gpe = idx + jdx;
-				if (sc->gpe_table[gpe].flags & GPE_DIRECT) {
-					dnprintf(10, "directly handle gpe: %x\n",
-					    gpe);
-					sc->gpe_table[gpe].handler(sc, gpe,
-					    sc->gpe_table[gpe].arg);
-					if (sc->gpe_table[gpe].flags &
-					    GPE_LEVEL)
-						acpi_gpe(sc, gpe,
-						    sc->gpe_table[gpe].arg);
-				} else {
-					sc->gpe_table[gpe].active = 1;
-					dnprintf(10, "queue gpe: %x\n", gpe);
-					acpi_addtask(sc, acpi_gpe_task, NULL,
-					    gpe);
-				}
+				sc->gpe_table[gpe].active = 1;
+				dnprintf(10, "queue gpe: %x\n", gpe);
+				acpi_addtask(sc, acpi_gpe_task, NULL, gpe);
 
 				/*
 				 * Edge interrupts need their STS bits cleared
@@ -2281,7 +2265,7 @@ acpi_set_gpehandler(struct acpi_softc *sc, int gpe, int (*handler)
 		return -EINVAL;
 	if (!(flags & (GPE_LEVEL | GPE_EDGE)))
 		return -EINVAL;
-	if (ptbl->handler != NULL && !(flags & GPE_DIRECT))
+	if (ptbl->handler != NULL)
 		printf("%s: GPE 0x%.2x already enabled\n", DEVNAME(sc), gpe);
 
 	dnprintf(50, "Adding GPE handler 0x%.2x (%s)\n", gpe,
@@ -2550,203 +2534,6 @@ acpi_indicator(struct acpi_softc *sc, int led_state)
 		aml_node_setval(sc, sc->sc_sst, led_state);
 		save_led_state = led_state;
 	}
-}
-
-
-int
-acpi_sleep_state(struct acpi_softc *sc, int sleepmode)
-{
-	extern int perflevel;
-	extern int lid_action;
-	int error = ENXIO;
-	size_t rndbuflen = 0;
-	char *rndbuf = NULL;
-	int state, s;
-#if NSOFTRAID > 0
-	extern void sr_quiesce(void);
-#endif
-
-	switch (sleepmode) {
-	case ACPI_SLEEP_SUSPEND:
-		state = ACPI_STATE_S3;
-		break;
-	case ACPI_SLEEP_HIBERNATE:
-		state = ACPI_STATE_S4;
-		break;
-	default:
-		return (EOPNOTSUPP);
-	}
-
-	if (sc->sc_sleeptype[state].slp_typa == -1 ||
-	    sc->sc_sleeptype[state].slp_typb == -1) {
-		printf("%s: state S%d unavailable\n",
-		    sc->sc_dev.dv_xname, state);
-		return (EOPNOTSUPP);
-	}
-
-	/* 1st suspend AML step: _TTS(tostate) */
-	if (aml_node_setval(sc, sc->sc_tts, state) != 0)
-		goto fail_tts;
-	acpi_indicator(sc, ACPI_SST_WAKING);	/* blink */
-
-#if NWSDISPLAY > 0
-	/*
-	 * Temporarily release the lock to prevent the X server from
-	 * blocking on setting the display brightness.
-	 */
-	rw_exit_write(&sc->sc_lck);
-	wsdisplay_suspend();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
-
-	stop_periodic_resettodr();
-
-#ifdef HIBERNATE
-	if (sleepmode == ACPI_SLEEP_HIBERNATE) {
-		/*
-		 * Discard useless memory to reduce fragmentation,
-		 * and attempt to create a hibernate work area
-		 */
-		hibernate_suspend_bufcache();
-		uvmpd_hibernate();
-		if (hibernate_alloc()) {
-			printf("%s: failed to allocate hibernate memory\n",
-			    sc->sc_dev.dv_xname);
-			goto fail_alloc;
-		}
-	}
-#endif /* HIBERNATE */
-
-	sensor_quiesce();
-	if (config_suspend_all(DVACT_QUIESCE))
-		goto fail_quiesce;
-
-	vfs_stall(curproc, 1);
-#if NSOFTRAID > 0
-	sr_quiesce();
-#endif
-	bufq_quiesce();
-
-#ifdef MULTIPROCESSOR
-	acpi_sleep_mp();
-#endif
-
-#ifdef HIBERNATE
-	if (sleepmode == ACPI_SLEEP_HIBERNATE) {
-		/*
-		 * We've just done various forms of syncing to disk
-		 * churned lots of memory dirty.  We don't need to
-		 * save that dirty memory to hibernate, so release it.
-		 */
-		hibernate_suspend_bufcache();
-		uvmpd_hibernate();
-	}
-#endif /* HIBERNATE */
-
-	resettodr();
-
-	s = splhigh();
-	intr_disable();	/* PSL_I for resume; PIC/APIC broken until repair */
-	cold = 2;	/* Force other code to delay() instead of tsleep() */
-
-	if (config_suspend_all(DVACT_SUSPEND) != 0)
-		goto fail_suspend;
-	acpi_sleep_clocks(sc, state);
-
-	suspend_randomness();
-
-	/* 2nd suspend AML step: _PTS(tostate) */
-	if (aml_node_setval(sc, sc->sc_pts, state) != 0)
-		goto fail_pts;
-
-	acpibtn_enable_psw();	/* enable _LID for wakeup */
-	acpi_indicator(sc, ACPI_SST_SLEEPING);
-
-	/* 3rd suspend AML step: _GTS(tostate) */
-	aml_node_setval(sc, sc->sc_gts, state);
-
-	/* Clear fixed event status */
-	acpi_write_pmreg(sc, ACPIREG_PM1_STS, 0, ACPI_PM1_ALL_STS);
-
-	/* Enable wake GPEs */
-	acpi_disable_allgpes(sc);
-	acpi_enable_wakegpes(sc, state);
-
-	/* Sleep */
-	sc->sc_state = state;
-	error = acpi_sleep_cpu(sc, state);
-	sc->sc_state = ACPI_STATE_S0;
-	/* Resume */
-
-#ifdef HIBERNATE
-	if (sleepmode == ACPI_SLEEP_HIBERNATE) {
-		uvm_pmr_dirty_everything();
-		hib_getentropy(&rndbuf, &rndbuflen);
-	}
-#endif /* HIBERNATE */
-
-	acpi_resume_cpu(sc, state);
-
-fail_pts:
-	config_suspend_all(DVACT_RESUME);
-
-fail_suspend:
-	cold = 0;
-	intr_enable();
-	splx(s);
-
-	acpibtn_disable_psw();		/* disable _LID for wakeup */
-
-	inittodr(gettime());
-
-	/* 3rd resume AML step: _TTS(runstate) */
-	aml_node_setval(sc, sc->sc_tts, sc->sc_state);
-
-	/* force RNG upper level reseed */
-	resume_randomness(rndbuf, rndbuflen);
-
-#ifdef MULTIPROCESSOR
-	acpi_resume_mp();
-#endif
-
-	vfs_stall(curproc, 0);
-	bufq_restart();
-
-fail_quiesce:
-	config_suspend_all(DVACT_WAKEUP);
-	sensor_restart();
-
-#ifdef HIBERNATE
-	if (sleepmode == ACPI_SLEEP_HIBERNATE) {
-		hibernate_free();
-fail_alloc:
-		hibernate_resume_bufcache();
-	}
-#endif /* HIBERNATE */
-
-	start_periodic_resettodr();
-
-#if NWSDISPLAY > 0
-	rw_exit_write(&sc->sc_lck);
-	wsdisplay_resume();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
-
-	sys_sync(curproc, NULL, NULL);
-
-	/* Restore hw.setperf */
-	if (cpu_setperf != NULL)
-		cpu_setperf(perflevel);
-
-	acpi_record_event(sc, APM_NORMAL_RESUME);
-	acpi_indicator(sc, ACPI_SST_WORKING);
-
-	/* If we woke up but all the lids are closed, go back to sleep */
-	if (acpibtn_numopenlids() == 0 && lid_action != 0)
-		acpi_addtask(sc, acpi_sleep_task, sc, sleepmode);
-
-fail_tts:
-	return (error);
 }
 
 /* XXX
@@ -3321,7 +3108,7 @@ acpi_foundhid(struct aml_node *node, void *arg)
 		return (0);
 
 	sta = acpi_getsta(sc, node->parent);
-	if ((sta & STA_PRESENT) == 0)
+	if ((sta & (STA_PRESENT | STA_ENABLED)) != (STA_PRESENT | STA_ENABLED))
 		return (0);
 
 	if (aml_evalinteger(sc, node->parent, "_CCA", 0, NULL, &cca))
@@ -3531,7 +3318,7 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 			error = EBADF;
 			break;
 		}
-		acpi_addtask(sc, acpi_sleep_task, sc, ACPI_SLEEP_SUSPEND);
+		acpi_addtask(sc, acpi_sleep_task, sc, SLEEP_SUSPEND);
 		acpi_wakeup(sc);
 		break;
 #ifdef HIBERNATE
@@ -3546,7 +3333,7 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 			error = EOPNOTSUPP;
 			break;
 		}
-		acpi_addtask(sc, acpi_sleep_task, sc, ACPI_SLEEP_HIBERNATE);
+		acpi_addtask(sc, acpi_sleep_task, sc, SLEEP_HIBERNATE);
 		acpi_wakeup(sc);
 		break;
 #endif
@@ -3583,6 +3370,9 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 			remaining += min(bat->aba_softc->sc_bst.bst_capacity,
 			    bat->aba_softc->sc_bix.bix_last_capacity);
 
+			if (bat->aba_softc->sc_bst.bst_state & BST_CHARGE)
+				pi->battery_state = APM_BATT_CHARGING;
+
 			if (bat->aba_softc->sc_bst.bst_rate == BST_UNKNOWN)
 				continue;
 			else if (bat->aba_softc->sc_bst.bst_rate > 1)
@@ -3618,13 +3408,19 @@ acpiioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 			break;
 		}
 
-		if (pi->ac_state == APM_AC_ON || rate == 0)
+		if (rate == 0)
 			pi->minutes_left = (unsigned int)-1;
+		else if (pi->battery_state == APM_BATT_CHARGING)
+			pi->minutes_left = 60 * (capacity - remaining) / rate;
 		else
 			pi->minutes_left = 60 * minutes / rate;
 
-		/* running on battery */
 		pi->battery_life = remaining * 100 / capacity;
+
+		if (pi->battery_state == APM_BATT_CHARGING)
+			break;
+
+		/* running on battery */
 		if (pi->battery_life > 50)
 			pi->battery_state = APM_BATT_HIGH;
 		else if (pi->battery_life > 25)
@@ -3661,7 +3457,7 @@ acpi_record_event(struct acpi_softc *sc, u_int type)
 		return (1);
 
 	acpi_evindex++;
-	KNOTE(sc->sc_note, APM_EVENT_COMPOSE(type, acpi_evindex));
+	KNOTE(&sc->sc_note, APM_EVENT_COMPOSE(type, acpi_evindex));
 	return (0);
 }
 
@@ -3672,7 +3468,7 @@ acpi_filtdetach(struct knote *kn)
 	int s;
 
 	s = splbio();
-	klist_remove_locked(sc->sc_note, kn);
+	klist_remove_locked(&sc->sc_note, kn);
 	splx(s);
 }
 
@@ -3706,7 +3502,7 @@ acpikqfilter(dev_t dev, struct knote *kn)
 	kn->kn_hook = sc;
 
 	s = splbio();
-	klist_insert_locked(sc->sc_note, kn);
+	klist_insert_locked(&sc->sc_note, kn);
 	splx(s);
 
 	return (0);

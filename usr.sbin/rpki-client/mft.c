@@ -1,4 +1,4 @@
-/*	$OpenBSD: mft.c,v 1.50 2022/01/22 09:18:48 tb Exp $ */
+/*	$OpenBSD: mft.c,v 1.53 2022/02/10 17:33:28 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -42,23 +42,6 @@ struct	parse {
 
 extern ASN1_OBJECT    *mft_oid;
 
-static const char *
-gentime2str(const ASN1_GENERALIZEDTIME *time)
-{
-	static char	buf[64];
-	BIO		*mem;
-
-	if ((mem = BIO_new(BIO_s_mem())) == NULL)
-		cryptoerrx("BIO_new");
-	if (!ASN1_GENERALIZEDTIME_print(mem, time))
-		cryptoerrx("ASN1_GENERALIZEDTIME_print");
-	if (BIO_gets(mem, buf, sizeof(buf)) < 0)
-		cryptoerrx("BIO_gets");
-
-	BIO_free(mem);
-	return buf;
-}
-
 /*
  * Convert an ASN1_GENERALIZEDTIME to a struct tm.
  * Returns 1 on success, 0 on failure.
@@ -79,44 +62,32 @@ generalizedtime_to_tm(const ASN1_GENERALIZEDTIME *gtime, struct tm *tm)
 
 /*
  * Validate and verify the time validity of the mft.
- * Returns 1 if all is good, 0 if mft is stale, any other case -1.
+ * Returns 1 if all is good and for any other case 0.
  */
 static int
-check_validity(const ASN1_GENERALIZEDTIME *from,
-    const ASN1_GENERALIZEDTIME *until, const char *fn)
+mft_parse_time(const ASN1_GENERALIZEDTIME *from,
+    const ASN1_GENERALIZEDTIME *until, struct parse *p)
 {
-	time_t now = time(NULL);
-	struct tm tm_from, tm_until, tm_now;
-
-	if (gmtime_r(&now, &tm_now) == NULL) {
-		warnx("%s: could not get current time", fn);
-		return -1;
-	}
+	struct tm tm_from, tm_until;
 
 	if (!generalizedtime_to_tm(from, &tm_from)) {
-		warnx("%s: embedded from time format invalid", fn);
-		return -1;
+		warnx("%s: embedded from time format invalid", p->fn);
+		return 0;
 	}
 	if (!generalizedtime_to_tm(until, &tm_until)) {
-		warnx("%s: embedded until time format invalid", fn);
-		return -1;
+		warnx("%s: embedded until time format invalid", p->fn);
+		return 0;
 	}
 
 	/* check that until is not before from */
 	if (ASN1_time_tm_cmp(&tm_until, &tm_from) < 0) {
-		warnx("%s: bad update interval", fn);
-		return -1;
-	}
-	/* check that now is not before from */
-	if (ASN1_time_tm_cmp(&tm_from, &tm_now) > 0) {
-		warnx("%s: mft not yet valid %s", fn, gentime2str(from));
-		return -1;
-	}
-	/* check that now is not after until */
-	if (ASN1_time_tm_cmp(&tm_until, &tm_now) < 0) {
-		warnx("%s: mft expired on %s", fn, gentime2str(until));
+		warnx("%s: bad update interval", p->fn);
 		return 0;
 	}
+
+	if ((p->res->valid_from = mktime(&tm_from)) == -1 ||
+	    (p->res->valid_until = mktime(&tm_until)) == -1)
+		errx(1, "%s: mktime failed", p->fn);
 
 	return 1;
 }
@@ -152,22 +123,33 @@ rtype_from_file_extension(const char *fn)
 
 /*
  * Validate that a filename listed on a Manifest only contains characters
- * permitted in draft-ietf-sidrops-6486bis section 4.2.2 and check that
- * it's a CER, CRL, GBR or a ROA.
+ * permitted in draft-ietf-sidrops-6486bis section 4.2.2
+ */
+static int
+valid_filename(const char *fn, size_t len)
+{
+	const unsigned char *c;
+	size_t i;
+
+	for (c = fn, i = 0; i < len; i++, c++)
+		if (!isalnum(*c) && *c != '-' && *c != '_' && *c != '.')
+			return 0;
+
+	c = memchr(fn, '.', len);
+	if (c == NULL || c != memrchr(fn, '.', len))
+		return 0;
+
+	return 1;
+}
+
+/*
+ * Check that the file is a CER, CRL, GBR or a ROA.
  * Returns corresponding rtype or RTYPE_INVALID on error.
  */
-enum rtype
+static enum rtype
 rtype_from_mftfile(const char *fn)
 {
-	const unsigned char	*c;
 	enum rtype		 type;
-
-	for (c = fn; *c != '\0'; ++c)
-		if (!isalnum(*c) && *c != '-' && *c != '_' && *c != '.')
-			return RTYPE_INVALID;
-
-	if (strchr(fn, '.') != strrchr(fn, '.'))
-		return RTYPE_INVALID;
 
 	type = rtype_from_file_extension(fn);
 	switch (type) {
@@ -191,7 +173,6 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	ASN1_SEQUENCE_ANY	*seq;
 	const ASN1_TYPE		*file, *hash;
 	char			*fn = NULL;
-	enum rtype		 type;
 	const unsigned char	*d = os->data;
 	size_t			 dsz = os->length;
 	int			 rc = 0;
@@ -217,15 +198,15 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 		    p->fn, ASN1_tag2str(file->type), file->type);
 		goto out;
 	}
+	if (!valid_filename(file->value.ia5string->data,
+	    file->value.ia5string->length)) {
+		warnx("%s: RFC 6486 section 4.2.2: bad filename", p->fn);
+		goto out;
+	}
 	fn = strndup((const char *)file->value.ia5string->data,
 	    file->value.ia5string->length);
 	if (fn == NULL)
 		err(1, NULL);
-
-	if ((type = rtype_from_mftfile(fn)) == RTYPE_INVALID) {
-		warnx("%s: invalid filename: %s", p->fn, fn);
-		goto out;
-	}
 
 	/* Now hash value. */
 
@@ -247,8 +228,8 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	/* Insert the filename and hash value. */
 	fent = &p->res->files[p->res->filesz++];
 
+	fent->type = rtype_from_mftfile(fn);
 	fent->file = fn;
-	fent->type = type;
 	fn = NULL;
 	memcpy(fent->hash, hash->value.bit_string->data, SHA256_DIGEST_LENGTH);
 
@@ -316,7 +297,6 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 	const ASN1_TYPE		*t;
 	const ASN1_GENERALIZEDTIME *from, *until;
 	long			 mft_version;
-	BIGNUM			*mft_seqnum = NULL;
 	int			 i = 0, rc = 0;
 
 	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
@@ -364,29 +344,9 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		goto out;
 	}
 
-	mft_seqnum = ASN1_INTEGER_to_BN(t->value.integer, NULL);
-	if (mft_seqnum == NULL) {
-		warnx("%s: ASN1_INTEGER_to_BN error", p->fn);
+	p->res->seqnum = x509_convert_seqnum(p->fn, t->value.integer);
+	if (p->res->seqnum == NULL)
 		goto out;
-	}
-
-	if (BN_is_negative(mft_seqnum)) {
-		warnx("%s: RFC 6486 section 4.2.1: manifestNumber: "
-		    "want positive integer, have negative.", p->fn);
-		goto out;
-	}
-
-	if (BN_num_bytes(mft_seqnum) > 20) {
-		warnx("%s: RFC 6486 section 4.2.1: manifestNumber: "
-		    "want 20 or less than octets, have more.", p->fn);
-		goto out;
-	}
-
-	p->res->seqnum = BN_bn2hex(mft_seqnum);
-	if (p->res->seqnum == NULL) {
-		warnx("%s: BN_bn2hex error", p->fn);
-		goto out;
-	}
 
 	/*
 	 * Timestamps: this and next update time.
@@ -416,15 +376,8 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 	}
 	until = t->value.generalizedtime;
 
-	switch (check_validity(from, until, p->fn)) {
-	case 0:
-		p->res->stale = 1;
-		/* FALLTHROUGH */
-	case 1:
-		break;
-	case -1:
+	if (!mft_parse_time(from, until, p))
 		goto out;
-	}
 
 	/* File list algorithm. */
 
@@ -459,7 +412,6 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 	rc = 1;
 out:
 	sk_ASN1_TYPE_pop_free(seq, ASN1_TYPE_free);
-	BN_free(mft_seqnum);
 	return rc;
 }
 
@@ -560,6 +512,8 @@ mft_buffer(struct ibuf *b, const struct mft *p)
 		io_str_buffer(b, p->files[i].file);
 		io_simple_buffer(b, &p->files[i].type,
 		    sizeof(p->files[i].type));
+		io_simple_buffer(b, &p->files[i].location,
+		    sizeof(p->files[i].location));
 		io_simple_buffer(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
 	}
 }
@@ -593,8 +547,36 @@ mft_read(struct ibuf *b)
 	for (i = 0; i < p->filesz; i++) {
 		io_read_str(b, &p->files[i].file);
 		io_read_buf(b, &p->files[i].type, sizeof(p->files[i].type));
+		io_read_buf(b, &p->files[i].location,
+		    sizeof(p->files[i].location));
 		io_read_buf(b, p->files[i].hash, SHA256_DIGEST_LENGTH);
 	}
 
 	return p;
+}
+
+/*
+ * Compare two MFT files, returns 1 if first MFT is preferred and 0 if second
+ * MFT should be used.
+ */
+int
+mft_compare(const struct mft *a, const struct mft *b)
+{
+	int r;
+
+	if (b == NULL)
+		return 1;
+	if (a == NULL)
+		return 0;
+
+	r = strlen(a->seqnum) - strlen(b->seqnum);
+	if (r > 0)	/* seqnum in a is longer -> higher */
+		return 1;
+	if (r < 0)	/* seqnum in a is shorter -> smaller */
+		return 0;
+
+	r = strcmp(a->seqnum, b->seqnum);
+	if (r >= 0)	/* a is greater or equal, prefer a */
+		return 1;
+	return 0;
 }

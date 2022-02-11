@@ -1,4 +1,4 @@
-/*	$OpenBSD: acpivar.h,v 1.116 2022/01/12 11:18:30 patrick Exp $	*/
+/*	$OpenBSD: acpivar.h,v 1.119 2022/02/10 07:39:20 visa Exp $	*/
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  *
@@ -23,6 +23,7 @@
 
 #ifndef _ACPI_WAKECODE
 
+#include <sys/event.h>
 #include <sys/timeout.h>
 #include <sys/rwlock.h>
 
@@ -45,7 +46,6 @@ extern int acpi_debug;
 extern int acpi_hasprocfvs;
 extern int acpi_haspci;
 
-struct klist;
 struct acpiec_softc;
 struct acpipwrres_softc;
 
@@ -239,7 +239,7 @@ struct acpi_softc {
 	 */
 	struct acpi_facs	*sc_facs;	/* Shared with firmware! */
 
-	struct klist		*sc_note;
+	struct klist		sc_note;
 	struct acpi_reg_map	sc_pmregs[ACPIREG_MAXREG];
 	bus_space_handle_t	sc_ioh_pm1a_evt;
 
@@ -295,7 +295,6 @@ extern struct acpi_softc *acpi_softc;
 #define GPE_NONE	0x00
 #define GPE_LEVEL	0x01
 #define GPE_EDGE	0x02
-#define GPE_DIRECT	0x04
 
 struct acpi_table {
 	int	offset;
@@ -335,20 +334,11 @@ int	 acpi_interrupt(void *);
 void	 acpi_powerdown(void);
 void	 acpi_reset(void);
 
-
-#define ACPI_SLEEP_SUSPEND	0x01
-#define ACPI_SLEEP_HIBERNATE	0x02
-
-int	 acpi_sleep_state(struct acpi_softc *, int);
-void	 acpi_sleep_clocks(struct acpi_softc *, int);
 int	 acpi_sleep_cpu(struct acpi_softc *, int);
-void	 acpi_sleep_mp(void);
 void	 acpi_sleep_pm(struct acpi_softc *, int);
 void	 acpi_resume_pm(struct acpi_softc *, int);
 void	 acpi_resume_cpu(struct acpi_softc *, int);
-void	 acpi_resume_mp(void);
 void	 acpi_sleep_walk(struct acpi_softc *, int);
-
 
 #define ACPI_IOREAD 0
 #define ACPI_IOWRITE 1
@@ -387,6 +377,10 @@ int64_t	acpi_getsta(struct acpi_softc *sc, struct aml_node *);
 
 int	acpi_getprop(struct aml_node *, const char *, void *, int);
 uint64_t acpi_getpropint(struct aml_node *, const char *, uint64_t);
+
+void	acpi_indicator(struct acpi_softc *, int);
+void	acpi_disable_allgpes(struct acpi_softc *);
+void	acpi_enable_wakegpes(struct acpi_softc *, int);
 
 int	acpi_record_event(struct acpi_softc *, u_int);
 

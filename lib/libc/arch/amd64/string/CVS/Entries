@@ -5,8 +5,8 @@
 /strchr.S/1.9/Tue Jul  3 23:14:05 2018//
 /strcmp.S/1.8/Tue Jul  3 23:14:05 2018//
 /strrchr.S/1.9/Tue Jul  3 23:14:05 2018//
-/bcmp.S/1.8/Sun Jan  2 13:10:40 2022//
-/bzero.S/1.8/Sun Jan  2 13:10:40 2022//
-/memmove.S/1.11/Sun Jan  2 13:10:40 2022//
-/strlen.S/1.9/Mon Jan 24 14:23:14 2022//
+/bcmp.S/1.8/Mon Jan 24 14:35:13 2022//
+/bzero.S/1.8/Mon Jan 24 14:35:13 2022//
+/memmove.S/1.11/Mon Jan 24 14:35:13 2022//
+/strlen.S/1.9/Mon Jan 24 14:35:13 2022//
 D

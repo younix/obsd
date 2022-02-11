@@ -7,7 +7,6 @@
 /bn_div.c/1.25/Sun Jan 29 17:49:22 2017//
 /bn_err.c/1.14/Sun Jan 29 17:49:22 2017//
 /bn_exp.c/1.31/Tue May  2 03:59:44 2017//
-/bn_exp2.c/1.12/Sun Jan 29 17:49:22 2017//
 /bn_gf2m.c/1.23/Sun Jan 29 17:49:22 2017//
 /bn_kron.c/1.6/Mon Feb  9 15:49:22 2015//
 /bn_mod.c/1.12/Sun Jan 29 17:49:22 2017//
@@ -24,10 +23,11 @@
 D/asm////
 /bn_rand.c/1.25/Thu Sep  2 14:22:30 2021//
 /bn_nist.c/1.19/Sun Nov 21 20:15:22 2021//
-/bn_gcd.c/1.16/Sun Jan  2 13:10:41 2022//
-/bn_lib.c/1.53/Sun Jan  2 13:10:41 2022//
-/bn_mont.c/1.27/Sun Jan  2 13:10:41 2022//
-/bn.h/1.52/Mon Jan 24 14:23:15 2022//
-/bn_lcl.h/1.31/Mon Jan 24 14:23:15 2022//
-/bn_print.c/1.33/Mon Jan 24 14:23:15 2022//
-/bn_x931p.c/1.13/Mon Jan 24 14:23:15 2022//
+/bn.h/1.52/Mon Jan 24 14:35:14 2022//
+/bn_exp2.c/1.13/Fri Feb 11 13:33:29 2022//
+/bn_gcd.c/1.16/Mon Jan 24 14:35:14 2022//
+/bn_lcl.h/1.31/Mon Jan 24 14:35:14 2022//
+/bn_lib.c/1.53/Mon Jan 24 14:35:14 2022//
+/bn_mont.c/1.28/Fri Feb 11 13:33:29 2022//
+/bn_print.c/1.33/Mon Jan 24 14:35:14 2022//
+/bn_x931p.c/1.13/Mon Jan 24 14:35:14 2022//

@@ -1,9 +1,10 @@
 /buildperl.pl/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
-/devtools.pl/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
-/mkapidoc.pl/1.1.1.1/Wed Sep  1 16:07:36 2021/-ko/
-/mkppport_fnc.pl/1.1.1.1/Wed Sep  1 16:07:36 2021/-ko/
 /mktodo/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
-/mktodo.pl/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
-/regenerate/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
-/scanprov/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
+/devtools.pl/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/mkapidoc.pl/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/mkppport_fnc.pl/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/mktodo.pl/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/regenerate/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/scanprov/1.2/Fri Feb 11 13:33:21 2022/-ko/
+/update_release_date.pl/1.1/Thu Feb 10 14:37:45 2022//
 D

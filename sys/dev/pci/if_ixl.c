@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ixl.c,v 1.78 2022/01/09 05:42:54 jsg Exp $ */
+/*	$OpenBSD: if_ixl.c,v 1.82 2022/02/10 16:22:00 bluhm Exp $ */
 
 /*
  * Copyright (c) 2013-2015, Intel Corporation
@@ -82,6 +82,10 @@
 #endif
 
 #include <netinet/in.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
 #include <netinet/if_ether.h>
 
 #include <dev/pci/pcireg.h>
@@ -822,6 +826,8 @@ struct ixl_tx_desc {
 #define IXL_TX_DESC_BSIZE_MAX		0x3fffULL
 #define IXL_TX_DESC_BSIZE_MASK		\
 	(IXL_TX_DESC_BSIZE_MAX << IXL_TX_DESC_BSIZE_SHIFT)
+
+#define IXL_TX_DESC_L2TAG1_SHIFT	48
 } __packed __aligned(16);
 
 struct ixl_rx_rd_desc_16 {
@@ -837,7 +843,8 @@ struct ixl_rx_rd_desc_32 {
 } __packed __aligned(16);
 
 struct ixl_rx_wb_desc_16 {
-	uint32_t		_reserved1;
+	uint16_t		_reserved1;
+	uint16_t		l2tag1;
 	uint32_t		filter_status;
 	uint64_t		qword1;
 #define IXL_RX_DESC_DD			(1 << 0)
@@ -1057,7 +1064,11 @@ struct ixl_hmc_rxq {
 #define IXL_HMC_RXQ_DSIZE_32		1
 	uint8_t			 crcstrip;
 	uint8_t			 fc_ena;
-	uint8_t			 l2sel;
+	uint8_t			 l2tsel;
+#define IXL_HMC_RXQ_L2TSEL_2ND_TAG_TO_L2TAG1 \
+					0
+#define IXL_HMC_RXQ_L2TSEL_1ST_TAG_TO_L2TAG1 \
+					1
 	uint8_t			 hsplit_0;
 	uint8_t			 hsplit_1;
 	uint8_t			 showiv;
@@ -1081,7 +1092,7 @@ static const struct ixl_hmc_pack ixl_hmc_pack_rxq[] = {
 	{ offsetof(struct ixl_hmc_rxq, dsize),		1,	116 },
 	{ offsetof(struct ixl_hmc_rxq, crcstrip),	1,	117 },
 	{ offsetof(struct ixl_hmc_rxq, fc_ena),		1,	118 },
-	{ offsetof(struct ixl_hmc_rxq, l2sel),		1,	119 },
+	{ offsetof(struct ixl_hmc_rxq, l2tsel),		1,	119 },
 	{ offsetof(struct ixl_hmc_rxq, hsplit_0),	4,	120 },
 	{ offsetof(struct ixl_hmc_rxq, hsplit_1),	2,	124 },
 	{ offsetof(struct ixl_hmc_rxq, showiv),		1,	127 },
@@ -1388,6 +1399,7 @@ static int	ixl_rxeof(struct ixl_softc *, struct ixl_rx_ring *);
 static void	ixl_rxfill(struct ixl_softc *, struct ixl_rx_ring *);
 static void	ixl_rxrefill(void *);
 static int	ixl_rxrinfo(struct ixl_softc *, struct if_rxrinfo *);
+static void	ixl_rx_checksum(struct mbuf *, uint64_t);
 
 #if NKSTAT > 0
 static void	ixl_kstat_attach(struct ixl_softc *);
@@ -1939,12 +1951,10 @@ ixl_attach(struct device *parent, struct device *self, void *aux)
 	strlcpy(ifp->if_xname, DEVNAME(sc), IFNAMSIZ);
 	ifq_set_maxlen(&ifp->if_snd, sc->sc_tx_ring_ndescs);
 
-	ifp->if_capabilities = IFCAP_VLAN_MTU;
-#if 0
-	ifp->if_capabilities |= IFCAP_VLAN_HWTAGGING;
-	ifp->if_capabilities |= IFCAP_CSUM_IPv4 | IFCAP_CSUM_TCPv4 |
-	    IFCAP_CSUM_UDPv4;
-#endif
+	ifp->if_capabilities = IFCAP_VLAN_HWTAGGING;
+	ifp->if_capabilities |= IFCAP_CSUM_IPv4 |
+	    IFCAP_CSUM_TCPv4 | IFCAP_CSUM_UDPv4 |
+	    IFCAP_CSUM_TCPv6 | IFCAP_CSUM_UDPv6;
 
 	ifmedia_init(&sc->sc_media, 0, ixl_media_change, ixl_media_status);
 
@@ -2771,6 +2781,94 @@ ixl_load_mbuf(bus_dma_tag_t dmat, bus_dmamap_t map, struct mbuf *m)
 	    BUS_DMA_STREAMING | BUS_DMA_NOWAIT));
 }
 
+static uint64_t
+ixl_tx_setup_offload(struct mbuf *m0)
+{
+	struct mbuf *m;
+	int hoff;
+	uint64_t hlen;
+	uint8_t ipproto;
+	uint64_t offload = 0;
+
+	if (ISSET(m0->m_flags, M_VLANTAG)) {
+		uint64_t vtag = m0->m_pkthdr.ether_vtag;
+		offload |= IXL_TX_DESC_CMD_IL2TAG1;
+		offload |= vtag << IXL_TX_DESC_L2TAG1_SHIFT;
+	}
+
+	if (!ISSET(m0->m_pkthdr.csum_flags,
+	    M_IPV4_CSUM_OUT|M_TCP_CSUM_OUT|M_UDP_CSUM_OUT))
+		return (offload);
+
+	switch (ntohs(mtod(m0, struct ether_header *)->ether_type)) {
+	case ETHERTYPE_IP: {
+		struct ip *ip;
+
+		m = m_getptr(m0, ETHER_HDR_LEN, &hoff);
+		KASSERT(m != NULL && m->m_len - hoff >= sizeof(*ip));
+		ip = (struct ip *)(mtod(m, caddr_t) + hoff);
+
+		offload |= ISSET(m0->m_pkthdr.csum_flags, M_IPV4_CSUM_OUT) ?
+		    IXL_TX_DESC_CMD_IIPT_IPV4_CSUM :
+		    IXL_TX_DESC_CMD_IIPT_IPV4;
+ 
+		hlen = ip->ip_hl << 2;
+		ipproto = ip->ip_p;
+		break;
+	}
+
+#ifdef INET6
+	case ETHERTYPE_IPV6: {
+		struct ip6_hdr *ip6;
+
+		m = m_getptr(m0, ETHER_HDR_LEN, &hoff);
+		KASSERT(m != NULL && m->m_len - hoff >= sizeof(*ip6));
+		ip6 = (struct ip6_hdr *)(mtod(m, caddr_t) + hoff);
+ 
+		offload |= IXL_TX_DESC_CMD_IIPT_IPV6;
+
+		hlen = sizeof(*ip6);
+		ipproto = ip6->ip6_nxt;
+		break;
+	}
+#endif
+	default:
+		panic("CSUM_OUT set for non-IP packet");
+		/* NOTREACHED */
+	}
+
+	offload |= (ETHER_HDR_LEN >> 1) << IXL_TX_DESC_MACLEN_SHIFT;
+	offload |= (hlen >> 2) << IXL_TX_DESC_IPLEN_SHIFT;
+
+	switch (ipproto) {
+	case IPPROTO_TCP: {
+		struct tcphdr *th;
+
+		if (!ISSET(m0->m_pkthdr.csum_flags, M_TCP_CSUM_OUT))
+			break;
+
+		m = m_getptr(m, hoff + hlen, &hoff);
+		KASSERT(m != NULL && m->m_len - hoff >= sizeof(*th));
+		th = (struct tcphdr *)(mtod(m, caddr_t) + hoff);
+ 
+		offload |= IXL_TX_DESC_CMD_L4T_EOFT_TCP;
+		offload |= (uint64_t)th->th_off << IXL_TX_DESC_L4LEN_SHIFT;
+		break;
+	}
+
+	case IPPROTO_UDP:
+		if (!ISSET(m0->m_pkthdr.csum_flags, M_UDP_CSUM_OUT))
+			break;
+ 
+		offload |= IXL_TX_DESC_CMD_L4T_EOFT_UDP;
+		offload |= (sizeof(struct udphdr) >> 2) <<
+		    IXL_TX_DESC_L4LEN_SHIFT;
+		break;
+	}
+
+	return (offload);
+}
+
 static void
 ixl_start(struct ifqueue *ifq)
 {
@@ -2785,6 +2883,7 @@ ixl_start(struct ifqueue *ifq)
 	unsigned int prod, free, last, i;
 	unsigned int mask;
 	int post = 0;
+	uint64_t offload;
 #if NBPFILTER > 0
 	caddr_t if_bpf;
 #endif
@@ -2816,6 +2915,8 @@ ixl_start(struct ifqueue *ifq)
 		if (m == NULL)
 			break;
 
+		offload = ixl_tx_setup_offload(m);
+
 		txm = &txr->txr_maps[prod];
 		map = txm->txm_map;
 
@@ -2834,6 +2935,7 @@ ixl_start(struct ifqueue *ifq)
 			cmd = (uint64_t)map->dm_segs[i].ds_len <<
 			    IXL_TX_DESC_BSIZE_SHIFT;
 			cmd |= IXL_TX_DESC_DTYPE_DATA | IXL_TX_DESC_CMD_ICRC;
+			cmd |= offload;
 
 			htolem64(&txd->addr, map->dm_segs[i].ds_addr);
 			htolem64(&txd->cmd, cmd);
@@ -3079,7 +3181,7 @@ ixl_rxr_config(struct ixl_softc *sc, struct ixl_rx_ring *rxr)
 	rxq.dtype = IXL_HMC_RXQ_DTYPE_NOSPLIT;
 	rxq.dsize = IXL_HMC_RXQ_DSIZE_16;
 	rxq.crcstrip = 1;
-	rxq.l2sel = 0;
+	rxq.l2tsel = IXL_HMC_RXQ_L2TSEL_1ST_TAG_TO_L2TAG1;
 	rxq.showiv = 0;
 	rxq.rxmax = htole16(IXL_HARDMTU);
 	rxq.tphrdesc_ena = 0;
@@ -3190,6 +3292,13 @@ ixl_rxeof(struct ixl_softc *sc, struct ixl_rx_ring *rxr)
 					m->m_pkthdr.csum_flags |= M_FLOWID;
 				}
 
+				if (ISSET(word, IXL_RX_DESC_L2TAG1P)) {
+					m->m_pkthdr.ether_vtag =
+					    lemtoh16(&rxd->l2tag1);
+					SET(m->m_flags, M_VLANTAG);
+				}
+
+				ixl_rx_checksum(m, word);
 				ml_enqueue(&ml, m);
 			} else {
 				ifp->if_ierrors++; /* XXX */
@@ -3320,6 +3429,23 @@ ixl_rxrinfo(struct ixl_softc *sc, struct if_rxrinfo *ifri)
 	free(ifr, M_TEMP, ixl_nqueues(sc) * sizeof(*ifr));
 
 	return (rv);
+}
+
+static void
+ixl_rx_checksum(struct mbuf *m, uint64_t word)
+{
+	if (!ISSET(word, IXL_RX_DESC_L3L4P))
+		return;
+
+	if (ISSET(word, IXL_RX_DESC_IPE))
+		return;
+
+	m->m_pkthdr.csum_flags |= M_IPV4_CSUM_IN_OK;
+
+	if (ISSET(word, IXL_RX_DESC_L4E))
+		return;
+
+	m->m_pkthdr.csum_flags |= M_TCP_CSUM_IN_OK | M_UDP_CSUM_IN_OK;
 }
 
 static int
@@ -4281,8 +4407,8 @@ ixl_set_vsi(struct ixl_softc *sc)
 
 	CLR(data->port_vlan_flags,
 	    htole16(IXL_AQ_VSI_PVLAN_MODE_MASK | IXL_AQ_VSI_PVLAN_EMOD_MASK));
-	SET(data->port_vlan_flags,
-	    htole16(IXL_AQ_VSI_PVLAN_MODE_ALL | IXL_AQ_VSI_PVLAN_EMOD_NOTHING));
+	SET(data->port_vlan_flags, htole16(IXL_AQ_VSI_PVLAN_MODE_ALL |
+	    IXL_AQ_VSI_PVLAN_EMOD_STR_BOTH));
 
 	/* grumble, vsi info isn't "known" at compile time */
 

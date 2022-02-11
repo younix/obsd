@@ -21,7 +21,6 @@
 /buffercache.9/1.13/Fri Jul 19 00:24:31 2019//
 /bufq_init.9/1.6/Fri Dec 25 20:50:57 2015//
 /bus_dma.9/1.36/Mon Nov 23 17:53:57 2015//
-/bus_space.9/1.31/Thu Sep 10 15:59:18 2015//
 /cond_init.9/1.2/Thu Dec 14 06:43:44 2017//
 /config_attach.9/1.3/Fri Dec  5 16:55:53 2014//
 /config_defer.9/1.2/Sat Dec 12 11:34:29 2015//
@@ -53,7 +52,6 @@
 /ieee80211_proto.9/1.5/Wed Jul 17 20:21:53 2013//
 /if_addrhook_add.9/1.2/Fri Nov  8 08:14:11 2019//
 /if_rxr_init.9/1.9/Tue May 12 20:47:58 2020//
-/iic.9/1.9/Mon Nov 23 17:53:57 2015//
 /imax.9/1.2/Mon Apr 23 11:11:38 2018//
 /intr_barrier.9/1.2/Sun Sep 13 17:55:42 2015//
 /intro.9/1.14/Sun Sep 30 13:24:33 2018//
@@ -64,7 +62,6 @@
 /lim_cur.9/1.2/Fri Jun 21 12:56:46 2019//
 /loadfirmware.9/1.4/Tue Jun  4 19:27:08 2013//
 /log.9/1.11/Mon Sep 14 15:14:55 2015//
-/malloc.9/1.67/Thu Feb  7 15:11:38 2019//
 /md5.9/1.14/Tue Nov 24 14:58:56 2015//
 /membar_sync.9/1.3/Fri Feb 14 05:11:55 2014//
 /memcmp.9/1.1/Mon Apr 23 10:30:39 2018//
@@ -146,7 +143,6 @@
 /Makefile/1.306/Thu Dec 17 19:39:58 2020//
 /counters_alloc.9/1.11/Thu Dec 17 19:39:58 2020//
 /cpumem_get.9/1.11/Thu Dec 17 19:39:58 2020//
-/kstat_create.9/1.2/Thu Dec 17 19:39:58 2020//
 /kstat_kv_init.9/1.2/Thu Dec 17 19:39:58 2020//
 /mq_init.9/1.13/Thu Dec 17 19:39:58 2020//
 /sysctl_int.9/1.9/Thu Dec 17 19:39:58 2020//
@@ -176,7 +172,11 @@
 /timeout.9/1.53/Wed Sep  1 16:07:38 2021//
 /usb_add_task.9/1.3/Wed Sep  1 16:07:38 2021//
 /vnode.9/1.35/Wed Oct 20 17:29:07 2021//
-/VOP_LOOKUP.9/1.45/Sun Jan  2 13:11:02 2022//
-/SMR_LIST_INIT.9/1.8/Mon Jan 24 14:23:35 2022//
-/stoeplitz_to_key.9/1.8/Mon Jan 24 14:23:35 2022//
+/SMR_LIST_INIT.9/1.8/Mon Jan 24 14:35:14 2022//
+/VOP_LOOKUP.9/1.45/Mon Jan 24 14:35:14 2022//
+/bus_space.9/1.32/Fri Feb 11 13:33:47 2022//
+/iic.9/1.10/Fri Feb 11 13:33:47 2022//
+/kstat_create.9/1.4/Fri Feb 11 13:33:47 2022//
+/malloc.9/1.68/Fri Feb 11 13:33:47 2022//
+/stoeplitz_to_key.9/1.8/Mon Jan 24 14:35:14 2022//
 D

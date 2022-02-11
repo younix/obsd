@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_trace.c,v 1.17 2020/05/14 06:58:54 mpi Exp $	*/
+/*	$OpenBSD: db_trace.c,v 1.19 2022/02/07 22:28:15 gkoehler Exp $	*/
 /*	$NetBSD: db_trace.c,v 1.15 1996/02/22 23:23:41 gwr Exp $	*/
 
 /*
@@ -63,9 +63,9 @@ struct db_variable db_regs[] = {
 	{ "r11", (long *)&ddb_regs.fixreg[11],	FCN_NULL },
 	{ "r12", (long *)&ddb_regs.fixreg[12],	FCN_NULL },
 	{ "r13", (long *)&ddb_regs.fixreg[13],	FCN_NULL },
-	{ "r14", (long *)&ddb_regs.fixreg[13],	FCN_NULL },
-	{ "r15", (long *)&ddb_regs.fixreg[13],	FCN_NULL },
-	{ "r16", (long *)&ddb_regs.fixreg[13],	FCN_NULL },
+	{ "r14", (long *)&ddb_regs.fixreg[14],	FCN_NULL },
+	{ "r15", (long *)&ddb_regs.fixreg[15],	FCN_NULL },
+	{ "r16", (long *)&ddb_regs.fixreg[16],	FCN_NULL },
 	{ "r17", (long *)&ddb_regs.fixreg[17],	FCN_NULL },
 	{ "r18", (long *)&ddb_regs.fixreg[18],	FCN_NULL },
 	{ "r19", (long *)&ddb_regs.fixreg[19],	FCN_NULL },
@@ -85,8 +85,10 @@ struct db_variable db_regs[] = {
 	{ "cr",  (long *)&ddb_regs.cr,		FCN_NULL },
 	{ "xer", (long *)&ddb_regs.xer,		FCN_NULL },
 	{ "ctr", (long *)&ddb_regs.ctr,		FCN_NULL },
-	{ "iar", (long *)&ddb_regs.srr0,		FCN_NULL },
-	{ "msr", (long *)&ddb_regs.srr1,		FCN_NULL },
+	{ "iar", (long *)&ddb_regs.srr0,	FCN_NULL },
+	{ "msr", (long *)&ddb_regs.srr1,	FCN_NULL },
+	{ "dar", (long *)&ddb_regs.dar,		FCN_NULL },
+	{ "dsisr", (long *)&ddb_regs.dsisr,	FCN_NULL },
 };
 
 struct db_variable *db_eregs = db_regs + nitems(db_regs);
@@ -102,14 +104,27 @@ db_save_regs(struct trapframe *frame)
 
 /* from locore.S */
 extern vaddr_t trapexit;
-extern vaddr_t esym;
 #define	INTSTK		(8*1024)	/* 8K interrupt stack */
 
 #define	INKERNEL(va)	(((vaddr_t)(va)) >= VM_MIN_KERNEL_ADDRESS &&	\
 			((vaddr_t)(va)) < VM_MAX_KERNEL_ADDRESS)
 
-#define	ININTSTK(va)	(((vaddr_t)(va)) >= round_page(esym) &&		\
-			((vaddr_t)(va)) < (round_page(esym) + INTSTK))
+#define	ININTSTK(va)	db_in_interrupt_stack((vaddr_t)(va))
+
+int
+db_in_interrupt_stack(vaddr_t va)
+{
+	struct cpu_info *ci;
+	CPU_INFO_ITERATOR cii;
+	vaddr_t stack;
+
+	CPU_INFO_FOREACH(cii, ci) {
+		stack = (vaddr_t)ci->ci_intstk;
+		if (va >= stack - INTSTK && va < stack)
+			return 1;
+	}
+	return 0;
+}
 
 /*
  *	Frame tracing.

@@ -69,10 +69,10 @@
 /cpu.h/1.141/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.19/Thu Sep  2 14:22:31 2021//
 /intrdefs.h/1.22/Thu Sep  2 14:22:31 2021//
-/pmap.h/1.78/Thu Sep  2 14:22:31 2021//
 /profile.h/1.5/Tue Sep 14 08:17:30 2021//
 /vmmvar.h/1.74/Tue Sep 14 08:17:30 2021//
-/specialreg.h/1.91/Sun Nov 21 20:15:22 2021//
-/asm.h/1.21/Sun Jan  2 13:11:03 2022//
-/intr.h/1.33/Sun Jan  2 13:11:03 2022//
+/asm.h/1.21/Mon Jan 24 14:35:14 2022//
+/intr.h/1.33/Mon Jan 24 14:35:14 2022//
+/pmap.h/1.79/Fri Feb 11 13:33:47 2022//
+/specialreg.h/1.91/Mon Jan 24 14:35:14 2022//
 D

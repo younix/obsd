@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbr.c,v 1.115 2022/01/21 17:29:24 krw Exp $	*/
+/*	$OpenBSD: mbr.c,v 1.118 2022/02/04 23:32:17 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -91,10 +91,7 @@ MBR_init(struct mbr *mbr)
 		obsdprt.prt_id = DOSPTYP_OPENBSD;
 		if (bootprt.prt_flag != DOSACTIVE)
 			obsdprt.prt_flag = DOSACTIVE;
-		PRT_fix_CHS(&obsdprt);
 	}
-
-	PRT_fix_CHS(&bootprt);
 
 	memset(mbr, 0, sizeof(*mbr));
 	memcpy(mbr->mbr_code, default_dmbr.dmbr_boot, sizeof(mbr->mbr_code));
@@ -132,8 +129,8 @@ mbr_to_dos_mbr(const struct mbr *mbr, struct dos_mbr *dos_mbr)
 	dos_mbr->dmbr_sign = htole16(DOSMBR_SIGNATURE);
 
 	for (i = 0; i < NDOSPART; i++) {
-		PRT_make(&mbr->mbr_prt[i], mbr->mbr_lba_self, mbr->mbr_lba_firstembr,
-		    &dos_partition);
+		PRT_make(&mbr->mbr_prt[i], mbr->mbr_lba_self,
+		    mbr->mbr_lba_firstembr, &dos_partition);
 		memcpy(&dos_mbr->dmbr_parts[i], &dos_partition,
 		    sizeof(dos_mbr->dmbr_parts[i]));
 	}
@@ -146,7 +143,7 @@ MBR_print(const struct mbr *mbr, const char *units)
 
 	DISK_printgeometry("s");
 
-	printf("Offset: %lld\t", (long long)mbr->mbr_lba_self);
+	printf("Offset: %llu\t", mbr->mbr_lba_self);
 	printf("Signature: 0x%X\n", (int)mbr->mbr_signature);
 	PRT_print_parthdr();
 

@@ -38,7 +38,6 @@
 /mpbiosvar.h/1.12/Wed May 18 03:45:11 2016//
 /mplock.h/1.4/Tue Oct 17 14:25:35 2017//
 /mutex.h/1.13/Thu Jan 25 15:06:29 2018//
-/param.h/1.50/Sat Aug 25 17:24:22 2018//
 /pcb.h/1.24/Wed Apr 11 15:44:08 2018//
 /pctr.h/1.17/Sat Mar 29 18:09:29 2014//
 /pic.h/1.2/Tue Dec 16 21:40:05 2014//
@@ -72,6 +71,7 @@
 /vmparam.h/1.57/Wed Sep  1 16:07:38 2021//
 /cpu.h/1.175/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.30/Thu Sep  2 14:22:31 2021//
-/specialreg.h/1.78/Sun Nov 21 20:15:22 2021//
-/intr.h/1.49/Sun Jan  2 13:11:04 2022//
+/intr.h/1.49/Mon Jan 24 14:35:14 2022//
+/param.h/1.51/Fri Feb 11 13:33:48 2022//
+/specialreg.h/1.78/Mon Jan 24 14:35:14 2022//
 D

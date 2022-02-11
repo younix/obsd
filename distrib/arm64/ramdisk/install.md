@@ -1,4 +1,4 @@
-#	$OpenBSD: install.md,v 1.23 2021/12/14 11:01:58 kettenis Exp $
+#	$OpenBSD: install.md,v 1.25 2022/02/10 20:07:47 krw Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -49,10 +49,7 @@ md_installboot() {
 		exit
 	fi
 
-	# Mount MSDOS partition to do some final tweaks
-	mount ${MOUNT_ARGS_msdos} ${_disk}i /mnt/mnt
-	echo bootaa64.efi > /mnt/mnt/efi/boot/startup.nsh
-
+	# Apply some final tweaks on selected platforms
 	_mdec=/usr/mdec/$_plat
 
 	case $_plat in
@@ -61,6 +58,7 @@ md_installboot() {
 		    bs=1024 seek=8 >/dev/null 2>&1
 		;;
 	rpi)
+		mount ${MOUNT_ARGS_msdos} ${_disk}i /mnt/mnt
 		cp $_mdec/{bootcode.bin,start*.elf,fixup*.dat,*.dtb} /mnt/mnt/
 		cp $_mdec/u-boot.bin /mnt/mnt/
 		mkdir -p /mnt/mnt/overlays
@@ -73,6 +71,7 @@ md_installboot() {
 				kernel=u-boot.bin
 			__EOT
 		fi
+		umount /mnt/mnt
 		;;
 	esac
 }
@@ -80,17 +79,14 @@ md_installboot() {
 md_prep_fdisk() {
 	local _disk=$1 _d _type=MBR
 
-	local bootpart=
 	local bootparttype="C"
 	local bootsectorstart="32768"
 	local bootsectorsize="32768"
-	local bootsectorend=$(($bootsectorstart + $bootsectorsize))
 	local bootfstype="msdos"
 
 	while :; do
 		_d=whole
 		if disk_has $_disk gpt; then
-			[[ $_disk == $ROOTDISK ]] && bootpart="-b ${bootsectorsize}"
 			_type=GPT
 			fdisk $_disk
 		elif disk_has $_disk mbr; then
@@ -103,26 +99,19 @@ md_prep_fdisk() {
 		[wW]*)
 			echo -n "Creating a ${bootfstype} partition and an OpenBSD partition for rest of $_disk..."
 			if disk_has $_disk gpt apfsisc; then
-				fdisk -Ay ${bootpart} ${_disk} >/dev/null
+				if [[ $_disk == $ROOTDISK ]]; then
+					fdisk -Ay -b "${bootsectorsize}" ${_disk} >/dev/null
+				else
+					fdisk -Ay ${_disk} >/dev/null
+				fi
 			elif disk_has $_disk gpt; then
-				fdisk -gy ${bootpart} ${_disk} >/dev/null
+				if [[ $_disk == $ROOTDISK ]]; then
+					fdisk -gy -b "${bootsectorsize}" ${_disk} >/dev/null
+				else
+					fdisk -gy ${_disk} >/dev/null
+				fi
 			else
-				fdisk -e ${_disk} <<__EOT >/dev/null
-reinit
-e 0
-${bootparttype}
-n
-${bootsectorstart}
-${bootsectorsize}
-f 0
-e 3
-A6
-n
-${bootsectorend}
-
-write
-quit
-__EOT
+				fdisk -iy -b "${bootsectorsize}@${bootsectorstart}:${bootparttype}" ${_disk} >/dev/null
 			fi
 			echo "done."
 			installboot -p $_disk

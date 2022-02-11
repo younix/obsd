@@ -22,7 +22,6 @@
 /disksubr.c/1.100/Tue Feb 28 10:49:37 2017//
 /fp_complete.c/1.12/Wed Mar 30 15:39:46 2016//
 /genassym.cf/1.12/Thu Nov  1 21:09:17 2012//
-/in_cksum.c/1.9/Thu Aug 21 14:24:08 2014//
 /interrupt.c/1.40/Sat Jan 21 05:42:03 2017//
 /ipifuncs.c/1.6/Sun Feb  2 22:49:38 2014//
 /lock_machdep.c/1.8/Thu Mar  5 09:28:31 2020//
@@ -45,5 +44,6 @@
 /pmap.c/1.87/Wed Sep  1 16:07:38 2021//
 /machdep.c/1.196/Wed Oct 20 17:29:07 2021//
 /conf.c/1.90/Sun Nov 21 20:15:22 2021//
-/trap.c/1.100/Sun Jan  2 13:11:02 2022//
+/in_cksum.c/1.10/Fri Feb 11 13:33:47 2022//
+/trap.c/1.100/Mon Jan 24 14:35:14 2022//
 D

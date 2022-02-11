@@ -1,5 +1,5 @@
 #!/bin/ksh
-#	$OpenBSD: fw_update.sh,v 1.32 2022/01/24 00:47:05 afresh1 Exp $
+#	$OpenBSD: fw_update.sh,v 1.37 2022/02/11 00:46:58 afresh1 Exp $
 #
 # Copyright (c) 2021 Andrew Hewus Fresh <afresh1@openbsd.org>
 #
@@ -42,13 +42,16 @@ INSTALL=true
 LOCALSRC=
 
 unset FTPPID
+unset LOCKPID
 unset FWPKGTMP
 REMOVE_LOCALSRC=false
 cleanup() {
 	set +o errexit # ignore errors from killing ftp
 	[ "${FTPPID:-}" ] && kill -TERM -"$FTPPID" 2>/dev/null
+	[ "${LOCKPID:-}" ] && kill -TERM -"$LOCKPID" 2>/dev/null
 	[ "${FWPKGTMP:-}" ] && rm -rf "$FWPKGTMP"
 	"$REMOVE_LOCALSRC" && rm -rf "$LOCALSRC"
+	[ -e "${CFILE}" ] && [ ! -s "$CFILE" ] && rm -f "$CFILE"
 }
 trap cleanup EXIT
 
@@ -122,6 +125,21 @@ fetch() {
 	return 0
 }
 
+# If we fail to fetch the CFILE, we don't want to try again
+# but we might be doing this in a subshell so write out
+# a blank file indicating failure.
+check_cfile() {
+	if [ -e "$CFILE" ]; then
+		[ -s "$CFILE" ] || return 1
+		return 0
+	fi
+	if ! fetch_cfile "$@"; then
+		echo -n > "$CFILE"
+		return 1
+	fi
+	return 0
+}
+
 fetch_cfile() {
 	if "$DOWNLOAD"; then
 		set +o noclobber # we want to get the latest CFILE
@@ -131,14 +149,14 @@ fetch_cfile() {
 		    echo "Signature check of SHA256.sig failed" >&2 && return 1
 	elif [ ! -e "$CFILE" ]; then
 		echo "${0##*/}: $CFILE: No such file or directory" >&2
-		return 2
+		return 1
 	fi
 
 	return 0
 }
 
 verify() {
-	[ -e "$CFILE" ] || fetch_cfile || return 1
+	check_cfile || return 1
 	# The installer sha256 lacks -C, do it by hand
 	if ! fgrep -qx "SHA256 (${1##*/}) = $( /bin/sha256 -qb "$1" )" "$CFILE"; then
 		((VERBOSE != 1)) && echo "Checksum test for ${1##*/} failed." >&2
@@ -168,11 +186,8 @@ firmware_in_dmesg() {
 }
 
 firmware_filename() {
-	local _f
-	[ -e "$CFILE" ] || fetch_cfile || return 1
-	_f="$( sed -n "s/.*(\($1-firmware-.*\.tgz\)).*/\1/p" "$CFILE" | sed '$!d' )"
-	! [ "$_f" ] && echo "Unable to find firmware for $1" >&2 && return 1
-	echo "$_f"
+	check_cfile || return 1
+	sed -n "s/.*(\($1-firmware-.*\.tgz\)).*/\1/p" "$CFILE" | sed '$!d'
 }
 
 firmware_devicename() {
@@ -181,8 +196,37 @@ firmware_devicename() {
 	echo "$_d"
 }
 
+lock_db() {
+	[ "${LOCKPID:-}" ] && return 0
+
+	# The installer doesn't have perl, so we can't lock there
+	[ -e /usr/bin/perl ] || return 0
+
+	set -o monitor
+	perl <<'EOL' |&
+		use v5.16;
+		use warnings;
+		use OpenBSD::PackageInfo qw< lock_db unlock_db >;
+		use OpenBSD::BaseState;
+
+		$|=1;
+
+		lock_db(0, 'OpenBSD::BaseState');
+		END { unlock_db }
+		$SIG{TERM} = sub { exit };
+	
+		say $$;
+		sleep;
+EOL
+	set +o monitor
+
+	read -rp LOCKPID
+
+	return 0
+}
+
 installed_firmware() {
-	local _pre="$1" _match="$2" _post="$3" _firmware
+	local _pre="$1" _match="$2" _post="$3" _firmware _fw
 	set -sA _firmware -- $(
 	    set +o noglob
 	    grep -Fxl '@option firmware' \
@@ -192,9 +236,9 @@ installed_firmware() {
 	)
 
 	[ "${_firmware[*]:-}" ] || return 0
-	for fw in "${_firmware[@]}"; do
-		fw="${fw%/+CONTENTS}"
-		echo "${fw##*/}"
+	for _fw in "${_firmware[@]}"; do
+		_fw="${_fw%/+CONTENTS}"
+		echo "${_fw##*/}"
 	done
 }
 
@@ -252,6 +296,22 @@ EOL
 	unset FWPKGTMP
 }
 
+remove_files() {
+	local _r
+	# Use rm -f, not removing files/dirs is probably not worth failing over
+	for _r in "$@" ; do
+		if [ -d "$_r" ]; then
+			# The installer lacks rmdir,
+			# but we only want to remove empty directories.
+			set +o noglob
+			[ "$_r/*" = "$( echo "$_r"/* )" ] && rm -rf "$_r"
+			set -o noglob
+		else
+			rm -f "$_r"
+		fi
+	done
+}
+
 delete_firmware() {
 	local _cwd _pkg="$1" _pkgdir="${DESTDIR}/var/db/pkg"
 
@@ -267,38 +327,46 @@ delete_firmware() {
 
 	set -A _remove -- "${_cwd}/+CONTENTS" "${_cwd}"
 
-	while read -r c g; do
-		case $c in
-		@cwd) _cwd="${DESTDIR}$g"
+	while read -r _c _g; do
+		case $_c in
+		@cwd) _cwd="${DESTDIR}$_g"
 		  ;;
 		@*) continue
 		  ;;
-		*) set -A _remove -- "$_cwd/$c" "${_remove[@]}"
+		*) set -A _remove -- "$_cwd/$_c" "${_remove[@]}"
 		  ;;
 		esac
 	done < "${_pkgdir}/${_pkg}/+CONTENTS"
 
-	# Use rm -f, not removing files/dirs is probably not worth failing over
-	for _r in "${_remove[@]}" ; do
-		if [ -d "$_r" ]; then
-			# The installer lacks rmdir,
-			# but we only want to remove empty directories.
-			set +o noglob
-			[ "$_r/*" = "$( echo "$_r"/* )" ] && rm -rf "$_r"
-			set -o noglob
-		else
-			rm -f "$_r"
-		fi
-	done
+	remove_files "${_remove[@]}"
 
 	((VERBOSE > 2)) && echo " done."
 
 	return 0
 }
 
+unregister_firmware() {
+	local _d="$1" _pkgdir="${DESTDIR}/var/db/pkg" _fw
+
+	set -A installed -- $( installed_firmware '' "$d-firmware-" '*' )
+	if [ "${installed:-}" ]; then
+		for _fw in "${installed[@]}"; do
+			((VERBOSE)) && echo "Unregister $_fw"
+			"$DRYRUN" && continue
+			remove_files \
+			    "$_pkgdir/$_fw/+CONTENTS" \
+			    "$_pkgdir/$_fw/+DESC" \
+			    "$_pkgdir/$_fw/"
+		done
+		return 0
+	fi
+
+	return 1
+}
+
 usage() {
 	echo "usage: ${0##*/} [-adFnv] [-p path] [driver | file ...]"
-	exit 2
+	exit 1
 }
 
 ALL=false
@@ -314,11 +382,11 @@ do
 	v) ((++VERBOSE)) ;;
 	:)
 	    echo "${0##*/}: option requires an argument -- -$OPTARG" >&2
-	    usage 2
+	    usage
 	    ;;
 	?)
 	    echo "${0##*/}: unknown option -- -$OPTARG" >&2
-	    usage 2
+	    usage
 	    ;;
 	esac
 done
@@ -332,7 +400,7 @@ if [ "$LOCALSRC" ]; then
 		LOCALSRC="${LOCALSRC:#file:}"
 		! [ -d "$LOCALSRC" ] &&
 		    echo "The path must be a URL or an existing directory" >&2 &&
-		    exit 2
+		    exit 1
 	fi
 fi
 
@@ -344,7 +412,7 @@ if [ "$OPT_F" ]; then
 	# Always check for latest CFILE and so latest firmware
 	if [ -e "$LOCALSRC/$CFILE" ]; then
 		mv "$LOCALSRC/$CFILE" "$LOCALSRC/$CFILE-OLD"
-		if fetch_cfile; then
+		if check_cfile; then
 			rm -f "$LOCALSRC/$CFILE-OLD"
 		else
 			mv "$LOCALSRC/$CFILE-OLD" "$LOCALSRC/$CFILE"
@@ -363,14 +431,15 @@ fi
 set -sA devices -- "$@"
 
 if "$DELETE"; then
-	[ "$OPT_F" ] && echo "Cannot use -F and -d" >&2 && usage 22
+	[ "$OPT_F" ] && echo "Cannot use -F and -d" >&2 && usage
+	lock_db
 
 	# Show the "Uninstall" message when just deleting not upgrading
 	((VERBOSE)) && VERBOSE=3
 
 	set -A installed
 	if [ "${devices[*]:-}" ]; then
-		"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage 22
+		"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage
 
 		set -A installed -- $(
 		    for d in "${devices[@]}"; do
@@ -417,7 +486,7 @@ fi
 CFILE="$LOCALSRC/$CFILE"
 
 if [ "${devices[*]:-}" ]; then
-	"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage 22
+	"$ALL" && echo "Cannot use -a and devices/files" >&2 && usage
 else
 	((VERBOSE > 1)) && echo -n "Detect firmware ..."
 	set -sA devices -- $( detect_firmware )
@@ -427,20 +496,30 @@ fi
 
 [ "${devices[*]:-}" ] || exit
 
+lock_db
+
 added=''
 updated=''
 kept=''
+unregister=''
 for f in "${devices[@]}"; do
 	d="$( firmware_devicename "$f" )"
 
 	verify_existing=true
 	if [ "$f" = "$d" ]; then
-		f=$( firmware_filename "$d" || true )
-		[ "$f" ] || continue
+		f=$( firmware_filename "$d" ) || continue
+		if [ ! "$f" ]; then
+			if "$INSTALL" && unregister_firmware "$d"; then
+				unregister="$unregister,$d"
+			else
+				echo "Unable to find firmware for $d" >&2
+			fi
+			continue
+		fi
 		f="$LOCALSRC/$f"
 	elif ! "$INSTALL" && ! grep -Fq "($f)" "$CFILE" ; then
 		echo "Cannot download local file $f" >&2
-		exit 2
+		exit 1
 	else
 		# Don't verify files specified on the command-line
 		verify_existing=false
@@ -472,7 +551,7 @@ for f in "${devices[@]}"; do
 		elif "$DOWNLOAD"; then
 			((VERBOSE == 1)) && echo " failed."
 			((VERBOSE > 1)) && echo "Refetching $f"
-			rm -f $f
+			rm -f "$f"
 		else
 			"$pending_status" && echo " failed."
 			continue
@@ -536,8 +615,9 @@ done
 added="${added:#,}"
 updated="${updated:#,}"
 kept="${kept:#,}"
+[ "${unregister:-}" ] && unregister="; unregistered ${unregister:#,}"
 if "$INSTALL"; then
-	echo  "${0##*/}: added ${added:-none}; updated ${updated:-none}; kept ${kept:-none}"
+	echo  "${0##*/}: added ${added:-none}; updated ${updated:-none}; kept ${kept:-none}${unregister}"
 else
-	echo  "${0##*/}: downloaded ${added:-none}; kept ${kept:-none}"
+	echo  "${0##*/}: downloaded ${added:-none}; kept ${kept:-none}${unregister}"
 fi

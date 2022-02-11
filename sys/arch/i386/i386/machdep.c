@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.646 2021/10/06 15:46:03 claudio Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.648 2022/02/01 20:29:55 deraadt Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -3348,14 +3348,15 @@ init386(paddr_t first_avail)
 
 			/*
 			 * XXX Some buggy ACPI BIOSes use memory that
-			 * they declare as free.  Typically the
+			 * they declare as free. Current worst offender
+			 * is Supermicro 5019D-FTN4.  Typically the
 			 * affected memory areas are small blocks
 			 * between areas reserved for ACPI and other
-			 * BIOS goo.  So skip areas smaller than 1 MB
+			 * BIOS goo.  So skip areas smaller than 32 MB
 			 * above the 16 MB boundary (to avoid
 			 * affecting legacy stuff).
 			 */
-			if (a > 16*1024*1024 && (e - a) < 1*1024*1024) {
+			if (a > 16*1024*1024 && (e - a) < 32*1024*1024) {
 #ifdef DEBUG
 				printf("-X");
 #endif
@@ -3617,12 +3618,8 @@ cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 	case CPU_CPUFEATURE:
 		return (sysctl_rdint(oldp, oldlenp, newp, curcpu()->ci_feature_flags));
 	case CPU_KBDRESET:
-		if (securelevel > 0)
-			return (sysctl_rdint(oldp, oldlenp, newp,
-			    kbd_reset));
-		else
-			return (sysctl_int(oldp, oldlenp, newp, newlen,
-			    &kbd_reset));
+		return (sysctl_securelevel_int(oldp, oldlenp, newp, newlen,
+		    &kbd_reset));
 #if NPCKBC > 0 && NUKBD > 0
 	case CPU_FORCEUKBD:
 		{

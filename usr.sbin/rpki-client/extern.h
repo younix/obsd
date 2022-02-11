@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.114 2022/01/23 12:09:24 claudio Exp $ */
+/*	$OpenBSD: extern.h,v 1.120 2022/02/10 17:33:28 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -164,12 +164,19 @@ enum rtype {
 	RTYPE_FILE,
 };
 
+enum location {
+	DIR_UNKNOWN,
+	DIR_TEMP,
+	DIR_VALID,
+};
+
 /*
  * Files specified in an MFT have their bodies hashed with SHA256.
  */
 struct mftfile {
 	char		*file; /* filename (CER/ROA/CRL, no path) */
 	enum rtype	 type; /* file type as determined by extension */
+	enum location	 location;	/* temporary or valid directory */
 	unsigned char	 hash[SHA256_DIGEST_LENGTH]; /* sha256 of body */
 };
 
@@ -181,11 +188,13 @@ struct mftfile {
 struct mft {
 	char		*path; /* relative path to directory of the MFT */
 	struct mftfile	*files; /* file and hash */
-	size_t		 filesz; /* number of filenames */
 	char		*seqnum; /* manifestNumber */
 	char		*aia; /* AIA */
 	char		*aki; /* AKI */
 	char		*ski; /* SKI */
+	time_t		 valid_from;
+	time_t		 valid_until;
+	size_t		 filesz; /* number of filenames */
 	unsigned int	 repoid;
 	int		 stale; /* if a stale manifest */
 };
@@ -271,7 +280,8 @@ struct crl {
 	RB_ENTRY(crl)	 entry;
 	char		*aki;
 	X509_CRL	*x509_crl;
-	time_t		 expires; /* do not use after */
+	time_t		 issued;	/* do not use before */
+	time_t		 expires;	/* do not use after */
 };
 /*
  * Tree of CRLs sorted by uri
@@ -349,6 +359,7 @@ struct entity {
 	unsigned int	 repoid;	/* repository identifier */
 	int		 talid;		/* tal identifier */
 	enum rtype	 type;		/* type of entity (not RTYPE_EOF) */
+	enum location	 location;	/* which directroy the file lives in */
 };
 TAILQ_HEAD(entityq, entity);
 
@@ -416,13 +427,13 @@ struct cert	*ta_parse(const char *, const unsigned char *, size_t,
 struct cert	*cert_read(struct ibuf *);
 void		 cert_insert_brks(struct brk_tree *, struct cert *);
 
+enum rtype	 rtype_from_file_extension(const char *);
 void		 mft_buffer(struct ibuf *, const struct mft *);
 void		 mft_free(struct mft *);
 struct mft	*mft_parse(X509 **, const char *, const unsigned char *,
 		    size_t);
 struct mft	*mft_read(struct ibuf *);
-enum rtype	 rtype_from_file_extension(const char *);
-enum rtype	 rtype_from_mftfile(const char *);
+int		 mft_compare(const struct mft *, const struct mft *);
 
 void		 roa_buffer(struct ibuf *, const struct roa *);
 void		 roa_free(struct roa *);
@@ -437,8 +448,8 @@ struct gbr	*gbr_parse(X509 **, const char *, const unsigned char *,
 		    size_t);
 
 /* crl.c */
-X509_CRL	*crl_parse(const char *, const unsigned char *, size_t);
-void		 free_crl(struct crl *);
+struct crl	*crl_parse(const char *, const unsigned char *, size_t);
+void		 crl_free(struct crl *);
 
 /* Validation of our objects. */
 
@@ -574,13 +585,17 @@ char		*x509_get_crl(X509 *, const char *);
 char		*x509_crl_get_aki(X509_CRL *, const char *);
 char		*x509_get_pubkey(X509 *, const char *);
 enum cert_purpose	 x509_get_purpose(X509 *, const char *);
+int		 x509_get_time(const ASN1_TIME *, time_t *);
+char		*x509_convert_seqnum(const char *, const ASN1_INTEGER *);
 
 /* printers */
-void		tal_print(const struct tal *);
-void		cert_print(const struct cert *);
-void		mft_print(const struct mft *);
-void		roa_print(const struct roa *);
-void		gbr_print(const struct gbr *);
+char		*time2str(time_t);
+void		 tal_print(const struct tal *);
+void		 cert_print(const struct cert *);
+void		 crl_print(const struct crl *);
+void		 mft_print(const struct mft *);
+void		 roa_print(const struct roa *);
+void		 gbr_print(const struct gbr *);
 
 /* Output! */
 

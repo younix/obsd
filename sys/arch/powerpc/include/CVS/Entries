@@ -34,8 +34,8 @@
 /trap.h/1.7/Thu Apr 26 21:36:32 2007//
 /asm.h/1.16/Sat May  1 08:41:51 2021//
 /exec.h/1.16/Wed Sep  1 16:07:38 2021//
-/cpu.h/1.70/Thu Sep  2 14:22:31 2021//
-/db_machdep.h/1.31/Thu Sep  2 14:22:31 2021//
 /mplock.h/1.5/Thu Sep  2 14:22:31 2021//
 /pmap.h/1.60/Thu Sep  2 14:22:31 2021//
+/cpu.h/1.71/Fri Feb 11 13:33:50 2022//
+/db_machdep.h/1.32/Fri Feb 11 13:33:50 2022//
 D

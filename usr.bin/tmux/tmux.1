@@ -1,4 +1,4 @@
-.\" $OpenBSD: tmux.1,v 1.873 2021/12/10 12:51:11 nicm Exp $
+.\" $OpenBSD: tmux.1,v 1.876 2022/02/03 07:26:43 nicm Exp $
 .\"
 .\" Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
 .\"
@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: December 10 2021 $
+.Dd $Mdocdate: February 3 2022 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -1773,6 +1773,7 @@ The following commands are supported in copy mode:
 .It Li "set-mark" Ta "X" Ta "X"
 .It Li "start-of-line" Ta "0" Ta "C-a"
 .It Li "stop-selection" Ta "" Ta ""
+.It Li "toggle-position" Ta "P" Ta "P"
 .It Li "top-line" Ta "H" Ta "M-R"
 .El
 .Pp
@@ -4223,6 +4224,12 @@ but set the starting index for pane numbers.
 .It Ic pane-border-format Ar format
 Set the text shown in pane border status lines.
 .Pp
+.It Xo Ic pane-border-indicators
+.Op Ic off | colour | arrows | both
+.Xc
+Indicate active pane by colouring only half of the border in windows with
+exactly two panes, by displaying arrow markers, by drawing both or neither.
+.Pp
 .It Ic pane-border-lines Ar type
 Set the type of characters used for drawing pane borders.
 .Ar type
@@ -4989,7 +4996,9 @@ commands to finish; instead, the previous result from running the same command i
 or a placeholder if the command has not been run before.
 If the command hasn't exited, the most recent line of output will be used, but the status
 line will not be updated more than once a second.
-Commands are executed with the
+Commands are executed using
+.Pa /bin/sh
+and with the
 .Nm
 global environment set (see the
 .Sx GLOBAL AND SESSION ENVIRONMENT
@@ -6155,6 +6164,8 @@ Execute the first
 .Ar command
 if
 .Ar shell-command
+(run with
+.Pa /bin/sh )
 returns success or the second
 .Ar command
 otherwise.
@@ -6191,6 +6202,8 @@ option.
 .D1 Pq alias: Ic run
 Execute
 .Ar shell-command
+using
+.Pa /bin/sh
 or (with
 .Fl C )
 a

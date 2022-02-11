@@ -1,4 +1,4 @@
-/*	$OpenBSD: bpf.c,v 1.210 2022/01/16 06:27:14 dlg Exp $	*/
+/*	$OpenBSD: bpf.c,v 1.212 2022/02/11 07:28:29 visa Exp $	*/
 /*	$NetBSD: bpf.c,v 1.33 1997/02/21 23:59:35 thorpej Exp $	*/
 
 /*
@@ -144,7 +144,7 @@ bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
 	struct mbuf *m;
 	struct m_tag *mtag;
 	int error;
-	u_int hlen;
+	u_int hlen, alen, mlen;
 	u_int len;
 	u_int linktype;
 	u_int slen;
@@ -198,23 +198,38 @@ bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
 		return (EIO);
 	}
 
-	if (uio->uio_resid > MAXMCLBYTES)
-		return (EIO);
 	len = uio->uio_resid;
+	if (len < hlen)
+		return (EINVAL);
+
+	/*
+	 * Get the length of the payload so we can align it properly.
+	 */
+	alen = len - hlen;
+
+	/*
+	 * Allocate enough space for headers and the aligned payload.
+	 */
+	mlen = max(max_linkhdr, hlen) + roundup(alen, sizeof(long));
+
+	if (mlen > MAXMCLBYTES)
+		return (EMSGSIZE);
 
 	MGETHDR(m, M_WAIT, MT_DATA);
-	m->m_pkthdr.ph_ifidx = 0;
-	m->m_pkthdr.len = len - hlen;
-
-	if (len > MHLEN) {
-		MCLGETL(m, M_WAIT, len);
+	if (mlen > MHLEN) {
+		MCLGETL(m, M_WAIT, mlen);
 		if ((m->m_flags & M_EXT) == 0) {
 			error = ENOBUFS;
 			goto bad;
 		}
 	}
+
+	m_align(m, alen); /* Align the payload. */
+	m->m_data -= hlen;
+
+	m->m_pkthdr.ph_ifidx = 0;
+	m->m_pkthdr.len = len;
 	m->m_len = len;
-	*mp = m;
 
 	error = uiomove(mtod(m, caddr_t), len, uio);
 	if (error)
@@ -232,10 +247,6 @@ bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
 		goto bad;
 	}
 
-	if (m->m_len < hlen) {
-		error = EPERM;
-		goto bad;
-	}
 	/*
 	 * Make room for link header, and copy it to sockaddr
 	 */
@@ -249,8 +260,10 @@ bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
 			sockp->sa_family = ntohl(af);
 		} else
 			memcpy(sockp->sa_data, m->m_data, hlen);
+
+		m->m_pkthdr.len -= hlen;
 		m->m_len -= hlen;
-		m->m_data += hlen; /* XXX */
+		m->m_data += hlen;
 	}
 
 	/*
@@ -260,6 +273,7 @@ bpf_movein(struct uio *uio, struct bpf_d *d, struct mbuf **mp,
 	*(u_int *)(mtag + 1) = linktype;
 	m_tag_prepend(m, mtag);
 
+	*mp = m;
 	return (0);
  bad:
 	m_freem(m);
@@ -566,16 +580,12 @@ out:
 void
 bpf_wakeup(struct bpf_d *d)
 {
-	struct klist *klist;
-
 	MUTEX_ASSERT_LOCKED(&d->bd_mtx);
 
 	if (d->bd_nreaders)
 		wakeup(d);
 
-	klist = &d->bd_sel.si_note;
-	if (!klist_empty(klist))
-		knote(klist, 0);
+	KNOTE(&d->bd_sel.si_note, 0);
 
 	/*
 	 * As long as pgsigio() and selwakeup() need to be protected
