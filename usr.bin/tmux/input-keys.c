@@ -1,4 +1,4 @@
-/* $OpenBSD: input-keys.c,v 1.86 2021/08/20 17:50:42 nicm Exp $ */
+/* $OpenBSD: input-keys.c,v 1.89 2022/03/01 15:20:22 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -418,7 +418,7 @@ int
 input_key(struct screen *s, struct bufferevent *bev, key_code key)
 {
 	struct input_key_entry	*ike;
-	key_code		 justkey, newkey, outkey;
+	key_code		 justkey, newkey, outkey, modifiers;
 	struct utf8_data	 ud;
 	char			 tmp[64], modifier;
 
@@ -519,7 +519,12 @@ input_key(struct screen *s, struct bufferevent *bev, key_code key)
 		return (input_key(s, bev, key & ~KEYC_CTRL));
 	}
 	outkey = (key & KEYC_MASK_KEY);
-	switch (key & KEYC_MASK_MODIFIERS) {
+	modifiers = (key & KEYC_MASK_MODIFIERS);
+	if (outkey < 32 && outkey != 9 && outkey != 13 && outkey != 27) {
+		outkey = 64 + outkey;
+		modifiers |= KEYC_CTRL;
+	}
+	switch (modifiers) {
 	case KEYC_SHIFT:
 		modifier = '2';
 		break;
@@ -578,13 +583,13 @@ input_key_get_mouse(struct screen *s, struct mouse_event *m, u_int x, u_int y,
 	 */
 	if (m->sgr_type != ' ') {
 		if (MOUSE_DRAG(m->sgr_b) &&
-		    MOUSE_BUTTONS(m->sgr_b) == 3 &&
+		    MOUSE_RELEASE(m->sgr_b) &&
 		    (~s->mode & MODE_MOUSE_ALL))
 			return (0);
 	} else {
 		if (MOUSE_DRAG(m->b) &&
-		    MOUSE_BUTTONS(m->b) == 3 &&
-		    MOUSE_BUTTONS(m->lb) == 3 &&
+		    MOUSE_RELEASE(m->b) &&
+		    MOUSE_RELEASE(m->lb) &&
 		    (~s->mode & MODE_MOUSE_ALL))
 			return (0);
 	}

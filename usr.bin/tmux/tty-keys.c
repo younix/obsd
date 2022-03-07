@@ -1,4 +1,4 @@
-/* $OpenBSD: tty-keys.c,v 1.151 2021/10/21 08:36:51 nicm Exp $ */
+/* $OpenBSD: tty-keys.c,v 1.153 2022/02/16 18:55:05 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1118,7 +1118,7 @@ tty_keys_mouse(struct tty *tty, const char *buf, size_t len, size_t *size,
 		/* Type is M for press, m for release. */
 		sgr_type = ch;
 		if (sgr_type == 'm')
-			b |= 3;
+			b = 3;
 
 		/*
 		 * Some terminals (like PuTTY 0.63) mistakenly send
@@ -1126,7 +1126,7 @@ tty_keys_mouse(struct tty *tty, const char *buf, size_t len, size_t *size,
 		 * Discard it before it reaches any program running inside
 		 * tmux.
 		 */
-		if (sgr_type == 'm' && (sgr_b & 64))
+		if (sgr_type == 'm' && MOUSE_WHEEL(sgr_b))
 		    return (-2);
 	} else
 		return (-1);
@@ -1216,6 +1216,11 @@ tty_keys_clipboard(__unused struct tty *tty, const char *buf, size_t len,
 		return (0);
 	buf++;
 	end--;
+
+	/* If we did not request this, ignore it. */
+	if (~tty->flags & TTY_OSC52QUERY)
+		return (0);
+	tty->flags &= ~TTY_OSC52QUERY;
 
 	/* It has to be a string so copy it. */
 	copy = xmalloc(end + 1);

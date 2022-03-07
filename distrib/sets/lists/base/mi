@@ -312,6 +312,8 @@
 ./etc/signify/openbsd-71-fw.pub
 ./etc/signify/openbsd-71-pkg.pub
 ./etc/signify/openbsd-71-syspatch.pub
+./etc/signify/openbsd-72-base.pub
+./etc/signify/openbsd-72-pkg.pub
 ./etc/skel
 ./etc/skel/.ssh
 ./etc/ssh
@@ -617,6 +619,7 @@
 ./usr/bin/sdiff
 ./usr/bin/sed
 ./usr/bin/sendbug
+./usr/bin/seq
 ./usr/bin/sftp
 ./usr/bin/shar
 ./usr/bin/showmount
@@ -2558,6 +2561,7 @@
 ./usr/local/share/doc
 ./usr/local/share/doc/pkg-readmes
 ./usr/local/share/examples
+./usr/local/share/examples/login.conf.d
 ./usr/local/share/misc
 ./usr/local/share/nls
 ./usr/local/share/nls/C

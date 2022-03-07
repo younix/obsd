@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfm.c,v 1.98 2022/01/05 05:18:24 dlg Exp $ */
+/* $OpenBSD: bwfm.c,v 1.101 2022/03/06 18:52:47 kettenis Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -70,6 +70,7 @@ void	 bwfm_update_nodes(struct bwfm_softc *);
 int	 bwfm_ioctl(struct ifnet *, u_long, caddr_t);
 int	 bwfm_media_change(struct ifnet *);
 
+void	 bwfm_init_board_type(struct bwfm_softc *);
 void	 bwfm_process_blob(struct bwfm_softc *, char *, u_char **, size_t *);
 
 int	 bwfm_chip_attach(struct bwfm_softc *);
@@ -272,6 +273,8 @@ bwfm_preinit(struct bwfm_softc *sc)
 		nmode = 0;
 	if (bwfm_fwvar_var_get_int(sc, "vhtmode", &vhtmode))
 		vhtmode = 0;
+	if (bwfm_fwvar_var_get_int(sc, "scan_ver", &sc->sc_scan_ver))
+		sc->sc_scan_ver = 0;
 	if (bwfm_fwvar_cmd_get_data(sc, BWFM_C_GET_BANDLIST, bandlist,
 	    sizeof(bandlist))) {
 		printf("%s: couldn't get supported band list\n", DEVNAME(sc));
@@ -963,6 +966,8 @@ bwfm_chip_attach(struct bwfm_softc *sc)
 
 	if (sc->sc_buscore_ops->bc_setup)
 		sc->sc_buscore_ops->bc_setup(sc);
+
+	bwfm_init_board_type(sc);
 
 	return 0;
 }
@@ -2132,10 +2137,10 @@ bwfm_hostap(struct bwfm_softc *sc)
 #endif
 
 void
-bwfm_scan(struct bwfm_softc *sc)
+bwfm_scan_v0(struct bwfm_softc *sc)
 {
 	struct ieee80211com *ic = &sc->sc_ic;
-	struct bwfm_escan_params *params;
+	struct bwfm_escan_params_v0 *params;
 	uint32_t nssid = 0, nchan = 0;
 	size_t params_size, chan_size, ssid_size;
 	struct bwfm_ssid *ssid;
@@ -2190,9 +2195,78 @@ bwfm_scan(struct bwfm_softc *sc)
 }
 
 void
-bwfm_scan_abort(struct bwfm_softc *sc)
+bwfm_scan_v2(struct bwfm_softc *sc)
 {
-	struct bwfm_escan_params *params;
+	struct ieee80211com *ic = &sc->sc_ic;
+	struct bwfm_escan_params_v2 *params;
+	uint32_t nssid = 0, nchan = 0;
+	size_t params_size, chan_size, ssid_size;
+	struct bwfm_ssid *ssid;
+
+	if (ic->ic_flags & IEEE80211_F_ASCAN &&
+	    ic->ic_des_esslen && ic->ic_des_esslen <= BWFM_MAX_SSID_LEN)
+		nssid = 1;
+
+	chan_size = roundup(nchan * sizeof(uint16_t), sizeof(uint32_t));
+	ssid_size = sizeof(struct bwfm_ssid) * nssid;
+	params_size = sizeof(*params) + chan_size + ssid_size;
+
+	params = malloc(params_size, M_TEMP, M_WAITOK | M_ZERO);
+	ssid = (struct bwfm_ssid *)
+	    (((uint8_t *)params) + sizeof(*params) + chan_size);
+
+	params->scan_params.version = 2;
+	params->scan_params.length = params_size;
+	memset(params->scan_params.bssid, 0xff,
+	    sizeof(params->scan_params.bssid));
+	params->scan_params.bss_type = 2;
+	params->scan_params.scan_type = BWFM_SCANTYPE_PASSIVE;
+	params->scan_params.nprobes = htole32(-1);
+	params->scan_params.active_time = htole32(-1);
+	params->scan_params.passive_time = htole32(-1);
+	params->scan_params.home_time = htole32(-1);
+	params->version = htole32(BWFM_ESCAN_REQ_VERSION_V2);
+	params->action = htole16(WL_ESCAN_ACTION_START);
+	params->sync_id = htole16(0x1234);
+
+	if (ic->ic_flags & IEEE80211_F_ASCAN &&
+	    ic->ic_des_esslen && ic->ic_des_esslen <= BWFM_MAX_SSID_LEN) {
+		params->scan_params.scan_type = BWFM_SCANTYPE_ACTIVE;
+		ssid->len = htole32(ic->ic_des_esslen);
+		memcpy(ssid->ssid, ic->ic_des_essid, ic->ic_des_esslen);
+	}
+
+	params->scan_params.channel_num = htole32(
+	    nssid << BWFM_CHANNUM_NSSID_SHIFT |
+	    nchan << BWFM_CHANNUM_NCHAN_SHIFT);
+
+#if 0
+	/* Scan a specific channel */
+	params->scan_params.channel_list[0] = htole16(
+	    (1 & 0xff) << 0 |
+	    (3 & 0x3) << 8 |
+	    (2 & 0x3) << 10 |
+	    (2 & 0x3) << 12
+	    );
+#endif
+
+	bwfm_fwvar_var_set_data(sc, "escan", params, params_size);
+	free(params, M_TEMP, params_size);
+}
+
+void
+bwfm_scan(struct bwfm_softc *sc)
+{
+	if (sc->sc_scan_ver == 0)
+		bwfm_scan_v0(sc);
+	else
+		bwfm_scan_v2(sc);
+}
+
+void
+bwfm_scan_abort_v0(struct bwfm_softc *sc)
+{
+	struct bwfm_escan_params_v0 *params;
 	size_t params_size;
 
 	params_size = sizeof(*params) + sizeof(uint16_t);
@@ -2212,6 +2286,42 @@ bwfm_scan_abort(struct bwfm_softc *sc)
 	params->scan_params.channel_list[0] = htole16(-1);
 	bwfm_fwvar_var_set_data(sc, "escan", params, params_size);
 	free(params, M_TEMP, params_size);
+}
+
+void
+bwfm_scan_abort_v2(struct bwfm_softc *sc)
+{
+	struct bwfm_escan_params_v2 *params;
+	size_t params_size;
+
+	params_size = sizeof(*params) + sizeof(uint16_t);
+	params = malloc(params_size, M_TEMP, M_WAITOK | M_ZERO);
+	params->scan_params.version = 2;
+	params->scan_params.length = params_size;
+	memset(params->scan_params.bssid, 0xff,
+	    sizeof(params->scan_params.bssid));
+	params->scan_params.bss_type = 2;
+	params->scan_params.scan_type = BWFM_SCANTYPE_PASSIVE;
+	params->scan_params.nprobes = htole32(-1);
+	params->scan_params.active_time = htole32(-1);
+	params->scan_params.passive_time = htole32(-1);
+	params->scan_params.home_time = htole32(-1);
+	params->version = htole32(BWFM_ESCAN_REQ_VERSION_V2);
+	params->action = htole16(WL_ESCAN_ACTION_START);
+	params->sync_id = htole16(0x1234);
+	params->scan_params.channel_num = htole32(1);
+	params->scan_params.channel_list[0] = htole16(-1);
+	bwfm_fwvar_var_set_data(sc, "escan", params, params_size);
+	free(params, M_TEMP, params_size);
+}
+
+void
+bwfm_scan_abort(struct bwfm_softc *sc)
+{
+	if (sc->sc_scan_ver == 0)
+		bwfm_scan_abort_v0(sc);
+	else
+		bwfm_scan_abort_v2(sc);
 }
 
 struct mbuf *
@@ -3018,56 +3128,52 @@ out:
 	*blobsize = 0;
 }
 
-#if defined(__HAVE_FDT)
-const char *
-bwfm_sysname(void)
+void
+bwfm_init_board_type(struct bwfm_softc *sc)
 {
-	static char sysfw[128];
+#if defined(__HAVE_FDT)
+	char compat[128];
 	int len;
 	char *p;
 
-	len = OF_getprop(OF_peer(0), "compatible", sysfw, sizeof(sysfw));
-	if (len > 0 && len < sizeof(sysfw)) {
-		sysfw[len] = '\0';
-		if ((p = strchr(sysfw, '/')) != NULL)
+	len = OF_getprop(OF_peer(0), "compatible", compat, sizeof(compat));
+	if (len > 0 && len < sizeof(compat)) {
+		compat[len] = '\0';
+		if ((p = strchr(compat, '/')) != NULL)
 			*p = '\0';
-		return sysfw;
+		strlcpy(sc->sc_board_type, compat, sizeof(sc->sc_board_type));
 	}
-	return NULL;
-}
-#else
-const char *
-bwfm_sysname(void)
-{
-	return NULL;
-}
 #endif
+}
 
 int
 bwfm_loadfirmware(struct bwfm_softc *sc, const char *chip, const char *bus,
     u_char **ucode, size_t *size, u_char **nvram, size_t *nvsize, size_t *nvlen)
 {
-	const char *sysname = NULL;
+	const char *board_type = NULL;
 	char name[128];
 	int r;
 
 	*ucode = *nvram = NULL;
 	*size = *nvsize = *nvlen = 0;
 
-	sysname = bwfm_sysname();
+	if (strlen(sc->sc_board_type) > 0)
+		board_type = sc->sc_board_type;
 
-	if (sysname != NULL) {
-		r = snprintf(name, sizeof(name), "brcmfmac%s%s.%s.bin", chip,
-		    bus, sysname);
+	if (board_type != NULL) {
+		r = snprintf(name, sizeof(name), "%sbrcmfmac%s%s.%s.bin",
+		    sc->sc_fwdir, chip, bus, board_type);
 		if ((r > 0 && r < sizeof(name)) &&
 		    loadfirmware(name, ucode, size) != 0)
 			*size = 0;
 	}
 	if (*size == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s.bin", chip, bus);
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s.bin",
+		    sc->sc_fwdir, chip, bus);
 		if (loadfirmware(name, ucode, size) != 0) {
-			snprintf(name, sizeof(name), "brcmfmac%s%s%s%s.bin", chip, bus,
-			    sysname ? "." : "", sysname ? sysname : "");
+			snprintf(name, sizeof(name), "%sbrcmfmac%s%s%s%s.bin",
+			    sc->sc_fwdir, chip, bus, board_type ? "." : "",
+			    board_type ? board_type : "");
 			printf("%s: failed loadfirmware of file %s\n",
 			    DEVNAME(sc), name);
 			return 1;
@@ -3075,15 +3181,31 @@ bwfm_loadfirmware(struct bwfm_softc *sc, const char *chip, const char *bus,
 	}
 
 	/* .txt needs to be processed first */
-	if (sysname != NULL) {
-		r = snprintf(name, sizeof(name), "brcmfmac%s%s.%s.txt", chip,
-		    bus, sysname);
+	if (strlen(sc->sc_modrev) > 0) {
+		r = snprintf(name, sizeof(name),
+		    "%sbrcmfmac%s%s.%s-%s-%s-%s.txt", sc->sc_fwdir, chip, bus,
+		    board_type, sc->sc_module, sc->sc_vendor, sc->sc_modrev);
+		if (r > 0 && r < sizeof(name))
+			loadfirmware(name, nvram, nvsize);
+	}
+	if (*nvsize == 0 && strlen(sc->sc_vendor) > 0) {
+		r = snprintf(name, sizeof(name),
+		    "%sbrcmfmac%s%s.%s-%s-%s.txt", sc->sc_fwdir, chip, bus,
+		    board_type, sc->sc_module, sc->sc_vendor);
+		if (r > 0 && r < sizeof(name))
+			loadfirmware(name, nvram, nvsize);
+	}
+
+	if (*nvsize == 0 && board_type != NULL) {
+		r = snprintf(name, sizeof(name), "%sbrcmfmac%s%s.%s.txt",
+		    sc->sc_fwdir, chip, bus, board_type);
 		if (r > 0 && r < sizeof(name))
 			loadfirmware(name, nvram, nvsize);
 	}
 
 	if (*nvsize == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s.txt", chip, bus);
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s.txt",
+		    sc->sc_fwdir, chip, bus);
 		loadfirmware(name, nvram, nvsize);
 	}
 
@@ -3099,39 +3221,44 @@ bwfm_loadfirmware(struct bwfm_softc *sc, const char *chip, const char *bus,
 
 	/* .nvram is the pre-processed version */
 	if (*nvlen == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s.nvram", chip, bus);
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s.nvram",
+		    sc->sc_fwdir, chip, bus);
 		if (loadfirmware(name, nvram, nvsize) == 0)
 			*nvlen = *nvsize;
 	}
 
 	if (*nvlen == 0 && strcmp(bus, "-sdio") == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s%s%s.txt", chip, bus,
-		    sysname ? "." : "", sysname ? sysname : "");
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s%s%s.txt",
+		    sc->sc_fwdir, chip, bus, board_type ? "." : "",
+		    board_type ? board_type : "");
 		printf("%s: failed loadfirmware of file %s\n",
 		    DEVNAME(sc), name);
 		free(*ucode, M_DEVBUF, *size);
 		return 1;
 	}
 
-	if (sysname != NULL) {
-		r = snprintf(name, sizeof(name), "brcmfmac%s%s.%s.clm_blob",
-		    chip, bus, sysname);
+	if (board_type != NULL) {
+		r = snprintf(name, sizeof(name), "%sbrcmfmac%s%s.%s.clm_blob",
+		    sc->sc_fwdir, chip, bus, board_type);
 		if (r > 0 && r < sizeof(name))
 			loadfirmware(name, &sc->sc_clm, &sc->sc_clmsize);
 	}
 	if (sc->sc_clmsize == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s.clm_blob", chip, bus);
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s.clm_blob",
+		    sc->sc_fwdir, chip, bus);
 		loadfirmware(name, &sc->sc_clm, &sc->sc_clmsize);
 	}
 
-	if (sysname != NULL) {
-		r = snprintf(name, sizeof(name), "brcmfmac%s%s.%s.txcap_blob",
-		    chip, bus, sysname);
+	if (board_type != NULL) {
+		r = snprintf(name, sizeof(name),
+		    "%sbrcmfmac%s%s.%s.txcap_blob", sc->sc_fwdir,
+		    chip, bus, board_type);
 		if (r > 0 && r < sizeof(name))
 			loadfirmware(name, &sc->sc_txcap, &sc->sc_txcapsize);
 	}
 	if (sc->sc_txcapsize == 0) {
-		snprintf(name, sizeof(name), "brcmfmac%s%s.txcap_blob", chip, bus);
+		snprintf(name, sizeof(name), "%sbrcmfmac%s%s.txcap_blob",
+		    sc->sc_fwdir, chip, bus);
 		loadfirmware(name, &sc->sc_txcap, &sc->sc_txcapsize);
 	}
 

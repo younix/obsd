@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bwfm_pci.c,v 1.66 2022/01/01 18:52:26 patrick Exp $	*/
+/*	$OpenBSD: if_bwfm_pci.c,v 1.69 2022/03/06 18:52:47 kettenis Exp $	*/
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2017 Patrick Wildt <patrick@blueri.se>
@@ -344,6 +344,7 @@ static const struct pci_matchid bwfm_pci_devices[] = {
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM43602 },
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4371 },
 	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4378 },
+	{ PCI_VENDOR_BROADCOM, PCI_PRODUCT_BROADCOM_BCM4387 },
 };
 
 int
@@ -490,7 +491,7 @@ bwfm_pci_preinit(struct bwfm_softc *bwfm)
 		chip = "4377b3";
 		break;
 	case BRCM_CC_4378_CHIP_ID:
-		chip = "4378";
+		chip = "4378b1";
 		break;
 	case BRCM_CC_4387_CHIP_ID:
 		chip = "4387c2";
@@ -1060,6 +1061,7 @@ bwfm_pci_process_otp_tuple(struct bwfm_pci_softc *sc, uint8_t type, uint8_t size
 {
 	struct bwfm_softc *bwfm = (void *)sc;
 	char chiprev[8] = "", module[8] = "", modrev[8] = "", vendor[8] = "", chip[8] = "";
+	char board_type[128] = "";
 	char product[16] = "unknown";
 	int len;
 
@@ -1115,13 +1117,27 @@ next:
 		snprintf(chip, sizeof(chip),
 		    bwfm->sc_chip.ch_chip > 40000 ? "%05d" : "%04x",
 		    bwfm->sc_chip.ch_chip);
-		if (sc->sc_sc.sc_node)
-			OF_getprop(sc->sc_sc.sc_node, "apple,module-instance",
-			    product, sizeof(product));
+		if (sc->sc_sc.sc_node) {
+			OF_getprop(sc->sc_sc.sc_node, "brcm,board-type",
+			    board_type, sizeof(board_type));
+			strlcpy(product, &board_type[6], sizeof(product));
+			if (strncmp(board_type, "apple,", 6) == 0) {
+				strlcpy(sc->sc_sc.sc_fwdir, "apple-bwfm/",
+				    sizeof(sc->sc_sc.sc_fwdir));
+			}
+		}
 		printf("%s: firmware C-%s%s%s/P-%s_M-%s_V-%s__m-%s\n",
 		    DEVNAME(sc), chip,
 		    *chiprev ? "__s-" : "", *chiprev ? chiprev : "",
 		    product, module, vendor, modrev);
+		strlcpy(sc->sc_sc.sc_board_type, board_type,
+		    sizeof(sc->sc_sc.sc_board_type));
+		strlcpy(sc->sc_sc.sc_module, module,
+		    sizeof(sc->sc_sc.sc_module));
+		strlcpy(sc->sc_sc.sc_vendor, vendor,
+		    sizeof(sc->sc_sc.sc_vendor));
+		strlcpy(sc->sc_sc.sc_modrev, modrev,
+		    sizeof(sc->sc_sc.sc_modrev));
 		break;
 	case 0x80: /* Broadcom CIS */
 		DPRINTF(("%s: Broadcom CIS\n", DEVNAME(sc)));

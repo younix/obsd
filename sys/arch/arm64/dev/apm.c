@@ -1,4 +1,4 @@
-/*	$OpenBSD: apm.c,v 1.12 2022/02/11 01:55:12 deraadt Exp $	*/
+/*	$OpenBSD: apm.c,v 1.16 2022/02/16 06:41:27 deraadt Exp $	*/
 
 /*-
  * Copyright (c) 2001 Alexander Guy.  All rights reserved.
@@ -32,7 +32,6 @@
  */
 
 #include "apm.h"
-#include "wsdisplay.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -49,8 +48,6 @@
 #include <machine/cpu.h>
 #include <machine/acpiapm.h>
 #include <machine/apmvar.h>
-
-#include <dev/wscons/wsdisplayvar.h>
 
 #if defined(APMDEBUG)
 #define DPRINTF(x)	printf x
@@ -376,10 +373,15 @@ sleep_setstate(void *v)
 	return 0;
 }
 
-void
+int
 gosleep(void *v)
 {
-	// XXX
+	return EOPNOTSUPP;
+}
+
+void
+sleep_abort(void *v)
+{
 }
 
 int
@@ -388,39 +390,7 @@ sleep_resume(void *v)
 	return 0;
 }
 
-void
-display_suspend(void *v)
-{
-#if 0
-#if NWSDISPLAY > 0
-	struct acpi_softc *sc = v;
-
-	/*
-	 * Temporarily release the lock to prevent the X server from
-	 * blocking on setting the display brightness.
-	 */
-	rw_exit_write(&sc->sc_lck);		/* XXX replace this interlock */
-	wsdisplay_suspend();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
-#endif
-}
-
-void
-display_resume(void *v)
-{
-#if 0
-#if NWSDISPLAY > 0
-	struct acpi_softc *sc = v;
-
-	rw_exit_write(&sc->sc_lck);		/* XXX replace this interlock */
-	wsdisplay_resume();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
-#endif
-}
-
-void
+int
 suspend_finish(void *v)
 {
 #if 0
@@ -435,12 +405,7 @@ suspend_finish(void *v)
 	if (acpibtn_numopenlids() == 0 && lid_action != 0)
 		acpi_addtask(sc, acpi_sleep_task, sc, sc->sc_state);
 #endif
-}
-
-void
-disable_lid_wakeups(void *v)
-{
+	return 0;
 }
 
 #endif /* SUSPEND */
-

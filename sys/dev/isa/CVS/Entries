@@ -78,7 +78,6 @@
 /aic_isapnp.c/1.2/Wed Sep  1 16:07:39 2021//
 /ast.c/1.19/Wed Sep  1 16:07:39 2021//
 /cy_isa.c/1.10/Wed Sep  1 16:07:39 2021//
-/gus.c/1.48/Wed Sep  1 16:07:39 2021//
 /gus_isa.c/1.8/Wed Sep  1 16:07:39 2021//
 /gus_isapnp.c/1.9/Wed Sep  1 16:07:39 2021//
 /i82365_isa.c/1.24/Wed Sep  1 16:07:39 2021//
@@ -87,7 +86,6 @@
 /ics2101.c/1.10/Wed Sep  1 16:07:39 2021//
 /if_ef_isapnp.c/1.40/Wed Sep  1 16:07:39 2021//
 /if_el.c/1.36/Wed Sep  1 16:07:39 2021//
-/if_ie.c/1.57/Wed Sep  1 16:07:39 2021//
 /if_lc_isa.c/1.13/Wed Sep  1 16:07:39 2021//
 /if_sm_isa.c/1.15/Wed Sep  1 16:07:39 2021//
 /isapnp.c/1.42/Wed Sep  1 16:07:39 2021//
@@ -95,8 +93,6 @@
 /mpu401.c/1.16/Wed Sep  1 16:07:39 2021//
 /mpu_isa.c/1.7/Wed Sep  1 16:07:39 2021//
 /mpu_isapnp.c/1.9/Wed Sep  1 16:07:39 2021//
-/pas.c/1.30/Wed Sep  1 16:07:39 2021//
-/sb.c/1.30/Wed Sep  1 16:07:39 2021//
 /sb_isa.c/1.11/Wed Sep  1 16:07:39 2021//
 /sb_isapnp.c/1.16/Wed Sep  1 16:07:39 2021//
 /spkr.c/1.26/Wed Sep  1 16:07:39 2021//
@@ -106,7 +102,6 @@
 /isadma.c/1.36/Sun Nov 21 20:15:22 2021//
 /ad1848.c/1.46/Mon Jan 24 14:35:14 2022//
 /aps.c/1.27/Mon Jan 24 14:35:14 2022//
-/ess.c/1.26/Mon Jan 24 14:35:14 2022//
 /essreg.h/1.4/Mon Jan 24 14:35:14 2022//
 /gusreg.h/1.7/Mon Jan 24 14:35:14 2022//
 /hsq.c/1.6/Mon Jan 24 14:35:14 2022//
@@ -119,4 +114,9 @@
 /sbdsp.c/1.40/Mon Jan 24 14:35:14 2022//
 /sbreg.h/1.7/Mon Jan 24 14:35:14 2022//
 /tcic2_isa.c/1.10/Mon Jan 24 14:35:14 2022//
+/ess.c/1.27/Mon Mar  7 08:56:14 2022//
+/gus.c/1.49/Mon Mar  7 08:56:14 2022//
+/if_ie.c/1.58/Mon Mar  7 08:56:14 2022//
+/pas.c/1.31/Mon Mar  7 08:56:14 2022//
+/sb.c/1.31/Mon Mar  7 08:56:14 2022//
 D

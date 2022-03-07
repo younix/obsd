@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.325 2022/02/07 19:28:14 rob Exp $	*/
+/*	$OpenBSD: proc.h,v 1.328 2022/02/25 18:05:49 rob Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -212,7 +212,7 @@ struct process {
 	struct	plimit *ps_limit;	/* [m,R] Process limits. */
 	struct	pgrp *ps_pgrp;		/* Pointer to process group. */
 
-	char	ps_comm[MAXCOMLEN+1];
+	char	ps_comm[_MAXCOMLEN];	/* command name, incl NUL */
 
 	vaddr_t	ps_strings;		/* User pointers to argv/env */
 	vaddr_t ps_timekeep; 		/* User pointer to timekeep */
@@ -229,7 +229,7 @@ struct process {
 		u_int   pr_scale;	/* pc scaling */
 	} ps_prof;
 
-	u_short	ps_acflag;		/* Accounting flags. */
+	u_int32_t	ps_acflag;	/* Accounting flags. */
 
 	uint64_t ps_pledge;
 	uint64_t ps_execpledge;
@@ -277,6 +277,7 @@ struct process {
 #define	PS_WXNEEDED	0x00200000	/* Process allowed to violate W^X */
 #define	PS_EXECPLEDGE	0x00400000	/* Has exec pledges */
 #define	PS_ORPHAN	0x00800000	/* Process is on an orphan list */
+#define	PS_CHROOT	0x01000000	/* Process is chrooted */
 
 #define	PS_BITS \
     ("\20" "\01CONTROLT" "\02EXEC" "\03INEXEC" "\04EXITING" "\05SUGID" \
@@ -284,7 +285,7 @@ struct process {
      "\013WAITED" "\014COREDUMP" "\015SINGLEEXIT" "\016SINGLEUNWIND" \
      "\017NOZOMBIE" "\020STOPPED" "\021SYSTEM" "\022EMBRYO" "\023ZOMBIE" \
      "\024NOBROADCASTKILL" "\025PLEDGE" "\026WXNEEDED" "\027EXECPLEDGE" \
-     "\030ORPHAN")
+     "\030ORPHAN" "\031CHROOT")
 
 
 struct kcov_dev;

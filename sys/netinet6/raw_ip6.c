@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip6.c,v 1.138 2020/08/02 11:15:51 kn Exp $	*/
+/*	$OpenBSD: raw_ip6.c,v 1.142 2022/03/02 12:53:15 bluhm Exp $	*/
 /*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
 
 /*
@@ -336,7 +336,7 @@ rip6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 		 */
 	}
 
-	(void) in6_pcbnotify(&rawin6pcbtable, sa6, 0,
+	in6_pcbnotify(&rawin6pcbtable, sa6, 0,
 	    sa6_src, 0, rdomain, cmd, cmdarg, notify);
 }
 
@@ -636,7 +636,7 @@ rip6_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 		break;
 
 	/*
-	 * Mark the connection as being incapable of futther input.
+	 * Mark the connection as being incapable of further input.
 	 */
 	case PRU_SHUTDOWN:
 		socantsendmore(so);

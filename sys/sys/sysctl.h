@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.h,v 1.223 2022/02/07 22:57:47 rob Exp $	*/
+/*	$OpenBSD: sysctl.h,v 1.227 2022/02/25 18:05:49 rob Exp $	*/
 /*	$NetBSD: sysctl.h,v 1.16 1996/04/09 20:55:36 cgd Exp $	*/
 
 /*
@@ -38,6 +38,7 @@
 #ifndef _SYS_SYSCTL_H_
 #define	_SYS_SYSCTL_H_
 
+#include <sys/syslimits.h>
 #include <uvm/uvmexp.h>
 
 /*
@@ -355,7 +356,7 @@ struct ctlname {
  * binary compatibility can be preserved.
  */
 #define	KI_NGROUPS	16
-#define	KI_MAXCOMLEN	24	/* extra for 8 byte alignment */
+#define	KI_MAXCOMLEN	_MAXCOMLEN	/* includes NUL */
 #define	KI_WMESGLEN	8
 #define	KI_MAXLOGNAME	32
 #define	KI_EMULNAMELEN	8
@@ -382,7 +383,6 @@ struct kinfo_proc {
 #define	EPROC_SLEADER	0x02	/* session leader */
 #define	EPROC_UNVEIL	0x04	/* has unveil settings */
 #define	EPROC_LKUNVEIL	0x08	/* unveil is locked */
-#define	EPROC_CHROOT	0x10	/* chrooted */
 	int32_t	p_exitsig;		/* unused, always zero. */
 	int32_t	p_flag;			/* INT: P_* flags. */
 
@@ -433,7 +433,7 @@ struct kinfo_proc {
 	u_int8_t p_nice;		/* U_CHAR: Process "nice" value. */
 
 	u_int16_t p_xstat;		/* U_SHORT: Exit status for wait; also stop signal. */
-	u_int16_t p_acflag;		/* U_SHORT: Accounting flags. */
+	u_int16_t p_spare;		/* U_SHORT: unused */
 
 	char	p_comm[KI_MAXCOMLEN];
 
@@ -475,7 +475,7 @@ struct kinfo_proc {
 	u_int32_t p_uctime_sec;		/* STRUCT TIMEVAL: child u+s time. */
 	u_int32_t p_uctime_usec;	/* STRUCT TIMEVAL: child u+s time. */
 	u_int32_t p_psflags;		/* UINT: PS_* flags on the process. */
-	int32_t p_spare;		/* INT: unused. */
+	u_int32_t p_acflag;		/* UINT: Accounting flags. */
 	u_int32_t p_svuid;		/* UID_T: saved user id */
 	u_int32_t p_svgid;		/* GID_T: saved group id */
 	char    p_emul[KI_EMULNAMELEN];	/* syscall emulation name */
@@ -581,6 +581,8 @@ struct kinfo_vmentry {
 
 #define PTRTOINT64(_x)	((u_int64_t)(u_long)(_x))
 
+#define	_FILL_KPROC_MIN(a,b) (((a)<(b))?(a):(b))
+
 #define FILL_KPROC(kp, copy_str, p, pr, uc, pg, paddr, \
     praddr, sess, vm, lim, sa, isthread, show_addresses) \
 do {									\
@@ -611,7 +613,7 @@ do {									\
 	(kp)->p_svgid = (uc)->cr_svgid;					\
 									\
 	memcpy((kp)->p_groups, (uc)->cr_groups,				\
-	    MIN(sizeof((kp)->p_groups), sizeof((uc)->cr_groups)));	\
+	    _FILL_KPROC_MIN(sizeof((kp)->p_groups), sizeof((uc)->cr_groups)));	\
 	(kp)->p_ngroups = (uc)->cr_ngroups;				\
 									\
 	(kp)->p_jobc = (pg)->pg_jobc;					\
@@ -653,10 +655,8 @@ do {									\
 	strlcpy((kp)->p_emul, "native", sizeof((kp)->p_emul));		\
 	strlcpy((kp)->p_comm, (pr)->ps_comm, sizeof((kp)->p_comm));	\
 	strlcpy((kp)->p_login, (sess)->s_login,				\
-	    MIN(sizeof((kp)->p_login), sizeof((sess)->s_login)));	\
+	    _FILL_KPROC_MIN(sizeof((kp)->p_login), sizeof((sess)->s_login)));	\
 									\
-	if ((pr)->ps_fd->fd_rdir != NULL)				\
-		(kp)->p_eflag |= EPROC_CHROOT;				\
 	if ((sess)->s_ttyvp)						\
 		(kp)->p_eflag |= EPROC_CTTY;				\
 	if ((pr)->ps_uvpaths)						\

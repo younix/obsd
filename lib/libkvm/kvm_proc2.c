@@ -1,4 +1,4 @@
-/*	$OpenBSD: kvm_proc2.c,v 1.36 2022/02/08 12:10:39 jsg Exp $	*/
+/*	$OpenBSD: kvm_proc2.c,v 1.38 2022/02/22 17:35:01 deraadt Exp $	*/
 /*	$NetBSD: kvm_proc.c,v 1.30 1999/03/24 05:50:50 mrg Exp $	*/
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -70,7 +70,7 @@
  */
 
 #define __need_process
-#include <sys/param.h>	/* MAXCOMLEN NODEV */
+#include <sys/param.h>	/* NODEV */
 #include <sys/types.h>
 #include <sys/signal.h>
 #include <sys/proc.h>
@@ -84,7 +84,6 @@
 #include <sys/signalvar.h>
 #include <sys/pledge.h>
 #include <sys/wait.h>
-#include <sys/filedesc.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde_update.c,v 1.132 2022/02/06 09:51:19 claudio Exp $ */
+/*	$OpenBSD: rde_update.c,v 1.136 2022/03/02 16:51:43 claudio Exp $ */
 
 /*
  * Copyright (c) 2004 Claudio Jeker <claudio@openbsd.org>
@@ -102,6 +102,7 @@ up_generate_updates(struct filter_head *rules, struct rde_peer *peer,
 {
 	struct filterstate	state;
 	struct bgpd_addr	addr;
+	struct prefix		*p;
 	int			need_withdraw;
 	uint8_t			prefixlen;
 
@@ -119,10 +120,8 @@ up_generate_updates(struct filter_head *rules, struct rde_peer *peer,
 again:
 	if (new == NULL) {
 		/* withdraw prefix */
-		if (prefix_adjout_withdraw(peer, &addr, prefixlen) == 1) {
-			peer->prefix_out_cnt--;
-			peer->up_wcnt++;
-		}
+		if ((p = prefix_adjout_get(peer, 0, &addr, prefixlen)) != NULL)
+			prefix_adjout_withdraw(p);
 	} else {
 		need_withdraw = 0;
 		/*
@@ -169,14 +168,8 @@ again:
 		}
 
 		up_prep_adjout(peer, &state, addr.aid);
-
-		/* only send update if path changed */
-		if (prefix_adjout_update(peer, &state, &addr,
-		    new->pt->prefixlen, prefix_vstate(new)) == 1) {
-			peer->prefix_out_cnt++;
-			peer->up_nlricnt++;
-		}
-
+		prefix_adjout_update(peer, &state, &addr,
+		    new->pt->prefixlen, prefix_vstate(new));
 		rde_filterstate_clean(&state);
 
 		/* max prefix checker outbound */
@@ -230,13 +223,7 @@ up_generate_default(struct filter_head *rules, struct rde_peer *peer,
 	}
 
 	up_prep_adjout(peer, &state, addr.aid);
-
-	if (prefix_adjout_update(peer, &state, &addr, 0, ROA_NOTFOUND) == 1) {
-		peer->prefix_out_cnt++;
-		peer->up_nlricnt++;
-	}
-
-	/* no longer needed */
+	prefix_adjout_update(peer, &state, &addr, 0, ROA_NOTFOUND);
 	rde_filterstate_clean(&state);
 
 	/* max prefix checker outbound */
@@ -605,7 +592,7 @@ up_is_eor(struct rde_peer *peer, uint8_t aid)
 		 * prefix_adjout_destroy() can't handle that.
 		 */
 		RB_REMOVE(prefix_tree, &peer->updates[aid], p);
-		p->flags &= ~PREFIX_FLAG_MASK;
+		p->flags &= ~PREFIX_FLAG_UPDATE;
 		prefix_adjout_destroy(p);
 		return 1;
 	}
@@ -632,8 +619,7 @@ up_dump_prefix(u_char *buf, int len, struct prefix_tree *prefix_head,
 		if (peer_has_add_path(peer, p->pt->aid, CAPA_AP_SEND)) {
 			if (len <= wpos + (int)sizeof(pathid))
 				break;
-			/* XXX add-path send side */
-			pathid = 0;
+			pathid = htonl(p->path_id_tx);
 			memcpy(buf + wpos, &pathid, sizeof(pathid));
 			wpos += sizeof(pathid);
 		}
@@ -652,17 +638,15 @@ up_dump_prefix(u_char *buf, int len, struct prefix_tree *prefix_head,
 		    np->eor)
 			done = 1;
 
-		/* prefix sent, remove from list and clear flag */
-		RB_REMOVE(prefix_tree, prefix_head, p);
-		p->flags &= ~PREFIX_FLAG_MASK;
 
 		if (withdraw) {
 			/* prefix no longer needed, remove it */
 			prefix_adjout_destroy(p);
-			peer->up_wcnt--;
 			peer->prefix_sent_withdraw++;
 		} else {
 			/* prefix still in Adj-RIB-Out, keep it */
+			RB_REMOVE(prefix_tree, prefix_head, p);
+			p->flags &= ~PREFIX_FLAG_UPDATE;
 			peer->up_nlricnt--;
 			peer->prefix_sent_update++;
 		}

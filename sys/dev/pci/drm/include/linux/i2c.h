@@ -1,4 +1,4 @@
-/*	$OpenBSD: i2c.h,v 1.4 2022/01/14 06:53:14 jsg Exp $	*/
+/*	$OpenBSD: i2c.h,v 1.6 2022/03/01 11:50:37 jsg Exp $	*/
 /*
  * Copyright (c) 2017 Mark Kettenis
  *
@@ -91,10 +91,19 @@ struct i2c_algo_bit_data {
 	struct i2c_controller ic;
 };
 
+int __i2c_transfer(struct i2c_adapter *, struct i2c_msg *, int);
 int i2c_transfer(struct i2c_adapter *, struct i2c_msg *, int);
-#define i2c_add_adapter(x) 0
-#define i2c_del_adapter(x)
-#define __i2c_transfer(adap, msgs, num)	i2c_transfer(adap, msgs, num)
+
+static inline int
+i2c_add_adapter(struct i2c_adapter *adap)
+{
+	return 0;
+}
+
+static inline void
+i2c_del_adapter(struct i2c_adapter *adap)
+{
+}
 
 static inline void *
 i2c_get_adapdata(struct i2c_adapter *adap)

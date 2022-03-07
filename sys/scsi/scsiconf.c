@@ -1,4 +1,4 @@
-/*	$OpenBSD: scsiconf.c,v 1.238 2021/10/24 16:57:30 mpi Exp $	*/
+/*	$OpenBSD: scsiconf.c,v 1.243 2022/03/03 19:10:13 krw Exp $	*/
 /*	$NetBSD: scsiconf.c,v 1.57 1996/05/02 01:09:01 neil Exp $	*/
 
 /*
@@ -75,7 +75,8 @@ int	scsibussubprint(void *, const char *);
 int	scsibusbioctl(struct device *, u_long, caddr_t);
 #endif /* NBIO > 0 */
 
-void	scsi_get_target_luns(struct scsi_link *, struct scsi_lun_array *);
+void	scsi_get_target_luns(struct scsibus_softc *, int,
+    struct scsi_lun_array *);
 void	scsi_add_link(struct scsi_link *);
 void	scsi_remove_link(struct scsi_link *);
 void	scsi_print_link(struct scsi_link *);
@@ -441,18 +442,15 @@ int
 scsi_probe_target(struct scsibus_softc *sb, int target)
 {
 	struct scsi_lun_array		 lunarray;
-	struct scsi_link		*link0;
 	int				 i, r, rv = 0;
 
 	if (target < 0 || target == sb->sb_adapter_target)
 		return EINVAL;
 
-	/* Probe all possible luns on target. */
-	scsi_probe_link(sb, target, 0, 0);
-	link0 = scsi_get_link(sb, target, 0);
-	if (link0 == NULL)
+	scsi_get_target_luns(sb, target, &lunarray);
+	if (lunarray.count == 0)
 		return EINVAL;
-	scsi_get_target_luns(link0, &lunarray);
+
 	for (i = 0; i < lunarray.count; i++) {
 		r = scsi_probe_link(sb, target, lunarray.luns[i],
 		    lunarray.dumbscan);
@@ -497,8 +495,7 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 
 	link = malloc(sizeof(*link), M_DEVBUF, M_NOWAIT);
 	if (link == NULL) {
-		SC_DEBUG(link, SDEV_DB2, ("Bad LUN. can't allocate "
-		    "scsi_link.\n"));
+		SC_DEBUG(link, SDEV_DB2, ("malloc(scsi_link) failed.\n"));
 		return EINVAL;
 	}
 
@@ -525,8 +522,7 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 	if (sb->sb_adapter->dev_probe != NULL &&
 	    sb->sb_adapter->dev_probe(link) != 0) {
 		if (lun == 0) {
-			SC_DEBUG(link, SDEV_DB2, ("Bad LUN 0. dev_probe() "
-			    "failed.\n"));
+			SC_DEBUG(link, SDEV_DB2, ("dev_probe(link) failed.\n"));
 			rslt = EINVAL;
 		}
 		goto free;
@@ -540,8 +536,7 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 		link->pool = malloc(sizeof(*link->pool),
 		    M_DEVBUF, M_NOWAIT);
 		if (link->pool == NULL) {
-			SC_DEBUG(link, SDEV_DB2, ("Bad LUN. can't allocate "
-			    "link->pool.\n"));
+			SC_DEBUG(link, SDEV_DB2, ("malloc(pool) failed.\n"));
 			rslt = ENOMEM;
 			goto bad;
 		}
@@ -581,18 +576,15 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 	/* Now go ask the device all about itself. */
 	inqbuf = dma_alloc(sizeof(*inqbuf), PR_NOWAIT | PR_ZERO);
 	if (inqbuf == NULL) {
-		SC_DEBUG(link, SDEV_DB2, ("Bad LUN. can't allocate inqbuf.\n"));
+		SC_DEBUG(link, SDEV_DB2, ("dma_alloc(inqbuf) failed.\n"));
 		rslt = ENOMEM;
 		goto bad;
 	}
 
 	rslt = scsi_inquire(link, inqbuf, scsi_autoconf | SCSI_SILENT);
 	if (rslt != 0) {
-		if (lun == 0) {
-			SC_DEBUG(link, SDEV_DB2, ("Bad LUN 0. inquiry rslt = "
-			    "%i\n", rslt));
+		if (lun == 0)
 			rslt = EINVAL;
-		}
 		dma_free(inqbuf, sizeof(*inqbuf));
 		goto bad;
 	}
@@ -613,24 +605,15 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 	case SID_QUAL_RSVD:
 	case SID_QUAL_BAD_LU:
 	case SID_QUAL_LU_OFFLINE:
-		SC_DEBUG(link, SDEV_DB1, ("Bad LUN. SID_QUAL = 0x%02x\n",
-		    inqbuf->device & SID_QUAL));
 		goto bad;
-
 	case SID_QUAL_LU_OK:
 		break;
-
 	default:
-		SC_DEBUG(link, SDEV_DB1, ("Vendor-specific SID_QUAL = 0x%02x\n",
-		    inqbuf->device & SID_QUAL));
 		break;
 	}
 
-	if ((inqbuf->device & SID_TYPE) == T_NODEVICE) {
-		SC_DEBUG(link, SDEV_DB1,
-		    ("Bad LUN. SID_TYPE = T_NODEVICE\n"));
+	if ((inqbuf->device & SID_TYPE) == T_NODEVICE)
 		goto bad;
-	}
 
 	scsi_devid(link);
 
@@ -644,8 +627,7 @@ scsi_probe_link(struct scsibus_softc *sb, int target, int lun, int dumbscan)
 	else if (dumbscan == 1 && memcmp(inqbuf, &link0->inqdata,
 	    sizeof(*inqbuf)) == 0) {
 		/* The device doesn't distinguish between LUNs. */
-		SC_DEBUG(link, SDEV_DB1, ("Bad LUN. IDENTIFY not supported."
-		    "\n"));
+		SC_DEBUG(link, SDEV_DB1, ("IDENTIFY not supported.\n"));
 		rslt = EINVAL;
 		goto free_devid;
 	}
@@ -878,10 +860,20 @@ scsi_remove_link(struct scsi_link *link)
 }
 
 void
-scsi_get_target_luns(struct scsi_link *link0, struct scsi_lun_array *lunarray)
+scsi_get_target_luns(struct scsibus_softc *sb, int target,
+    struct scsi_lun_array *lunarray)
 {
 	struct scsi_report_luns_data	*report;
+	struct scsi_link		*link0;
 	int				 i, nluns, rv = 0;
+
+	/* LUN 0 *must* be present. */
+	scsi_probe_link(sb, target, 0, 0);
+	link0 = scsi_get_link(sb, target, 0);
+	if (link0 == NULL) {
+		lunarray->count = 0;
+		return;
+	}
 
 	/* Initialize dumbscan result. Just in case. */
 	report = NULL;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: apldart.c,v 1.9 2022/02/06 19:10:07 kettenis Exp $	*/
+/*	$OpenBSD: apldart.c,v 1.12 2022/03/01 20:45:27 kettenis Exp $	*/
 /*
  * Copyright (c) 2021 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -70,7 +70,7 @@
  */
 #define DART_OFFSET_MASK	7
 
-#define DART_L1_TABLE		0xb
+#define DART_L1_TABLE		0x3
 #define DART_L2_INVAL		0
 #define DART_L2_VALID		(1 << 0)
 #define DART_L2_FULL_PAGE	(1 << 1)
@@ -117,6 +117,7 @@ struct apldart_softc {
 	struct extent		*sc_dvamap;
 	struct mutex		sc_dvamap_mtx;
 
+	int			sc_shift;
 	struct apldart_dmamem	*sc_l1;
 	struct apldart_dmamem	**sc_l2;
 
@@ -185,7 +186,8 @@ apldart_match(struct device *parent, void *match, void *aux)
 {
 	struct fdt_attach_args *faa = aux;
 
-	return OF_is_compatible(faa->fa_node, "apple,t8103-dart");
+	return OF_is_compatible(faa->fa_node, "apple,t8103-dart") ||
+	    OF_is_compatible(faa->fa_node, "apple,t6000-dart");
 }
 
 void
@@ -196,7 +198,7 @@ apldart_attach(struct device *parent, struct device *self, void *aux)
 	paddr_t pa;
 	volatile uint64_t *l1;
 	int ntte, nl1, nl2;
-	uint32_t config, params2;
+	uint32_t config, params2, tcr, ttbr;
 	int sid, idx;
 
 	if (faa->fa_nreg < 1) {
@@ -221,6 +223,26 @@ apldart_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	/*
+	 * Resetting the DART used for the display controller will
+	 * kill the framebuffer.  This should be the only DART that
+	 * has translation enabled and a valid translation table
+	 * installed.  Skip this DART for now.
+	 */
+	for (sid = 0; sid < DART_NUM_STREAMS; sid++) {
+		tcr = HREAD4(sc, DART_TCR(sid));
+		if ((tcr & DART_TCR_TRANSLATE_ENABLE) == 0)
+			continue;
+
+		for (idx = 0; idx < 4; idx++) {
+			ttbr = HREAD4(sc, DART_TTBR(sid, idx));
+			if (ttbr & DART_TTBR_VALID) {
+				printf(": translating\n");
+				return;
+			}
+		}
+	}
+
+	/*
 	 * Use bypass mode if supported.  This avoids an issue with
 	 * the USB3 controllers which need mappings entered into two
 	 * IOMMUs, which is somewhat difficult to implement with our
@@ -237,6 +259,9 @@ apldart_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	printf("\n");
+
+	if (OF_is_compatible(faa->fa_node, "apple,t6000-dart"))
+		sc->sc_shift = 4;
 
 	/*
 	 * Skip the first page to help catching bugs where a device is
@@ -277,7 +302,8 @@ apldart_attach(struct device *parent, struct device *self, void *aux)
 	for (idx = 0; idx < nl2; idx++) {
 		sc->sc_l2[idx] = apldart_dmamem_alloc(sc->sc_dmat,
 		    DART_PAGE_SIZE, DART_PAGE_SIZE);
-		l1[idx] = APLDART_DMA_DVA(sc->sc_l2[idx]) | DART_L1_TABLE;
+		pa = APLDART_DMA_DVA(sc->sc_l2[idx]);
+		l1[idx] = (pa >> sc->sc_shift) | DART_L1_TABLE;
 	}
 
 	/* Install page tables. */
@@ -405,7 +431,7 @@ apldart_load_map(struct apldart_softc *sc, bus_dmamap_t map)
 				end = apldart_round_offset(len) - 1;
 
 			tte = apldart_lookup_tte(sc, dva);
-			*tte = pa | DART_L2_VALID |
+			*tte = (pa >> sc->sc_shift) | DART_L2_VALID |
 			    DART_L2_START(start) | DART_L2_END(end);
 
 			pa += DART_PAGE_SIZE;

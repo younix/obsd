@@ -1708,9 +1708,9 @@ amdgpu_probe(struct device *parent, void *match, void *aux)
 		if (flags & AMD_EXP_HW_SUPPORT)
 			return 0;
 		else
-			return 20;		
+			return 20;
 	}
-	
+
 	return 0;
 }
 
@@ -1782,14 +1782,15 @@ amdgpu_attach(struct device *parent, struct device *self, void *aux)
 		bus_size_t start, end, pci_mem_end;
 		bus_addr_t base;
 
+		KASSERT(pa->pa_memex != NULL);
+
 		start = max(PCI_MEM_START, pa->pa_memex->ex_start);
 		if (PCI_MAPREG_MEM_TYPE(type) == PCI_MAPREG_MEM_TYPE_64BIT)
 			pci_mem_end = PCI_MEM64_END;
 		else
 			pci_mem_end = PCI_MEM_END;
 		end = min(pci_mem_end, pa->pa_memex->ex_end);
-		if (pa->pa_memex == NULL ||
-		    extent_alloc_subregion(pa->pa_memex, start, end,
+		if (extent_alloc_subregion(pa->pa_memex, start, end,
 		    adev->fb_aper_size, adev->fb_aper_size, 0, 0, 0, &base)) {
 			printf(": can't reserve framebuffer space\n");
 			return;
@@ -1854,7 +1855,7 @@ amdgpu_attach(struct device *parent, struct device *self, void *aux)
 
 	printf("\n");
 
-	/* from amdgpu_pci_probe() */
+	/* from amdgpu_pci_probe(), aspm test done later */
 
 	if (!amdgpu_virtual_display &&
 	     amdgpu_device_asic_has_dc_support(adev->family))
@@ -1872,8 +1873,16 @@ amdgpu_attach(struct device *parent, struct device *self, void *aux)
 
 	dev = drm_attach_pci(&amdgpu_kms_driver, pa, 0, adev->primary,
 	    self, &adev->ddev);
+	if (dev == NULL) {
+		printf("%s: drm attach failed\n", adev->self.dv_xname);
+		return;
+	}
 	adev->pdev = dev->pdev;
 	adev->is_fw_fb = adev->primary;
+
+	/* from amdgpu_pci_probe() */
+	if (amdgpu_aspm == -1 && !pcie_aspm_enabled(adev->pdev))
+		amdgpu_aspm = 0;
 
 	if (!supports_atomic)
 		dev->driver_features &= ~DRIVER_ATOMIC;
@@ -1886,13 +1895,15 @@ amdgpu_attach(struct device *parent, struct device *self, void *aux)
 		drm_sched_fence_slab_init();
 
 		if (amdgpu_sync_init()) {
-			printf(": amdgpu_sync_init failed\n");
+			printf("%s: amdgpu_sync_init failed\n",
+			    adev->self.dv_xname);
 			return;
 		}
 
 		if (amdgpu_fence_slab_init()) {
 			amdgpu_sync_fini();
-			printf(": amdgpu_fence_slab_init failed\n");
+			printf("%s: amdgpu_fence_slab_init failed\n",
+			    adev->self.dv_xname);
 			return;
 		}
 
@@ -1905,7 +1916,7 @@ amdgpu_attach(struct device *parent, struct device *self, void *aux)
 	if (pci_intr_map_msi(pa, &adev->intrh) == 0)
 		adev->irq.msi_enabled = true;
 	else if (pci_intr_map(pa, &adev->intrh) != 0) {
-		printf(": couldn't map interrupt\n");
+		printf("%s: couldn't map interrupt\n", adev->self.dv_xname);
 		return;
 	}
 	printf("%s: %s\n", adev->self.dv_xname,
@@ -2275,13 +2286,13 @@ amdgpu_detach(struct device *self, int flags)
 
 		drm_sched_fence_slab_fini();
 	}
-	
+
 	config_detach(adev->ddev.dev, flags);
 
 	return 0;
 }
 
-int     
+int
 amdgpu_activate(struct device *self, int act)
 {
 	struct amdgpu_device *adev = (struct amdgpu_device *)self;

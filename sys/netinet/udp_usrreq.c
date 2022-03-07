@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.268 2022/01/04 06:32:40 yasuoka Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.272 2022/03/02 12:53:15 bluhm Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -110,11 +110,6 @@
 #ifdef PIPEX 
 #include <netinet/if_ether.h>
 #include <net/pipex.h>
-#endif
-
-#include "vxlan.h"
-#if NVXLAN > 0
-#include <net/if_vxlan.h>
 #endif
 
 /*
@@ -345,15 +340,6 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 		break;
 #endif /* INET6 */
 	}
-
-#if NVXLAN > 0
-	if (vxlan_enable > 0 &&
-#if NPF > 0
-	    !(m->m_pkthdr.pf.flags & PF_TAG_DIVERTED) &&
-#endif
-	    vxlan_lookup(m, uh, iphlen, &srcsa.sa, &dstsa.sa) != 0)
-		return IPPROTO_DONE;
-#endif
 
 	if (m->m_flags & (M_BCAST|M_MCAST)) {
 		struct inpcb *last;
@@ -805,10 +791,10 @@ udp6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 			 */
 		}
 
-		(void) in6_pcbnotify(&udbtable, &sa6, uh.uh_dport,
+		in6_pcbnotify(&udbtable, &sa6, uh.uh_dport,
 		    &sa6_src, uh.uh_sport, rdomain, cmd, cmdarg, notify);
 	} else {
-		(void) in6_pcbnotify(&udbtable, &sa6, 0,
+		in6_pcbnotify(&udbtable, &sa6, 0,
 		    &sa6_any, 0, rdomain, cmd, cmdarg, notify);
 	}
 }

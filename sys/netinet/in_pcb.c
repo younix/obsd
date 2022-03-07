@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.256 2021/10/25 22:20:47 bluhm Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.259 2022/03/04 20:35:10 bluhm Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -175,14 +175,10 @@ in_pcbinit(struct inpcbtable *table, int hashsize)
 {
 
 	TAILQ_INIT(&table->inpt_queue);
-	table->inpt_hashtbl = hashinit(hashsize, M_PCB, M_NOWAIT,
+	table->inpt_hashtbl = hashinit(hashsize, M_PCB, M_WAITOK,
 	    &table->inpt_mask);
-	if (table->inpt_hashtbl == NULL)
-		panic("in_pcbinit: hashinit failed");
-	table->inpt_lhashtbl = hashinit(hashsize, M_PCB, M_NOWAIT,
+	table->inpt_lhashtbl = hashinit(hashsize, M_PCB, M_WAITOK,
 	    &table->inpt_lmask);
-	if (table->inpt_lhashtbl == NULL)
-		panic("in_pcbinit: hashinit failed for lport");
 	table->inpt_count = 0;
 	table->inpt_size = hashsize;
 	arc4random_buf(&table->inpt_key, sizeof(table->inpt_key));
@@ -671,14 +667,6 @@ in_pcbnotifyall(struct inpcbtable *table, struct sockaddr *dst, u_int rtable,
 
 	NET_ASSERT_LOCKED();
 
-#ifdef INET6
-	/*
-	 * See in6_pcbnotify() for IPv6 codepath.  By the time this
-	 * gets called, the addresses passed are either definitely IPv4 or
-	 * IPv6; *_pcbnotify() never gets called with v4-mapped v6 addresses.
-	 */
-#endif /* INET6 */
-
 	if (dst->sa_family != AF_INET)
 		return;
 	faddr = satosin(dst)->sin_addr;
@@ -748,7 +736,7 @@ in_rtchange(struct inpcb *inp, int errno)
 {
 	if (inp->inp_route.ro_rt) {
 		rtfree(inp->inp_route.ro_rt);
-		inp->inp_route.ro_rt = 0;
+		inp->inp_route.ro_rt = NULL;
 		/*
 		 * A new route can be allocated the next time
 		 * output is attempted.

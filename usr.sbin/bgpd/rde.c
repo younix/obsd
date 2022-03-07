@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.c,v 1.534 2022/02/06 09:51:19 claudio Exp $ */
+/*	$OpenBSD: rde.c,v 1.540 2022/03/03 13:06:15 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -2422,7 +2422,7 @@ rde_dump_rib_as(struct prefix *p, struct rde_aspath *asp, pid_t pid, int flags,
 		}
 	} else {
 		if (peer_has_add_path(peer, p->pt->aid, CAPA_AP_SEND)) {
-			rib.path_id = 0;	/* XXX add-path send */
+			rib.path_id = p->path_id_tx;
 			rib.flags |= F_PREF_PATH_ID;
 		}
 	}
@@ -2507,12 +2507,16 @@ rde_dump_filter(struct prefix *p, struct ctl_show_rib_request *req, int adjout)
 	if ((req->flags & F_CTL_INVALID) &&
 	    (asp->flags & F_ATTR_PARSE_ERR) == 0)
 		return;
-	/*
-	 * XXX handle out specially since then we want to match against our
-	 * path ids.
-	 */
-	if ((req->flags & F_CTL_HAS_PATHID) && req->path_id != p->path_id)
-		return;
+	if ((req->flags & F_CTL_HAS_PATHID)) {
+		/* Match against the transmit path id if adjout is used.  */
+		if (adjout) {
+			if (req->path_id != p->path_id_tx)
+				return;
+		} else {
+			if (req->path_id != p->path_id)
+				return;
+		}
+	}
 	if (req->as.type != AS_UNDEF &&
 	    !aspath_match(asp->aspath, &req->as, 0))
 		return;
@@ -2570,6 +2574,8 @@ rde_dump_adjout_upcall(struct prefix *p, void *ptr)
 {
 	struct rde_dump_ctx	*ctx = ptr;
 
+	if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
+		fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit", __func__);
 	if (p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD))
 		return;
 	rde_dump_filter(p, &ctx->req, 1);
@@ -2581,6 +2587,8 @@ rde_dump_adjout_prefix_upcall(struct prefix *p, void *ptr)
 	struct rde_dump_ctx	*ctx = ptr;
 	struct bgpd_addr	 addr;
 
+	if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
+		fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit", __func__);
 	if (p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD))
 		return;
 
@@ -2724,12 +2732,16 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 
 			do {
 				if (req->prefixlen == hostplen)
-					p = prefix_match(peer, &req->prefix);
+					p = prefix_adjout_match(peer,
+					    &req->prefix);
 				else
-					p = prefix_lookup(peer, &req->prefix,
-					    req->prefixlen);
-				if (p)
+					p = prefix_adjout_lookup(peer,
+					    &req->prefix, req->prefixlen);
+				/* dump all matching paths */
+				while (p != NULL) {
 					rde_dump_adjout_upcall(p, ctx);
+					p = prefix_adjout_next(peer, p);
+				}
 			} while ((peer = peer_match(&req->neighbor,
 			    peer->conf.id)));
 
@@ -2900,9 +2912,7 @@ void
 rde_send_kroute(struct rib *rib, struct prefix *new, struct prefix *old)
 {
 	struct kroute_full	 kr;
-	struct bgpd_addr	 addr;
 	struct prefix		*p;
-	struct rde_aspath	*asp;
 	struct l3vpn		*vpn;
 	enum imsg_type		 type;
 
@@ -2922,21 +2932,21 @@ rde_send_kroute(struct rib *rib, struct prefix *new, struct prefix *old)
 		p = new;
 	}
 
-	asp = prefix_aspath(p);
-	pt_getaddr(p->pt, &addr);
 	bzero(&kr, sizeof(kr));
-	memcpy(&kr.prefix, &addr, sizeof(kr.prefix));
+	pt_getaddr(p->pt, &kr.prefix);
 	kr.prefixlen = p->pt->prefixlen;
-	if (prefix_nhflags(p) == NEXTHOP_REJECT)
-		kr.flags |= F_REJECT;
-	if (prefix_nhflags(p) == NEXTHOP_BLACKHOLE)
-		kr.flags |= F_BLACKHOLE;
-	if (type == IMSG_KROUTE_CHANGE)
+	if (type == IMSG_KROUTE_CHANGE) {
+		if (prefix_nhflags(p) == NEXTHOP_REJECT)
+			kr.flags |= F_REJECT;
+		if (prefix_nhflags(p) == NEXTHOP_BLACKHOLE)
+			kr.flags |= F_BLACKHOLE;
 		memcpy(&kr.nexthop, &prefix_nexthop(p)->true_nexthop,
 		    sizeof(kr.nexthop));
-	strlcpy(kr.label, rtlabel_id2name(asp->rtlabelid), sizeof(kr.label));
+		strlcpy(kr.label, rtlabel_id2name(prefix_aspath(p)->rtlabelid),
+		    sizeof(kr.label));
+	}
 
-	switch (addr.aid) {
+	switch (kr.prefix.aid) {
 	case AID_VPN_IPv4:
 	case AID_VPN_IPv6:
 		if (!(rib->flags & F_RIB_LOCAL))
@@ -3015,9 +3025,6 @@ rde_generate_updates(struct rib *rib, struct prefix *new, struct prefix *old,
 	if (old == NULL && new == NULL)
 		return;
 
-	if (!eval_all && (rib->flags & F_RIB_NOFIB) == 0)
-		rde_send_kroute(rib, new, old);
-
 	if (new)
 		aid = new->pt->aid;
 	else
@@ -3038,9 +3045,7 @@ rde_generate_updates(struct rib *rib, struct prefix *new, struct prefix *old,
 static void
 rde_up_flush_upcall(struct prefix *p, void *ptr)
 {
-	struct rde_peer *peer = ptr;
-
-	up_generate_updates(out_rules, peer, NULL, p);
+	prefix_adjout_withdraw(p);
 }
 
 u_char	queue_buf[4096];
@@ -3432,7 +3437,7 @@ rde_reload_done(void)
 
 		if (peer->reconf_rib) {
 			if (prefix_dump_new(peer, AID_UNSPEC,
-			    RDE_RUNNER_ROUNDS, peer, rde_up_flush_upcall,
+			    RDE_RUNNER_ROUNDS, NULL, rde_up_flush_upcall,
 			    rde_softreconfig_in_done, NULL) == -1)
 				fatal("%s: prefix_dump_new", __func__);
 			log_peer_info(&peer->conf, "flushing Adj-RIB-Out");

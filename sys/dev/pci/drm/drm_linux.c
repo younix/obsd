@@ -1,4 +1,4 @@
-/*	$OpenBSD: drm_linux.c,v 1.90 2022/02/07 13:16:42 kettenis Exp $	*/
+/*	$OpenBSD: drm_linux.c,v 1.92 2022/03/01 11:50:37 jsg Exp $	*/
 /*
  * Copyright (c) 2013 Jonathan Gray <jsg@openbsd.org>
  * Copyright (c) 2015, 2016 Mark Kettenis <kettenis@openbsd.org>
@@ -1132,12 +1132,9 @@ fail:
 }
 
 int
-i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+__i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
 {
 	int ret, retries;
-
-	if (adap->lock_ops)
-		adap->lock_ops->lock_bus(adap, 0);
 
 	retries = adap->retries;
 retry:
@@ -1149,6 +1146,19 @@ retry:
 		retries--;
 		goto retry;
 	}
+
+	return ret;
+}
+
+int
+i2c_transfer(struct i2c_adapter *adap, struct i2c_msg *msgs, int num)
+{
+	int ret; 
+
+	if (adap->lock_ops)
+		adap->lock_ops->lock_bus(adap, 0);
+
+	ret = __i2c_transfer(adap, msgs, num);
 
 	if (adap->lock_ops)
 		adap->lock_ops->unlock_bus(adap, 0);
@@ -2493,6 +2503,25 @@ pcie_get_width_cap(struct pci_dev *pdev)
 	if (lnkcap)
 		return (lnkcap & 0x3f0) >> 4;
 	return PCIE_LNK_WIDTH_UNKNOWN;
+}
+
+bool
+pcie_aspm_enabled(struct pci_dev *pdev)
+{
+	pci_chipset_tag_t	pc = pdev->pc;
+	pcitag_t		tag = pdev->tag;
+	int			pos ;
+	pcireg_t		lcsr;
+
+	if (!pci_get_capability(pc, tag, PCI_CAP_PCIEXPRESS,
+	    &pos, NULL)) 
+		return false;
+
+	lcsr = pci_conf_read(pc, tag, pos + PCI_PCIE_LCSR);
+	if ((lcsr & (PCI_PCIE_LCSR_ASPM_L0S | PCI_PCIE_LCSR_ASPM_L1)) != 0)
+		return true;
+	
+	return false;
 }
 
 int

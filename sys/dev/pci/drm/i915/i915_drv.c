@@ -956,12 +956,13 @@ int i915_driver_probe(struct drm_i915_private *i915, const struct pci_device_id 
 {
 	const struct intel_device_info *match_info =
 		(struct intel_device_info *)ent->driver_data;
+	struct pci_dev *pdev = i915->drm.pdev;
 #ifdef __linux__
 	struct drm_i915_private *i915;
 #endif
 	int ret;
 
-#ifdef __linux
+#ifdef __linux__
 	i915 = i915_driver_create(pdev, ent);
 	if (IS_ERR(i915))
 		return PTR_ERR(i915);
@@ -2397,6 +2398,10 @@ inteldrm_attach(struct device *parent, struct device *self, void *aux)
 
 	dev = drm_attach_pci(&driver, pa, 0, dev_priv->primary,
 	    self, &dev_priv->drm);
+	if (dev == NULL) {
+		printf("%s: drm attach failed\n", dev_priv->sc_dev.dv_xname);
+		return;
+	}
 
 	id = drm_find_description(PCI_VENDOR(pa->pa_id),
 	    PCI_PRODUCT(pa->pa_id), pciidlist);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kdump.c,v 1.145 2021/12/23 18:50:32 guenther Exp $	*/
+/*	$OpenBSD: kdump.c,v 1.148 2022/02/22 17:31:31 deraadt Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -29,7 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>	/* MAXCOMLEN nitems */
 #include <sys/time.h>
 #include <sys/signal.h>
 #include <sys/uio.h>
@@ -74,6 +73,8 @@
 #include "kdump.h"
 #include "kdump_subr.h"
 #include "extern.h"
+
+#define nitems(_a)	(sizeof((_a)) / sizeof((_a)[0]))
 
 enum {
 	TIMESTAMP_NONE,
@@ -367,7 +368,7 @@ dumpheader(struct ktr_header *kth)
 	basecol = printf("%6ld", (long)kth->ktr_pid);
 	if (needtid)
 		basecol += printf("/%-7ld", (long)kth->ktr_tid);
-	basecol += printf(" %-8.*s ", MAXCOMLEN, kth->ktr_comm);
+	basecol += printf(" %-8s ", kth->ktr_comm);
 	if (timestamp != TIMESTAMP_NONE) {
 		if (timestamp == TIMESTAMP_ELAPSED) {
 			if (prevtime.tv_sec == 0)

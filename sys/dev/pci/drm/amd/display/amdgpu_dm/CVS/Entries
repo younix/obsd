@@ -1,5 +1,4 @@
 /amdgpu_dm_hdcp.h/1.2/Thu Sep  2 14:22:32 2021//
-/amdgpu_dm.c/1.31/Fri Feb 11 13:33:52 2022//
 /amdgpu_dm.h/1.7/Mon Jan 24 14:35:14 2022//
 /amdgpu_dm_color.c/1.5/Mon Jan 24 14:35:14 2022//
 /amdgpu_dm_crc.c/1.5/Mon Jan 24 14:35:14 2022//
@@ -20,4 +19,5 @@
 /amdgpu_dm_trace.h/1.2/Mon Jan 24 14:35:14 2022//
 /dc_fpu.c/1.1/Mon Jan 24 14:35:14 2022//
 /dc_fpu.h/1.1/Mon Jan 24 14:35:14 2022//
+/amdgpu_dm.c/1.32/Mon Mar  7 08:56:15 2022//
 D

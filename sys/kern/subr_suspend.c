@@ -1,4 +1,4 @@
-/* $OpenBSD: subr_suspend.c,v 1.3 2022/02/11 01:55:12 deraadt Exp $ */
+/* $OpenBSD: subr_suspend.c,v 1.10 2022/02/16 16:44:17 deraadt Exp $ */
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  * Copyright (c) 2005 Jordan Hargrave <jordan@openbsd.org>
@@ -33,24 +33,29 @@
 #endif
 
 #include "softraid.h"
+#include "wsdisplay.h"
 
 int
 sleep_state(void *v, int sleepmode)
 {
-	int error = ENXIO;
+	int error, s;
 	extern int perflevel;
-	size_t rndbuflen = 0;
-	char *rndbuf = NULL;
-	int s;
+	size_t rndbuflen;
+	char *rndbuf;
 #if NSOFTRAID > 0
 	extern void sr_quiesce(void);
 #endif
 
+top:
+	error = ENXIO;
+	rndbuf = NULL;
+	rndbuflen = 0;
+
 	if (sleep_showstate(v, sleepmode))
 		return EOPNOTSUPP;
-
-	display_suspend(v);
-
+#if NWSDISPLAY > 0
+	wsdisplay_suspend();
+#endif
 	stop_periodic_resettodr();
 
 #ifdef HIBERNATE
@@ -63,23 +68,28 @@ sleep_state(void *v, int sleepmode)
 		uvmpd_hibernate();
 		if (hibernate_alloc()) {
 			printf("failed to allocate hibernate memory\n");
-			goto fail_alloc;
+			sleep_abort(v);
+			error = ENOMEM;
+			goto fail_hiballoc;
 		}
 	}
 #endif /* HIBERNATE */
 
 	sensor_quiesce();
-	if (config_suspend_all(DVACT_QUIESCE))
+	if (config_suspend_all(DVACT_QUIESCE)) {
+		sleep_abort(v);
+		error = EIO;
 		goto fail_quiesce;
+	}
 
 	vfs_stall(curproc, 1);
 #if NSOFTRAID > 0
 	sr_quiesce();
 #endif
 	bufq_quiesce();
-
-	
 #ifdef MULTIPROCESSOR
+	sched_stop_secondary_cpus();
+	KASSERT(CPU_IS_PRIMARY(curcpu()));
 	sleep_mp();
 #endif
 
@@ -101,13 +111,17 @@ sleep_state(void *v, int sleepmode)
 	intr_disable();	/* PSL_I for resume; PIC/APIC broken until repair */
 	cold = 2;	/* Force other code to delay() instead of tsleep() */
 
-	if (config_suspend_all(DVACT_SUSPEND) != 0)
+	if (config_suspend_all(DVACT_SUSPEND) != 0) {
+		sleep_abort(v);
+		error = EDEADLK;
 		goto fail_suspend;
-
+	}
 	suspend_randomness();
-
-	if (sleep_setstate(v))
+	if (sleep_setstate(v)) {
+		sleep_abort(v);
+		error = ENOTBLK;
 		goto fail_pts;
+	}
 
 	if (sleepmode == SLEEP_SUSPEND) {
 		/*
@@ -120,7 +134,7 @@ sleep_state(void *v, int sleepmode)
 		boothowto &= ~RB_POWERDOWN;
 	}
 
-	gosleep(v);
+	error = gosleep(v);
 
 #ifdef HIBERNATE
 	if (sleepmode == SLEEP_HIBERNATE) {
@@ -137,19 +151,13 @@ fail_suspend:
 	intr_enable();
 	splx(s);
 
-	disable_lid_wakeups(v);
-
 	inittodr(gettime());
-
 	sleep_resume(v);
-
-	/* force RNG upper level reseed */
 	resume_randomness(rndbuf, rndbuflen);
-
 #ifdef MULTIPROCESSOR
 	resume_mp();
+	sched_start_secondary_cpus();
 #endif
-
 	vfs_stall(curproc, 0);
 	bufq_restart();
 
@@ -160,22 +168,19 @@ fail_quiesce:
 #ifdef HIBERNATE
 	if (sleepmode == SLEEP_HIBERNATE) {
 		hibernate_free();
-fail_alloc:
+fail_hiballoc:
 		hibernate_resume_bufcache();
 	}
 #endif /* HIBERNATE */
 
 	start_periodic_resettodr();
-
-	display_resume(v);
-
+#if NWSDISPLAY > 0
+	wsdisplay_resume();
+#endif
 	sys_sync(curproc, NULL, NULL);
-
-	/* Restore hw.setperf */
 	if (cpu_setperf != NULL)
-		cpu_setperf(perflevel);
-
-	suspend_finish(v);
-
+		cpu_setperf(perflevel);	/* Restore hw.setperf */
+	if (suspend_finish(v) == EAGAIN)
+		goto top;
 	return (error);
 }

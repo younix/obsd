@@ -1,4 +1,4 @@
-/* $OpenBSD: doas.c,v 1.94 2022/02/10 13:06:46 robert Exp $ */
+/* $OpenBSD: doas.c,v 1.96 2022/03/04 05:37:21 tb Exp $ */
 /*
  * Copyright (c) 2015 Ted Unangst <tedu@openbsd.org>
  *
@@ -455,7 +455,7 @@ main(int argc, char **argv)
 	if (setusercontext(NULL, targpw, target, LOGIN_SETGROUP |
 	    LOGIN_SETPATH |
 	    LOGIN_SETPRIORITY | LOGIN_SETRESOURCES | LOGIN_SETUMASK |
-	    LOGIN_SETUSER) != 0)
+	    LOGIN_SETUSER | LOGIN_SETENV | LOGIN_SETRTABLE) != 0)
 		errx(1, "failed to set user context for target");
 
 	if (pledge("stdio rpath exec", NULL) == -1)

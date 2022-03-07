@@ -498,10 +498,8 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 	int			 i;
 	uint8_t			 rmmio_bar;
 	paddr_t			 fb_aper;
-#if !defined(__sparc64__)
 	pcireg_t		 addr, mask;
 	int			 s;
-#endif
 
 #if defined(__sparc64__) || defined(__macppc__)
 	extern int fbnode;
@@ -551,15 +549,15 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 		printf(": can't get frambuffer info\n");
 		return;
 	}
-#if !defined(__sparc64__)
 	if (rdev->fb_aper_offset == 0) {
 		bus_size_t start, end;
 		bus_addr_t base;
 
+		KASSERT(pa->pa_memex != NULL);
+
 		start = max(PCI_MEM_START, pa->pa_memex->ex_start);
 		end = min(PCI_MEM_END, pa->pa_memex->ex_end);
-		if (pa->pa_memex == NULL ||
-		    extent_alloc_subregion(pa->pa_memex, start, end,
+		if (extent_alloc_subregion(pa->pa_memex, start, end,
 		    rdev->fb_aper_size, rdev->fb_aper_size, 0, 0, 0, &base)) {
 			printf(": can't reserve framebuffer space\n");
 			return;
@@ -570,7 +568,6 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 			    RADEON_PCI_MEM + 4, (uint64_t)base >> 32);
 		rdev->fb_aper_offset = base;
 	}
-#endif
 
 	for (i = PCI_MAPREG_START; i < PCI_MAPREG_END; i += 4) {
 		type = pci_mapreg_type(pa->pa_pc, pa->pa_tag, i);
@@ -610,7 +607,6 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 	}
 	rdev->rmmio = bus_space_vaddr(rdev->memt, rdev->rmmio_bsh);
 
-#if !defined(__sparc64__)
 	/*
 	 * Make sure we have a base address for the ROM such that we
 	 * can map it later.
@@ -633,11 +629,6 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 		    size, 0, 0, 0, &base) == 0)
 			pci_conf_write(pa->pa_pc, pa->pa_tag, PCI_ROM_REG, base);
 	}
-#endif
-
-#ifdef notyet
-	mtx_init(&rdev->swi_lock, IPL_TTY);
-#endif
 
 	/* update BUS flag */
 	if (pci_get_capability(pa->pa_pc, pa->pa_tag, PCI_CAP_AGP, NULL, NULL)) {
@@ -665,6 +656,10 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 
 	dev = drm_attach_pci(&kms_driver, pa, is_agp, rdev->primary,
 	    self, NULL);
+	if (dev == NULL) {
+		printf("%s: drm attach failed\n", rdev->self.dv_xname);
+		return;
+	}
 	rdev->ddev = dev;
 	rdev->pdev = dev->pdev;
 
@@ -675,7 +670,7 @@ radeondrm_attach_kms(struct device *parent, struct device *self, void *aux)
 	if (pci_intr_map_msi(pa, &rdev->intrh) == 0)
 		rdev->msi_enabled = 1;
 	else if (pci_intr_map(pa, &rdev->intrh) != 0) {
-		printf(": couldn't map interrupt\n");
+		printf("%s: couldn't map interrupt\n", rdev->self.dv_xname);
 		return;
 	}
 	printf("%s: %s\n", rdev->self.dv_xname,
@@ -760,8 +755,9 @@ radeondrm_forcedetach(struct radeon_device *rdev)
 void
 radeondrm_attachhook(struct device *self)
 {
-	struct radeon_device	*rdev = (struct radeon_device *)self;
-	int			 r, acpi_status;
+	struct radeon_device *rdev = (struct radeon_device *)self;
+	struct drm_device *dev = rdev->ddev;
+	int r, acpi_status;
 
 	/* radeon_device_init should report only fatal error
 	 * like memory allocation failure or iomapping failure,

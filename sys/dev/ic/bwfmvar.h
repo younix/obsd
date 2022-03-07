@@ -1,4 +1,4 @@
-/* $OpenBSD: bwfmvar.h,v 1.28 2021/12/27 13:54:39 patrick Exp $ */
+/* $OpenBSD: bwfmvar.h,v 1.31 2022/03/06 18:52:47 kettenis Exp $ */
 /*
  * Copyright (c) 2010-2016 Broadcom Corporation
  * Copyright (c) 2016,2017 Patrick Wildt <patrick@blueri.se>
@@ -174,6 +174,8 @@ struct bwfm_softc {
 	int			 sc_initialized;
 	int			 sc_tx_timer;
 
+	int			 sc_scan_ver;
+
 	int			 (*sc_newstate)(struct ieee80211com *,
 				     enum ieee80211_state, int);
 	struct bwfm_host_cmd_ring sc_cmdq;
@@ -184,6 +186,7 @@ struct bwfm_softc {
 	int			 sc_bcdc_reqid;
 	TAILQ_HEAD(, bwfm_proto_bcdc_ctl) sc_bcdc_rxctlq;
 
+	char			 sc_fwdir[16];
 	u_char			*sc_clm;
 	size_t			 sc_clmsize;
 	u_char			*sc_txcap;
@@ -191,6 +194,11 @@ struct bwfm_softc {
 	u_char			*sc_cal;
 	size_t			 sc_calsize;
 	int			 sc_key_tasks;
+
+	char			 sc_board_type[128];
+	char			 sc_module[8];
+	char			 sc_vendor[8];
+	char			 sc_modrev[8];
 };
 
 void bwfm_attach(struct bwfm_softc *);

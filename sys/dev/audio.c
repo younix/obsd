@@ -1,4 +1,4 @@
-/*	$OpenBSD: audio.c,v 1.194 2022/01/09 05:42:36 jsg Exp $	*/
+/*	$OpenBSD: audio.c,v 1.197 2022/02/22 07:34:06 visa Exp $	*/
 /*
  * Copyright (c) 2015 Alexandre Ratchov <alex@caoua.org>
  *
@@ -96,6 +96,8 @@ struct wskbd_vol
 #define WSKBD_MUTE_DISABLE	2
 #define WSKBD_MUTE_ENABLE	3
 };
+
+int wskbd_set_mixervolume_unit(int, long, long);
 #endif
 
 /*
@@ -112,6 +114,7 @@ struct mixer_ev {
 struct audio_softc {
 	struct device dev;
 	struct audio_hw_if *ops;	/* driver funcs */
+	void *cookie;			/* wskbd cookie */
 	void *arg;			/* first arg to driver funcs */
 	int mode;			/* bitmask of AUMODE_* */
 	int quiesce;			/* device suspended */
@@ -167,32 +170,40 @@ struct cfdriver audio_cd = {
 
 void filt_audioctlrdetach(struct knote *);
 int filt_audioctlread(struct knote *, long);
+int filt_audiomodify(struct kevent *, struct knote *);
+int filt_audioprocess(struct knote *, struct kevent *);
 
 const struct filterops audioctlread_filtops = {
-	.f_flags	= FILTEROP_ISFD,
+	.f_flags	= FILTEROP_ISFD | FILTEROP_MPSAFE,
 	.f_attach	= NULL,
 	.f_detach	= filt_audioctlrdetach,
 	.f_event	= filt_audioctlread,
+	.f_modify	= filt_audiomodify,
+	.f_process	= filt_audioprocess,
 };
 
 void filt_audiowdetach(struct knote *);
 int filt_audiowrite(struct knote *, long);
 
 const struct filterops audiowrite_filtops = {
-	.f_flags	= FILTEROP_ISFD,
+	.f_flags	= FILTEROP_ISFD | FILTEROP_MPSAFE,
 	.f_attach	= NULL,
 	.f_detach	= filt_audiowdetach,
 	.f_event	= filt_audiowrite,
+	.f_modify	= filt_audiomodify,
+	.f_process	= filt_audioprocess,
 };
 
 void filt_audiordetach(struct knote *);
 int filt_audioread(struct knote *, long);
 
 const struct filterops audioread_filtops = {
-	.f_flags	= FILTEROP_ISFD,
+	.f_flags	= FILTEROP_ISFD | FILTEROP_MPSAFE,
 	.f_attach	= NULL,
 	.f_detach	= filt_audiordetach,
 	.f_event	= filt_audioread,
+	.f_modify	= filt_audiomodify,
+	.f_process	= filt_audioprocess,
 };
 
 /*
@@ -305,11 +316,12 @@ audio_buf_wakeup(void *addr)
 int
 audio_buf_init(struct audio_softc *sc, struct audio_buf *buf, int dir)
 {
+	klist_init_mutex(&buf->sel.si_note, &audio_lock);
 	buf->softintr = softintr_establish(IPL_SOFTAUDIO,
 	    audio_buf_wakeup, buf);
 	if (buf->softintr == NULL) {
 		printf("%s: can't establish softintr\n", DEVNAME(sc));
-		return ENOMEM;
+		goto bad;
 	}
 	if (sc->ops->round_buffersize) {
 		buf->datalen = sc->ops->round_buffersize(sc->arg,
@@ -323,9 +335,12 @@ audio_buf_init(struct audio_softc *sc, struct audio_buf *buf, int dir)
 		buf->data = malloc(buf->datalen, M_DEVBUF, M_WAITOK);
 	if (buf->data == NULL) {
 		softintr_disestablish(buf->softintr);
-		return ENOMEM;
+		goto bad;
 	}
 	return 0;
+bad:
+	klist_free(&buf->sel.si_note);
+	return ENOMEM;
 }
 
 void
@@ -336,6 +351,7 @@ audio_buf_done(struct audio_softc *sc, struct audio_buf *buf)
 	else
 		free(buf->data, M_DEVBUF, buf->datalen);
 	softintr_disestablish(buf->softintr);
+	klist_free(&buf->sel.si_note);
 }
 
 /*
@@ -1236,6 +1252,7 @@ audio_attach(struct device *parent, struct device *self, void *aux)
 	}
 #endif
 	sc->ops = ops;
+	sc->cookie = sa->cookie;
 	sc->arg = arg;
 
 #if NWSKBD > 0
@@ -1256,9 +1273,11 @@ audio_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
+	klist_init_mutex(&sc->mix_sel.si_note, &audio_lock);
 	sc->mix_softintr = softintr_establish(IPL_SOFTAUDIO,
 	    audio_mixer_wakeup, sc);
 	if (sc->mix_softintr == NULL) {
+		klist_free(&sc->mix_sel.si_note);
 		audio_buf_done(sc, &sc->rec);
 		audio_buf_done(sc, &sc->play);
 		sc->ops = 0;
@@ -1451,6 +1470,7 @@ audio_detach(struct device *self, int flags)
 
 	/* free resources */
 	softintr_disestablish(sc->mix_softintr);
+	klist_free(&sc->mix_sel.si_note);
 	free(sc->mix_evbuf, M_DEVBUF, sc->mix_nent * sizeof(struct mixer_ev));
 	free(sc->mix_ents, M_DEVBUF, sc->mix_nent * sizeof(struct mixer_ctrl));
 	audio_buf_done(sc, &sc->play);
@@ -1467,13 +1487,14 @@ audio_submatch(struct device *parent, void *match, void *aux)
 }
 
 struct device *
-audio_attach_mi(struct audio_hw_if *ops, void *arg, struct device *dev)
+audio_attach_mi(struct audio_hw_if *ops, void *arg, void *cookie, struct device *dev)
 {
 	struct audio_attach_args aa;
 
 	aa.type = AUDIODEV_TYPE_AUDIO;
 	aa.hwif = ops;
 	aa.hdl = arg;
+	aa.cookie = cookie;
 
 	/*
 	 * attach this driver to the caller (hardware driver), this
@@ -2293,9 +2314,7 @@ audiokqfilter(dev_t dev, struct knote *kn)
 	}
 	kn->kn_hook = sc;
 
-	mtx_enter(&audio_lock);
-	klist_insert_locked(klist, kn);
-	mtx_leave(&audio_lock);
+	klist_insert(klist, kn);
 done:
 	device_unref(&sc->dev);
 	return error;
@@ -2306,24 +2325,17 @@ filt_audiordetach(struct knote *kn)
 {
 	struct audio_softc *sc = kn->kn_hook;
 
-	mtx_enter(&audio_lock);
-	klist_remove_locked(&sc->rec.sel.si_note, kn);
-	mtx_leave(&audio_lock);
+	klist_remove(&sc->rec.sel.si_note, kn);
 }
 
 int
 filt_audioread(struct knote *kn, long hint)
 {
 	struct audio_softc *sc = kn->kn_hook;
-	int retval = 0;
 
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_enter(&audio_lock);
-	retval = (sc->mode & AUMODE_RECORD) && (sc->rec.used > 0);
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_leave(&audio_lock);
+	MUTEX_ASSERT_LOCKED(&audio_lock);
 
-	return retval;
+	return (sc->mode & AUMODE_RECORD) && (sc->rec.used > 0);
 }
 
 void
@@ -2331,24 +2343,17 @@ filt_audiowdetach(struct knote *kn)
 {
 	struct audio_softc *sc = kn->kn_hook;
 
-	mtx_enter(&audio_lock);
-	klist_remove_locked(&sc->play.sel.si_note, kn);
-	mtx_leave(&audio_lock);
+	klist_remove(&sc->play.sel.si_note, kn);
 }
 
 int
 filt_audiowrite(struct knote *kn, long hint)
 {
 	struct audio_softc *sc = kn->kn_hook;
-	int retval = 0;
 
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_enter(&audio_lock);
-	retval = (sc->mode & AUMODE_PLAY) && (sc->play.used < sc->play.len);
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_leave(&audio_lock);
+	MUTEX_ASSERT_LOCKED(&audio_lock);
 
-	return retval;
+	return (sc->mode & AUMODE_PLAY) && (sc->play.used < sc->play.len);
 }
 
 void
@@ -2356,24 +2361,41 @@ filt_audioctlrdetach(struct knote *kn)
 {
 	struct audio_softc *sc = kn->kn_hook;
 
-	mtx_enter(&audio_lock);
-	klist_remove_locked(&sc->mix_sel.si_note, kn);
-	mtx_leave(&audio_lock);
+	klist_remove(&sc->mix_sel.si_note, kn);
 }
 
 int
 filt_audioctlread(struct knote *kn, long hint)
 {
 	struct audio_softc *sc = kn->kn_hook;
-	int retval = 0;
 
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_enter(&audio_lock);
-	retval = (sc->mix_isopen && sc->mix_pending);
-	if ((hint & NOTE_SUBMIT) == 0)
-		mtx_leave(&audio_lock);
+	MUTEX_ASSERT_LOCKED(&audio_lock);
 
-	return retval;
+	return (sc->mix_isopen && sc->mix_pending);
+}
+
+int
+filt_audiomodify(struct kevent *kev, struct knote *kn)
+{
+	int active;
+
+	mtx_enter(&audio_lock);
+	active = knote_modify(kev, kn);
+	mtx_leave(&audio_lock);
+
+	return active;
+}
+
+int
+filt_audioprocess(struct knote *kn, struct kevent *kev)
+{
+	int active;
+
+	mtx_enter(&audio_lock);
+	active = knote_process(kn, kev);
+	mtx_leave(&audio_lock);
+
+	return active;
 }
 
 #if NWSKBD > 0
@@ -2452,10 +2474,6 @@ wskbd_mixer_init(struct audio_softc *sc)
 	};
 	int i;
 
-	if (sc->dev.dv_unit != 0) {
-		DPRINTF("%s: not configuring wskbd keys\n", DEVNAME(sc));
-		return;
-	}
 	for (i = 0; i < sizeof(spkr_names) / sizeof(spkr_names[0]); i++) {
 		if (wskbd_initvol(sc, &sc->spkr,
 			spkr_names[i].cn, spkr_names[i].dn))
@@ -2566,13 +2584,48 @@ wskbd_set_mixermute(long mute, long out)
 	return 0;
 }
 
+/*
+ * Adjust the volume of the audio device associated with the given cookie.
+ * Otherwise, fallback to audio0.
+ */
+int
+wskbd_set_mixervolume_dev(void *cookie, long dir, long out)
+{
+	int unit = 0;
+	int i;
+
+	for (i = 0; i < audio_cd.cd_ndevs; i++) {
+		struct audio_softc *sc;
+
+		sc = (struct audio_softc *)device_lookup(&audio_cd, i);
+		if (sc == NULL)
+			continue;
+		if (sc->cookie != cookie) {
+			device_unref(&sc->dev);
+			continue;
+		}
+
+		device_unref(&sc->dev);
+		unit = i;
+		break;
+	}
+
+	return wskbd_set_mixervolume_unit(unit, dir, out);
+}
+
 int
 wskbd_set_mixervolume(long dir, long out)
+{
+	return wskbd_set_mixervolume_unit(0, dir, out);
+}
+
+int
+wskbd_set_mixervolume_unit(int unit, long dir, long out)
 {
 	struct audio_softc *sc;
 	struct wskbd_vol *vol;
 
-	sc = (struct audio_softc *)device_lookup(&audio_cd, 0);
+	sc = (struct audio_softc *)device_lookup(&audio_cd, unit);
 	if (sc == NULL)
 		return ENODEV;
 	vol = out ? &sc->spkr : &sc->mic;

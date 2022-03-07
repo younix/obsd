@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde_decide.c,v 1.87 2022/02/06 09:51:19 claudio Exp $ */
+/*	$OpenBSD: rde_decide.c,v 1.89 2022/03/03 13:06:15 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Claudio Jeker <claudio@openbsd.org>
@@ -281,7 +281,7 @@ prefix_cmp(struct prefix *p1, struct prefix *p2, int *testall)
 	if (i > 0)
 		return -1;
 
-	/* XXX RFC7911 does not specify this but it is needed. */
+	/* RFC7911 does not specify this but something like this is needed. */
 	/* 13. lowest path identifier wins */
 	if (p1->path_id < p2->path_id)
 		return 1;
@@ -305,7 +305,7 @@ prefix_insert(struct prefix *new, struct prefix *ep, struct rib_entry *re)
 	struct prefix *xp, *np, *tailp = NULL, *insertp = ep;
 	int testall, selected = 0;
 
-	/* start scan at the entry point (ep) or if the head if ep == NULL */
+	/* start scan at the entry point (ep) or the head if ep == NULL */
 	if (ep == NULL)
 		ep = LIST_FIRST(&re->prefix_h);
 
@@ -339,10 +339,13 @@ prefix_insert(struct prefix *new, struct prefix *ep, struct rib_entry *re)
 			}
 		} else {
 			/*
-			 * p is less preferred, remember insertion point
-			 * If p got selected during a testall traverse 
-			 * do not alter the insertion point unless this
-			 * happened on an actual MED check.
+			 * xp is preferred over new.
+			 * Remember insertion point for later unless the
+			 * traverse is just looking for a possible MED
+			 * inversion (selected == 1).
+			 * If the last comparison's tie-breaker was the MED
+			 * check reset selected and with it insertp since
+			 * this was an actual MED priority inversion.
 			 */
 			if (testall == 2)
 				selected = 0;
@@ -451,8 +454,10 @@ void
 prefix_evaluate(struct rib_entry *re, struct prefix *new, struct prefix *old)
 {
 	struct prefix	*xp;
+	struct rib	*rib;
 
-	if (re_rib(re)->flags & F_RIB_NOEVALUATE) {
+	rib = re_rib(re);
+	if (rib->flags & F_RIB_NOEVALUATE) {
 		/* decision process is turned off */
 		if (old != NULL)
 			LIST_REMOVE(old, entry.list.rib);
@@ -465,7 +470,7 @@ prefix_evaluate(struct rib_entry *re, struct prefix *new, struct prefix *old)
 			 * active. Clean up now to ensure that the RIB
 			 * is consistant.
 			 */
-			rde_generate_updates(re_rib(re), NULL, re->active, 0);
+			rde_generate_updates(rib, NULL, re->active, 0);
 			re->active = NULL;
 		}
 		return;
@@ -491,7 +496,9 @@ prefix_evaluate(struct rib_entry *re, struct prefix *new, struct prefix *old)
 		 * but remember that xp may be NULL aka ineligible.
 		 * Additional decision may be made by the called functions.
 		 */
-		rde_generate_updates(re_rib(re), xp, re->active, 0);
+		rde_generate_updates(rib, xp, re->active, 0);
+		if ((rib->flags & F_RIB_NOFIB) == 0)
+			rde_send_kroute(rib, xp, re->active);
 		re->active = xp;
 		return;
 	}
@@ -503,5 +510,5 @@ prefix_evaluate(struct rib_entry *re, struct prefix *new, struct prefix *old)
 	 */
 	if (rde_evaluate_all())
 		if ((new != NULL && prefix_eligible(new)) || old != NULL)
-			rde_generate_updates(re_rib(re), re->active, NULL, 1);
+			rde_generate_updates(rib, re->active, NULL, 1);
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: acpi_x86.c,v 1.1 2022/02/09 23:54:34 deraadt Exp $ */
+/* $OpenBSD: acpi_x86.c,v 1.15 2022/03/06 15:12:00 deraadt Exp $ */
 /*
  * Copyright (c) 2005 Thorsten Lockert <tholo@sigmasoft.com>
  * Copyright (c) 2005 Jordan Hargrave <jordan@openbsd.org>
@@ -18,54 +18,14 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/buf.h>
 #include <sys/device.h>
-#include <sys/malloc.h>
-#include <sys/pool.h>
-#include <sys/fcntl.h>
-#include <sys/ioccom.h>
-#include <sys/event.h>
-#include <sys/signalvar.h>
-#include <sys/proc.h>
-#include <sys/kthread.h>
-#include <sys/sched.h>
-#include <sys/reboot.h>
-#include <sys/sysctl.h>
-#include <sys/mount.h>
-#include <sys/syscallargs.h>
-#include <sys/sensors.h>
-#include <sys/timetc.h>
 
-#ifdef HIBERNATE
-#include <sys/hibernate.h>
-#endif
-
-#include <machine/conf.h>
-#include <machine/cpufunc.h>
-#include <machine/bus.h>
-
-#include <dev/pci/pcivar.h>
 #include <dev/acpi/acpireg.h>
 #include <dev/acpi/acpivar.h>
-#include <dev/acpi/amltypes.h>
 #include <dev/acpi/acpidev.h>
 #include <dev/acpi/dsdt.h>
-#include <dev/wscons/wsdisplayvar.h>
-
-#include <dev/pci/pcidevs.h>
-#include <dev/pci/ppbreg.h>
-
-#include <dev/pci/pciidevar.h>
 
 #include <machine/apmvar.h>
-#define APMUNIT(dev)	(minor(dev)&0xf0)
-#define APMDEV(dev)	(minor(dev)&0x0f)
-#define APMDEV_NORMAL	0
-#define APMDEV_CTL	8
-
-#include "wd.h"
-#include "wsdisplay.h"
-#include "softraid.h"
 
 int
 sleep_showstate(void *v, int sleepmode)
@@ -85,9 +45,15 @@ sleep_showstate(void *v, int sleepmode)
 
 	if (sc->sc_sleeptype[sc->sc_state].slp_typa == -1 ||
 	    sc->sc_sleeptype[sc->sc_state].slp_typb == -1) {
-		printf("%s: state S%d unavailable\n",
-		    sc->sc_dev.dv_xname, sc->sc_state);
-		return (EOPNOTSUPP);
+		if (sc->sc_state == ACPI_STATE_S4) {
+			sc->sc_state = ACPI_STATE_S5;	/* No S4, use S5 */
+			printf("%s: S4 unavailable, using S5\n",
+			    sc->sc_dev.dv_xname);
+		} else {
+			printf("%s: state S%d unavailable\n",
+			    sc->sc_dev.dv_xname, sc->sc_state);
+			return (EOPNOTSUPP);
+		}
 	}
 
 	/* 1st suspend AML step: _TTS(tostate) */
@@ -109,13 +75,14 @@ sleep_setstate(void *v)
 	return 0;
 }
 
-void
+int
 gosleep(void *v)
 {
 	struct acpi_softc *sc = v;
+	int ret;
 
 	acpibtn_enable_psw();   /* enable _LID for wakeup */
-	acpi_indicator(v, ACPI_SST_SLEEPING);
+	acpi_indicator(sc, ACPI_SST_SLEEPING);
 
 	/* 3rd suspend AML step: _GTS(tostate) */
 	aml_node_setval(sc, sc->sc_gts, sc->sc_state);
@@ -127,18 +94,27 @@ gosleep(void *v)
 	acpi_disable_allgpes(sc);
 	acpi_enable_wakegpes(sc, sc->sc_state);
 
-	/* Sleep */
-	acpi_sleep_cpu(sc, sc->sc_state);
-	sc->sc_state = ACPI_STATE_S0;
-	/* Resume */
-
+	ret = acpi_sleep_cpu(sc, sc->sc_state);
 	acpi_resume_cpu(sc, sc->sc_state);
+	sc->sc_state = ACPI_STATE_S0;
+
+	return ret;
+}
+
+void
+sleep_abort(void *v)
+{
+	struct acpi_softc *sc = v;
+
+	sc->sc_state = ACPI_STATE_S0;
 }
 
 int
 sleep_resume(void *v)
 {
 	struct acpi_softc *sc = v;
+
+	acpibtn_disable_psw();		/* disable _LID for wakeup */
 
 	/* 3rd resume AML step: _TTS(runstate) */
 	if (aml_node_setval(sc, sc->sc_tts, sc->sc_state) != 0)
@@ -147,51 +123,28 @@ sleep_resume(void *v)
 	return 0;
 }
 
-void
+
+static int
+checklids(struct acpi_softc *sc)
+{
+	extern int lid_action;
+	int lids;
+
+	lids = acpibtn_numopenlids();
+	if (lids == 0 && lid_action != 0)
+		return EAGAIN;
+	return 0;
+}	
+
+
+int
 suspend_finish(void *v)
 {
 	struct acpi_softc *sc = v;
-	extern int lid_action;
 
 	acpi_record_event(sc, APM_NORMAL_RESUME);
 	acpi_indicator(sc, ACPI_SST_WORKING);
 
 	/* If we woke up but all the lids are closed, go back to sleep */
-	if (acpibtn_numopenlids() == 0 && lid_action != 0)
-		acpi_addtask(sc, acpi_sleep_task, sc, sc->sc_state);
-}
-
-void
-disable_lid_wakeups(void *v)
-{
-	acpibtn_disable_psw();		/* disable _LID for wakeup */
-
-}
-
-void
-display_suspend(void *v)
-{
-#if NWSDISPLAY > 0
-	struct acpi_softc *sc = v;
-
-	/*
-	 * Temporarily release the lock to prevent the X server from
-	 * blocking on setting the display brightness.
-	 */
-	rw_exit_write(&sc->sc_lck);
-	wsdisplay_suspend();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
-}
-
-void
-display_resume(void *v)
-{
-#if NWSDISPLAY > 0
-	struct acpi_softc *sc = v;
-
-	rw_exit_write(&sc->sc_lck);
-	wsdisplay_resume();
-	rw_enter_write(&sc->sc_lck);
-#endif /* NWSDISPLAY > 0 */
+	return checklids(sc);
 }

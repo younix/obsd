@@ -1,4 +1,4 @@
-/*	$OpenBSD: apmd.c,v 1.107 2022/02/06 09:07:42 robert Exp $	*/
+/*	$OpenBSD: apmd.c,v 1.109 2022/02/18 22:54:13 deraadt Exp $	*/
 
 /*
  *  Copyright (c) 1995, 1996 John T. Kohl
@@ -163,7 +163,8 @@ power_status(int fd, int force, struct apm_power_info *pinfo)
 		if (force ||
 		    bstate.ac_state != last.ac_state ||
 		    bstate.battery_state != last.battery_state ||
-		    (bstate.minutes_left && bstate.minutes_left < 15) ||
+		    ((bstate.battery_state != APM_BATT_CHARGING) &&
+		     (bstate.minutes_left && bstate.minutes_left < 15)) ||
 		    abs(bstate.battery_life - last.battery_life) >= 10) {
 			if ((int)bstate.minutes_left > 0)
 				logmsg(priority, "battery status: %s. "
@@ -314,6 +315,25 @@ handle_client(int sock_fd, int ctl_fd)
 	close(cli_fd);
 }
 
+/*
+ * Refresh the random file read by the bootblocks, and remove the +t bit
+ * which the bootblock use to track "reuse of the file".
+ */
+void
+fixrandom(void)
+{
+	char buf[512];
+	int fd;
+
+	fd = open("/etc/random.seed", O_WRONLY);
+	if (fd != -1) {
+		arc4random_buf(buf, sizeof buf);
+		write(fd, buf, sizeof buf);
+		fchmod(fd, 0600);
+		close(fd);
+	}
+}
+
 int
 suspend(int ctl_fd)
 {
@@ -321,6 +341,7 @@ suspend(int ctl_fd)
 
 	logmsg(LOG_NOTICE, "system suspending");
 	power_status(ctl_fd, 1, NULL);
+	fixrandom();
 	do_etc_file(_PATH_APM_ETC_SUSPEND);
 	sync();
 	sleep(1);
@@ -340,6 +361,7 @@ stand_by(int ctl_fd)
 
 	logmsg(LOG_NOTICE, "system entering standby");
 	power_status(ctl_fd, 1, NULL);
+	fixrandom();
 	do_etc_file(_PATH_APM_ETC_STANDBY);
 	sync();
 	sleep(1);
@@ -359,6 +381,7 @@ hibernate(int ctl_fd)
 
 	logmsg(LOG_NOTICE, "system hibernating");
 	power_status(ctl_fd, 1, NULL);
+	fixrandom();
 	do_etc_file(_PATH_APM_ETC_HIBERNATE);
 	sync();
 	sleep(1);
@@ -496,6 +519,8 @@ main(int argc, char *argv[])
 
 	if (unveil(_PATH_APM_ETC_DIR, "rx") == -1)
 		err(1, "unveil %s", _PATH_APM_ETC_DIR);
+	if (unveil("/etc/random.seed", "w") == -1)
+		err(1, "unveil /etc/random.seed");
 	if (unveil(NULL, NULL) == -1)
 		err(1, "unveil");
 

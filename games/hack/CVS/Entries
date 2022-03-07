@@ -24,7 +24,6 @@
 /def.rm.h/1.4/Sun Mar 16 21:22:35 2003//
 /def.trap.h/1.4/Sat Jan  9 18:33:15 2016//
 /def.wseg.h/1.4/Sun Mar 16 21:22:35 2003//
-/hack.6/1.22/Mon Apr  8 17:49:07 2019//
 /hack.Decl.c/1.7/Sat Jan  9 18:33:15 2016//
 /hack.apply.c/1.8/Sat Jan  9 21:54:11 2016//
 /hack.bones.c/1.11/Fri Jun 28 13:32:52 2019//
@@ -88,4 +87,5 @@
 /hack.mklev.c/1.9/Wed Sep  1 16:07:30 2021//
 /help/1.2/Wed Sep  1 16:07:30 2021//
 /hack.unix.c/1.21/Mon Jan 24 14:35:08 2022//
+/hack.6/1.23/Mon Mar  7 08:55:18 2022//
 D

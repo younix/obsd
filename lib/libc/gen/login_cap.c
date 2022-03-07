@@ -1,4 +1,4 @@
-/*	$OpenBSD: login_cap.c,v 1.41 2022/02/10 13:06:07 robert Exp $	*/
+/*	$OpenBSD: login_cap.c,v 1.43 2022/03/01 01:22:11 tedu Exp $	*/
 
 /*
  * Copyright (c) 2000-2004 Todd C. Miller <millert@openbsd.org>
@@ -52,6 +52,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/resource.h>
+#include <sys/socket.h>
 
 #include <err.h>
 #include <errno.h>
@@ -584,7 +585,7 @@ int
 setusercontext(login_cap_t *lc, struct passwd *pwd, uid_t uid, u_int flags)
 {
 	login_cap_t *flc;
-	quad_t p;
+	quad_t p, rtable;
 	int i;
 
 	flc = NULL;
@@ -633,6 +634,14 @@ setusercontext(login_cap_t *lc, struct passwd *pwd, uid_t uid, u_int flags)
 	if (flags & LOGIN_SETUMASK) {
 		p = login_getcapnum(lc, "umask", LOGIN_DEFUMASK,LOGIN_DEFUMASK);
 		umask((mode_t)p);
+	}
+
+	if (flags & LOGIN_SETRTABLE) {
+		rtable = login_getcapnum(lc, "rtable", 0, 0);
+
+		if (setrtable((int)rtable) == -1) {
+			syslog(LOG_ERR, "%s: setrtable: %m", lc->lc_class);
+		}
 	}
 
 	if (flags & LOGIN_SETGROUP) {
@@ -700,8 +709,11 @@ setuserpath(login_cap_t *lc, const struct passwd *pwd)
 	char *path = NULL, *opath = NULL, *op, *np;
 	int len, error;
 
+	/*
+	 * If we have no capabilities then set _PATH_DEFPATH.
+	 */
 	if (lc->lc_cap == NULL)
-		goto setit;		/* impossible */
+		goto setit;
 
 	if ((len = cgetustr(lc->lc_cap, "path", &opath)) <= 0)
 		goto setit;
@@ -753,8 +765,12 @@ setuserenv(login_cap_t *lc, const struct passwd *pwd)
 	char *beg, *end, *ep, *list, *value;
 	int len, error;
 
+	/*
+	 * If we have no capabilities then there is nothing to do and
+	 * we can just return success.
+	 */
 	if (lc->lc_cap == NULL)
-		return (-1);		/* impossible */
+		return (0);
 
 	if ((len = cgetustr(lc->lc_cap, "setenv", &list)) <= 0)
 		return (0);

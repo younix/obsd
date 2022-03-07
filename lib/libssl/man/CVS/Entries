@@ -32,7 +32,6 @@
 /SSL_CTX_set_session_cache_mode.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_CTX_set_session_id_context.3/1.6/Sat Jun  8 15:25:43 2019//
 /SSL_CTX_set_timeout.3/1.4/Tue Mar 27 17:35:50 2018//
-/SSL_CTX_set_tmp_dh_callback.3/1.8/Mon Mar 30 10:28:59 2020//
 /SSL_CTX_set_tmp_rsa_callback.3/1.8/Tue Mar 27 17:35:50 2018//
 /SSL_SESSION_free.3/1.7/Wed Jun 12 09:36:30 2019//
 /SSL_SESSION_get0_peer.3/1.2/Fri Mar 23 05:50:30 2018//
@@ -123,4 +122,5 @@
 /SSL_get_ex_data_X509_STORE_CTX_idx.3/1.5/Fri Feb 11 13:33:31 2022//
 /SSL_read_early_data.3/1.4/Mon Jan 24 14:35:14 2022//
 /SSL_set_tmp_ecdh.3/1.6/Mon Jan 24 14:35:14 2022//
+/SSL_CTX_set_tmp_dh_callback.3/1.9/Mon Mar  7 08:55:54 2022//
 D

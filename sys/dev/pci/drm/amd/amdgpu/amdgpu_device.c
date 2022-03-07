@@ -1031,7 +1031,7 @@ static int amdgpu_device_doorbell_init(struct amdgpu_device *adev)
 		return 0;
 	}
 
-#ifdef __linux
+#ifdef __linux__
 	if (pci_resource_flags(adev->pdev, 2) & IORESOURCE_UNSET)
 		return -EINVAL;
 #endif
@@ -1608,13 +1608,15 @@ static bool amdgpu_switcheroo_can_switch(struct pci_dev *pdev)
 	*/
 	return atomic_read(&dev->open_count) == 0;
 }
+#endif /* __linux__ */
 
 static const struct vga_switcheroo_client_ops amdgpu_switcheroo_ops = {
+#ifdef notyet
 	.set_gpu_state = amdgpu_switcheroo_set_state,
 	.reprobe = NULL,
 	.can_switch = amdgpu_switcheroo_can_switch,
+#endif
 };
-#endif /* __linux__ */
 
 /**
  * amdgpu_device_ip_set_clockgating_state - set the CG state

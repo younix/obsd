@@ -2,7 +2,6 @@
 /dcn31_dccg.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_dio_link_encoder.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_dio_link_encoder.h/1.1/Mon Jan 24 14:35:15 2022//
-/dcn31_hubbub.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hubbub.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hubp.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hubp.h/1.1/Mon Jan 24 14:35:15 2022//
@@ -16,4 +15,5 @@
 /dcn31_panel_cntl.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_resource.c/1.2/Fri Feb 11 13:33:52 2022//
 /dcn31_resource.h/1.1/Mon Jan 24 14:35:15 2022//
+/dcn31_hubbub.c/1.2/Mon Mar  7 08:56:15 2022//
 D

@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1158 2022/02/01 14:46:42 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1161 2022/02/22 11:10:41 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -201,26 +201,68 @@ enum {
 	KEYC_MOUSE_KEY(MOUSEDOWN1),
 	KEYC_MOUSE_KEY(MOUSEDOWN2),
 	KEYC_MOUSE_KEY(MOUSEDOWN3),
+	KEYC_MOUSE_KEY(MOUSEDOWN6),
+	KEYC_MOUSE_KEY(MOUSEDOWN7),
+	KEYC_MOUSE_KEY(MOUSEDOWN8),
+	KEYC_MOUSE_KEY(MOUSEDOWN9),
+	KEYC_MOUSE_KEY(MOUSEDOWN10),
+	KEYC_MOUSE_KEY(MOUSEDOWN11),
 	KEYC_MOUSE_KEY(MOUSEUP1),
 	KEYC_MOUSE_KEY(MOUSEUP2),
 	KEYC_MOUSE_KEY(MOUSEUP3),
+	KEYC_MOUSE_KEY(MOUSEUP6),
+	KEYC_MOUSE_KEY(MOUSEUP7),
+	KEYC_MOUSE_KEY(MOUSEUP8),
+	KEYC_MOUSE_KEY(MOUSEUP9),
+	KEYC_MOUSE_KEY(MOUSEUP10),
+	KEYC_MOUSE_KEY(MOUSEUP11),
 	KEYC_MOUSE_KEY(MOUSEDRAG1),
 	KEYC_MOUSE_KEY(MOUSEDRAG2),
 	KEYC_MOUSE_KEY(MOUSEDRAG3),
+	KEYC_MOUSE_KEY(MOUSEDRAG6),
+	KEYC_MOUSE_KEY(MOUSEDRAG7),
+	KEYC_MOUSE_KEY(MOUSEDRAG8),
+	KEYC_MOUSE_KEY(MOUSEDRAG9),
+	KEYC_MOUSE_KEY(MOUSEDRAG10),
+	KEYC_MOUSE_KEY(MOUSEDRAG11),
 	KEYC_MOUSE_KEY(MOUSEDRAGEND1),
 	KEYC_MOUSE_KEY(MOUSEDRAGEND2),
 	KEYC_MOUSE_KEY(MOUSEDRAGEND3),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND6),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND7),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND8),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND9),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND10),
+	KEYC_MOUSE_KEY(MOUSEDRAGEND11),
 	KEYC_MOUSE_KEY(WHEELUP),
 	KEYC_MOUSE_KEY(WHEELDOWN),
 	KEYC_MOUSE_KEY(SECONDCLICK1),
 	KEYC_MOUSE_KEY(SECONDCLICK2),
 	KEYC_MOUSE_KEY(SECONDCLICK3),
+	KEYC_MOUSE_KEY(SECONDCLICK6),
+	KEYC_MOUSE_KEY(SECONDCLICK7),
+	KEYC_MOUSE_KEY(SECONDCLICK8),
+	KEYC_MOUSE_KEY(SECONDCLICK9),
+	KEYC_MOUSE_KEY(SECONDCLICK10),
+	KEYC_MOUSE_KEY(SECONDCLICK11),
 	KEYC_MOUSE_KEY(DOUBLECLICK1),
 	KEYC_MOUSE_KEY(DOUBLECLICK2),
 	KEYC_MOUSE_KEY(DOUBLECLICK3),
+	KEYC_MOUSE_KEY(DOUBLECLICK6),
+	KEYC_MOUSE_KEY(DOUBLECLICK7),
+	KEYC_MOUSE_KEY(DOUBLECLICK8),
+	KEYC_MOUSE_KEY(DOUBLECLICK9),
+	KEYC_MOUSE_KEY(DOUBLECLICK10),
+	KEYC_MOUSE_KEY(DOUBLECLICK11),
 	KEYC_MOUSE_KEY(TRIPLECLICK1),
 	KEYC_MOUSE_KEY(TRIPLECLICK2),
 	KEYC_MOUSE_KEY(TRIPLECLICK3),
+	KEYC_MOUSE_KEY(TRIPLECLICK6),
+	KEYC_MOUSE_KEY(TRIPLECLICK7),
+	KEYC_MOUSE_KEY(TRIPLECLICK8),
+	KEYC_MOUSE_KEY(TRIPLECLICK9),
+	KEYC_MOUSE_KEY(TRIPLECLICK10),
+	KEYC_MOUSE_KEY(TRIPLECLICK11),
 
 	/* Backspace key. */
 	KEYC_BSPACE,
@@ -1198,21 +1240,33 @@ struct session {
 RB_HEAD(sessions, session);
 
 /* Mouse button masks. */
-#define MOUSE_MASK_BUTTONS 3
+#define MOUSE_MASK_BUTTONS 195
 #define MOUSE_MASK_SHIFT 4
 #define MOUSE_MASK_META 8
 #define MOUSE_MASK_CTRL 16
 #define MOUSE_MASK_DRAG 32
-#define MOUSE_MASK_WHEEL 64
 #define MOUSE_MASK_MODIFIERS (MOUSE_MASK_SHIFT|MOUSE_MASK_META|MOUSE_MASK_CTRL)
 
-/* Mouse wheel states. */
-#define MOUSE_WHEEL_UP 0
-#define MOUSE_WHEEL_DOWN 1
+/* Mouse wheel type. */
+#define MOUSE_WHEEL_UP 64
+#define MOUSE_WHEEL_DOWN 65
+
+/* Mouse button type. */
+#define MOUSE_BUTTON_1 0
+#define MOUSE_BUTTON_2 1
+#define MOUSE_BUTTON_3 2
+#define MOUSE_BUTTON_6 66
+#define MOUSE_BUTTON_7 67
+#define MOUSE_BUTTON_8 128
+#define MOUSE_BUTTON_9 129
+#define MOUSE_BUTTON_10 130
+#define MOUSE_BUTTON_11 131
 
 /* Mouse helpers. */
 #define MOUSE_BUTTONS(b) ((b) & MOUSE_MASK_BUTTONS)
-#define MOUSE_WHEEL(b) ((b) & MOUSE_MASK_WHEEL)
+#define MOUSE_WHEEL(b) \
+	(((b) & MOUSE_MASK_BUTTONS) == MOUSE_WHEEL_UP || \
+	 ((b) & MOUSE_MASK_BUTTONS) == MOUSE_WHEEL_DOWN)
 #define MOUSE_DRAG(b) ((b) & MOUSE_MASK_DRAG)
 #define MOUSE_RELEASE(b) (((b) & MOUSE_MASK_BUTTONS) == 3)
 
@@ -1277,6 +1331,7 @@ LIST_HEAD(tty_terms, tty_term);
 struct tty {
 	struct client	*client;
 	struct event	 start_timer;
+	struct event	 query_timer;
 
 	u_int		 sx;
 	u_int		 sy;
@@ -1320,7 +1375,7 @@ struct tty {
 #define TTY_NOBLOCK 0x8
 #define TTY_STARTED 0x10
 #define TTY_OPENED 0x20
-/* 0x40 unused */
+#define TTY_OSC52QUERY 0x40
 #define TTY_BLOCK 0x80
 #define TTY_HAVEDA 0x100
 #define TTY_HAVEXDA 0x200
@@ -2173,6 +2228,7 @@ void	tty_reset(struct tty *);
 void	tty_region_off(struct tty *);
 void	tty_margin_off(struct tty *);
 void	tty_cursor(struct tty *, u_int, u_int);
+void	tty_send_osc52_query(struct tty *);
 void	tty_putcode(struct tty *, enum tty_code_code);
 void	tty_putcode1(struct tty *, enum tty_code_code, int);
 void	tty_putcode2(struct tty *, enum tty_code_code, int, int);
@@ -3062,6 +3118,7 @@ void	control_notify_session_window_changed(struct session *);
 
 /* session.c */
 extern struct sessions sessions;
+extern u_int next_session_id;
 int	session_cmp(struct session *, struct session *);
 RB_PROTOTYPE(sessions, session, entry, session_cmp);
 int		 session_alive(struct session *);

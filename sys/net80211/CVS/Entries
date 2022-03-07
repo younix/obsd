@@ -10,8 +10,6 @@
 /ieee80211_regdomain.h/1.9/Tue Jan 12 09:28:09 2016//
 /ieee80211_rssadapt.c/1.11/Tue Dec 23 03:24:08 2014//
 /ieee80211_rssadapt.h/1.5/Sat Jul 17 16:25:09 2010//
-/ieee80211_ioctl.c/1.80/Sat May  1 08:41:52 2021//
-/ieee80211_ioctl.h/1.41/Sat May  1 08:41:52 2021//
 /ieee80211_pae_input.c/1.37/Sat May  1 08:41:52 2021//
 /ieee80211_radiotap.h/1.16/Sat May  1 08:41:52 2021//
 /ieee80211_crypto.c/1.78/Wed Sep  1 16:07:40 2021//
@@ -27,4 +25,6 @@
 /ieee80211_proto.c/1.107/Mon Jan 24 14:35:16 2022//
 /ieee80211_proto.h/1.47/Mon Jan 24 14:35:16 2022//
 /ieee80211_var.h/1.110/Mon Jan 24 14:35:16 2022//
+/ieee80211_ioctl.c/1.81/Mon Mar  7 08:56:17 2022//
+/ieee80211_ioctl.h/1.42/Mon Mar  7 08:56:17 2022//
 D
