@@ -1,4 +1,4 @@
-/*	$OpenBSD: ucc.c,v 1.30 2022/02/16 06:23:42 anton Exp $	*/
+/*	$OpenBSD: ucc.c,v 1.32 2022/03/08 19:32:41 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>
@@ -31,14 +31,17 @@
 #include <dev/wscons/wsksymdef.h>
 #include <dev/wscons/wsksymvar.h>
 
+#define DEVNAME(sc)	((sc)->sc_hdev.sc_dev.dv_xname)
+
 /* #define UCC_DEBUG */
 #ifdef UCC_DEBUG
 #define DPRINTF(x...)	do { if (ucc_debug) printf(x); } while (0)
-void	ucc_dump(const char *, uint8_t *, u_int);
+struct ucc_softc;
+void	ucc_dump(struct ucc_softc *, const char *, uint8_t *, u_int);
 int	ucc_debug = 1;
 #else
 #define DPRINTF(x...)
-#define ucc_dump(prefix, data, len)
+#define ucc_dump(sc, prefix, data, len)
 #endif
 
 struct ucc_softc {
@@ -708,22 +711,22 @@ ucc_intr(struct uhidev *addr, void *data, u_int len)
 	int error;
 	u_int bit = 0;
 
-	ucc_dump(__func__, data, len);
+	ucc_dump(sc, __func__, data, len);
 
 	if (len > sc->sc_input.i_bufsiz) {
-		DPRINTF("%s: too much data: len %d, bufsiz %d\n", __func__,
+		DPRINTF("%s: too much data: len %d, bufsiz %d\n", DEVNAME(sc),
 		    len, sc->sc_input.i_bufsiz);
 		return;
 	}
 
 	error = ucc_intr_slice(sc, data, buf, &len);
 	if (error) {
-		DPRINTF("%s: slice failure: error %d\n", __func__, error);
+		DPRINTF("%s: slice failure: error %d\n", DEVNAME(sc), error);
 		return;
 	}
 
 	/* Dump the buffer again after slicing. */
-	ucc_dump(__func__, buf, len);
+	ucc_dump(sc, __func__, buf, len);
 
 	if (ucc_setbits(sc, buf, len, &bit)) {
 		/* All zeroes, assume key up event. */
@@ -768,7 +771,7 @@ ucc_intr(struct uhidev *addr, void *data, u_int len)
 	return;
 
 unknown:
-	DPRINTF("%s: unknown key: bit %d\n", __func__, bit);
+	DPRINTF("%s: unknown key: bit %d\n", DEVNAME(sc), bit);
 }
 
 void
@@ -964,7 +967,7 @@ ucc_hid_parse(struct ucc_softc *sc, void *desc, int descsiz)
 	}
 	hid_end_parse(hd);
 
-	DPRINTF("%s: input: off %d, len %d\n", __func__,
+	DPRINTF("%s: input: off %d, len %d\n", DEVNAME(sc),
 	    sc->sc_input.i_off, sc->sc_input.i_len);
 
 	return error;
@@ -1021,7 +1024,7 @@ ucc_add_key(struct ucc_softc *sc, int32_t usage, u_int bit)
 		sc->sc_raw[bit] = us;
 	}
 
-	DPRINTF("%s: bit %d, usage \"%s\"\n", __func__,
+	DPRINTF("%s: bit %d, usage \"%s\"\n", DEVNAME(sc),
 	    bit, us->us_name);
 	return 0;
 }
@@ -1054,7 +1057,7 @@ ucc_add_key_volume(struct ucc_softc *sc, const struct hid_item *hi,
 	sc->sc_volume.v_len = len;
 
 	DPRINTF("%s: inc %d, dec %d, off %d, len %d, min %d, max %d\n",
-	    __func__, sc->sc_volume.v_inc, sc->sc_volume.v_dec,
+	    DEVNAME(sc), sc->sc_volume.v_inc, sc->sc_volume.v_dec,
 	    sc->sc_volume.v_off, sc->sc_volume.v_len,
 	    hi->logical_minimum, hi->logical_maximum);
 
@@ -1229,14 +1232,14 @@ ucc_setbits(struct ucc_softc *sc, uint8_t *data, int len, u_int *bit)
 #ifdef UCC_DEBUG
 
 void
-ucc_dump(const char *prefix, uint8_t *data, u_int len)
+ucc_dump(struct ucc_softc *sc, const char *prefix, uint8_t *data, u_int len)
 {
 	u_int i;
 
 	if (ucc_debug == 0)
 		return;
 
-	printf("%s:", prefix);
+	printf("%s: %s:", DEVNAME(sc), prefix);
 	for (i = 0; i < len; i++)
 		printf(" %02x", data[i]);
 	printf("\n");

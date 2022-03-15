@@ -11,8 +11,6 @@
 /sysex.h/1.2/Fri Dec 20 08:47:37 2013//
 /dev_sioctl.c/1.7/Wed Sep  1 16:07:40 2021//
 /dsp.c/1.18/Thu Sep  2 14:22:33 2021//
-/dsp.h/1.10/Thu Sep  2 14:22:33 2021//
-/dev.c/1.103/Sun Nov 21 20:15:22 2021//
 /dev.h/1.41/Sun Nov 21 20:15:22 2021//
 /fdpass.c/1.11/Sun Nov 21 20:15:22 2021//
 /fdpass.h/1.4/Sun Nov 21 20:15:22 2021//
@@ -24,9 +22,11 @@
 /opt.h/1.7/Sun Nov 21 20:15:22 2021//
 /siofile.c/1.25/Sun Nov 21 20:15:22 2021//
 /siofile.h/1.5/Sun Nov 21 20:15:22 2021//
-/sndiod.c/1.47/Sun Nov 21 20:15:22 2021//
 /sock.c/1.45/Sun Nov 21 20:15:22 2021//
 /utils.c/1.8/Sun Nov 21 20:15:22 2021//
 /utils.h/1.7/Sun Nov 21 20:15:22 2021//
-/sndiod.8/1.15/Mon Mar  7 08:56:18 2022//
+/dev.c/1.104/Tue Mar 15 08:20:20 2022//
+/dsp.h/1.11/Tue Mar 15 08:20:20 2022//
+/sndiod.8/1.16/Tue Mar 15 08:20:20 2022//
+/sndiod.c/1.48/Tue Mar 15 08:20:20 2022//
 D

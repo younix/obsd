@@ -1,4 +1,4 @@
-/*	$OpenBSD: part.c,v 1.116 2022/02/04 23:32:17 krw Exp $	*/
+/*	$OpenBSD: part.c,v 1.120 2022/03/14 17:11:44 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -29,6 +29,7 @@
 #include "part.h"
 #include "disk.h"
 #include "misc.h"
+#include "gpt.h"
 
 const char		*ascii_id(const int);
 
@@ -140,7 +141,6 @@ struct gpt_type {
 	int	gt_protected;
 	char	gt_sname[14];
 	char	gt_guid[UUID_STR_LEN + 1];
-
 };
 
 const struct gpt_type		gpt_types[] = {
@@ -180,29 +180,54 @@ const struct gpt_type		gpt_types[] = {
 	{ 0xEF, 0, "EFI Sys     ", "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" },
 };
 
+const struct gpt_type	*find_gpt_type(const struct uuid *);
+
 int
 PRT_protected_guid(const struct uuid *uuid)
 {
-	char			*str = NULL;
+	const uint8_t		 gpt_uuid_efi_system[] = GPT_UUID_EFI_SYSTEM;
+	struct uuid		 uuid_efi_system;
+	char			*efistr = NULL, *str = NULL;
+	const char		*typename;
 	int			 rslt = 0;
 	unsigned int		 i;
 	uint32_t		 status;
 
+	uuid_dec_be(gpt_uuid_efi_system, &uuid_efi_system);
+
+	uuid_to_string(&uuid_efi_system, &efistr, &status);
+	if (status != uuid_s_ok) {
+		rslt = -1;
+		goto done;
+	}
 	uuid_to_string(uuid, &str, &status);
 	if (status != uuid_s_ok) {
 		rslt = -1;
 		goto done;
 	}
 
-	for(i = 0; i < nitems(gpt_types); i++) {
-		if (strncmp(str, gpt_types[i].gt_guid, UUID_STR_LEN) == 0) {
-			if (gpt_types[i].gt_protected)
-				rslt = -1;
+	if (strncmp(str, efistr, UUID_STR_LEN) == 0) {
+		/* Look for partitions indicating a need to preserve EFI Sys */
+		for (i = 0; i < NGPTPARTITIONS; i++) {
+			typename = PRT_uuid_to_typename(&gp[i].gp_type);
+			if (strncmp(typename, "APFS ", 5))
+				continue;
+			rslt = -1;
 			break;
+		}
+	} else {
+		for(i = 0; i < nitems(gpt_types); i++) {
+			if (strncmp(str, gpt_types[i].gt_guid, UUID_STR_LEN))
+				continue;
+			if (gpt_types[i].gt_protected) {
+				rslt = -1;
+				break;
+			}
 		}
 	}
 
  done:
+	free(efistr);
 	free(str);
 	return rslt;
 }
@@ -396,62 +421,75 @@ PRT_lba_to_chs(const struct prt *prt, struct chs *start, struct chs *end)
 	return 0;
 }
 
-char *
-PRT_uuid_to_typename(const struct uuid *uuid)
+const struct gpt_type *
+find_gpt_type(const struct uuid *uuid)
 {
-	static char		 partition_type[UUID_STR_LEN + 1];
 	char			*uuidstr = NULL;
-	int			 i, entries, status;
-
-	memset(partition_type, 0, sizeof(partition_type));
+	unsigned int		 i;
+	uint32_t		 status;
 
 	uuid_to_string(uuid, &uuidstr, &status);
-	if (status != uuid_s_ok)
-		goto done;
-
-	entries = nitems(gpt_types);
-
-	for (i = 0; i < entries; i++) {
-		if (memcmp(gpt_types[i].gt_guid, uuidstr,
-		    sizeof(gpt_types[i].gt_guid)) == 0)
-			break;
-	}
-
-	if (i < entries)
-		strlcpy(partition_type, gpt_types[i].gt_sname,
-		    sizeof(partition_type));
-	else
-		strlcpy(partition_type, uuidstr, sizeof(partition_type));
-
-done:
+	if (status == uuid_s_ok) {
+		for (i = 0; i < nitems(gpt_types); i++) {
+			if (memcmp(gpt_types[i].gt_guid, uuidstr,
+			    sizeof(gpt_types[i].gt_guid)) == 0)
+				break;
+		}
+	} else
+		i = nitems(gpt_types);
 	free(uuidstr);
 
-	return partition_type;
+	if (i < nitems(gpt_types))
+		return &gpt_types[i];
+	else
+		return NULL;
+}
+
+int
+PRT_uuid_to_protection(const struct uuid *uuid)
+{
+	const struct gpt_type	*gt;
+
+	gt = find_gpt_type(uuid);
+	if (gt == NULL)
+		return 0;
+	else
+		return gt->gt_protected;
+}
+
+const char *
+PRT_uuid_to_typename(const struct uuid *uuid)
+{
+	static char		 typename[UUID_STR_LEN + 1];
+	const struct gpt_type	*gt;
+	char			*uuidstr;
+	int			 status;
+
+	memset(typename, 0, sizeof(typename));
+
+	gt = find_gpt_type(uuid);
+	if (gt == NULL) {
+		uuid_to_string(uuid, &uuidstr, &status);
+		if (status == uuid_s_ok)
+			strlcpy(typename, uuidstr, sizeof(typename));
+		free(uuidstr);
+	} else {
+		strlcpy(typename, gt->gt_sname, sizeof(typename));
+	}
+
+	return typename;
 }
 
 int
 PRT_uuid_to_type(const struct uuid *uuid)
 {
-	char			*uuidstr;
-	int			 i, status, type;
+	const struct gpt_type	*gt;
 
-	type = 0;
-
-	uuid_to_string(uuid, &uuidstr, &status);
-	if (status != uuid_s_ok)
-		goto done;
-
-	for (i = 0; i < nitems(gpt_types); i++) {
-		if (memcmp(gpt_types[i].gt_guid, uuidstr,
-		    sizeof(gpt_types[i].gt_guid)) == 0) {
-			type = gpt_types[i].gt_type;
-			break;
-		}
-	}
-
-done:
-	free(uuidstr);
-	return type;
+	gt = find_gpt_type(uuid);
+	if (gt == NULL)
+		return 0;
+	else
+		return gt->gt_type;
 }
 
 struct uuid *

@@ -1,4 +1,4 @@
-/* $OpenBSD: if_aq_pci.c,v 1.4 2021/10/09 08:38:13 jmatthew Exp $ */
+/* $OpenBSD: if_aq_pci.c,v 1.10 2022/03/15 02:07:21 jmatthew Exp $ */
 /*	$NetBSD: if_aq.c,v 1.27 2021/06/16 00:21:18 riastradh Exp $	*/
 
 /*
@@ -79,6 +79,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include "bpfilter.h"
+#include "vlan.h"
 
 #include <sys/types.h>
 #include <sys/device.h>
@@ -116,7 +117,7 @@
 #define AQ_TXD_NUM 				2048
 #define AQ_RXD_NUM 				2048
 
-#define AQ_TX_MAX_SEGMENTS			1	/* XXX */
+#define AQ_TX_MAX_SEGMENTS			32
 
 #define AQ_LINKSTAT_IRQ				31
 
@@ -238,6 +239,10 @@
 #define RPF_RPB_RX_TC_UPT_REG                   0x54c4
 #define  RPF_RPB_RX_TC_UPT_MASK(i)              (0x00000007 << ((i) * 4))
 
+#define RPO_HWCSUM_REG				0x5580
+#define  RPO_HWCSUM_L4CSUM_EN			(1 << 0)
+#define  RPO_HWCSUM_IP4CSUM_EN			(1 << 1)
+
 #define RPB_RPF_RX_REG				0x5700
 #define  RPB_RPF_RX_TC_MODE			(1 << 8)
 #define  RPB_RPF_RX_FC_MODE			0x30
@@ -250,6 +255,9 @@
 #define  RPB_RXB_XOFF_EN			(1 << 31)
 #define  RPB_RXB_XOFF_THRESH_HI                 0x3FFF0000
 #define  RPB_RXB_XOFF_THRESH_LO                 0x3FFF
+
+#define RX_DMA_DESC_CACHE_INIT_REG		0x5a00
+#define  RX_DMA_DESC_CACHE_INIT			(1 << 0)
 
 #define RX_DMA_INT_DESC_WRWB_EN_REG		0x5a30
 #define  RX_DMA_INT_DESC_WRWB_EN		(1 << 2)
@@ -310,6 +318,10 @@
 
 #define AQ_HW_TXBUF_MAX         160
 #define AQ_HW_RXBUF_MAX         320
+
+#define TPO_HWCSUM_REG				0x7800
+#define  TPO_HWCSUM_L4CSUM_EN			(1 << 0)
+#define  TPO_HWCSUM_IP4CSUM_EN			(1 << 1)
 
 #define THM_LSO_TCP_FLAG1_REG			0x7820
 #define  THM_LSO_TCP_FLAG1_FIRST		0xFFF
@@ -631,13 +643,13 @@ struct aq_rx_desc_wb {
 #define AQ_RXDESC_TYPE_VLAN2	(1 << 10)
 #define AQ_RXDESC_TYPE_DMA_ERR	(1 << 12)
 #define AQ_RXDESC_TYPE_V4_SUM	(1 << 19)
-#define AQ_RXDESC_TYPE_TCP_SUM	(1 << 20)
+#define AQ_RXDESC_TYPE_L4_SUM	(1 << 20)
 	uint32_t		rss_hash;
 	uint16_t		status;
 #define AQ_RXDESC_STATUS_DD	(1 << 0)
 #define AQ_RXDESC_STATUS_EOP	(1 << 1)
 #define AQ_RXDESC_STATUS_MACERR (1 << 2)
-#define AQ_RXDESC_STATUS_V4_SUM (1 << 3)
+#define AQ_RXDESC_STATUS_V4_SUM_NG (1 << 3)
 #define AQ_RXDESC_STATUS_L4_SUM_ERR (1 << 4)
 #define AQ_RXDESC_STATUS_L4_SUM_OK (1 << 5)
 	uint16_t		pkt_len;
@@ -651,6 +663,7 @@ struct aq_tx_desc {
 #define AQ_TXDESC_CTL1_TYPE_TXD	0x00000001
 #define AQ_TXDESC_CTL1_TYPE_TXC	0x00000002
 #define AQ_TXDESC_CTL1_BLEN_SHIFT 4
+#define AQ_TXDESC_CTL1_VLAN_SHIFT 4
 #define AQ_TXDESC_CTL1_DD	(1 << 20)
 #define AQ_TXDESC_CTL1_CMD_EOP	(1 << 21)
 #define AQ_TXDESC_CTL1_CMD_VLAN	(1 << 22)
@@ -846,6 +859,7 @@ int	aq_set_linkmode(struct aq_softc *, enum aq_link_speed,
     enum aq_link_fc, enum aq_link_eee);
 void	aq_watchdog(struct ifnet *);
 void	aq_enable_intr(struct aq_softc *, int, int);
+int	aq_rxrinfo(struct aq_softc *, struct if_rxrinfo *);
 int	aq_ioctl(struct ifnet *, u_long, caddr_t);
 int	aq_up(struct aq_softc *);
 void	aq_down(struct aq_softc *);
@@ -1030,7 +1044,12 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 	ifp->if_qstart = aq_start;
 	ifp->if_watchdog = aq_watchdog;
 	ifp->if_hardmtu = 9000;
-	ifp->if_capabilities = IFCAP_VLAN_MTU;
+	ifp->if_capabilities = IFCAP_VLAN_MTU | IFCAP_CSUM_IPv4 |
+	    IFCAP_CSUM_UDPv4 | IFCAP_CSUM_UDPv6 | IFCAP_CSUM_TCPv4 |
+	    IFCAP_CSUM_TCPv6;
+#if NVLAN > 0
+	ifp->if_capabilities |= IFCAP_VLAN_HWTAGGING;
+#endif
 	ifq_set_maxlen(&ifp->if_snd, AQ_TXD_NUM);
 
 	ifmedia_init(&sc->sc_media, IFM_IMASK, aq_ifmedia_change,
@@ -1795,7 +1814,7 @@ aq_hw_init_rx_path(struct aq_softc *sc)
 	    ETHERTYPE_QINQ);
 	AQ_WRITE_REG_BIT(sc, RPF_VLAN_TPID_REG, RPF_VLAN_TPID_INNER,
 	    ETHERTYPE_VLAN);
-	AQ_WRITE_REG_BIT(sc, RPF_VLAN_MODE_REG, RPF_VLAN_MODE_PROMISC, 0);
+	AQ_WRITE_REG_BIT(sc, RPF_VLAN_MODE_REG, RPF_VLAN_MODE_PROMISC, 1);
 
 	if (sc->sc_features & FEATURES_REV_B) {
 		AQ_WRITE_REG_BIT(sc, RPF_VLAN_MODE_REG,
@@ -2018,6 +2037,7 @@ void
 aq_rxring_reset(struct aq_softc *sc, struct aq_rxring *rx, int start)
 {
 	daddr_t paddr;
+	int strip;
 
 	AQ_WRITE_REG_BIT(sc, RX_DMA_DESC_REG(rx->rx_q), RX_DMA_DESC_EN, 0);
 	/* drain */
@@ -2039,8 +2059,14 @@ aq_rxring_reset(struct aq_softc *sc, struct aq_rxring *rx, int start)
 	    RX_DMA_DESC_BUFSIZE_HDR, 0);
 	AQ_WRITE_REG_BIT(sc, RX_DMA_DESC_REG(rx->rx_q),
 	    RX_DMA_DESC_HEADER_SPLIT, 0);
+
+#if NVLAN > 0
+	strip = 1;
+#else
+	strip = 0;
+#endif
 	AQ_WRITE_REG_BIT(sc, RX_DMA_DESC_REG(rx->rx_q),
-	    RX_DMA_DESC_VLAN_STRIP, 0);
+	    RX_DMA_DESC_VLAN_STRIP, strip);
 
 	rx->rx_cons = AQ_READ_REG(sc, RX_DMA_DESC_HEAD_PTR_REG(rx->rx_q)) &
 	    RX_DMA_DESC_HEAD_PTR;
@@ -2182,7 +2208,23 @@ aq_rxeof(struct aq_softc *sc, struct aq_rxring *rx)
 
 		pktlen = lemtoh16(&rxd->pkt_len);
 		rxd_type = lemtoh32(&rxd->type);
-		/* rss hash, vlan */
+		/* rss hash */
+
+#if NVLAN > 0
+		if (rxd_type & (AQ_RXDESC_TYPE_VLAN | AQ_RXDESC_TYPE_VLAN2)) {
+			m->m_pkthdr.ether_vtag = lemtoh16(&rxd->vlan);
+			m->m_flags |= M_VLANTAG;
+		}
+#endif
+
+		if ((rxd_type & AQ_RXDESC_TYPE_V4_SUM) &&
+		    ((status & AQ_RXDESC_STATUS_V4_SUM_NG) == 0))
+			m->m_pkthdr.csum_flags |= M_IPV4_CSUM_IN_OK;
+
+		if ((rxd_type & AQ_RXDESC_TYPE_L4_SUM) &&
+		   (status & AQ_RXDESC_STATUS_L4_SUM_OK))
+			m->m_pkthdr.csum_flags |= M_UDP_CSUM_IN_OK |
+			    M_TCP_CSUM_IN_OK;
 
 		if ((status & AQ_RXDESC_STATUS_MACERR) ||
 		    (rxd_type & AQ_RXDESC_TYPE_DMA_ERR)) {
@@ -2231,10 +2273,13 @@ aq_txeof(struct aq_softc *sc, struct aq_txring *tx)
 
 	while (idx != end) {
 		as = &tx->tx_slots[idx];
-		bus_dmamap_unload(sc->sc_dmat, as->as_map);
 
-		m_freem(as->as_m);
-		as->as_m = NULL;
+		if (as->as_m != NULL) {
+			bus_dmamap_unload(sc->sc_dmat, as->as_map);
+
+			m_freem(as->as_m);
+			as->as_m = NULL;
+		}
 
 		idx++;
 		if (idx == AQ_TXD_NUM)
@@ -2260,6 +2305,7 @@ aq_start(struct ifqueue *ifq)
 	struct aq_slot *as;
 	struct mbuf *m;
 	uint32_t idx, free, used, ctl1, ctl2;
+	int error, i;
 
 	idx = tx->tx_prod;
 	free = tx->tx_cons + AQ_TXD_NUM - tx->tx_prod;
@@ -2270,7 +2316,7 @@ aq_start(struct ifqueue *ifq)
 	ring = (struct aq_tx_desc *)AQ_DMA_KVA(&tx->tx_mem);
 
 	for (;;) {
-		if (used + AQ_TX_MAX_SEGMENTS >= free) {
+		if (used + AQ_TX_MAX_SEGMENTS + 1 >= free) {
 			ifq_set_oactive(ifq);
 			break;
 		}
@@ -2279,16 +2325,20 @@ aq_start(struct ifqueue *ifq)
 		if (m == NULL)
 			break;
 
-		txd = ring + idx;
 		as = &tx->tx_slots[idx];
 
-		if (m_defrag(m, M_DONTWAIT) != 0) {
-			m_freem(m);
-			break;
-		}
+		error = bus_dmamap_load_mbuf(sc->sc_dmat, as->as_map, m,
+		    BUS_DMA_STREAMING | BUS_DMA_NOWAIT);
+		if (error == EFBIG) {
+			if (m_defrag(m, M_DONTWAIT)) {
+				m_freem(m);
+				break;
+			}
 
-		if (bus_dmamap_load_mbuf(sc->sc_dmat, as->as_map, m,
-		    BUS_DMA_STREAMING | BUS_DMA_NOWAIT) != 0) {
+			error = bus_dmamap_load_mbuf(sc->sc_dmat, as->as_map,
+			    m, BUS_DMA_STREAMING | BUS_DMA_NOWAIT);
+		}
+		if (error != 0) {
 			m_freem(m);
 			break;
 		}
@@ -2302,19 +2352,49 @@ aq_start(struct ifqueue *ifq)
 		bus_dmamap_sync(sc->sc_dmat, as->as_map, 0,
 		    as->as_map->dm_mapsize, BUS_DMASYNC_PREWRITE);
 
-		ctl1 = AQ_TXDESC_CTL1_TYPE_TXD | (as->as_map->dm_segs[0].ds_len <<
-		    AQ_TXDESC_CTL1_BLEN_SHIFT) | AQ_TXDESC_CTL1_CMD_FCS |
-		    AQ_TXDESC_CTL1_CMD_EOP | AQ_TXDESC_CTL1_CMD_WB;
 		ctl2 = m->m_pkthdr.len << AQ_TXDESC_CTL2_LEN_SHIFT;
+		ctl1 = AQ_TXDESC_CTL1_TYPE_TXD | AQ_TXDESC_CTL1_CMD_FCS;
+#if NVLAN > 0
+		if (m->m_flags & M_VLANTAG) {
+			txd = ring + idx;
+			txd->buf_addr = 0;
+			txd->ctl1 = htole32(AQ_TXDESC_CTL1_TYPE_TXC |
+			    (m->m_pkthdr.ether_vtag << AQ_TXDESC_CTL1_VLAN_SHIFT));
+			txd->ctl2 = 0;
 
-		txd->buf_addr = htole64(as->as_map->dm_segs[0].ds_addr);
-		txd->ctl1 = htole32(ctl1);
-		txd->ctl2 = htole32(ctl2);
+			ctl1 |= AQ_TXDESC_CTL1_CMD_VLAN;
+			ctl2 |= AQ_TXDESC_CTL2_CTX_EN;
 
-		idx++;
-		if (idx == AQ_TXD_NUM)
-			idx = 0;
-		used++;
+			idx++;
+			if (idx == AQ_TXD_NUM)
+				idx = 0;
+			used++;
+		}
+#endif
+
+		if (m->m_pkthdr.csum_flags & M_IPV4_CSUM_OUT)
+			ctl1 |= AQ_TXDESC_CTL1_CMD_IP4CSUM;
+		if (m->m_pkthdr.csum_flags & (M_TCP_CSUM_OUT | M_UDP_CSUM_OUT))
+			ctl1 |= AQ_TXDESC_CTL1_CMD_L4CSUM;
+
+		for (i = 0; i < as->as_map->dm_nsegs; i++) {
+
+			if (i == as->as_map->dm_nsegs - 1)
+				ctl1 |= AQ_TXDESC_CTL1_CMD_EOP |
+				    AQ_TXDESC_CTL1_CMD_WB;
+
+			txd = ring + idx;
+			txd->buf_addr = htole64(as->as_map->dm_segs[i].ds_addr);
+			txd->ctl1 = htole32(ctl1 |
+			    (as->as_map->dm_segs[i].ds_len <<
+			    AQ_TXDESC_CTL1_BLEN_SHIFT));
+			txd->ctl2 = htole32(ctl2);
+
+			idx++;
+			if (idx == AQ_TXD_NUM)
+				idx = 0;
+			used++;
+		}
 	}
 
 	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&tx->tx_mem), 0,
@@ -2481,19 +2561,36 @@ aq_queue_down(struct aq_softc *sc, struct aq_queues *aq)
 	aq_dmamem_free(sc, &rx->rx_mem);
 }
 
+void
+aq_invalidate_rx_desc_cache(struct aq_softc *sc)
+{
+	uint32_t cache;
+
+	cache = AQ_READ_REG(sc, RX_DMA_DESC_CACHE_INIT_REG);
+	AQ_WRITE_REG_BIT(sc, RX_DMA_DESC_CACHE_INIT_REG, RX_DMA_DESC_CACHE_INIT,
+	    (cache & RX_DMA_DESC_CACHE_INIT) ^ RX_DMA_DESC_CACHE_INIT);
+}
+
 int
 aq_up(struct aq_softc *sc)
 {
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
 	int i;
 
+	aq_invalidate_rx_desc_cache(sc);
+
 	for (i = 0; i < sc->sc_nqueues; i++) {
 		if (aq_queue_up(sc, &sc->sc_queues[i]) != 0)
 			goto downqueues;
 	}
 
-	/* filters? */
-	/* enable checksum offload */
+	aq_set_mac_addr(sc, AQ_HW_MAC_OWN, sc->sc_arpcom.ac_enaddr);
+
+	AQ_WRITE_REG_BIT(sc, TPO_HWCSUM_REG, TPO_HWCSUM_IP4CSUM_EN, 1);
+	AQ_WRITE_REG_BIT(sc, TPO_HWCSUM_REG, TPO_HWCSUM_L4CSUM_EN, 1);
+
+	AQ_WRITE_REG_BIT(sc, RPO_HWCSUM_REG, RPO_HWCSUM_IP4CSUM_EN, 1);
+	AQ_WRITE_REG_BIT(sc, RPO_HWCSUM_REG, RPO_HWCSUM_L4CSUM_EN, 1);
 
 	SET(ifp->if_flags, IFF_RUNNING);
 	aq_enable_intr(sc, 1, 1);
@@ -2528,10 +2625,14 @@ aq_down(struct aq_softc *sc)
 	aq_enable_intr(sc, 1, 0);
 	intr_barrier(sc->sc_ih);
 
+	AQ_WRITE_REG_BIT(sc, TPB_TX_BUF_REG, TPB_TX_BUF_EN, 0);
+	AQ_WRITE_REG_BIT(sc, RPB_RPF_RX_REG, RPB_RPF_RX_BUF_EN, 0);
 	for (i = 0; i < sc->sc_nqueues; i++) {
 		/* queue intr barrier? */
 		aq_queue_down(sc, &sc->sc_queues[i]);
 	}
+
+	aq_invalidate_rx_desc_cache(sc);
 }
 
 void
@@ -2665,6 +2766,28 @@ aq_update_link_status(struct aq_softc *sc)
 	}
 }
 
+int
+aq_rxrinfo(struct aq_softc *sc, struct if_rxrinfo *ifri)
+{
+	struct if_rxring_info *ifr;
+	int i;
+	int error;
+
+	ifr = mallocarray(sc->sc_nqueues, sizeof(*ifr), M_TEMP,
+	    M_WAITOK | M_ZERO | M_CANFAIL);
+	if (ifr == NULL)
+		return (ENOMEM);
+
+	for (i = 0; i < sc->sc_nqueues; i++) {
+		ifr[i].ifr_size = MCLBYTES;
+		ifr[i].ifr_info = sc->sc_queues[i].q_rx.rx_rxr;
+	}
+
+	error = if_rxr_info_ioctl(ifri, sc->sc_nqueues, ifr);
+	free(ifr, M_TEMP, sc->sc_nqueues * sizeof(*ifr));
+
+	return (error);
+}
 
 int
 aq_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
@@ -2696,6 +2819,11 @@ aq_ioctl(struct ifnet *ifp, u_long cmd, caddr_t data)
 	case SIOCGIFMEDIA:
 		error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, cmd);
 		break;
+
+	case SIOCGIFRXR:
+		error = aq_rxrinfo(sc, (struct if_rxrinfo *)ifr->ifr_data);
+		break;
+
 	default:
 		error = ether_ioctl(ifp, &sc->sc_arpcom, cmd, data);
 	}
@@ -2719,24 +2847,21 @@ aq_iff(struct aq_softc *sc)
 	struct ether_multistep step;
 	int idx;
 
-	if (ifp->if_flags & IFF_PROMISC || ac->ac_multirangecnt > 0) {
+	if (ifp->if_flags & IFF_PROMISC) {
 		ifp->if_flags |= IFF_ALLMULTI;
 		AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_PROMISC, 1);
-	} else if (ac->ac_multicnt >= AQ_HW_MAC_NUM ||
-	    ISSET(ifp->if_flags, IFF_ALLMULTI)) {
+	} else if (ac->ac_multirangecnt > 0 ||
+	    ac->ac_multicnt >= AQ_HW_MAC_NUM) {
+		ifp->if_flags |= IFF_ALLMULTI;
 		AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_PROMISC, 0);
 		AQ_WRITE_REG_BIT(sc, RPF_MCAST_FILTER_MASK_REG,
 		    RPF_MCAST_FILTER_MASK_ALLMULTI, 1);
 		AQ_WRITE_REG_BIT(sc, RPF_MCAST_FILTER_REG(0),
 		    RPF_MCAST_FILTER_EN, 1);
-	} else if (ac->ac_multicnt == 0) {
-		AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_PROMISC, 0);
-		AQ_WRITE_REG_BIT(sc, RPF_MCAST_FILTER_REG(0),
-		    RPF_MCAST_FILTER_EN, 0);
 	} else {
+		ifp->if_flags &= ~IFF_ALLMULTI;
 		idx = AQ_HW_MAC_OWN + 1;
 
-		/* turn on allmulti while we're rewriting? */
 		AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_PROMISC, 0);
 
 		ETHER_FIRST_MULTI(step, ac, enm);
@@ -2751,7 +2876,7 @@ aq_iff(struct aq_softc *sc)
 		AQ_WRITE_REG_BIT(sc, RPF_MCAST_FILTER_MASK_REG,
 		    RPF_MCAST_FILTER_MASK_ALLMULTI, 0);
 		AQ_WRITE_REG_BIT(sc, RPF_MCAST_FILTER_REG(0),
-		    RPF_MCAST_FILTER_EN, 1);
+		    RPF_MCAST_FILTER_EN, 0);
 	}
 }
 

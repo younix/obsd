@@ -1,4 +1,4 @@
-/*	$OpenBSD: pluart_acpi.c,v 1.5 2021/12/21 20:53:46 kettenis Exp $	*/
+/*	$OpenBSD: pluart_acpi.c,v 1.7 2022/03/13 21:17:52 kettenis Exp $	*/
 /*
  * Copyright (c) 2018 Mark Kettenis
  *

@@ -20,7 +20,6 @@
 /bpf_mtap.9/1.16/Mon Sep 30 01:55:26 2019//
 /buffercache.9/1.13/Fri Jul 19 00:24:31 2019//
 /bufq_init.9/1.6/Fri Dec 25 20:50:57 2015//
-/cond_init.9/1.2/Thu Dec 14 06:43:44 2017//
 /config_attach.9/1.3/Fri Dec  5 16:55:53 2014//
 /config_defer.9/1.2/Sat Dec 12 11:34:29 2015//
 /copy.9/1.17/Mon Nov 23 17:53:57 2015//
@@ -62,7 +61,6 @@
 /loadfirmware.9/1.4/Tue Jun  4 19:27:08 2013//
 /log.9/1.11/Mon Sep 14 15:14:55 2015//
 /md5.9/1.14/Tue Nov 24 14:58:56 2015//
-/membar_sync.9/1.3/Fri Feb 14 05:11:55 2014//
 /memcmp.9/1.1/Mon Apr 23 10:30:39 2018//
 /mi_switch.9/1.7/Tue Sep  5 03:49:56 2017//
 /ml_init.9/1.15/Thu Jan 23 07:12:42 2020//
@@ -139,7 +137,6 @@
 /ratecheck.9/1.13/Fri Dec 11 17:58:22 2020//
 /resettodr.9/1.8/Fri Dec 11 17:58:22 2020//
 /task_add.9/1.22/Fri Dec 11 17:58:22 2020//
-/Makefile/1.306/Thu Dec 17 19:39:58 2020//
 /cpumem_get.9/1.11/Thu Dec 17 19:39:58 2020//
 /kstat_kv_init.9/1.2/Thu Dec 17 19:39:58 2020//
 /mq_init.9/1.13/Thu Dec 17 19:39:58 2020//
@@ -177,6 +174,10 @@
 /kstat_create.9/1.4/Fri Feb 11 13:33:47 2022//
 /malloc.9/1.68/Fri Feb 11 13:33:47 2022//
 /stoeplitz_to_key.9/1.8/Mon Jan 24 14:35:14 2022//
-/bus_dma.9/1.37/Mon Mar  7 08:56:11 2022//
-/counters_alloc.9/1.12/Mon Mar  7 08:56:11 2022//
+/Makefile/1.307/Tue Mar 15 08:20:14 2022//
+/atomic_load_int.9/1.1/Thu Mar 10 14:12:40 2022//
+/bus_dma.9/1.37/Mon Mar  7 09:08:07 2022//
+/cond_init.9/1.3/Tue Mar 15 08:20:14 2022//
+/counters_alloc.9/1.12/Mon Mar  7 09:08:07 2022//
+/membar_sync.9/1.4/Tue Mar 15 08:20:14 2022//
 D

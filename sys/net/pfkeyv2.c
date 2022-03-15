@@ -1,4 +1,4 @@
-/* $OpenBSD: pfkeyv2.c,v 1.231 2022/02/25 23:51:03 guenther Exp $ */
+/* $OpenBSD: pfkeyv2.c,v 1.233 2022/03/13 21:38:32 bluhm Exp $ */
 
 /*
  *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
@@ -1591,7 +1591,8 @@ pfkeyv2_send(struct socket *so, void *message, int len)
 	case SADB_X_ASKPOLICY:
 		/* Get the relevant policy */
 		NET_LOCK();
-		ipa = ipsec_get_acquire(((struct sadb_x_policy *) headers[SADB_X_EXT_POLICY])->sadb_x_policy_seq);
+		ipa = ipsec_get_acquire(((struct sadb_x_policy *)
+		    headers[SADB_X_EXT_POLICY])->sadb_x_policy_seq);
 		if (ipa == NULL) {
 			rval = ESRCH;
 			NET_UNLOCK();
@@ -1600,6 +1601,7 @@ pfkeyv2_send(struct socket *so, void *message, int len)
 
 		rval = pfkeyv2_policy(ipa, headers, &freeme, &freeme_sz);
 		NET_UNLOCK();
+		ipsec_unref_acquire(ipa);
 		if (rval)
 			mode = PFKEYV2_SENDMESSAGE_UNICAST;
 
@@ -1996,7 +1998,7 @@ pfkeyv2_send(struct socket *so, void *message, int len)
 
 			TAILQ_INIT(&ipo->ipo_acquires);
 			ipo->ipo_rdomain = rdomain;
-			ipo->ipo_ref_count = 1;
+			refcnt_init(&ipo->ipo_refcnt);
 
 			/* Add SPD entry */
 			if ((rnh = spd_table_get(rdomain)) == NULL ||

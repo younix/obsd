@@ -1,4 +1,4 @@
-/*	$OpenBSD: pluartvar.h,v 1.1 2018/07/02 12:46:20 kettenis Exp $	*/
+/*	$OpenBSD: pluartvar.h,v 1.3 2022/03/13 21:17:52 kettenis Exp $	*/
 /*
  * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
  * Copyright (c) 2005 Dale Rahn <drahn@dalerahn.com>
