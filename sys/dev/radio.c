@@ -1,4 +1,4 @@
-/* $OpenBSD: radio.c,v 1.11 2016/09/22 00:47:19 jsg Exp $ */
+/* $OpenBSD: radio.c,v 1.13 2022/04/06 18:59:27 naddy Exp $ */
 /* $RuOBSD: radio.c,v 1.7 2001/12/04 06:03:05 tm Exp $ */
 
 /*
@@ -48,7 +48,7 @@ int	radiodetach(struct device *, int);
 int	radioactivate(struct device *, int);
 int	radioprint(void *, const char *);
 
-struct cfattach radio_ca = {
+const struct cfattach radio_ca = {
 	sizeof(struct radio_softc), radioprobe, radioattach,
 	radiodetach, radioactivate
 };
@@ -152,7 +152,7 @@ radioioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
  */
 
 struct device *
-radio_attach_mi(struct radio_hw_if *rhwp, void *hdlp, struct device *dev)
+radio_attach_mi(const struct radio_hw_if *rhwp, void *hdlp, struct device *dev)
 {
 	struct audio_attach_args arg;
 

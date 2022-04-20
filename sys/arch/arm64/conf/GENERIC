@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.226 2022/02/25 13:51:02 visa Exp $
+# $OpenBSD: GENERIC,v 1.228 2022/03/31 14:44:49 krw Exp $
 #
 # GENERIC machine description file
 #
@@ -446,6 +446,7 @@ uath*		at uhub?		# Atheros AR5005UG/AR5005UX
 ural*		at uhub?		# Ralink RT2500USB
 rum*		at uhub?		# Ralink RT2501USB/RT2601USB
 run*		at uhub?		# Ralink RT2700U/RT2800U/RT3000U
+mtw*		at uhub?		# MediaTek MT7601U
 otus*		at uhub?		# Atheros AR9001U
 athn*		at uhub?		# Atheros AR9002U
 zyd*		at uhub?		# Zydas ZD1211
@@ -481,13 +482,6 @@ rgephy*		at mii?			# Realtek 8169S/8110S PHY
 rlphy*		at mii?			# Realtek 8139 internal PHYs
 ukphy*		at mii?			# "unknown" PHYs
 urlphy*		at mii?			# Realtek RTL8150L internal PHY
-
-scsibus*	at scsi?
-sd*		at scsibus?
-cd*		at scsibus?
-st*		at scsibus?
-ch*		at scsibus?
-uk*		at scsibus?
 
 # I2C devices
 abcrtc*		at iic?			# Abracon x80x RTC

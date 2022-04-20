@@ -4,7 +4,6 @@
 /unix.c/1.32/Thu Apr 26 12:42:51 2018//
 /inet6.c/1.55/Wed Sep  1 16:07:40 2021//
 /main.c/1.121/Wed Sep  1 16:07:40 2021//
-/netstat.1/1.92/Wed Sep  1 16:07:40 2021//
 /netstat.h/1.76/Wed Sep  1 16:07:40 2021//
 /show.c/1.58/Wed Sep  1 16:07:40 2021//
 /if.c/1.78/Mon Jan 24 14:35:16 2022//
@@ -12,4 +11,5 @@
 /mroute6.c/1.25/Mon Jan 24 14:35:16 2022//
 /net80211.c/1.20/Mon Jan 24 14:35:16 2022//
 /route.c/1.108/Mon Jan 24 14:35:16 2022//
+/netstat.1/1.93/Wed Apr 20 14:28:23 2022//
 D

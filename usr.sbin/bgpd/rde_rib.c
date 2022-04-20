@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde_rib.c,v 1.232 2022/03/02 16:51:43 claudio Exp $ */
+/*	$OpenBSD: rde_rib.c,v 1.237 2022/03/22 10:53:08 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Claudio Jeker <claudio@openbsd.org>
@@ -179,7 +179,7 @@ rib_new(char *name, u_int rtableid, uint16_t flags)
  * or RECONF_REINIT (rerun the route decision process for every element)
  * depending on the new flags.
  */
-void
+int
 rib_update(struct rib *rib)
 {
 	/* flush fib first if there was one */
@@ -198,6 +198,8 @@ rib_update(struct rib *rib)
 	if (rib->fibstate != RECONF_REINIT &&
 	    (rib->flags & (F_RIB_NOFIB | F_RIB_NOEVALUATE)) == 0)
 		rib->fibstate = RECONF_RELOAD;
+
+	return (rib->fibstate == RECONF_REINIT);
 }
 
 struct rib *
@@ -250,7 +252,7 @@ rib_free(struct rib *rib)
 		 * an empty check in prefix_destroy() it is not possible to
 		 * use the default for loop.
 		 */
-		while ((p = LIST_FIRST(&re->prefix_h))) {
+		while ((p = TAILQ_FIRST(&re->prefix_h))) {
 			struct rde_aspath *asp = prefix_aspath(p);
 			if (asp && asp->pftableid)
 				rde_pftable_del(asp->pftableid, p);
@@ -351,7 +353,7 @@ rib_add(struct rib *rib, struct bgpd_addr *prefix, int prefixlen)
 	if ((re = calloc(1, sizeof(*re))) == NULL)
 		fatal("rib_add");
 
-	LIST_INIT(&re->prefix_h);
+	TAILQ_INIT(&re->prefix_h);
 	re->prefix = pt_ref(pte);
 	re->rib_id = rib->id;
 
@@ -389,7 +391,7 @@ rib_remove(struct rib_entry *re)
 int
 rib_empty(struct rib_entry *re)
 {
-	return LIST_EMPTY(&re->prefix_h);
+	return TAILQ_EMPTY(&re->prefix_h);
 }
 
 static struct rib_entry *
@@ -875,10 +877,10 @@ prefix_index_cmp(struct prefix *a, struct prefix *b)
 static inline int
 prefix_cmp(struct prefix *a, struct prefix *b)
 {
-	if (a->eor != b->eor)
-		return a->eor - b->eor;
-	/* if EOR marker no need to check the rest also a->eor == b->eor */
-	if (a->eor)
+	if ((a->flags & PREFIX_FLAG_EOR) != (b->flags & PREFIX_FLAG_EOR))
+		return (a->flags & PREFIX_FLAG_EOR) ? 1 : -1;
+	/* if EOR marker no need to check the rest */
+	if (a->flags & PREFIX_FLAG_EOR)
 		return 0;
 
 	if (a->aspath != b->aspath)
@@ -1152,8 +1154,7 @@ prefix_add_eor(struct rde_peer *peer, uint8_t aid)
 	struct prefix *p;
 
 	p = prefix_alloc();
-	p->flags = PREFIX_FLAG_ADJOUT | PREFIX_FLAG_UPDATE;
-	p->eor = 1;
+	p->flags = PREFIX_FLAG_ADJOUT | PREFIX_FLAG_UPDATE | PREFIX_FLAG_EOR;
 	if (RB_INSERT(prefix_tree, &peer->updates[aid], p) != NULL)
 		/* no need to add if EoR marker already present */
 		prefix_free(p);
@@ -1171,46 +1172,10 @@ prefix_adjout_update(struct rde_peer *peer, struct filterstate *state,
 	struct rde_community *comm;
 	struct prefix *p;
 
-	if ((p = prefix_adjout_get(peer, 0, prefix, prefixlen)) != NULL) {
-		if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
-			fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit",
-			    __func__);
-
-		/* prefix is already in the Adj-RIB-Out */
-		if (p->flags & PREFIX_FLAG_WITHDRAW) {
-			RB_REMOVE(prefix_tree,
-			    &peer->withdraws[prefix->aid], p);
-			peer->up_wcnt--;
-		}
-		if ((p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD)) ==
-		    0) {
-			if (prefix_nhflags(p) == state->nhflags &&
-			    prefix_nexthop(p) == state->nexthop &&
-			    communities_equal(&state->communities,
-			    prefix_communities(p)) &&
-			    path_compare(&state->aspath, prefix_aspath(p)) ==
-			    0) {
-				/* nothing changed */
-				p->validation_state = vstate;
-				p->lastchange = getmonotime();
-				p->flags &= ~PREFIX_FLAG_STALE;
-				return;
-			}
-
-			if (p->flags & PREFIX_FLAG_UPDATE) {
-				RB_REMOVE(prefix_tree,
-				    &peer->updates[prefix->aid], p);
-				peer->up_nlricnt--;
-			}
-			/* unlink prefix so it can be relinked below */
-			prefix_unlink(p);
-			peer->prefix_out_cnt--;
-		}
-		/* nothing needs to be done for PREFIX_FLAG_DEAD and STALE */
-		p->flags &= ~PREFIX_FLAG_MASK;
-	} else {
+	if ((p = prefix_adjout_get(peer, 0, prefix, prefixlen)) == NULL) {
 		p = prefix_alloc();
-		p->flags |= PREFIX_FLAG_ADJOUT;
+		/* initally mark DEAD so code below is skipped */
+		p->flags |= PREFIX_FLAG_ADJOUT | PREFIX_FLAG_DEAD;
 
 		p->pt = pt_get(prefix, prefixlen);
 		if (p->pt == NULL)
@@ -1222,6 +1187,39 @@ prefix_adjout_update(struct rde_peer *peer, struct filterstate *state,
 		if (RB_INSERT(prefix_index, &peer->adj_rib_out, p) != NULL)
 			fatalx("%s: RB index invariant violated", __func__);
 	}
+
+	if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
+		fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit", __func__);
+	if ((p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD)) == 0) {
+		if (prefix_nhflags(p) == state->nhflags &&
+		    prefix_nexthop(p) == state->nexthop &&
+		    communities_equal(&state->communities,
+		    prefix_communities(p)) &&
+		    path_compare(&state->aspath, prefix_aspath(p)) == 0) {
+			/* nothing changed */
+			p->validation_state = vstate;
+			p->lastchange = getmonotime();
+			p->flags &= ~PREFIX_FLAG_STALE;
+			return;
+		}
+
+		/* if pending update unhook it before it is unlinked */
+		if (p->flags & PREFIX_FLAG_UPDATE) {
+			RB_REMOVE(prefix_tree, &peer->updates[prefix->aid], p);
+			peer->up_nlricnt--;
+		}
+
+		/* unlink prefix so it can be relinked below */
+		prefix_unlink(p);
+		peer->prefix_out_cnt--;
+	}
+	if (p->flags & PREFIX_FLAG_WITHDRAW) {
+		RB_REMOVE(prefix_tree, &peer->withdraws[prefix->aid], p);
+		peer->up_wcnt--;
+	}
+
+	/* nothing needs to be done for PREFIX_FLAG_DEAD and STALE */
+	p->flags &= ~PREFIX_FLAG_MASK;
 
 	if ((asp = path_lookup(&state->aspath)) == NULL) {
 		/* Path not available, create and link a new one. */
@@ -1293,7 +1291,7 @@ prefix_adjout_destroy(struct prefix *p)
 	if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
 		fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit", __func__);
 
-	if (p->eor) {
+	if (p->flags & PREFIX_FLAG_EOR) {
 		/* EOR marker is not linked in the index */
 		prefix_free(p);
 		return;
@@ -1498,7 +1496,7 @@ prefix_bypeer(struct rib_entry *re, struct rde_peer *peer, uint32_t path_id)
 {
 	struct prefix	*p;
 
-	LIST_FOREACH(p, &re->prefix_h, entry.list.rib)
+	TAILQ_FOREACH(p, &re->prefix_h, entry.list.rib)
 		if (prefix_peer(p) == peer && p->path_id == path_id)
 			return (p);
 	return (NULL);
@@ -1525,7 +1523,7 @@ prefix_evaluate_all(struct prefix *p, enum nexthop_state state,
 		 */
 		if (state == NEXTHOP_REACH) {
 			if ((re_rib(re)->flags & F_RIB_NOFIB) == 0 &&
-			    p == re->active)
+			    p == prefix_best(re))
 				rde_send_kroute(re_rib(re), p, NULL);
 		}
 		return;

@@ -6,7 +6,6 @@
 /autoconf.c/1.106/Sun Dec  8 12:25:30 2019//
 /bus_dma.c/1.35/Thu Dec 17 17:16:04 2015//
 /bus_space.c/1.9/Sat Apr 25 21:31:24 2015//
-/db_interface.c/1.42/Wed Nov  6 07:34:35 2019//
 /db_trace.c/1.42/Thu May 14 06:58:54 2020//
 /disksubr.c/1.116/Tue Feb 28 10:49:37 2017//
 /dkcsum.c/1.32/Sun Sep 14 14:17:23 2014//
@@ -58,10 +57,11 @@
 /apm.c/1.127/Mon Mar  7 09:08:07 2022//
 /bios.c/1.127/Mon Mar  7 09:08:07 2022//
 /cpu.c/1.108/Mon Mar  7 09:08:07 2022//
-/esm.c/1.62/Mon Mar  7 09:08:07 2022//
 /ioapic.c/1.43/Mon Mar  7 09:08:07 2022//
 /mainbus.c/1.60/Mon Mar  7 09:08:07 2022//
 /mpbios.c/1.44/Mon Mar  7 09:08:07 2022//
 /pmap.c/1.218/Mon Mar  7 09:08:07 2022//
 /vm_machdep.c/1.72/Mon Mar  7 09:08:07 2022//
+/db_interface.c/1.44/Wed Apr 20 14:28:17 2022//
+/esm.c/1.63/Wed Apr 20 14:28:17 2022//
 D

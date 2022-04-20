@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile.inc,v 1.19 2022/02/10 19:16:44 tb Exp $
+# $OpenBSD: Makefile.inc,v 1.22 2022/04/12 08:46:33 tb Exp $
 
 .PATH:		${.CURDIR}/../../../../usr.sbin/rpki-client
 
@@ -18,7 +18,8 @@ CFLAGS+=	-I${.CURDIR}/.. -I${.CURDIR}/../../../../usr.sbin/rpki-client
 LDADD+=		-lcrypto -lutil
 DPADD+=		${LIBCRYPTO} ${LIBUTIL}
 
-SRCS_test-ip +=		test-ip.c ip.c io.c encoding.c print.c x509.c
+SRCS_test-ip +=		test-ip.c ip.c io.c encoding.c print.c x509.c \
+			log.c validate.c as.c cert.c cms.c mft.c
 run-regress-test-ip: test-ip
 	./test-ip
 
@@ -27,7 +28,7 @@ TALARGS += ta/apnic-rpki-root-iana-origin.cer	tal/apnic.tal
 TALARGS += ta/ripe-ncc-ta.cer			tal/ripe.tal
 
 SRCS_test-cert+=	test-cert.c cert.c cms.c x509.c ip.c as.c io.c \
-			log.c tal.c validate.c encoding.c print.c
+			log.c tal.c validate.c encoding.c print.c mft.c
 run-regress-test-cert: test-cert
 	./test-cert -v ${.CURDIR}/../cer/*.cer
 	./test-cert -vt ${TALARGS:S,,${.CURDIR}/../&,}
@@ -38,12 +39,12 @@ run-regress-test-mft: test-mft
 	./test-mft -v ${.CURDIR}/../mft/*.mft
 
 SRCS_test-roa+=	test-roa.c roa.c cms.c x509.c ip.c as.c io.c log.c \
-		encoding.c print.c
+		encoding.c print.c validate.c cert.c mft.c
 run-regress-test-roa: test-roa
 	./test-roa -v ${.CURDIR}/../roa/*.roa
 
 SRCS_test-gbr+=	test-gbr.c gbr.c cms.c x509.c ip.c io.c log.c \
-		encoding.c print.c
+		encoding.c print.c validate.c as.c cert.c mft.c
 run-regress-test-gbr: test-gbr
 	./test-gbr -v ${.CURDIR}/../gbr/*.gbr
 
@@ -87,3 +88,4 @@ run-regress-test-rrdp: test-rrdp
 	./test-rrdp \
 	-n < ${.CURDIR}/../rrdp/notification_xmlns.xml 2>&1 | tee rrdp-r7.out
 	cmp ${.CURDIR}/../rrdp/rrdp-r7.out rrdp-r7.out
+	@echo OK

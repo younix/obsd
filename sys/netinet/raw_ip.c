@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.123 2022/03/14 22:38:43 tb Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.127 2022/03/23 17:22:28 bluhm Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -109,11 +109,8 @@ struct inpcbtable rawcbtable;
 void
 rip_init(void)
 {
-
 	in_pcbinit(&rawcbtable, 1);
 }
-
-struct sockaddr_in ripsrc = { sizeof(ripsrc), AF_INET };
 
 struct mbuf	*rip_chkhdr(struct mbuf *, struct mbuf *);
 
@@ -122,15 +119,20 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 {
 	struct mbuf *m = *mp;
 	struct ip *ip = mtod(m, struct ip *);
-	struct inpcb *inp, *last = NULL;
+	struct inpcb *inp;
+	SIMPLEQ_HEAD(, inpcb) inpcblist;
 	struct in_addr *key;
-	struct mbuf *opts = NULL;
 	struct counters_ref ref;
 	uint64_t *counters;
+	struct sockaddr_in ripsrc;
 
 	KASSERT(af == AF_INET);
 
+	memset(&ripsrc, 0, sizeof(ripsrc));
+	ripsrc.sin_family = AF_INET;
+	ripsrc.sin_len = sizeof(ripsrc);
 	ripsrc.sin_addr = ip->ip_src;
+
 	key = &ip->ip_dst;
 #if NPF > 0
 	if (m->m_pkthdr.pf.flags & PF_TAG_DIVERTED) {
@@ -150,7 +152,9 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		}
 	}
 #endif
-	NET_ASSERT_LOCKED();
+	NET_ASSERT_WLOCKED();
+	SIMPLEQ_INIT(&inpcblist);
+	mtx_enter(&rawcbtable.inpt_mtx);
 	TAILQ_FOREACH(inp, &rawcbtable.inpt_queue, inp_queue) {
 		if (inp->inp_socket->so_state & SS_CANTRCVMORE)
 			continue;
@@ -170,39 +174,16 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		if (inp->inp_faddr.s_addr &&
 		    inp->inp_faddr.s_addr != ip->ip_src.s_addr)
 			continue;
-		if (last) {
-			struct mbuf *n;
 
-			if ((n = m_copym(m, 0, M_COPYALL, M_NOWAIT)) != NULL) {
-				if (last->inp_flags & INP_CONTROLOPTS ||
-				    last->inp_socket->so_options & SO_TIMESTAMP)
-					ip_savecontrol(last, &opts, ip, n);
-				if (sbappendaddr(last->inp_socket,
-				    &last->inp_socket->so_rcv,
-				    sintosa(&ripsrc), n, opts) == 0) {
-					/* should notify about lost packet */
-					m_freem(n);
-					m_freem(opts);
-				} else
-					sorwakeup(last->inp_socket);
-				opts = NULL;
-			}
-		}
-		last = inp;
+		in_pcbref(inp);
+		SIMPLEQ_INSERT_TAIL(&inpcblist, inp, inp_notify);
 	}
-	if (last) {
-		if (last->inp_flags & INP_CONTROLOPTS ||
-		    last->inp_socket->so_options & SO_TIMESTAMP)
-			ip_savecontrol(last, &opts, ip, m);
-		if (sbappendaddr(last->inp_socket, &last->inp_socket->so_rcv,
-		    sintosa(&ripsrc), m, opts) == 0) {
-			m_freem(m);
-			m_freem(opts);
-		} else
-			sorwakeup(last->inp_socket);
-	} else {
+	mtx_leave(&rawcbtable.inpt_mtx);
+
+	if (SIMPLEQ_EMPTY(&inpcblist)) {
 		if (ip->ip_p != IPPROTO_ICMP)
-			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PROTOCOL, 0, 0);
+			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PROTOCOL,
+			    0, 0);
 		else
 			m_freem(m);
 
@@ -210,6 +191,30 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		counters[ips_noproto]++;
 		counters[ips_delivered]--;
 		counters_leave(&ref, ipcounters);
+	}
+
+	while ((inp = SIMPLEQ_FIRST(&inpcblist)) != NULL) {
+		struct mbuf *n, *opts = NULL;
+
+		SIMPLEQ_REMOVE_HEAD(&inpcblist, inp_notify);
+		if (SIMPLEQ_EMPTY(&inpcblist))
+			n = m;
+		else
+			n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
+		if (n != NULL) {
+			if (inp->inp_flags & INP_CONTROLOPTS ||
+			    inp->inp_socket->so_options & SO_TIMESTAMP)
+				ip_savecontrol(inp, &opts, ip, n);
+			if (sbappendaddr(inp->inp_socket,
+			    &inp->inp_socket->so_rcv,
+			    sintosa(&ripsrc), n, opts) == 0) {
+				/* should notify about lost packet */
+				m_freem(n);
+				m_freem(opts);
+			} else
+				sorwakeup(inp->inp_socket);
+		}
+		in_pcbunref(inp);
 	}
 	return IPPROTO_DONE;
 }
@@ -222,6 +227,7 @@ int
 rip_output(struct mbuf *m, struct socket *so, struct sockaddr *dstaddr,
     struct mbuf *control)
 {
+	struct sockaddr_in *dst = satosin(dstaddr);
 	struct ip *ip;
 	struct inpcb *inp;
 	int flags, error;
@@ -246,8 +252,8 @@ rip_output(struct mbuf *m, struct socket *so, struct sockaddr *dstaddr,
 		ip->ip_off = htons(0);
 		ip->ip_p = inp->inp_ip.ip_p;
 		ip->ip_len = htons(m->m_pkthdr.len);
-		ip->ip_src = inp->inp_laddr;
-		ip->ip_dst = satosin(dstaddr)->sin_addr;
+		ip->ip_src.s_addr = INADDR_ANY;
+		ip->ip_dst = dst->sin_addr;
 		ip->ip_ttl = inp->inp_ip.ip_ttl ? inp->inp_ip.ip_ttl : MAXTTL;
 	} else {
 		if (m->m_pkthdr.len > IP_MAXPACKET) {
@@ -262,11 +268,23 @@ rip_output(struct mbuf *m, struct socket *so, struct sockaddr *dstaddr,
 		ip = mtod(m, struct ip *);
 		if (ip->ip_id == 0)
 			ip->ip_id = htons(ip_randomid());
+		dst->sin_addr = ip->ip_dst;
 
 		/* XXX prevent ip_output from overwriting header fields */
 		flags |= IP_RAWOUTPUT;
 		ipstat_inc(ips_rawout);
 	}
+
+	if (ip->ip_src.s_addr == INADDR_ANY) {
+		struct in_addr *laddr;
+
+		error = in_pcbselsrc(&laddr, dst, inp);
+		if (error != 0)
+			return (error);
+
+		ip->ip_src = *laddr;
+	}
+
 #ifdef INET6
 	/*
 	 * A thought:  Even though raw IP shouldn't be able to set IPv6

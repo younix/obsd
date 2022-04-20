@@ -52,7 +52,6 @@
 /sndiod/1.6/Fri Nov 22 06:31:30 2019//
 /snmpd/1.4/Thu Jan 11 19:52:12 2018//
 /spamd/1.10/Thu Jan 11 21:09:26 2018//
-/spamlogd/1.4/Thu Jan 11 21:09:26 2018//
 /sshd/1.6/Sat Jan 25 12:05:08 2020//
 /statd/1.2/Thu Jan 11 19:52:12 2018//
 /syslogd/1.5/Thu Jan 11 19:52:12 2018//
@@ -71,4 +70,5 @@
 /dhcpleased/1.1/Wed Sep  1 16:07:30 2021//
 /resolvd/1.1/Wed Sep  1 16:07:30 2021//
 /rc.subr/1.152/Fri Feb 11 13:32:36 2022//
+/spamlogd/1.5/Wed Apr 20 14:27:25 2022//
 D

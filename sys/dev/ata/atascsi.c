@@ -1,4 +1,4 @@
-/*	$OpenBSD: atascsi.c,v 1.151 2022/01/09 05:42:37 jsg Exp $ */
+/*	$OpenBSD: atascsi.c,v 1.153 2022/04/16 19:19:58 naddy Exp $ */
 
 /*
  * Copyright (c) 2007 David Gwynne <dlg@openbsd.org>
@@ -42,7 +42,7 @@ struct atascsi {
 
 	struct atascsi_host_port **as_host_ports;
 
-	struct atascsi_methods	*as_methods;
+	const struct atascsi_methods *as_methods;
 	struct scsi_adapter	as_switch;
 	struct scsibus_softc	*as_scsibus;
 
@@ -94,7 +94,7 @@ int		atascsi_probe(struct scsi_link *);
 void		atascsi_free(struct scsi_link *);
 
 /* template */
-struct scsi_adapter atascsi_switch = {
+const struct scsi_adapter atascsi_switch = {
 	atascsi_cmd, NULL, atascsi_probe, atascsi_free, NULL
 };
 

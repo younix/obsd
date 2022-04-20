@@ -1,4 +1,4 @@
-/*	$OpenBSD: mft.c,v 1.53 2022/02/10 17:33:28 claudio Exp $ */
+/*	$OpenBSD: mft.c,v 1.60 2022/04/20 10:46:20 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -38,6 +38,7 @@
 struct	parse {
 	const char	*fn; /* manifest file name */
 	struct mft	*res; /* result object */
+	int		 found_crl;
 };
 
 extern ASN1_OBJECT    *mft_oid;
@@ -85,9 +86,9 @@ mft_parse_time(const ASN1_GENERALIZEDTIME *from,
 		return 0;
 	}
 
-	if ((p->res->valid_from = mktime(&tm_from)) == -1 ||
-	    (p->res->valid_until = mktime(&tm_until)) == -1)
-		errx(1, "%s: mktime failed", p->fn);
+	if ((p->res->valid_since = timegm(&tm_from)) == -1 ||
+	    (p->res->valid_until = timegm(&tm_until)) == -1)
+		errx(1, "%s: timegm failed", p->fn);
 
 	return 1;
 }
@@ -117,6 +118,8 @@ rtype_from_file_extension(const char *fn)
 		return RTYPE_ROA;
 	if (strcasecmp(fn + sz - 4, ".gbr") == 0)
 		return RTYPE_GBR;
+	if (strcasecmp(fn + sz - 4, ".asa") == 0)
+		return RTYPE_ASPA;
 
 	return RTYPE_INVALID;
 }
@@ -143,7 +146,7 @@ valid_filename(const char *fn, size_t len)
 }
 
 /*
- * Check that the file is a CER, CRL, GBR or a ROA.
+ * Check that the file is an ASPA, CER, CRL, GBR or a ROA.
  * Returns corresponding rtype or RTYPE_INVALID on error.
  */
 static enum rtype
@@ -153,6 +156,7 @@ rtype_from_mftfile(const char *fn)
 
 	type = rtype_from_file_extension(fn);
 	switch (type) {
+	case RTYPE_ASPA:
 	case RTYPE_CER:
 	case RTYPE_CRL:
 	case RTYPE_GBR:
@@ -177,6 +181,7 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 	size_t			 dsz = os->length;
 	int			 rc = 0;
 	struct mftfile		*fent;
+	enum rtype		 type;
 
 	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
 		cryptowarnx("%s: RFC 6486 section 4.2.1: FileAndHash: "
@@ -225,10 +230,17 @@ mft_parse_filehash(struct parse *p, const ASN1_OCTET_STRING *os)
 		goto out;
 	}
 
+	type = rtype_from_mftfile(fn);
+	/* remember the filehash for the CRL in struct mft */
+	if (type == RTYPE_CRL && strcmp(fn, p->res->crl) == 0) {
+		memcpy(p->res->crlhash, hash->value.bit_string->data,
+		    SHA256_DIGEST_LENGTH);
+		p->found_crl = 1;
+	}
+
 	/* Insert the filename and hash value. */
 	fent = &p->res->files[p->res->filesz++];
-
-	fent->type = rtype_from_mftfile(fn);
+	fent->type = type;
 	fent->file = fn;
 	fn = NULL;
 	memcpy(fent->hash, hash->value.bit_string->data, SHA256_DIGEST_LENGTH);
@@ -278,6 +290,11 @@ mft_parse_flist(struct parse *p, const ASN1_OCTET_STRING *os)
 			goto out;
 		} else if (!mft_parse_filehash(p, t->value.octet_string))
 			goto out;
+	}
+
+	if (!p->found_crl) {
+		warnx("%s: CRL not part of MFT fileList", p->fn);
+		goto out;
 	}
 
 	rc = 1;
@@ -429,6 +446,7 @@ mft_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	int		 rc = 0;
 	size_t		 cmsz;
 	unsigned char	*cms;
+	char		*crldp = NULL, *crlfile;
 
 	memset(&p, 0, sizeof(struct parse));
 	p.fn = fn;
@@ -441,14 +459,35 @@ mft_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	if ((p.res = calloc(1, sizeof(struct mft))) == NULL)
 		err(1, NULL);
 
-	p.res->aia = x509_get_aia(*x509, fn);
-	p.res->aki = x509_get_aki(*x509, 0, fn);
-	p.res->ski = x509_get_ski(*x509, fn);
+	if (!x509_get_aia(*x509, fn, &p.res->aia))
+		goto out;
+	if (!x509_get_aki(*x509, fn, &p.res->aki))
+		goto out;
+	if (!x509_get_ski(*x509, fn, &p.res->ski))
+		goto out;
 	if (p.res->aia == NULL || p.res->aki == NULL || p.res->ski == NULL) {
 		warnx("%s: RFC 6487 section 4.8: "
 		    "missing AIA, AKI or SKI X509 extension", fn);
 		goto out;
 	}
+
+	/* get CRL info for later */
+	if (!x509_get_crl(*x509, fn, &crldp))
+		goto out;
+	if (crldp == NULL) {
+		warnx("%s: RFC 6487 section 4.8.6: CRL: "
+		    "missing CRL distribution point extension", fn);
+		goto out;
+	}
+	if ((crlfile = strrchr(crldp, '/')) == NULL ||
+	    !valid_filename(crlfile + 1, strlen(crlfile + 1)) ||
+	    rtype_from_file_extension(crlfile + 1) != RTYPE_CRL) {
+		warnx("%s: RFC 6487 section 4.8.6: CRL: "
+		    "bad CRL distribution point extension", fn);
+		goto out;
+	}
+	if ((p.res->crl = strdup(crlfile + 1)) == NULL)
+		err(1, NULL);
 
 	if (mft_parse_econtent(cms, cmsz, &p) == 0)
 		goto out;
@@ -461,6 +500,7 @@ out:
 		X509_free(*x509);
 		*x509 = NULL;
 	}
+	free(crldp);
 	free(cms);
 	return p.res;
 }

@@ -8,12 +8,10 @@
 /openprom.c/1.1/Wed Sep  1 16:07:38 2021//
 /pagezero.S/1.2/Wed Sep  1 16:07:38 2021//
 /softintr.c/1.3/Wed Sep  1 16:07:38 2021//
-/support.S/1.2/Wed Sep  1 16:07:38 2021//
 /clock.c/1.3/Thu Sep  2 14:22:31 2021//
 /copy.S/1.7/Thu Sep  2 14:22:31 2021//
 /copystr.S/1.4/Thu Sep  2 14:22:31 2021//
 /cpufunc_asm.S/1.3/Thu Sep  2 14:22:31 2021//
-/db_interface.c/1.6/Thu Sep  2 14:22:31 2021//
 /exception.S/1.5/Thu Sep  2 14:22:31 2021//
 /fpu.c/1.11/Thu Sep  2 14:22:31 2021//
 /genassym.cf/1.6/Thu Sep  2 14:22:31 2021//
@@ -21,10 +19,6 @@
 /mem.c/1.5/Thu Sep  2 14:22:31 2021//
 /process_machdep.c/1.6/Thu Sep  2 14:22:31 2021//
 /sbi.c/1.6/Thu Sep  2 14:22:31 2021//
-/trap.c/1.17/Tue Sep 14 08:17:33 2021//
-/machdep.c/1.26/Wed Oct 20 17:29:10 2021//
-/sig_machdep.c/1.9/Wed Oct 20 17:29:10 2021//
-/cpu.c/1.12/Mon Jan 24 14:35:14 2022//
 /intr.c/1.9/Mon Jan 24 14:35:14 2022//
 /locore.S/1.14/Mon Jan 24 14:35:14 2022//
 /pmap.c/1.21/Mon Jan 24 14:35:14 2022//
@@ -33,4 +27,10 @@
 /db_trace.c/1.5/Mon Mar  7 09:08:07 2022//
 /syscall.c/1.12/Mon Mar  7 09:08:07 2022//
 /vm_machdep.c/1.10/Mon Mar  7 09:08:07 2022//
+/cpu.c/1.13/Wed Apr 20 14:28:18 2022//
+/db_interface.c/1.8/Wed Apr 20 14:28:18 2022//
+/machdep.c/1.27/Wed Apr 20 14:28:18 2022//
+/sig_machdep.c/1.10/Wed Apr 20 14:28:18 2022//
+/support.S/1.3/Wed Apr 20 14:28:18 2022//
+/trap.c/1.18/Wed Apr 20 14:28:18 2022//
 D

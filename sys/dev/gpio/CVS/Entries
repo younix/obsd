@@ -1,8 +1,8 @@
 /files.gpio/1.11/Fri Jan 24 05:14:51 2020//
-/gpio.c/1.15/Fri Aug 18 12:15:35 2017//
-/gpioiic.c/1.10/Fri Apr 19 23:44:34 2013//
-/gpioow.c/1.5/Sun Jul  3 15:47:16 2011//
-/gpiosim.c/1.1/Sun Nov 23 18:46:49 2008//
 /gpiovar.h/1.6/Mon Oct  3 20:24:51 2011//
 /gpiodcf.c/1.9/Fri Dec 11 17:58:22 2020//
+/gpio.c/1.17/Wed Apr 20 14:28:19 2022//
+/gpioiic.c/1.11/Wed Apr 20 14:28:19 2022//
+/gpioow.c/1.6/Wed Apr 20 14:28:19 2022//
+/gpiosim.c/1.2/Wed Apr 20 14:28:19 2022//
 D

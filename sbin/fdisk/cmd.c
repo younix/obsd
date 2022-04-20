@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.152 2022/02/04 18:21:33 krw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.156 2022/04/20 00:47:32 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -102,7 +102,7 @@ Xswap(char *args, struct mbr *mbr)
 		return CMD_CONT;
 	}
 
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
+	if (gh.gh_sig == GPTSIGNATURE) {
 		gg = gp[pt];
 		gp[pt] = gp[pf];
 		gp[pf] = gg;
@@ -119,20 +119,18 @@ int
 gedit(const int pn)
 {
 	struct uuid		 oldtype;
-	struct gpt_partition	*gg;
 	char			*name;
 	uint16_t		*utf;
 	int			 i;
 
-	gg = &gp[pn];
-	oldtype = gg->gp_type;
+	oldtype = gp[pn].gp_type;
 
 	if (gsetpid(pn))
 		return -1;
 
-	if (uuid_is_nil(&gg->gp_type, NULL)) {
+	if (uuid_is_nil(&gp[pn].gp_type, NULL)) {
 		if (uuid_is_nil(&oldtype, NULL) == 0) {
-			memset(gg, 0, sizeof(struct gpt_partition));
+			memset(&gp[pn], 0, sizeof(gp[pn]));
 			printf("Partition %d is disabled.\n", pn);
 		}
 		return 0;
@@ -143,7 +141,7 @@ gedit(const int pn)
 		return -1;
 	}
 
-	name = ask_string("Partition name", utf16le_to_string(gg->gp_name));
+	name = ask_string("Partition name", utf16le_to_string(gp[pn].gp_name));
 	if (strlen(name) >= GPTPARTNAMESIZE) {
 		printf("partition name must be < %d characters\n",
 		    GPTPARTNAMESIZE);
@@ -155,7 +153,7 @@ gedit(const int pn)
 	 */
 	utf = string_to_utf16le(name);
 	for (i = 0; i < GPTPARTNAMESIZE; i++) {
-		gg->gp_name[i] = utf[i];
+		gp[pn].gp_name[i] = utf[i];
 		if (utf[i] == 0)
 			break;
 	}
@@ -173,8 +171,8 @@ parsepn(const char *pnstr)
 		return -1;
 	}
 
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE)
-		maxpn = letoh32(gh.gh_part_num) - 1;
+	if (gh.gh_sig == GPTSIGNATURE)
+		maxpn = gh.gh_part_num - 1;
 	else
 		maxpn = NDOSPART - 1;
 
@@ -248,18 +246,17 @@ Xedit(char *args, struct mbr *mbr)
 {
 	struct gpt_partition	 oldgg;
 	struct prt		 oldprt;
-	struct gpt_partition	*gg;
 	int			 pn;
 
 	pn = parsepn(args);
 	if (pn == -1)
 		return CMD_CONT;
 
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
+	if (gh.gh_sig == GPTSIGNATURE) {
 		oldgg = gp[pn];
 		if (gedit(pn))
 			gp[pn] = oldgg;
-		else if (memcmp(&gp[pn], &oldgg, sizeof(oldgg)))
+		else if (memcmp(&gp[pn], &oldgg, sizeof(gp[pn])))
 			return CMD_DIRTY;
 	} else {
 		oldprt = mbr->mbr_prt[pn];
@@ -276,15 +273,12 @@ int
 gsetpid(const int pn)
 {
 	struct uuid		 gp_type, gp_guid;
-	struct gpt_partition	*gg;
-	int			 status;
-
-	gg = &gp[pn];
+	uint32_t		 status;
 
 	GPT_print_parthdr(TERSE);
 	GPT_print_part(pn, "s", TERSE);
 
-	uuid_dec_le(&gg->gp_type, &gp_type);
+	uuid_dec_le(&gp[pn].gp_type, &gp_type);
 	if (PRT_protected_guid(&gp_type)) {
 		printf("can't edit partition type %s\n",
 		    PRT_uuid_to_typename(&gp_type));
@@ -298,7 +292,7 @@ gsetpid(const int pn)
 		return -1;
 	}
 
-	uuid_dec_le(&gg->gp_guid, &gp_guid);
+	uuid_dec_le(&gp[pn].gp_guid, &gp_guid);
 	if (uuid_is_nil(&gp_guid, NULL)) {
 		uuid_create(&gp_guid, &status);
 		if (status != uuid_s_ok) {
@@ -307,8 +301,8 @@ gsetpid(const int pn)
 		}
 	}
 
-	uuid_enc_le(&gg->gp_type, &gp_type);
-	uuid_enc_le(&gg->gp_guid, &gp_guid);
+	uuid_enc_le(&gp[pn].gp_type, &gp_type);
+	uuid_enc_le(&gp[pn].gp_guid, &gp_guid);
 
 	return 0;
 }
@@ -339,11 +333,11 @@ Xsetpid(char *args, struct mbr *mbr)
 	if (pn == -1)
 		return CMD_CONT;
 
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
+	if (gh.gh_sig == GPTSIGNATURE) {
 		oldgg = gp[pn];
 		if (gsetpid(pn))
 			gp[pn] = oldgg;
-		else if (memcmp(&gp[pn], &oldgg, sizeof(oldgg)))
+		else if (memcmp(&gp[pn], &oldgg, sizeof(gp[pn])))
 			return CMD_DIRTY;
 	} else {
 		oldprt = mbr->mbr_prt[pn];
@@ -394,7 +388,7 @@ Xselect(char *args, struct mbr *mbr)
 int
 Xprint(char *args, struct mbr *mbr)
 {
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE)
+	if (gh.gh_sig == GPTSIGNATURE)
 		GPT_print(args, VERBOSE);
 	else
 		MBR_print(mbr, args);
@@ -416,7 +410,7 @@ Xwrite(char *args, struct mbr *mbr)
 			return CMD_CONT;
 	}
 
-	if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
+	if (gh.gh_sig == GPTSIGNATURE) {
 		printf("Writing GPT.\n");
 		if (GPT_write() == -1) {
 			warn("error writing GPT");
@@ -485,7 +479,7 @@ Xflag(char *args, struct mbr *mbr)
 		return CMD_CONT;
 
 	if (flag != NULL) {
-		if (letoh64(gh.gh_sig) == GPTSIGNATURE)
+		if (gh.gh_sig == GPTSIGNATURE)
 			val = strtonum(flag, 0, INT64_MAX, &errstr);
 		else
 			val = strtonum(flag, 0, 0xff, &errstr);
@@ -493,14 +487,14 @@ Xflag(char *args, struct mbr *mbr)
 			printf("flag value is %s: %s.\n", errstr, flag);
 			return CMD_CONT;
 		}
-		if (letoh64(gh.gh_sig) == GPTSIGNATURE)
+		if (gh.gh_sig == GPTSIGNATURE)
 			gp[pn].gp_attrs = htole64(val);
 		else
 			mbr->mbr_prt[pn].prt_flag = val;
 		printf("Partition %d flag value set to 0x%llx.\n", pn, val);
 	} else {
-		if (letoh64(gh.gh_sig) == GPTSIGNATURE) {
-			for (i = 0; i < NGPTPARTITIONS; i++) {
+		if (gh.gh_sig == GPTSIGNATURE) {
+			for (i = 0; i < gh.gh_part_num; i++) {
 				if (i == pn)
 					gp[i].gp_attrs = htole64(GPTDOSACTIVE);
 				else
@@ -606,7 +600,7 @@ ask_uuid(const struct uuid *olduuid)
 	static struct uuid	 uuid;
 	char			 lbuf[100];
 	char			*dflt = NULL;
-	int			 status;
+	uint32_t		 status;
 	int			 num = 0;
 
 	uuid = *olduuid;

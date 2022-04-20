@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.56 2022/02/04 16:50:49 tb Exp $ */
+/*	$OpenBSD: cert.c,v 1.69 2022/04/12 09:48:23 tb Exp $ */
 /*
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -122,266 +122,6 @@ sbgp_addr(struct parse *p,
 		return 0;
 	}
 	return append_ip(p, ip);
-}
-
-/*
- * Parse the SIA notify URL, 4.8.8.1.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia_resource_notify(struct parse *p, const char *d, size_t dsz)
-{
-	if (p->res->notify != NULL) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "Notify location already specified", p->fn);
-		return 0;
-	}
-
-	/* Make sure it's a https:// address. */
-	if (!valid_uri(d, dsz, "https://")) {
-		warnx("%s: RFC 8182 section 3.2: bad Notify URI", p->fn);
-		return 0;
-	}
-
-	if ((p->res->notify = strndup(d, dsz)) == NULL)
-		err(1, NULL);
-
-	return 1;
-}
-
-/*
- * Parse the SIA manifest, 4.8.8.1.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia_resource_mft(struct parse *p, const char *d, size_t dsz)
-{
-	if (p->res->mft != NULL) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "MFT location already specified", p->fn);
-		return 0;
-	}
-
-	/* Make sure it's an MFT rsync address. */
-	if (!valid_uri(d, dsz, "rsync://")) {
-		warnx("%s: RFC 6487 section 4.8.8: bad MFT location", p->fn);
-		return 0;
-	}
-
-	if (dsz < 4 || strcasecmp(d + dsz - 4, ".mft") != 0) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "not an MFT file", p->fn);
-		return 0;
-	}
-
-	if ((p->res->mft = strndup(d, dsz)) == NULL)
-		err(1, NULL);
-
-	return 1;
-}
-
-/*
- * Parse the SIA manifest, 4.8.8.1.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia_resource_carepo(struct parse *p, const char *d, size_t dsz)
-{
-	if (p->res->repo != NULL) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "CA repository already specified", p->fn);
-		return 0;
-	}
-
-	/* Make sure it's an rsync:// address. */
-	if (!valid_uri(d, dsz, "rsync://")) {
-		warnx("%s: RFC 6487 section 4.8.8: bad CA repository URI",
-		    p->fn);
-		return 0;
-	}
-
-	if ((p->res->repo = strndup(d, dsz)) == NULL)
-		err(1, NULL);
-
-	return 1;
-}
-
-/*
- * Parse the SIA entries, 4.8.8.1.
- * There may be multiple different resources at this location, so throw
- * out all but the matching resource type. Currently only two entries
- * are of interest: rpkiManifest and rpkiNotify.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia_resource_entry(struct parse *p,
-	const unsigned char *d, size_t dsz)
-{
-	ASN1_SEQUENCE_ANY	*seq;
-	ASN1_OBJECT		*oid;
-	const ASN1_TYPE		*t;
-	int			 rc = 0, ptag;
-	long			 plen;
-
-	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
-		cryptowarnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "failed ASN.1 sequence parse", p->fn);
-		goto out;
-	}
-	if (sk_ASN1_TYPE_num(seq) != 2) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want 2 elements, have %d",
-		    p->fn, sk_ASN1_TYPE_num(seq));
-		goto out;
-	}
-
-	/* Composed of an OID and its continuation. */
-
-	t = sk_ASN1_TYPE_value(seq, 0);
-	if (t->type != V_ASN1_OBJECT) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want ASN.1 object, have %s (NID %d)",
-		    p->fn, ASN1_tag2str(t->type), t->type);
-		goto out;
-	}
-	oid = t->value.object;
-
-	t = sk_ASN1_TYPE_value(seq, 1);
-	if (t->type != V_ASN1_OTHER) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want ASN.1 external, have %s (NID %d)",
-		    p->fn, ASN1_tag2str(t->type), t->type);
-		goto out;
-	}
-
-	/* FIXME: there must be a way to do this without ASN1_frame. */
-
-	d = t->value.asn1_string->data;
-	dsz = t->value.asn1_string->length;
-	if (!ASN1_frame(p->fn, dsz, &d, &plen, &ptag))
-		goto out;
-
-	if (OBJ_cmp(oid, carepo_oid) == 0)
-		rc = sbgp_sia_resource_carepo(p, d, plen);
-	else if (OBJ_cmp(oid, manifest_oid) == 0)
-		rc = sbgp_sia_resource_mft(p, d, plen);
-	else if (OBJ_cmp(oid, notify_oid) == 0)
-		rc = sbgp_sia_resource_notify(p, d, plen);
-	else
-		rc = 1;	/* silently ignore */
-out:
-	sk_ASN1_TYPE_pop_free(seq, ASN1_TYPE_free);
-	return rc;
-}
-
-/*
- * Multiple locations as defined in RFC 6487, 4.8.8.1.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia_resource(struct parse *p, const unsigned char *d, size_t dsz)
-{
-	ASN1_SEQUENCE_ANY	*seq;
-	const ASN1_TYPE		*t;
-	int			 rc = 0, i;
-
-	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
-		cryptowarnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "failed ASN.1 sequence parse", p->fn);
-		goto out;
-	}
-
-	for (i = 0; i < sk_ASN1_TYPE_num(seq); i++) {
-		t = sk_ASN1_TYPE_value(seq, i);
-		if (t->type != V_ASN1_SEQUENCE) {
-			warnx("%s: RFC 6487 section 4.8.8: SIA: "
-			    "want ASN.1 sequence, have %s (NID %d)",
-			    p->fn, ASN1_tag2str(t->type), t->type);
-			goto out;
-		}
-		d = t->value.asn1_string->data;
-		dsz = t->value.asn1_string->length;
-		if (!sbgp_sia_resource_entry(p, d, dsz))
-			goto out;
-	}
-
-	if (strstr(p->res->mft, p->res->repo) != p->res->mft) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "conflicting URIs for caRepository and rpkiManifest",
-		    p->fn);
-		goto out;
-	}
-	rc = 1;
-out:
-	sk_ASN1_TYPE_pop_free(seq, ASN1_TYPE_free);
-	return rc;
-}
-
-/*
- * Parse "Subject Information Access" extension, RFC 6487 4.8.8.
- * Returns zero on failure, non-zero on success.
- */
-static int
-sbgp_sia(struct parse *p, X509_EXTENSION *ext)
-{
-	unsigned char		*sv = NULL;
-	const unsigned char	*d;
-	ASN1_SEQUENCE_ANY	*seq = NULL;
-	const ASN1_TYPE		*t;
-	int			 dsz, rc = 0;
-
-	if ((dsz = i2d_X509_EXTENSION(ext, &sv)) < 0) {
-		cryptowarnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "failed extension parse", p->fn);
-		goto out;
-	}
-	d = sv;
-
-	if ((seq = d2i_ASN1_SEQUENCE_ANY(NULL, &d, dsz)) == NULL) {
-		cryptowarnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "failed ASN.1 sequence parse", p->fn);
-		goto out;
-	}
-	if (sk_ASN1_TYPE_num(seq) != 2) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want 2 elements, have %d", p->fn,
-		    sk_ASN1_TYPE_num(seq));
-		goto out;
-	}
-
-	t = sk_ASN1_TYPE_value(seq, 0);
-	if (t->type != V_ASN1_OBJECT) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want ASN.1 object, have %s (NID %d)",
-		    p->fn, ASN1_tag2str(t->type), t->type);
-		goto out;
-	}
-	if (OBJ_obj2nid(t->value.object) != NID_sinfo_access) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "incorrect OID, have %s (NID %d)", p->fn,
-		    ASN1_tag2str(OBJ_obj2nid(t->value.object)),
-		    OBJ_obj2nid(t->value.object));
-		goto out;
-	}
-
-	t = sk_ASN1_TYPE_value(seq, 1);
-	if (t->type != V_ASN1_OCTET_STRING) {
-		warnx("%s: RFC 6487 section 4.8.8: SIA: "
-		    "want ASN.1 octet string, have %s (NID %d)",
-		    p->fn, ASN1_tag2str(t->type), t->type);
-		goto out;
-	}
-
-	d = t->value.octet_string->data;
-	dsz = t->value.octet_string->length;
-	if (!sbgp_sia_resource(p, d, dsz))
-		goto out;
-
-	rc = 1;
-out:
-	sk_ASN1_TYPE_pop_free(seq, ASN1_TYPE_free);
-	free(sv);
-	return rc;
 }
 
 /*
@@ -610,8 +350,6 @@ sbgp_assysnum(struct parse *p, X509_EXTENSION *ext)
 		    p->fn, ASN1_tag2str(t->type), t->type);
 		goto out;
 	}
-
-	/* FIXME: verify OID. */
 
 	t = sk_ASN1_TYPE_value(seq, 1);
 	if (t->type != V_ASN1_BOOLEAN) {
@@ -918,8 +656,6 @@ sbgp_ipaddrblk(struct parse *p, X509_EXTENSION *ext)
 		goto out;
 	}
 
-	/* FIXME: verify OID. */
-
 	t = sk_ASN1_TYPE_value(seq, 1);
 	if (t->type != V_ASN1_BOOLEAN) {
 		warnx("%s: RFC 6487 section 4.8.10: sbgp-ipAddrBlock: "
@@ -968,6 +704,75 @@ out:
 	sk_ASN1_TYPE_pop_free(seq, ASN1_TYPE_free);
 	sk_ASN1_TYPE_pop_free(sseq, ASN1_TYPE_free);
 	free(sv);
+	return rc;
+}
+
+/*
+ * Parse "Subject Information Access" extension, RFC 6487 4.8.8.
+ * Returns zero on failure, non-zero on success.
+ */
+static int
+sbgp_sia(struct parse *p, X509_EXTENSION *ext)
+{
+	AUTHORITY_INFO_ACCESS	*sia = NULL;
+	ACCESS_DESCRIPTION	*ad;
+	ASN1_OBJECT		*oid;
+	int			 i, rc = 0;
+
+	if (X509_EXTENSION_get_critical(ext)) {
+		warnx("%s: RFC 6487 section 4.8.8: SIA: "
+		    "extension not non-critical", p->fn);
+		goto out;
+	}
+
+	if ((sia = X509V3_EXT_d2i(ext)) == NULL) {
+		cryptowarnx("%s: RFC 6487 section 4.8.8: SIA: "
+		    "failed extension parse", p->fn);
+		goto out;
+	}
+
+	for (i = 0; i < sk_ACCESS_DESCRIPTION_num(sia); i++) {
+		ad = sk_ACCESS_DESCRIPTION_value(sia, i);
+
+		oid = ad->method;
+
+		if (OBJ_cmp(oid, carepo_oid) == 0) {
+			if (!x509_location(p->fn, "SIA: caRepository",
+			    "rsync://", ad->location, &p->res->repo))
+				goto out;
+		} else if (OBJ_cmp(oid, manifest_oid) == 0) {
+			if (!x509_location(p->fn, "SIA: rpkiManifest",
+			    "rsync://", ad->location, &p->res->mft))
+				goto out;
+		} else if (OBJ_cmp(oid, notify_oid) == 0) {
+			if (!x509_location(p->fn, "SIA: rpkiNotify",
+			    "https://", ad->location, &p->res->notify))
+				goto out;
+		}
+	}
+
+	if (p->res->mft == NULL || p->res->repo == NULL) {
+		warnx("%s: RFC 6487 section 4.8.8: SIA: missing caRepository "
+		    "or rpkiManifest", p->fn);
+		goto out;
+	}
+
+	if (strstr(p->res->mft, p->res->repo) != p->res->mft) {
+		warnx("%s: RFC 6487 section 4.8.8: SIA: "
+		    "conflicting URIs for caRepository and rpkiManifest",
+		    p->fn);
+		goto out;
+	}
+
+	if (rtype_from_file_extension(p->res->mft) != RTYPE_MFT) {
+		warnx("%s: RFC 6487 section 4.8.8: SIA: "
+		    "not an MFT file", p->fn);
+		goto out;
+	}
+
+	rc = 1;
+ out:
+	AUTHORITY_INFO_ACCESS_free(sia);
 	return rc;
 }
 
@@ -1052,15 +857,12 @@ certificate_policies(struct parse *p, X509_EXTENSION *ext)
 /*
  * Parse and partially validate an RPKI X509 certificate (either a trust
  * anchor or a certificate) as defined in RFC 6487.
- * If "ta" is set, this is a trust anchor and must be self-signed.
- * Returns the parse results or NULL on failure ("xp" will be NULL too).
- * On success, free the pointer with cert_free() and make sure that "xp"
- * is also dereferenced.
+ * Returns the parse results or NULL on failure.
  */
-static struct cert *
-cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
+struct cert *
+cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 {
-	int		 rc = 0, extsz, c;
+	int		 extsz;
 	int		 sia_present = 0;
 	size_t		 i;
 	X509		*x = NULL;
@@ -1078,7 +880,7 @@ cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 		err(1, NULL);
 
 	if ((x = d2i_X509(NULL, &der, len)) == NULL) {
-		cryptowarnx("%s: d2i_X509_bio", p.fn);
+		cryptowarnx("%s: d2i_X509", p.fn);
 		goto out;
 	}
 
@@ -1092,21 +894,24 @@ cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 		assert(ext != NULL);
 		obj = X509_EXTENSION_get_object(ext);
 		assert(obj != NULL);
-		c = 1;
 
 		switch (OBJ_obj2nid(obj)) {
 		case NID_sbgp_ipAddrBlock:
-			c = sbgp_ipaddrblk(&p, ext);
+			if (!sbgp_ipaddrblk(&p, ext))
+				goto out;
 			break;
 		case NID_sbgp_autonomousSysNum:
-			c = sbgp_assysnum(&p, ext);
+			if (!sbgp_assysnum(&p, ext))
+				goto out;
 			break;
 		case NID_sinfo_access:
 			sia_present = 1;
-			c = sbgp_sia(&p, ext);
+			if (!sbgp_sia(&p, ext))
+				goto out;
 			break;
 		case NID_certificate_policies:
-			c = certificate_policies(&p, ext);
+			if (!certificate_policies(&p, ext))
+				goto out;
 			break;
 		case NID_crl_distribution_points:
 			/* ignored here, handled later */
@@ -1128,16 +933,16 @@ cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 			} */
 			break;
 		}
-		if (c == 0)
-			goto out;
 	}
 
-	p.res->aki = x509_get_aki(x, ta, p.fn);
-	p.res->ski = x509_get_ski(x, p.fn);
-	if (!ta) {
-		p.res->aia = x509_get_aia(x, p.fn);
-		p.res->crl = x509_get_crl(x, p.fn);
-	}
+	if (!x509_get_aki(x, p.fn, &p.res->aki))
+		goto out;
+	if (!x509_get_ski(x, p.fn, &p.res->ski))
+		goto out;
+	if (!x509_get_aia(x, p.fn, &p.res->aia))
+		goto out;
+	if (!x509_get_crl(x, p.fn, &p.res->crl))
+		goto out;
 	if (!x509_get_expire(x, p.fn, &p.res->expires))
 		goto out;
 	p.res->purpose = x509_get_purpose(x, p.fn);
@@ -1171,11 +976,6 @@ cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 			   p.fn);
 			goto out;
 		}
-		if (ta) {
-			warnx("%s: BGPsec cert can not be a trust anchor",
-			   p.fn);
-			goto out;
-		}
 		break;
 	default:
 		warnx("%s: x509_get_purpose failed in %s", p.fn, __func__);
@@ -1187,66 +987,50 @@ cert_parse_inner(const char *fn, const unsigned char *der, size_t len, int ta)
 		goto out;
 	}
 
-	if (ta && p.res->aki != NULL && strcmp(p.res->aki, p.res->ski)) {
-		warnx("%s: RFC 6487 section 8.4.2: "
-		    "trust anchor AKI, if specified, must match SKI", p.fn);
-		goto out;
-	}
-
-	if (!ta && p.res->aki == NULL) {
-		warnx("%s: RFC 6487 section 8.4.2: "
-		    "non-trust anchor missing AKI", p.fn);
-		goto out;
-	} else if (!ta && strcmp(p.res->aki, p.res->ski) == 0) {
-		warnx("%s: RFC 6487 section 8.4.2: "
-		    "non-trust anchor AKI may not match SKI", p.fn);
-		goto out;
-	}
-
-	if (!ta && p.res->aia == NULL) {
-		warnx("%s: RFC 6487 section 8.4.7: "
-		    "non-trust anchor missing AIA", p.fn);
-		goto out;
-	} else if (ta && p.res->aia != NULL) {
-		warnx("%s: RFC 6487 section 8.4.7: "
-		    "trust anchor must not have AIA", p.fn);
-		goto out;
-	}
-
-	if (ta && p.res->crl != NULL) {
-		warnx("%s: RFC 6487 section 8.4.2: "
-		    "trust anchor may not specify CRL resource", p.fn);
-		goto out;
-	}
-
 	p.res->x509 = x;
+	return p.res;
 
-	rc = 1;
 out:
-	if (rc == 0) {
-		cert_free(p.res);
-		X509_free(x);
-	}
-	return (rc == 0) ? NULL : p.res;
+	cert_free(p.res);
+	X509_free(x);
+	return NULL;
 }
 
 struct cert *
-cert_parse(const char *fn, const unsigned char *der, size_t len)
+cert_parse(const char *fn, struct cert *p)
 {
-	return cert_parse_inner(fn, der, len, 0);
+	if (p->aki == NULL) {
+		warnx("%s: RFC 6487 section 8.4.2: "
+		    "non-trust anchor missing AKI", fn);
+		goto badcert;
+	}
+	if (strcmp(p->aki, p->ski) == 0) {
+		warnx("%s: RFC 6487 section 8.4.2: "
+		    "non-trust anchor AKI may not match SKI", fn);
+		goto badcert;
+	}
+	if (p->aia == NULL) {
+		warnx("%s: RFC 6487 section 8.4.7: AIA: extension missing", fn);
+		goto badcert;
+	}
+	if (p->crl == NULL) {
+		warnx("%s: RFC 6487 section 4.8.6: CRL: "
+		    "no CRL distribution point extension", fn);
+		goto badcert;
+	}
+	return p;
+
+badcert:
+	cert_free(p);
+	return NULL;
 }
 
 struct cert *
-ta_parse(const char *fn, const unsigned char *der, size_t len,
-    const unsigned char *pkey, size_t pkeysz)
+ta_parse(const char *fn, struct cert *p, const unsigned char *pkey,
+    size_t pkeysz)
 {
 	ASN1_TIME	*notBefore, *notAfter;
-	EVP_PKEY	*pk = NULL, *opk = NULL;
-	struct cert	*p;
-	int		 rc = 0;
-
-	if ((p = cert_parse_inner(fn, der, len, 1)) == NULL)
-		return NULL;
+	EVP_PKEY	*pk, *opk;
 
 	/* first check pubkey against the one from the TAL */
 	pk = d2i_PUBKEY(NULL, &pkey, pkeysz);
@@ -1257,7 +1041,8 @@ ta_parse(const char *fn, const unsigned char *der, size_t len,
 	if ((opk = X509_get0_pubkey(p->x509)) == NULL) {
 		cryptowarnx("%s: RFC 6487 (trust anchor): missing pubkey", fn);
 		goto badcert;
-	} else if (EVP_PKEY_cmp(pk, opk) != 1) {
+	}
+	if (EVP_PKEY_cmp(pk, opk) != 1) {
 		cryptowarnx("%s: RFC 6487 (trust anchor): "
 		    "pubkey does not match TAL pubkey", fn);
 		goto badcert;
@@ -1279,17 +1064,33 @@ ta_parse(const char *fn, const unsigned char *der, size_t len,
 		warnx("%s: certificate has expired", fn);
 		goto badcert;
 	}
+	if (p->aki != NULL && strcmp(p->aki, p->ski)) {
+		warnx("%s: RFC 6487 section 8.4.2: "
+		    "trust anchor AKI, if specified, must match SKI", fn);
+		goto badcert;
+	}
+	if (p->aia != NULL) {
+		warnx("%s: RFC 6487 section 8.4.7: "
+		    "trust anchor must not have AIA", fn);
+		goto badcert;
+	}
+	if (p->crl != NULL) {
+		warnx("%s: RFC 6487 section 8.4.2: "
+		    "trust anchor may not specify CRL resource", fn);
+		goto badcert;
+	}
+	if (p->purpose == CERT_PURPOSE_BGPSEC_ROUTER) {
+		warnx("%s: BGPsec cert cannot be a trust anchor", fn);
+		goto badcert;
+	}
 
-	rc = 1;
+	EVP_PKEY_free(pk);
+	return p;
 
 badcert:
 	EVP_PKEY_free(pk);
-	if (rc == 0) {
-		cert_free(p);
-		p = NULL;
-	}
-
-	return p;
+	cert_free(p);
+	return NULL;
 }
 
 /*

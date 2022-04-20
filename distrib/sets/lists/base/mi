@@ -313,7 +313,9 @@
 ./etc/signify/openbsd-71-pkg.pub
 ./etc/signify/openbsd-71-syspatch.pub
 ./etc/signify/openbsd-72-base.pub
+./etc/signify/openbsd-72-fw.pub
 ./etc/signify/openbsd-72-pkg.pub
+./etc/signify/openbsd-72-syspatch.pub
 ./etc/skel
 ./etc/skel/.ssh
 ./etc/ssh
@@ -512,6 +514,7 @@
 ./usr/bin/jot
 ./usr/bin/kdump
 ./usr/bin/keynote
+./usr/bin/kstat
 ./usr/bin/ktrace
 ./usr/bin/lam
 ./usr/bin/last
@@ -760,7 +763,7 @@
 ./usr/lib/libssl.so.52.0
 ./usr/lib/libtermcap.so.14.0
 ./usr/lib/libtermlib.so.14.0
-./usr/lib/libtls.so.24.1
+./usr/lib/libtls.so.25.0
 ./usr/lib/libusbhid.so.7.1
 ./usr/lib/libutil.so.16.0
 ./usr/lib/libz.so.6.0
@@ -1142,6 +1145,7 @@
 ./usr/libdata/perl5/OpenBSD/PackageName.pm
 ./usr/libdata/perl5/OpenBSD/PackageRepository
 ./usr/libdata/perl5/OpenBSD/PackageRepository.pm
+./usr/libdata/perl5/OpenBSD/PackageRepository/Cache.pm
 ./usr/libdata/perl5/OpenBSD/PackageRepository/HTTP.pm
 ./usr/libdata/perl5/OpenBSD/PackageRepository/Installed.pm
 ./usr/libdata/perl5/OpenBSD/PackageRepository/Persistent.pm

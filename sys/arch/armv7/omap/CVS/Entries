@@ -8,17 +8,13 @@
 /omap3.c/1.6/Tue Mar 31 10:33:10 2020//
 /omap3_prcmreg.h/1.3/Mon Oct 28 11:11:50 2013//
 /omap4_prcmreg.h/1.1/Wed Sep  4 14:38:30 2013//
-/omclock.c/1.1/Fri Apr 10 22:02:45 2020//
 /omehcivar.h/1.2/Mon May  6 03:45:58 2019//
 /omgpiovar.h/1.2/Wed Nov 20 13:32:40 2013//
 /prcmvar.h/1.8/Sun Apr  5 13:11:13 2020//
 /ti_iicreg.h/1.1/Sun Nov 24 15:00:22 2013//
-/omrng.c/1.2/Mon Jun  1 06:23:23 2020//
 /intc.h/1.4/Fri Dec 11 17:58:22 2020//
 /omap4.c/1.7/Wed Sep  1 16:07:38 2021//
 /omap_machdep.c/1.13/Wed Sep  1 16:07:38 2021//
-/omcm.c/1.2/Wed Sep  1 16:07:38 2021//
-/omsysc.c/1.2/Wed Sep  1 16:07:38 2021//
 /amdisplay.c/1.16/Mon Nov 15 19:06:15 2021//
 /edma.c/1.8/Mon Nov 15 19:06:15 2021//
 /if_cpsw.c/1.52/Mon Nov 15 19:06:15 2021//
@@ -38,4 +34,8 @@
 /intc.c/1.12/Mon Jan 24 14:35:14 2022//
 /dmtimer.c/1.15/Mon Mar  7 09:08:07 2022//
 /gptimer.c/1.16/Mon Mar  7 09:08:07 2022//
+/omclock.c/1.2/Wed Apr 20 14:28:16 2022//
+/omcm.c/1.3/Wed Apr 20 14:28:16 2022//
+/omrng.c/1.3/Wed Apr 20 14:28:16 2022//
+/omsysc.c/1.3/Wed Apr 20 14:28:16 2022//
 D

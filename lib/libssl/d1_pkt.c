@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_pkt.c,v 1.120 2022/03/14 16:49:35 jsing Exp $ */
+/* $OpenBSD: d1_pkt.c,v 1.123 2022/03/26 15:05:53 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -486,116 +486,172 @@ static int
 dtls1_read_handshake_unexpected(SSL *s)
 {
 	SSL3_RECORD_INTERNAL *rr = &s->s3->rrec;
-	int i;
+	struct hm_header_st hs_msg_hdr;
+	CBS cbs;
+	int ret;
 
 	if (s->internal->in_handshake) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		return -1;
 	}
 
-	/* If we are a client, check for an incoming 'Hello Request': */
-	if (!s->server && rr->type == SSL3_RT_HANDSHAKE &&
-	    rr->length >= DTLS1_HM_HEADER_LENGTH && rr->off == 0 &&
-	    rr->data[0] == SSL3_MT_HELLO_REQUEST &&
-	    s->session != NULL && s->session->cipher != NULL) {
-		struct hm_header_st msg_hdr;
-		CBS cbs;
+	if (rr->off != 0) {
+		SSLerror(s, ERR_R_INTERNAL_ERROR);
+		return -1;
+	}
 
-		CBS_init(&cbs, rr->data, rr->length);
-		if (!dtls1_get_message_header(&cbs, &msg_hdr))
-			return -1; /* XXX - probably should drop/continue. */
-		if (msg_hdr.msg_len != 0) {
+	/* Parse handshake message header. */
+	CBS_init(&cbs, rr->data, rr->length);
+	if (!dtls1_get_message_header(&cbs, &hs_msg_hdr))
+		return -1; /* XXX - probably should drop/continue. */
+
+	/* This may just be a stale retransmit. */
+	if (rr->epoch != tls12_record_layer_read_epoch(s->internal->rl)) {
+		rr->length = 0;
+		return 1;
+	}
+
+	if (hs_msg_hdr.type == SSL3_MT_HELLO_REQUEST) {
+		/*
+		 * Incoming HelloRequest messages should only be received by a
+		 * client. A server may send these at any time - a client should
+		 * ignore the message if received in the middle of a handshake.
+		 * See RFC 5246 sections 7.4 and 7.4.1.1.
+		 */
+		if (s->server) {
+			SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			     SSL_AD_UNEXPECTED_MESSAGE);
+			return -1;
+		}
+
+		/* XXX - should also check frag offset/length. */
+		if (hs_msg_hdr.msg_len != 0) {
 			SSLerror(s, SSL_R_BAD_HELLO_REQUEST);
 			ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_DECODE_ERROR);
 			return -1;
 		}
+
+		ssl_msg_callback(s, 0, SSL3_RT_HANDSHAKE, rr->data,
+		    DTLS1_HM_HEADER_LENGTH);
+
 		rr->length = 0;
 
-		/* no need to check sequence number on HELLO REQUEST messages */
+		/*
+		 * It should be impossible to hit this, but keep the safety
+		 * harness for now...
+		 */
+		if (s->session == NULL || s->session->cipher == NULL)
+			return 1;
 
-		ssl_msg_callback(s, 0, SSL3_RT_HANDSHAKE, rr->data, 4);
+		/*
+		 * Ignore this message if we're currently handshaking,
+		 * renegotiation is already pending or renegotiation is disabled
+		 * via flags.
+		 */
+		if (!SSL_is_init_finished(s) || s->s3->renegotiate ||
+		    (s->s3->flags & SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) != 0)
+			return 1;
 
-		if (SSL_is_init_finished(s) &&
-		    !(s->s3->flags & SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) &&
-		    !s->s3->renegotiate) {
-			s->d1->handshake_read_seq++;
-			s->internal->new_session = 1;
-			ssl3_renegotiate(s);
-			if (ssl3_renegotiate_check(s)) {
-				i = s->internal->handshake_func(s);
-				if (i < 0)
-					return (i);
-				if (i == 0) {
-					SSLerror(s, SSL_R_SSL_HANDSHAKE_FAILURE);
-					return (-1);
-				}
+		s->d1->handshake_read_seq++;
 
-				if (!(s->internal->mode & SSL_MODE_AUTO_RETRY)) {
-					if (s->s3->rbuf.left == 0) {
-						ssl_force_want_read(s);
-						return (-1);
-					}
-				}
-			}
+		/* XXX - why is this set here but not in ssl3? */
+		s->internal->new_session = 1;
+
+		if (!ssl3_renegotiate(s))
+			return 1;
+		if (!ssl3_renegotiate_check(s))
+			return 1;
+
+	} else if (hs_msg_hdr.type == SSL3_MT_CLIENT_HELLO) {
+		/*
+		 * Incoming ClientHello messages should only be received by a
+		 * server. A client may send these in response to server
+		 * initiated renegotiation (HelloRequest) or in order to
+		 * initiate renegotiation by the client. See RFC 5246 section
+		 * 7.4.1.2.
+		 */
+		if (!s->server) {
+			SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			     SSL_AD_UNEXPECTED_MESSAGE);
+			return -1;
 		}
-		/* we either finished a handshake or ignored the request,
-		 * now try again to obtain the (application) data we were asked for */
-		rr->length = 0;
-		return 1;
-	}
 
-	/* Unexpected handshake message (Client Hello, or protocol violation) */
-	if (rr->type == SSL3_RT_HANDSHAKE &&
-	    rr->length >= DTLS1_HM_HEADER_LENGTH && rr->off == 0 &&
-	    !s->internal->in_handshake) {
-		struct hm_header_st msg_hdr;
-		CBS cbs;
+		/*
+		 * A client should not be sending a ClientHello unless we're not
+		 * currently handshaking.
+		 */
+		if (!SSL_is_init_finished(s)) {
+			SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			    SSL_AD_UNEXPECTED_MESSAGE);
+			return -1;
+		}
 
-		/* this may just be a stale retransmit */
-		CBS_init(&cbs, rr->data, rr->length);
-		if (!dtls1_get_message_header(&cbs, &msg_hdr))
-			return -1; /* XXX - this should probably drop/continue. */
-		if (rr->epoch != tls12_record_layer_read_epoch(s->internal->rl)) {
-			rr->length = 0;
+		if ((s->internal->options & SSL_OP_NO_CLIENT_RENEGOTIATION) != 0) {
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			    SSL_AD_NO_RENEGOTIATION);
+			return -1;
+		}
+
+		if (s->session == NULL || s->session->cipher == NULL) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
+			return -1;
+		}
+
+		/* Client requested renegotiation but it is not permitted. */
+		if (!s->s3->send_connection_binding ||
+		    (s->s3->flags & SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS) != 0) {
+			ssl3_send_alert(s, SSL3_AL_WARNING,
+			    SSL_AD_NO_RENEGOTIATION);
 			return 1;
 		}
 
-		/* If we are server, we may have a repeated FINISHED of the
+		s->s3->hs.state = SSL_ST_ACCEPT;
+		s->internal->renegotiate = 1;
+		s->internal->new_session = 1;
+
+	} else if (hs_msg_hdr.type == SSL3_MT_FINISHED && s->server) {
+		/*
+		 * If we are server, we may have a repeated FINISHED of the
 		 * client here, then retransmit our CCS and FINISHED.
 		 */
-		if (msg_hdr.type == SSL3_MT_FINISHED) {
-			if (dtls1_check_timeout_num(s) < 0)
-				return -1;
+		if (dtls1_check_timeout_num(s) < 0)
+			return -1;
 
-			dtls1_retransmit_buffered_messages(s);
-			rr->length = 0;
-			return 1;
-		}
+		/* XXX - should this be calling ssl_msg_callback()? */
 
-		if (((s->s3->hs.state&SSL_ST_MASK) == SSL_ST_OK) &&
-		    !(s->s3->flags & SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS)) {
-			s->s3->hs.state = s->server ? SSL_ST_ACCEPT : SSL_ST_CONNECT;
-			s->internal->renegotiate = 1;
-			s->internal->new_session = 1;
-		}
-		i = s->internal->handshake_func(s);
-		if (i < 0)
-			return (i);
-		if (i == 0) {
-			SSLerror(s, SSL_R_SSL_HANDSHAKE_FAILURE);
-			return (-1);
-		}
+		dtls1_retransmit_buffered_messages(s);
 
-		if (!(s->internal->mode & SSL_MODE_AUTO_RETRY)) {
-			if (s->s3->rbuf.left == 0) {
-				ssl_force_want_read(s);
-				return (-1);
-			}
-		}
 		rr->length = 0;
+
 		return 1;
+
+	} else {
+		SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_UNEXPECTED_MESSAGE);
+		return -1;
 	}
 
+	if ((ret = s->internal->handshake_func(s)) < 0)
+		return ret;
+	if (ret == 0) {
+		SSLerror(s, SSL_R_SSL_HANDSHAKE_FAILURE);
+		return -1;
+	}
+
+	if (!(s->internal->mode & SSL_MODE_AUTO_RETRY)) {
+		if (s->s3->rbuf.left == 0) {
+			ssl_force_want_read(s);
+			return -1;
+		}
+	}
+
+	/*
+	 * We either finished a handshake or ignored the request, now try again
+	 * to obtain the (application) data we were asked for.
+	 */
 	return 1;
 }
 
@@ -629,29 +685,37 @@ dtls1_read_handshake_unexpected(SSL *s)
 int
 dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 {
-	int al, i, ret;
+	SSL3_RECORD_INTERNAL *rr;
 	int rrcount = 0;
 	unsigned int n;
-	SSL3_RECORD_INTERNAL *rr;
+	int ret;
 
-	if (s->s3->rbuf.buf == NULL) /* Not initialized yet */
+	if (s->s3->rbuf.buf == NULL) {
 		if (!ssl3_setup_buffers(s))
-			return (-1);
+			return -1;
+	}
 
-	if ((type &&
-	     type != SSL3_RT_APPLICATION_DATA && type != SSL3_RT_HANDSHAKE) ||
-	    (peek && (type != SSL3_RT_APPLICATION_DATA))) {
+	if (len < 0) {
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
 		return -1;
 	}
 
-	if (!s->internal->in_handshake && SSL_in_init(s)) {
-		i = s->internal->handshake_func(s);
-		if (i < 0)
-			return (i);
-		if (i == 0) {
+	if (type != 0 && type != SSL3_RT_APPLICATION_DATA &&
+	    type != SSL3_RT_HANDSHAKE) {
+		SSLerror(s, ERR_R_INTERNAL_ERROR);
+		return -1;
+	}
+	if (peek && type != SSL3_RT_APPLICATION_DATA) {
+		SSLerror(s, ERR_R_INTERNAL_ERROR);
+		return -1;
+	}
+
+	if (SSL_in_init(s) && !s->internal->in_handshake) {
+		if ((ret = s->internal->handshake_func(s)) < 0)
+			return ret;
+		if (ret == 0) {
 			SSLerror(s, SSL_R_SSL_HANDSHAKE_FAILURE);
-			return (-1);
+			return -1;
 		}
 	}
 
@@ -671,33 +735,24 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 
 	s->internal->rwstate = SSL_NOTHING;
 
-	/* s->s3->rrec.type	    - is the type of record
-	 * s->s3->rrec.data,    - data
-	 * s->s3->rrec.off,     - offset into 'data' for next read
-	 * s->s3->rrec.length,  - number of bytes. */
-	rr = &(s->s3->rrec);
+	rr = &s->s3->rrec;
 
-	/* We are not handshaking and have no data yet,
-	 * so process data buffered during the last handshake
-	 * in advance, if any.
+	/*
+	 * We are not handshaking and have no data yet, so process data buffered
+	 * during the last handshake in advance, if any.
 	 */
 	if (s->s3->hs.state == SSL_ST_OK && rr->length == 0)
-		dtls1_retrieve_buffered_record(s, &(s->d1->buffered_app_data));
+		dtls1_retrieve_buffered_record(s, &s->d1->buffered_app_data);
 
-	/* Check for timeout */
 	if (dtls1_handle_timeout(s) > 0)
 		goto start;
 
-	/* get new packet if necessary */
-	if ((rr->length == 0) || (s->internal->rstate == SSL_ST_READ_BODY)) {
-		ret = dtls1_get_record(s);
-		if (ret <= 0) {
-			ret = dtls1_read_failed(s, ret);
-			/* anything other than a timeout is an error */
-			if (ret <= 0)
-				return (ret);
-			else
-				goto start;
+	if (rr->length == 0 || s->internal->rstate == SSL_ST_READ_BODY) {
+		if ((ret = dtls1_get_record(s)) <= 0) {
+			/* Anything other than a timeout is an error. */
+			if ((ret = dtls1_read_failed(s, ret)) <= 0)
+				return ret;
+			goto start;
 		}
 	}
 
@@ -706,17 +761,16 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 		goto start;
 	}
 
-	/* we now have a packet which can be read and processed */
+	/* We now have a packet which can be read and processed. */
 
-	if (s->s3->change_cipher_spec /* set when we receive ChangeCipherSpec,
-	                               * reset by ssl3_get_finished */
-	    && (rr->type != SSL3_RT_HANDSHAKE)) {
-		/* We now have application data between CCS and Finished.
+	if (s->s3->change_cipher_spec && rr->type != SSL3_RT_HANDSHAKE) {
+		/*
+		 * We now have application data between CCS and Finished.
 		 * Most likely the packets were reordered on their way, so
 		 * buffer the application data for later processing rather
 		 * than dropping the connection.
 		 */
-		if (dtls1_buffer_record(s, &(s->d1->buffered_app_data),
+		if (dtls1_buffer_record(s, &s->d1->buffered_app_data,
 		    rr->seq_num) < 0) {
 			SSLerror(s, ERR_R_INTERNAL_ERROR);
 			return (-1);
@@ -725,35 +779,41 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 		goto start;
 	}
 
-	/* If the other end has shut down, throw anything we read away
-	 * (even in 'peek' mode) */
+	/*
+	 * If the other end has shut down, throw anything we read away (even in
+	 * 'peek' mode).
+	 */
 	if (s->internal->shutdown & SSL_RECEIVED_SHUTDOWN) {
-		rr->length = 0;
 		s->internal->rwstate = SSL_NOTHING;
-		return (0);
+		rr->length = 0;
+		return 0;
 	}
 
 	/* SSL3_RT_APPLICATION_DATA or SSL3_RT_HANDSHAKE */
 	if (type == rr->type) {
-		/* make sure that we are not getting application data when we
-		 * are doing a handshake for the first time */
+		/*
+		 * Make sure that we are not getting application data when we
+		 * are doing a handshake for the first time.
+		 */
 		if (SSL_in_init(s) && type == SSL3_RT_APPLICATION_DATA &&
 		    !tls12_record_layer_read_protected(s->internal->rl)) {
-			al = SSL_AD_UNEXPECTED_MESSAGE;
 			SSLerror(s, SSL_R_APP_DATA_IN_HANDSHAKE);
-			goto fatal_err;
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			    SSL_AD_UNEXPECTED_MESSAGE);
+			return -1;
 		}
 
 		if (len <= 0)
-			return (len);
+			return len;
 
 		if ((unsigned int)len > rr->length)
 			n = rr->length;
 		else
 			n = (unsigned int)len;
 
-		memcpy(buf, &(rr->data[rr->off]), n);
+		memcpy(buf, &rr->data[rr->off], n);
 		if (!peek) {
+			memset(&rr->data[rr->off], 0, n);
 			rr->length -= n;
 			rr->off += n;
 			if (rr->length == 0) {
@@ -762,44 +822,13 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 			}
 		}
 
-		return (n);
+		return n;
 	}
 
 	/*
 	 * If we get here, then type != rr->type; if we have a handshake
 	 * message, then it was unexpected (Hello Request or Client Hello).
 	 */
-
-	{
-		unsigned int record_min_len = 0;
-
-		if (rr->type == SSL3_RT_HANDSHAKE) {
-			record_min_len = DTLS1_HM_HEADER_LENGTH;
-		} else if (rr->type == SSL3_RT_ALERT) {
-			record_min_len = DTLS1_AL_HEADER_LENGTH;
-		} else if (rr->type == SSL3_RT_CHANGE_CIPHER_SPEC) {
-			record_min_len = DTLS1_CCS_HEADER_LENGTH;
-		} else if (rr->type == SSL3_RT_APPLICATION_DATA) {
-			/*
-			 * Application data while renegotiating is allowed.
-			 * Try reading again.
-			 */
-			s->s3->in_read_app_data = 2;
-			ssl_force_want_read(s);
-			return -1;
-		} else {
-			/* Not certain if this is the right error handling */
-			al = SSL_AD_UNEXPECTED_MESSAGE;
-			SSLerror(s, SSL_R_UNEXPECTED_RECORD);
-			goto fatal_err;
-		}
-
-		if (record_min_len > 0 && rr->length < record_min_len) {
-			s->internal->rstate = SSL_ST_READ_HEADER;
-			rr->length = 0;
-			goto start;
-		}
-	}
 
 	if (rr->type == SSL3_RT_ALERT) {
 		if ((ret = ssl3_read_alert(s)) <= 0)
@@ -811,6 +840,32 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 		s->internal->rwstate = SSL_NOTHING;
 		rr->length = 0;
 		return (0);
+	}
+
+	if (rr->type == SSL3_RT_APPLICATION_DATA) {
+		/*
+		 * At this point, we were expecting handshake data, but have
+		 * application data. If the library was running inside
+		 * ssl3_read() (i.e. in_read_app_data is set) and it makes
+		 * sense to read application data at this point (session
+		 * renegotiation not yet started), we will indulge it.
+		 */
+		if (s->s3->in_read_app_data != 0 &&
+		    s->s3->total_renegotiations != 0 &&
+		    (((s->s3->hs.state & SSL_ST_CONNECT) &&
+		    (s->s3->hs.state >= SSL3_ST_CW_CLNT_HELLO_A) &&
+		    (s->s3->hs.state <= SSL3_ST_CR_SRVR_HELLO_A)) || (
+		    (s->s3->hs.state & SSL_ST_ACCEPT) &&
+		    (s->s3->hs.state <= SSL3_ST_SW_HELLO_REQ_A) &&
+		    (s->s3->hs.state >= SSL3_ST_SR_CLNT_HELLO_A)))) {
+			s->s3->in_read_app_data = 2;
+			return -1;
+		} else {
+			SSLerror(s, SSL_R_UNEXPECTED_RECORD);
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			    SSL_AD_UNEXPECTED_MESSAGE);
+			return -1;
+		}
 	}
 
 	if (rr->type == SSL3_RT_CHANGE_CIPHER_SPEC) {
@@ -825,50 +880,10 @@ dtls1_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 		goto start;
 	}
 
-	switch (rr->type) {
-	default:
-		al = SSL_AD_UNEXPECTED_MESSAGE;
-		SSLerror(s, SSL_R_UNEXPECTED_RECORD);
-		goto fatal_err;
-	case SSL3_RT_CHANGE_CIPHER_SPEC:
-	case SSL3_RT_ALERT:
-	case SSL3_RT_HANDSHAKE:
-		/* we already handled all of these, with the possible exception
-		 * of SSL3_RT_HANDSHAKE when s->internal->in_handshake is set, but that
-		 * should not happen when type != rr->type */
-		al = SSL_AD_UNEXPECTED_MESSAGE;
-		SSLerror(s, ERR_R_INTERNAL_ERROR);
-		goto fatal_err;
-	case SSL3_RT_APPLICATION_DATA:
-		/* At this point, we were expecting handshake data,
-		 * but have application data.  If the library was
-		 * running inside ssl3_read() (i.e. in_read_app_data
-		 * is set) and it makes sense to read application data
-		 * at this point (session renegotiation not yet started),
-		 * we will indulge it.
-		 */
-		if (s->s3->in_read_app_data &&
-		    (s->s3->total_renegotiations != 0) &&
-		    (((s->s3->hs.state & SSL_ST_CONNECT) &&
-		    (s->s3->hs.state >= SSL3_ST_CW_CLNT_HELLO_A) &&
-		    (s->s3->hs.state <= SSL3_ST_CR_SRVR_HELLO_A)) || (
-		    (s->s3->hs.state & SSL_ST_ACCEPT) &&
-		    (s->s3->hs.state <= SSL3_ST_SW_HELLO_REQ_A) &&
-		    (s->s3->hs.state >= SSL3_ST_SR_CLNT_HELLO_A)))) {
-			s->s3->in_read_app_data = 2;
-			return (-1);
-		} else {
-			al = SSL_AD_UNEXPECTED_MESSAGE;
-			SSLerror(s, SSL_R_UNEXPECTED_RECORD);
-			goto fatal_err;
-		}
-	}
-	/* not reached */
-
- fatal_err:
-	ssl3_send_alert(s, SSL3_AL_FATAL, al);
-
-	return (-1);
+	/* Unknown record type. */
+	SSLerror(s, SSL_R_UNEXPECTED_RECORD);
+	ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_UNEXPECTED_MESSAGE);
+	return -1;
 }
 
 int

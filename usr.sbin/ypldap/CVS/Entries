@@ -1,5 +1,4 @@
 /Makefile/1.11/Sat May 11 17:46:02 2019//
-/aldap.c/1.47/Thu Oct 24 12:39:27 2019//
 /aldap.h/1.14/Sat May 11 17:46:02 2019//
 /log.c/1.4/Tue Mar 21 12:06:56 2017//
 /log.h/1.1/Fri Jan 20 12:39:36 2017//
@@ -12,4 +11,5 @@
 /entries.c/1.5/Fri Feb 11 13:34:03 2022//
 /ldapclient.c/1.44/Fri Feb 11 13:34:03 2022//
 /yp.c/1.20/Fri Feb 11 13:34:03 2022//
+/aldap.c/1.48/Wed Apr 20 14:28:28 2022//
 D

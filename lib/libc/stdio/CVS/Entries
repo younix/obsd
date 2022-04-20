@@ -63,7 +63,6 @@
 /glue.h/1.5/Thu Aug 27 04:37:09 2015//
 /local.h/1.25/Mon May 23 00:21:48 2016//
 /makebuf.c/1.10/Fri Jun 28 13:32:42 2019//
-/mktemp.3/1.54/Sun Oct 26 12:54:18 2014//
 /mktemp.c/1.39/Tue Nov 28 06:55:49 2017//
 /open_memstream.3/1.4/Wed Jun  5 03:39:23 2013//
 /open_memstream.c/1.8/Thu May  2 08:30:10 2019//
@@ -84,7 +83,6 @@
 /remove.c/1.9/Fri Jun 28 13:32:42 2019//
 /rewind.c/1.6/Mon Aug 31 02:53:57 2015//
 /rget.c/1.8/Mon Aug 31 02:53:57 2015//
-/scanf.3/1.25/Fri Aug 30 20:27:25 2019//
 /scanf.c/1.11/Mon Aug 31 02:53:57 2015//
 /setbuf.3/1.16/Tue Nov 25 19:08:14 2014//
 /setbuf.c/1.6/Mon Aug 31 02:53:57 2015//
@@ -129,11 +127,13 @@
 /printf.3/1.92/Thu Sep  2 14:22:30 2021//
 /vfprintf.c/1.81/Tue Sep 14 08:17:17 2021//
 /vfwprintf.c/1.22/Tue Sep 14 08:17:17 2021//
-/wprintf.3/1.9/Tue Sep 14 08:17:17 2021//
 /fputws.c/1.9/Mon Nov 15 19:06:15 2021//
 /getwchar.c/1.3/Mon Nov 15 19:06:15 2021//
 /ferror.3/1.11/Sun Nov 21 20:15:22 2021//
 /findfp.c/1.20/Mon Jan 24 14:35:13 2022//
 /funopen.3/1.19/Mon Jan 24 14:35:13 2022//
 /funopen.c/1.10/Mon Jan 24 14:35:13 2022//
+/mktemp.3/1.55/Wed Apr 20 14:28:02 2022//
+/scanf.3/1.26/Wed Apr 20 14:28:02 2022//
+/wprintf.3/1.10/Wed Apr 20 14:28:02 2022//
 D

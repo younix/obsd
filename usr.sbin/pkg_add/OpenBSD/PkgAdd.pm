@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 
 # ex:ts=8 sw=4:
-# $OpenBSD: PkgAdd.pm,v 1.124 2022/03/13 14:39:56 espie Exp $
+# $OpenBSD: PkgAdd.pm,v 1.128 2022/04/16 09:32:40 espie Exp $
 #
 # Copyright (c) 2003-2014 Marc Espie <espie@openbsd.org>
 #
@@ -37,7 +37,9 @@ sub has_different_sig
 {
 	my ($plist, $state) = @_;
 	if (!defined $plist->{different_sig}) {
-		my $n = OpenBSD::PackingList->from_installation($plist->pkgname)->signature;
+		my $n = 
+		    OpenBSD::PackingList->from_installation($plist->pkgname, 
+			\&OpenBSD::PackingList::UpdateInfoOnly)->signature;
 		my $o = $plist->signature;
 		my $r = $n->compare($o, $state);
 		$state->print("Comparing full signature for #1 \"#2\" vs. \"#3\":",
@@ -328,7 +330,7 @@ sub display_timestamp
 
 sub find_kept_handle
 {
-	my ($set, $n,  $state) = @_;
+	my ($set, $n, $state) = @_;
 	unless (defined $n->{location} && defined $n->{location}{update_info}) {
 		$n->complete($state);
 	}
@@ -358,6 +360,11 @@ sub find_kept_handle
 		}
 	}
 	$set->check_security($state, $plist, $o);
+	if ($set->{quirks}) {
+		# The installed package has inst: for a location, we want
+		# the newer one (which is identical)
+		$n->location->{repository}->setup_cache($state->{setlist});
+	}
 	$set->move_kept($o);
 	$o->{tweaked} =
 	    OpenBSD::Add::tweak_package_status($pkgname, $state);
@@ -655,6 +662,8 @@ sub partial_install
 	return failed_message($base_msg, $state->{received}, save_partial_set($set, $state));
 }
 
+# quick sub to build the dependency arcs for older packages
+# newer packages are handled by Dependencies.pm
 sub build_before
 {
 	my %known = map {($_->pkgname, 1)} @_;
@@ -765,9 +774,6 @@ sub really_add
 		$replacing = 1;
 	}
 	$state->{replacing} = $replacing;
-	# XXX placeholder for optimization
-	$state->{simple_update} = 0;
-	#$state->{simple_update} = $set->{simple_update};
 
 	my $handler = sub {
 		$state->{received} = shift;
@@ -854,6 +860,9 @@ sub really_add
 		add_installed($pkgname);
 		delete $handle->{partial};
 		OpenBSD::PkgCfl::register($handle, $state);
+		if ($set->{quirks}) {
+			$handle->location->{repository}->setup_cache($state->{setlist});
+		}
 	}
 	delete $state->{partial};
 	$set->{solver}->register_dependencies($state);
@@ -918,7 +927,8 @@ sub newer_is_bad_arch
 sub may_tie_files
 {
 	my ($set, $state) = @_;
-	if ($set->newer > 0 && $set->older_to_do > 0 && !$state->defines('donttie')) {
+	if ($set->newer > 0 && $set->older_to_do > 0 && 
+	    !$state->defines('donttie')) {
 		my $sha = {};
 
 		for my $o ($set->older_to_do) {

@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile,v 1.2 2021/11/24 15:15:19 robert Exp $
+# $OpenBSD: Makefile,v 1.4 2022/03/23 22:44:01 deraadt Exp $
 
 PROG=	ar
 BINDIR=	/usr/bin
@@ -6,6 +6,9 @@ BINDIR=	/usr/bin
 .include <bsd.own.mk>
 
 SRCS=	llvm-ar.cpp
+
+LINKS=	${BINDIR}/ar ${BINDIR}/ranlib
+MAN+=	ranlib.1 ar.1
 
 .PATH:	${.CURDIR}/../../../llvm/llvm/tools/llvm-ar
 

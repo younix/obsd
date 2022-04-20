@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.13 2019/11/07 16:08:08 mpi Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.15 2022/04/14 19:47:11 naddy Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.37 2006/09/06 00:11:49 uwe Exp $	*/
 
 /*-
@@ -73,7 +73,7 @@ void db_frame_cmd(db_expr_t, int, db_expr_t, char *);
 void __db_print_symbol(db_expr_t);
 char *__db_procname_by_asid(int);
 
-struct db_command db_machine_command_table[] = {
+const struct db_command db_machine_command_table[] = {
 	{ "tlb",	db_tlbdump_cmd,		0,	NULL },
 	{ "cache",	db_cachedump_cmd,	0,	NULL },
 	{ "frame",	db_frame_cmd,		0,	NULL },
@@ -86,8 +86,6 @@ struct db_command db_machine_command_table[] = {
 void
 db_machine_init(void)
 {
-
-	db_machine_commands_install(db_machine_command_table);
 }
 
 void

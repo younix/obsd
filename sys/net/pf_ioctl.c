@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf_ioctl.c,v 1.373 2022/02/16 04:25:34 dlg Exp $ */
+/*	$OpenBSD: pf_ioctl.c,v 1.379 2022/04/09 13:15:44 mbuhl Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -93,7 +93,7 @@ int			 pfopen(dev_t, int, int, struct proc *);
 int			 pfclose(dev_t, int, int, struct proc *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
 int			 pf_begin_rules(u_int32_t *, const char *);
-int			 pf_rollback_rules(u_int32_t, char *);
+void			 pf_rollback_rules(u_int32_t, char *);
 void			 pf_remove_queues(void);
 int			 pf_commit_queues(void);
 void			 pf_free_queues(struct pf_queuehead *);
@@ -107,7 +107,7 @@ struct pfi_kif		*pf_kif_setup(struct pfi_kif *);
 void			 pf_addr_copyout(struct pf_addr_wrap *);
 void			 pf_trans_set_commit(void);
 void			 pf_pool_copyin(struct pf_pool *, struct pf_pool *);
-int			 pf_validate_range(u_int8_t, u_int16_t[2]);
+int			 pf_validate_range(u_int8_t, u_int16_t[2], int);
 int			 pf_rule_copyin(struct pf_rule *, struct pf_rule *);
 int			 pf_rule_checkaf(struct pf_rule *);
 u_int16_t		 pf_qname2qid(char *, int);
@@ -125,6 +125,9 @@ struct {
 	u_int32_t	reass;
 	u_int32_t	mask;
 } pf_trans_set;
+
+#define	PF_ORDER_HOST	0
+#define	PF_ORDER_NET	1
 
 #define	PF_TSET_STATUSIF	0x01
 #define	PF_TSET_DEBUG		0x02
@@ -150,6 +153,7 @@ TAILQ_HEAD(pf_tags, pf_tagname)	pf_tags = TAILQ_HEAD_INITIALIZER(pf_tags),
  */
 struct rwlock		 pf_lock = RWLOCK_INITIALIZER("pf_lock");
 struct rwlock		 pf_state_lock = RWLOCK_INITIALIZER("pf_state_lock");
+struct rwlock		 pfioctl_rw = RWLOCK_INITIALIZER("pfioctl_rw");
 
 #if (PF_QNAME_SIZE != PF_TAG_NAME_SIZE)
 #error PF_QNAME_SIZE must be equal to PF_TAG_NAME_SIZE
@@ -533,7 +537,7 @@ pf_begin_rules(u_int32_t *ticket, const char *anchor)
 	return (0);
 }
 
-int
+void
 pf_rollback_rules(u_int32_t ticket, char *anchor)
 {
 	struct pf_ruleset	*rs;
@@ -542,7 +546,7 @@ pf_rollback_rules(u_int32_t ticket, char *anchor)
 	rs = pf_find_ruleset(anchor);
 	if (rs == NULL || !rs->rules.inactive.open ||
 	    rs->rules.inactive.ticket != ticket)
-		return (0);
+		return;
 	while ((rule = TAILQ_FIRST(rs->rules.inactive.ptr)) != NULL) {
 		pf_rm_rule(rs->rules.inactive.ptr, rule);
 		rs->rules.inactive.rcount--;
@@ -551,11 +555,9 @@ pf_rollback_rules(u_int32_t ticket, char *anchor)
 
 	/* queue defs only in the main ruleset */
 	if (anchor[0])
-		return (0);
+		return;
 
 	pf_free_queues(pf_queues_inactive);
-
-	return (0);
 }
 
 void
@@ -1142,6 +1144,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			return (EACCES);
 		}
 
+	if (flags & FWRITE)
+		rw_enter_write(&pfioctl_rw);
+	else
+		rw_enter_read(&pfioctl_rw);
+
 	switch (cmd) {
 
 	case DIOCSTART:
@@ -1211,7 +1218,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 
 		/* save state to not run over them all each time? */
@@ -1222,7 +1229,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		memcpy(&pq->queue, qs, sizeof(pq->queue));
 		PF_UNLOCK();
@@ -1242,7 +1249,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		nbytes = pq->nbytes;
 		nr = 0;
@@ -1255,7 +1262,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		memcpy(&pq->queue, qs, sizeof(pq->queue));
 		/* It's a root flow queue but is not an HFSC root class */
@@ -1280,7 +1287,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		qs = pool_get(&pf_queue_pl, PR_WAITOK|PR_LIMITFAIL|PR_ZERO);
 		if (qs == NULL) {
 			error = ENOMEM;
-			break;
+			goto fail;
 		}
 
 		NET_LOCK();
@@ -1290,7 +1297,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pool_put(&pf_queue_pl, qs);
-			break;
+			goto fail;
 		}
 		memcpy(qs, &q->queue, sizeof(*qs));
 		qs->qid = pf_qname2qid(qs->qname, 1);
@@ -1299,7 +1306,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pool_put(&pf_queue_pl, qs);
-			break;
+			goto fail;
 		}
 		if (qs->parent[0] && (qs->parent_qid =
 		    pf_qname2qid(qs->parent, 0)) == 0) {
@@ -1307,7 +1314,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pool_put(&pf_queue_pl, qs);
-			break;
+			goto fail;
 		}
 		qs->kif = pfi_kif_get(qs->ifname, NULL);
 		if (qs->kif == NULL) {
@@ -1315,7 +1322,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pool_put(&pf_queue_pl, qs);
-			break;
+			goto fail;
 		}
 		/* XXX resolve bw percentage specs */
 		pfi_kif_ref(qs->kif, PFI_KIF_REF_RULE);
@@ -1335,20 +1342,20 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		rule = pool_get(&pf_rule_pl, PR_WAITOK|PR_LIMITFAIL|PR_ZERO);
 		if (rule == NULL) {
 			error = ENOMEM;
-			break;
+			goto fail;
 		}
 
 		if ((error = pf_rule_copyin(&pr->rule, rule))) {
 			pf_rule_free(rule);
 			rule = NULL;
-			break;
+			goto fail;
 		}
 
 		if (pr->rule.return_icmp >> 8 > ICMP_MAXTYPE) {
 			error = EINVAL;
 			pf_rule_free(rule);
 			rule = NULL;
-			break;
+			goto fail;
 		}
 		if ((error = pf_rule_checkaf(rule))) {
 			pf_rule_free(rule);
@@ -1360,14 +1367,14 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			pf_rule_free(rule);
 			rule = NULL;
-			break;
+			goto fail;
 		}
 
 		if (rule->rt && !rule->direction) {
 			error = EINVAL;
 			pf_rule_free(rule);
 			rule = NULL;
-			break;
+			goto fail;
 		}
 
 		NET_LOCK();
@@ -1379,14 +1386,14 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pf_rule_free(rule);
-			break;
+			goto fail;
 		}
 		if (pr->ticket != ruleset->rules.inactive.ticket) {
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pf_rule_free(rule);
-			break;
+			goto fail;
 		}
 		rule->cuid = p->p_ucred->cr_ruid;
 		rule->cpid = p->p_p->ps_pid;
@@ -1429,7 +1436,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pf_rm_rule(NULL, rule);
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		TAILQ_INSERT_TAIL(ruleset->rules.inactive.ptr,
 		    rule, entries);
@@ -1453,7 +1460,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		tail = TAILQ_LAST(ruleset->rules.active.ptr, pf_rulequeue);
 		if (tail)
@@ -1480,13 +1487,13 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		if (pr->ticket != ruleset->rules.active.ticket) {
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		rule = TAILQ_FIRST(ruleset->rules.active.ptr);
 		while ((rule != NULL) && (rule->nr != pr->nr))
@@ -1495,7 +1502,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		memcpy(&pr->rule, rule, sizeof(struct pf_rule));
 		memset(&pr->rule.entries, 0, sizeof(pr->rule.entries));
@@ -1513,7 +1520,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		pf_addr_copyout(&pr->rule.src.addr);
 		pf_addr_copyout(&pr->rule.dst.addr);
@@ -1547,7 +1554,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (pcr->action < PF_CHANGE_ADD_HEAD ||
 		    pcr->action > PF_CHANGE_GET_TICKET) {
 			error = EINVAL;
-			break;
+			goto fail;
 		}
 
 		if (pcr->action == PF_CHANGE_GET_TICKET) {
@@ -1562,7 +1569,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 
 		if (pcr->action != PF_CHANGE_REMOVE) {
@@ -1570,19 +1577,19 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			    PR_WAITOK|PR_LIMITFAIL|PR_ZERO);
 			if (newrule == NULL) {
 				error = ENOMEM;
-				break;
+				goto fail;
 			}
 
 			if (pcr->rule.return_icmp >> 8 > ICMP_MAXTYPE) {
 				error = EINVAL;
 				pool_put(&pf_rule_pl, newrule);
-				break;
+				goto fail;
 			}
 			error = pf_rule_copyin(&pcr->rule, newrule);
 			if (error != 0) {
 				pf_rule_free(newrule);
 				newrule = NULL;
-				break;
+				goto fail;
 			}
 			if ((error = pf_rule_checkaf(newrule))) {
 				pf_rule_free(newrule);
@@ -1593,7 +1600,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				pf_rule_free(newrule);
 				error = EINVAL;
 				newrule = NULL;
-				break;
+				goto fail;
 			}
 		}
 
@@ -1605,7 +1612,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pf_rule_free(newrule);
-			break;
+			goto fail;
 		}
 
 		if (pcr->ticket != ruleset->rules.active.ticket) {
@@ -1613,7 +1620,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			pf_rule_free(newrule);
-			break;
+			goto fail;
 		}
 
 		if (pcr->action != PF_CHANGE_REMOVE) {
@@ -1659,7 +1666,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				pf_rm_rule(NULL, newrule);
 				PF_UNLOCK();
 				NET_UNLOCK();
-				break;
+				goto fail;
 			}
 		}
 
@@ -1678,7 +1685,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				error = EINVAL;
 				PF_UNLOCK();
 				NET_UNLOCK();
-				break;
+				goto fail;
 			}
 		}
 
@@ -1743,7 +1750,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_STATE_EXIT_WRITE();
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 
 		if (psk->psk_af && psk->psk_proto &&
@@ -1800,7 +1807,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_STATE_EXIT_WRITE();
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 
 		NET_LOCK();
@@ -1864,7 +1871,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (sp->timeout >= PFTM_MAX) {
 			error = EINVAL;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -1892,7 +1899,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		NET_UNLOCK();
 		if (s == NULL) {
 			error = ENOENT;
-			break;
+			goto fail;
 		}
 
 		pf_state_export(&ps->state, s);
@@ -1924,7 +1931,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			memset(pf_status.ifname, 0, IFNAMSIZ);
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		strlcpy(pf_trans_set.statusif, pi->pfiio_name, IFNAMSIZ);
 		pf_trans_set.mask |= PF_TSET_STATUSIF;
@@ -1943,7 +1950,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pfi_update_status(pi->pfiio_name, NULL);
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 
 		memset(pf_status.counters, 0, sizeof(pf_status.counters));
@@ -2129,7 +2136,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		pr->nr = 0;
 		if (ruleset == &pf_main_ruleset) {
@@ -2160,7 +2167,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			PF_UNLOCK();
 			NET_UNLOCK();
-			break;
+			goto fail;
 		}
 		pr->name[0] = '\0';
 		if (ruleset == &pf_main_ruleset) {
@@ -2192,7 +2199,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != 0) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2208,7 +2215,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_table)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2224,7 +2231,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_table)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2240,7 +2247,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_table)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2256,7 +2263,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_tstats)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2272,7 +2279,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_table)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2288,7 +2295,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_table)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2305,7 +2312,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != 0) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2321,7 +2328,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		error = pfr_add_addrs(&io->pfrio_table, io->pfrio_buffer,
 		    io->pfrio_size, &io->pfrio_nadd, io->pfrio_flags |
@@ -2334,7 +2341,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2351,7 +2358,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2369,7 +2376,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2385,7 +2392,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_astats)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2401,7 +2408,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2418,7 +2425,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2435,7 +2442,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfrio_esize != sizeof(struct pfr_addr)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2474,11 +2481,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		NET_LOCK();
 		PF_LOCK();
 		pf_default_rule_new = pf_default_rule;
+		PF_UNLOCK();
+		NET_UNLOCK();
 		memset(&pf_trans_set, 0, sizeof(pf_trans_set));
 		for (i = 0; i < io->size; i++) {
 			if (copyin(io->array+i, ioe, sizeof(*ioe))) {
-				PF_UNLOCK();
-				NET_UNLOCK();
 				free(table, M_TEMP, sizeof(*table));
 				free(ioe, M_TEMP, sizeof(*ioe));
 				error = EFAULT;
@@ -2486,13 +2493,13 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			}
 			if (strnlen(ioe->anchor, sizeof(ioe->anchor)) ==
 			    sizeof(ioe->anchor)) {
-				PF_UNLOCK();
-				NET_UNLOCK();
 				free(table, M_TEMP, sizeof(*table));
 				free(ioe, M_TEMP, sizeof(*ioe));
 				error = ENAMETOOLONG;
 				goto fail;
 			}
+			NET_LOCK();
+			PF_LOCK();
 			switch (ioe->type) {
 			case PF_TRANS_TABLE:
 				memset(table, 0, sizeof(*table));
@@ -2525,17 +2532,15 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				error = EINVAL;
 				goto fail;
 			}
+			PF_UNLOCK();
+			NET_UNLOCK();
 			if (copyout(ioe, io->array+i, sizeof(io->array[i]))) {
-				PF_UNLOCK();
-				NET_UNLOCK();
 				free(table, M_TEMP, sizeof(*table));
 				free(ioe, M_TEMP, sizeof(*ioe));
 				error = EFAULT;
 				goto fail;
 			}
 		}
-		PF_UNLOCK();
-		NET_UNLOCK();
 		free(table, M_TEMP, sizeof(*table));
 		free(ioe, M_TEMP, sizeof(*ioe));
 		break;
@@ -2553,12 +2558,8 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		}
 		ioe = malloc(sizeof(*ioe), M_TEMP, M_WAITOK);
 		table = malloc(sizeof(*table), M_TEMP, M_WAITOK);
-		NET_LOCK();
-		PF_LOCK();
 		for (i = 0; i < io->size; i++) {
 			if (copyin(io->array+i, ioe, sizeof(*ioe))) {
-				PF_UNLOCK();
-				NET_UNLOCK();
 				free(table, M_TEMP, sizeof(*table));
 				free(ioe, M_TEMP, sizeof(*ioe));
 				error = EFAULT;
@@ -2566,13 +2567,13 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			}
 			if (strnlen(ioe->anchor, sizeof(ioe->anchor)) ==
 			    sizeof(ioe->anchor)) {
-				PF_UNLOCK();
-				NET_UNLOCK();
 				free(table, M_TEMP, sizeof(*table));
 				free(ioe, M_TEMP, sizeof(*ioe));
 				error = ENAMETOOLONG;
 				goto fail;
 			}
+			NET_LOCK();
+			PF_LOCK();
 			switch (ioe->type) {
 			case PF_TRANS_TABLE:
 				memset(table, 0, sizeof(*table));
@@ -2588,14 +2589,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				}
 				break;
 			case PF_TRANS_RULESET:
-				if ((error = pf_rollback_rules(ioe->ticket,
-				    ioe->anchor))) {
-					PF_UNLOCK();
-					NET_UNLOCK();
-					free(table, M_TEMP, sizeof(*table));
-					free(ioe, M_TEMP, sizeof(*ioe));
-					goto fail; /* really bad */
-				}
+				pf_rollback_rules(ioe->ticket, ioe->anchor);
 				break;
 			default:
 				PF_UNLOCK();
@@ -2605,9 +2599,9 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				error = EINVAL;
 				goto fail; /* really bad */
 			}
+			PF_UNLOCK();
+			NET_UNLOCK();
 		}
-		PF_UNLOCK();
-		NET_UNLOCK();
 		free(table, M_TEMP, sizeof(*table));
 		free(ioe, M_TEMP, sizeof(*ioe));
 		break;
@@ -2800,7 +2794,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			PF_UNLOCK();
 			NET_UNLOCK();
 			free(pstore, M_TEMP, sizeof(*pstore));
-			break;
+			goto fail;
 		}
 
 		p = psn->psn_src_nodes;
@@ -2931,7 +2925,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		if (io->pfiio_esize != sizeof(struct pfi_kif)) {
 			error = ENODEV;
-			break;
+			goto fail;
 		}
 		NET_LOCK();
 		PF_LOCK();
@@ -2945,8 +2939,10 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	case DIOCSETIFFLAG: {
 		struct pfioc_iface *io = (struct pfioc_iface *)addr;
 
-		if (io == NULL)
-			return (EINVAL);
+		if (io == NULL) {
+			error = EINVAL;
+			goto fail;
+		}
 
 		NET_LOCK();
 		PF_LOCK();
@@ -2959,8 +2955,10 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	case DIOCCLRIFFLAG: {
 		struct pfioc_iface *io = (struct pfioc_iface *)addr;
 
-		if (io == NULL)
-			return (EINVAL);
+		if (io == NULL) {
+			error = EINVAL;
+			goto fail;
+		}
 
 		NET_LOCK();
 		PF_LOCK();
@@ -3020,6 +3018,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		break;
 	}
 fail:
+	if (flags & FWRITE)
+		rw_exit_write(&pfioctl_rw);
+	else
+		rw_exit_read(&pfioctl_rw);
+
 	return (error);
 }
 
@@ -3045,10 +3048,10 @@ pf_pool_copyin(struct pf_pool *from, struct pf_pool *to)
 }
 
 int
-pf_validate_range(u_int8_t op, u_int16_t port[2])
+pf_validate_range(u_int8_t op, u_int16_t port[2], int order)
 {
-	u_int16_t a = ntohs(port[0]);
-	u_int16_t b = ntohs(port[1]);
+	u_int16_t a = (order == PF_ORDER_NET) ? ntohs(port[0]) : port[0];
+	u_int16_t b = (order == PF_ORDER_NET) ? ntohs(port[1]) : port[1];
 
 	if ((op == PF_OP_RRG && a > b) ||  /* 34:12,  i.e. none */
 	    (op == PF_OP_IRG && a >= b) || /* 34><12, i.e. none */
@@ -3072,9 +3075,9 @@ pf_rule_copyin(struct pf_rule *from, struct pf_rule *to)
 	to->dst = from->dst;
 	to->dst.addr.p.tbl = NULL;
 
-	if (pf_validate_range(to->src.port_op, to->src.port))
+	if (pf_validate_range(to->src.port_op, to->src.port, PF_ORDER_NET))
 		return (EINVAL);
-	if (pf_validate_range(to->dst.port_op, to->dst.port))
+	if (pf_validate_range(to->dst.port_op, to->dst.port, PF_ORDER_NET))
 		return (EINVAL);
 
 	/* XXX union skip[] */
@@ -3094,7 +3097,8 @@ pf_rule_copyin(struct pf_rule *from, struct pf_rule *to)
 	pf_pool_copyin(&from->rdr, &to->rdr);
 	pf_pool_copyin(&from->route, &to->route);
 
-	if (pf_validate_range(to->rdr.port_op, to->rdr.proxy_port))
+	if (pf_validate_range(to->rdr.port_op, to->rdr.proxy_port,
+	    PF_ORDER_HOST))
 		return (EINVAL);
 
 	to->kif = (to->ifname[0]) ?

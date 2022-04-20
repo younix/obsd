@@ -1,4 +1,4 @@
-.\" $OpenBSD: tmux.1,v 1.882 2022/03/08 18:31:46 nicm Exp $
+.\" $OpenBSD: tmux.1,v 1.887 2022/04/14 06:59:29 nicm Exp $
 .\"
 .\" Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
 .\"
@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 8 2022 $
+.Dd $Mdocdate: April 14 2022 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -43,7 +43,7 @@ then later reattached.
 .Pp
 When
 .Nm
-is started it creates a new
+is started, it creates a new
 .Em session
 with a single
 .Em window
@@ -3624,6 +3624,8 @@ Supports DECSLRM margins.
 Supports
 .Xr xterm 1
 mouse sequences.
+.It osc7
+Supports the OSC 7 working directory extension.
 .It overline
 Supports the overline SGR attribute.
 .It rectfill
@@ -4114,6 +4116,9 @@ Set clock colour.
 .Xc
 Set clock hour format.
 .Pp
+.It Ic fill-character Ar character
+Set the character used to fill areas of the terminal unused by a window.
+.Pp
 .It Ic main-pane-height Ar height
 .It Ic main-pane-width Ar width
 Set the width or height of the main (left or top) pane in the
@@ -4472,6 +4477,12 @@ command.
 Set the text shown at the bottom of exited panes when
 .Ic remain-on-exit
 is enabled.
+.Pp
+.It Xo Ic scroll-on-clear
+.Op Ic on | off
+.Xc
+When the entire screen is cleared and this option is on, scroll the contents of
+the screen into history before clearing it.
 .Pp
 .It Xo Ic synchronize-panes
 .Op Ic on | off
@@ -5569,11 +5580,11 @@ session option.
 .Pp
 Commands related to the status line are as follows:
 .Bl -tag -width Ds
-.Tg clrphist
+.Tg clearphist
 .It Xo Ic clear-prompt-history
 .Op Fl T Ar prompt-type
 .Xc
-.D1 Pq alias: Ic clrphist
+.D1 Pq alias: Ic clearphist
 Clear status prompt history for prompt type
 .Ar prompt-type .
 If
@@ -5904,7 +5915,7 @@ does not surround the popup by a border.
 sets the type of border line for the popup.
 When
 .Fl B
-is specified the
+is specified, the
 .Fl b
 option is ignored.
 See
@@ -6382,6 +6393,11 @@ $ printf '\e033[4 q'
 If
 .Em Se
 is not set, \&Ss with argument 0 will be used to reset the cursor style instead.
+.It Em \&Swd
+Set the opening sequence for the working directory notification.
+The sequence is terminated using the standard
+.Em fsl
+capability.
 .It Em \&Sync
 Start (parameter is 1) or end (parameter is 2) a synchronized update.
 .It Em \&Tc
@@ -6620,7 +6636,7 @@ are replaced with underscores
 For input,
 .Nm
 always runs with a UTF-8 locale.
-If en_US.UTF-8 is provided by the operating system it is used and
+If en_US.UTF-8 is provided by the operating system, it is used and
 .Ev LC_CTYPE
 is ignored for input.
 Otherwise,

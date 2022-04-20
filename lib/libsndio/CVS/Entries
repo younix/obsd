@@ -15,7 +15,6 @@
 /sioctl_priv.h/1.1/Wed Feb 26 13:53:58 2020//
 /sioctl_sun.c/1.2/Thu Apr 30 12:30:47 2020//
 /sioctl_open.3/1.12/Fri Dec 11 17:58:18 2020//
-/sio_open.3/1.52/Sat May  1 08:41:50 2021//
 /Makefile/1.15/Wed Sep  1 16:07:37 2021//
 /amsg.h/1.14/Sun Nov 21 20:15:22 2021//
 /aucat.c/1.79/Sun Nov 21 20:15:22 2021//
@@ -23,4 +22,5 @@
 /sioctl.c/1.2/Sun Nov 21 20:15:22 2021//
 /sndio.7/1.27/Sun Nov 21 20:15:22 2021//
 /sndio.pc/1.3/Mon Jan 24 14:35:14 2022//
+/sio_open.3/1.53/Wed Apr 20 14:28:04 2022//
 D

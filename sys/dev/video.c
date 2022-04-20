@@ -1,4 +1,4 @@
-/*	$OpenBSD: video.c,v 1.54 2021/02/17 17:21:58 mglocker Exp $	*/
+/*	$OpenBSD: video.c,v 1.56 2022/04/06 18:59:27 naddy Exp $	*/
 
 /*
  * Copyright (c) 2008 Robert Nagy <robert@openbsd.org>
@@ -46,7 +46,7 @@ struct video_softc {
 	struct device		 dev;
 	void			*hw_hdl;	/* hardware driver handle */
 	struct device		*sc_dev;	/* hardware device struct */
-	struct video_hw_if	*hw_if;		/* hardware interface */
+	const struct video_hw_if *hw_if;	/* hardware interface */
 	char			 sc_dying;	/* device detached */
 	struct process		*sc_owner;	/* owner process */
 	uint8_t			 sc_open;	/* device opened */
@@ -74,7 +74,7 @@ void	video_intr(void *);
 int	video_stop(struct video_softc *);
 int	video_claim(struct video_softc *, struct process *);
 
-struct cfattach video_ca = {
+const struct cfattach video_ca = {
 	sizeof(struct video_softc), videoprobe, videoattach,
 	videodetach, videoactivate
 };
@@ -562,7 +562,7 @@ video_submatch(struct device *parent, void *match, void *aux)
  * probed/attached to the hardware driver
  */
 struct device *
-video_attach_mi(struct video_hw_if *rhwp, void *hdlp, struct device *dev)
+video_attach_mi(const struct video_hw_if *rhwp, void *hdlp, struct device *dev)
 {
 	struct video_attach_args arg;
 

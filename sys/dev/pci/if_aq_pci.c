@@ -1,4 +1,4 @@
-/* $OpenBSD: if_aq_pci.c,v 1.10 2022/03/15 02:07:21 jmatthew Exp $ */
+/* $OpenBSD: if_aq_pci.c,v 1.16 2022/04/06 18:59:29 naddy Exp $ */
 /*	$NetBSD: if_aq.c,v 1.27 2021/06/16 00:21:18 riastradh Exp $	*/
 
 /*
@@ -87,9 +87,11 @@
 #include <sys/kernel.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
+#include <sys/intrmap.h>
 
 #include <net/if.h>
 #include <net/if_media.h>
+#include <net/toeplitz.h>
 
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
@@ -113,6 +115,8 @@
 
 #define AQ_BAR0 				0x10
 #define AQ_MAXQ 				8
+#define AQ_RSS_KEYSIZE				40
+#define AQ_RSS_REDIR_ENTRIES			12
 
 #define AQ_TXD_NUM 				2048
 #define AQ_RXD_NUM 				2048
@@ -193,6 +197,8 @@
 #define  RX_SYSCONTROL_RESET_DIS		(1 << 29)
 
 #define RX_TCP_RSS_HASH_REG			0x5040
+#define  RX_TCP_RSS_HASH_RPF2			(0xf << 16)
+#define  RX_TCP_RSS_HASH_TYPE			(0xffff)
 
 #define RPF_L2BC_REG				0x5100
 #define  RPF_L2BC_EN				(1 << 0)
@@ -239,6 +245,19 @@
 #define RPF_RPB_RX_TC_UPT_REG                   0x54c4
 #define  RPF_RPB_RX_TC_UPT_MASK(i)              (0x00000007 << ((i) * 4))
 
+#define RPF_RSS_KEY_ADDR_REG			0x54d0
+#define  RPF_RSS_KEY_ADDR			0x1f
+#define  RPF_RSS_KEY_WR_EN			(1 << 5)
+#define RPF_RSS_KEY_WR_DATA_REG			0x54d4
+#define RPF_RSS_KEY_RD_DATA_REG			0x54d8
+
+#define RPF_RSS_REDIR_ADDR_REG			0x54e0
+#define  RPF_RSS_REDIR_ADDR			0xf
+#define  RPF_RSS_REDIR_WR_EN			(1 << 4)
+
+#define RPF_RSS_REDIR_WR_DATA_REG		0x54e4
+
+
 #define RPO_HWCSUM_REG				0x5580
 #define  RPO_HWCSUM_L4CSUM_EN			(1 << 0)
 #define  RPO_HWCSUM_IP4CSUM_EN			(1 << 1)
@@ -265,6 +284,8 @@
 
 #define RX_INTR_MODERATION_CTL_REG(i)		(0x5a40 + (i) * 4)
 #define  RX_INTR_MODERATION_CTL_EN		(1 << 1)
+#define  RX_INTR_MODERATION_CTL_MIN		(0xFF << 8)
+#define  RX_INTR_MODERATION_CTL_MAX		(0x1FF << 16)
 
 #define RX_DMA_DESC_BASE_ADDRLSW_REG(i)		(0x5b00 + (i) * 0x20)
 #define RX_DMA_DESC_BASE_ADDRMSW_REG(i)		(0x5b04 + (i) * 0x20)
@@ -368,6 +389,8 @@
 
 #define TX_INTR_MODERATION_CTL_REG(i)		(0x8980 + (i) * 4)
 #define  TX_INTR_MODERATION_CTL_EN		(1 << 1)
+#define  TX_INTR_MODERATION_CTL_MIN		(0xFF << 8)
+#define  TX_INTR_MODERATION_CTL_MAX		(0x1FF << 16)
 
 #define __LOWEST_SET_BIT(__mask) (((((uint32_t)__mask) - 1) & ((uint32_t)__mask)) ^ ((uint32_t)__mask))
 #define __SHIFTIN(__x, __mask) ((__x) * __LOWEST_SET_BIT(__mask))
@@ -694,6 +717,10 @@ struct aq_rxring {
 	struct if_rxring	 rx_rxr;
 	uint32_t		 rx_prod;
 	uint32_t		 rx_cons;
+
+	struct mbuf		*rx_m_head;
+	struct mbuf		**rx_m_tail;
+	int			 rx_m_error;
 };
 
 struct aq_txring {
@@ -838,6 +865,8 @@ void	aq_attach(struct device *, struct device *, void *);
 int	aq_detach(struct device *, int);
 int	aq_activate(struct device *, int);
 int	aq_intr(void *);
+int	aq_intr_link(void *);
+int	aq_intr_queue(void *);
 void	aq_global_software_reset(struct aq_softc *);
 int	aq_fw_reset(struct aq_softc *);
 int	aq_mac_soft_reset(struct aq_softc *, enum aq_fw_bootloader_mode *);
@@ -848,8 +877,9 @@ int	aq_fw_version_init(struct aq_softc *);
 int	aq_hw_init_ucp(struct aq_softc *);
 int	aq_fw_downld_dwords(struct aq_softc *, uint32_t, uint32_t *, uint32_t);
 int	aq_get_mac_addr(struct aq_softc *);
+int	aq_init_rss(struct aq_softc *);
 int	aq_hw_reset(struct aq_softc *);
-int	aq_hw_init(struct aq_softc *, int);
+int	aq_hw_init(struct aq_softc *, int, int);
 void	aq_hw_qos_set(struct aq_softc *);
 void	aq_l3_filter_set(struct aq_softc *);
 void	aq_hw_init_tx_path(struct aq_softc *);
@@ -907,7 +937,7 @@ const struct aq_firmware_ops aq_fw2x_ops = {
 	.get_stats = aq_fw2x_get_stats,
 };
 
-struct cfattach aq_ca = {
+const struct cfattach aq_ca = {
 	sizeof(struct aq_softc), aq_match, aq_attach, NULL,
 	aq_activate
 };
@@ -962,7 +992,8 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 	const char *intrstr;
 	pcitag_t tag;
 	struct ifnet *ifp = &sc->sc_arpcom.ac_if;
-	int irqmode;
+	int txmin, txmax, rxmin, rxmax;
+	int irqmode, irqnum;
 	int i;
 
 	mtx_init(&sc->sc_mpi_mutex, IPL_NET);
@@ -990,8 +1021,24 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 	}
 
 	sc->sc_nqueues = 1;
+	sc->sc_linkstat_irq = AQ_LINKSTAT_IRQ;
+	isr = aq_intr;
+	irqnum = 0;
 
 	if (pci_intr_map_msix(pa, 0, &ih) == 0) {
+		int nmsix = pci_intr_msix_count(pa);
+		if (nmsix > 1) {
+			nmsix--;
+			sc->sc_intrmap = intrmap_create(&sc->sc_dev,
+			    nmsix, AQ_MAXQ, INTRMAP_POWEROF2);
+			sc->sc_nqueues = intrmap_count(sc->sc_intrmap);
+			KASSERT(sc->sc_nqueues > 0);
+			KASSERT(powerof2(sc->sc_nqueues));
+
+			sc->sc_linkstat_irq = 0;
+			isr = aq_intr_link;
+			irqnum++;
+		}
 		irqmode = AQ_INTR_CTRL_IRQMODE_MSIX;
 	} else if (pci_intr_map_msi(pa, &ih) == 0) {
 		irqmode = AQ_INTR_CTRL_IRQMODE_MSI;
@@ -1002,12 +1049,14 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	isr = aq_intr;
 	sc->sc_ih = pci_intr_establish(pa->pa_pc, ih,
 	    IPL_NET | IPL_MPSAFE, isr, sc, self->dv_xname);
 	intrstr = pci_intr_string(pa->pa_pc, ih);
 	if (intrstr)
 		printf(": %s", intrstr);
+
+	if (sc->sc_nqueues > 1)
+		printf(", %d queues", sc->sc_nqueues);
 
 	if (aq_fw_reset(sc))
 		return;
@@ -1026,7 +1075,10 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 	if (aq_get_mac_addr(sc))
 		return;
 
-	if (aq_hw_init(sc, irqmode))
+	if (aq_init_rss(sc))
+		return;
+
+	if (aq_hw_init(sc, irqmode, (sc->sc_nqueues > 1)))
 		return;
 
 	sc->sc_media_type = aqp->aq_media_type;
@@ -1095,40 +1147,83 @@ aq_attach(struct device *parent, struct device *self, void *aux)
 	if_attach_iqueues(ifp, sc->sc_nqueues);
 	if_attach_queues(ifp, sc->sc_nqueues);
 
+	/*
+	 * set interrupt moderation for up to 20k interrupts per second,
+	 * more rx than tx.  these values are in units of 2us.
+	 */
+	txmin = 20;
+	txmax = 200;
+	rxmin = 6;
+	rxmax = 60;
+
 	for (i = 0; i < sc->sc_nqueues; i++) {
 		struct aq_queues *aq = &sc->sc_queues[i];
 		struct aq_rxring *rx = &aq->q_rx;
 		struct aq_txring *tx = &aq->q_tx;
+		pci_intr_handle_t ih;
 
 		aq->q_sc = sc;
 		aq->q_index = i;
 		rx->rx_q = i;
-		rx->rx_irq = i * 2;
 		rx->rx_ifiq = ifp->if_iqs[i];
+		rx->rx_m_head = NULL;
+		rx->rx_m_tail = &rx->rx_m_head;
+		rx->rx_m_error = 0;
 		ifp->if_iqs[i]->ifiq_softc = aq;
 		timeout_set(&rx->rx_refill, aq_refill, rx);
 
 		tx->tx_q = i;
-		tx->tx_irq = rx->rx_irq + 1;
 		tx->tx_ifq = ifp->if_ifqs[i];
 		ifp->if_ifqs[i]->ifq_softc = aq;
 
+		snprintf(aq->q_name, sizeof(aq->q_name), "%s:%u",
+		    DEVNAME(sc), i);
+
 		if (sc->sc_nqueues > 1) {
-			/* map msix */
+			if (pci_intr_map_msix(pa, irqnum, &ih)) {
+				printf("%s: unable to map msi-x vector %d\n",
+				    DEVNAME(sc), irqnum);
+				return;
+			}
+
+			aq->q_ihc = pci_intr_establish_cpu(sc->sc_pc, ih,
+			    IPL_NET | IPL_MPSAFE, intrmap_cpu(sc->sc_intrmap, i),
+			    aq_intr_queue, aq, aq->q_name);
+			if (aq->q_ihc == NULL) {
+				printf("%s: unable to establish interrupt %d\n",
+				    DEVNAME(sc), irqnum);
+				return;
+			}
+			rx->rx_irq = irqnum;
+			tx->tx_irq = irqnum;
+			irqnum++;
+		} else {
+			rx->rx_irq = irqnum++;
+			tx->tx_irq = irqnum++;
 		}
 
-		AQ_WRITE_REG(sc, TX_INTR_MODERATION_CTL_REG(i), 0);
-		AQ_WRITE_REG(sc, RX_INTR_MODERATION_CTL_REG(i), 0);
+		AQ_WRITE_REG_BIT(sc, TX_INTR_MODERATION_CTL_REG(i),
+		    TX_INTR_MODERATION_CTL_MIN, txmin);
+		AQ_WRITE_REG_BIT(sc, TX_INTR_MODERATION_CTL_REG(i),
+		    TX_INTR_MODERATION_CTL_MAX, txmax);
+		AQ_WRITE_REG_BIT(sc, TX_INTR_MODERATION_CTL_REG(i),
+		    TX_INTR_MODERATION_CTL_EN, 1);
+		AQ_WRITE_REG_BIT(sc, RX_INTR_MODERATION_CTL_REG(i),
+		    RX_INTR_MODERATION_CTL_MIN, rxmin);
+		AQ_WRITE_REG_BIT(sc, RX_INTR_MODERATION_CTL_REG(i),
+		    RX_INTR_MODERATION_CTL_MAX, rxmax);
+		AQ_WRITE_REG_BIT(sc, RX_INTR_MODERATION_CTL_REG(i),
+		    RX_INTR_MODERATION_CTL_EN, 1);
 	}
 
 	AQ_WRITE_REG_BIT(sc, TX_DMA_INT_DESC_WRWB_EN_REG,
-	    TX_DMA_INT_DESC_WRWB_EN, 1);
+	    TX_DMA_INT_DESC_WRWB_EN, 0);
 	AQ_WRITE_REG_BIT(sc, TX_DMA_INT_DESC_WRWB_EN_REG,
-	    TX_DMA_INT_DESC_MODERATE_EN, 0);
+	    TX_DMA_INT_DESC_MODERATE_EN, 1);
 	AQ_WRITE_REG_BIT(sc, RX_DMA_INT_DESC_WRWB_EN_REG,
-	    RX_DMA_INT_DESC_WRWB_EN, 1);
+	    RX_DMA_INT_DESC_WRWB_EN, 0);
 	AQ_WRITE_REG_BIT(sc, RX_DMA_INT_DESC_WRWB_EN_REG,
-	    RX_DMA_INT_DESC_MODERATE_EN, 0);
+	    RX_DMA_INT_DESC_MODERATE_EN, 1);
 
 	aq_enable_intr(sc, 1, 0);
 	printf("\n");
@@ -1718,7 +1813,7 @@ aq_hw_l3_filter_set(struct aq_softc *sc)
 }
 
 int
-aq_hw_init(struct aq_softc *sc, int irqmode)
+aq_hw_init(struct aq_softc *sc, int irqmode, int multivec)
 {
 	uint32_t v;
 
@@ -1745,7 +1840,7 @@ aq_hw_init(struct aq_softc *sc, int irqmode)
 
 	/* Enable interrupt */
 	AQ_WRITE_REG(sc, AQ_INTR_CTRL_REG, AQ_INTR_CTRL_RESET_DIS);
-	AQ_WRITE_REG_BIT(sc, AQ_INTR_CTRL_REG, AQ_INTR_CTRL_MULTIVEC, 0);
+	AQ_WRITE_REG_BIT(sc, AQ_INTR_CTRL_REG, AQ_INTR_CTRL_MULTIVEC, multivec);
 
 	AQ_WRITE_REG_BIT(sc, AQ_INTR_CTRL_REG, AQ_INTR_CTRL_IRQMODE, irqmode);
 
@@ -1757,7 +1852,6 @@ aq_hw_init(struct aq_softc *sc, int irqmode)
 	);
 
 	/* link interrupt */
-	sc->sc_linkstat_irq = AQ_LINKSTAT_IRQ;
 	AQ_WRITE_REG(sc, AQ_GEN_INTR_MAP_REG(3),
 	    (1 << 7) | sc->sc_linkstat_irq);
 
@@ -1800,6 +1894,28 @@ aq_hw_init_rx_path(struct aq_softc *sc)
 		   RPF_ETHERTYPE_FILTER_EN, 0);
 	}
 
+	if (sc->sc_nqueues > 1) {
+		uint32_t bits;
+
+		AQ_WRITE_REG_BIT(sc, RPB_RPF_RX_REG, RPB_RPF_RX_TC_MODE, 1);
+		AQ_WRITE_REG_BIT(sc, RPB_RPF_RX_REG, RPB_RPF_RX_FC_MODE, 1);
+
+		switch (sc->sc_nqueues) {
+		case 2:
+			bits = 0x11111111;
+			break;
+		case 4:
+			bits = 0x22222222;	
+			break;
+		case 8:
+			bits = 0x33333333;
+			break;
+		}
+
+		AQ_WRITE_REG(sc, RX_FLR_RSS_CONTROL1_REG,
+		    RX_FLR_RSS_CONTROL1_EN | bits);
+	}
+
 	/* L2 and Multicast filters */
 	for (i = 0; i < AQ_HW_MAC_NUM; i++) {
 		AQ_WRITE_REG_BIT(sc, RPF_L2UC_MSW_REG(i), RPF_L2UC_MSW_EN, 0);
@@ -1823,7 +1939,14 @@ aq_hw_init_rx_path(struct aq_softc *sc)
 		    RPF_VLAN_MODE_UNTAGGED_ACTION, RPF_ACTION_HOST);
 	}
 
-	AQ_WRITE_REG(sc, RX_TCP_RSS_HASH_REG, 0);
+	if (sc->sc_features & FEATURES_RPF2)
+		AQ_WRITE_REG(sc, RX_TCP_RSS_HASH_REG, RX_TCP_RSS_HASH_RPF2);
+	else
+		AQ_WRITE_REG(sc, RX_TCP_RSS_HASH_REG, 0);
+
+	/* we might want to figure out what this magic number does */
+	AQ_WRITE_REG_BIT(sc, RX_TCP_RSS_HASH_REG, RX_TCP_RSS_HASH_TYPE,
+	    0x001e);
 
 	AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_EN, 1);
 	AQ_WRITE_REG_BIT(sc, RPF_L2BC_REG, RPF_L2BC_ACTION, RPF_ACTION_HOST);
@@ -1995,6 +2118,69 @@ aq_hw_qos_set(struct aq_softc *sc)
 	}
 }
 
+int
+aq_init_rss(struct aq_softc *sc)
+{
+	uint32_t rss_key[AQ_RSS_KEYSIZE / sizeof(uint32_t)];
+	uint32_t redir;
+	int bits, queue;
+	int error;
+	int i;
+	
+	if (sc->sc_nqueues == 1)
+		return 0;
+
+	/* rss key is composed of 32 bit registers */
+	stoeplitz_to_key(rss_key, sizeof(rss_key));
+	for (i = 0; i < nitems(rss_key); i++) {
+		AQ_WRITE_REG(sc, RPF_RSS_KEY_WR_DATA_REG, htole32(rss_key[i]));
+		AQ_WRITE_REG_BIT(sc, RPF_RSS_KEY_ADDR_REG, RPF_RSS_KEY_ADDR,
+		    nitems(rss_key) - 1 - i);
+		AQ_WRITE_REG_BIT(sc, RPF_RSS_KEY_ADDR_REG, RPF_RSS_KEY_WR_EN,
+		    1);
+		WAIT_FOR((AQ_READ_REG(sc, RPF_RSS_KEY_ADDR_REG) &
+		    RPF_RSS_KEY_WR_EN) == 0, 1000, 10, &error);
+		if (error != 0) {
+			printf(": timed out setting rss key\n");
+			return error;
+		}
+	}
+
+	/*
+	 * the redirection table has 64 entries, each entry is a 3 bit
+	 * queue number, packed into a 16 bit register, so there are 12
+	 * registers to program.
+	 */
+	bits = 0;
+	redir = 0;
+	queue = 0;
+	for (i = 0; i < AQ_RSS_REDIR_ENTRIES; i++) {
+		while (bits < 16) {
+			redir |= (queue << bits);
+			bits += 3;
+			queue++;
+			if (queue == sc->sc_nqueues)
+				queue = 0;
+		}
+
+		AQ_WRITE_REG(sc, RPF_RSS_REDIR_WR_DATA_REG, htole16(redir));
+		AQ_WRITE_REG_BIT(sc, RPF_RSS_REDIR_ADDR_REG, RPF_RSS_REDIR_ADDR,
+		    i);
+		AQ_WRITE_REG_BIT(sc, RPF_RSS_REDIR_ADDR_REG,
+		    RPF_RSS_REDIR_WR_EN, 1);
+		WAIT_FOR((AQ_READ_REG(sc, RPF_RSS_REDIR_ADDR_REG) &
+		    RPF_RSS_REDIR_WR_EN) == 0, 1000, 10, &error);
+		if (error != 0) {
+			printf(": timed out setting rss table\n");
+			return error;
+		}
+		redir >>= 16;
+		bits -= 16;
+	}
+
+	return 0;
+}
+
 void
 aq_txring_reset(struct aq_softc *sc, struct aq_txring *tx, int start)
 {
@@ -2112,7 +2298,7 @@ aq_rx_fill_slots(struct aq_softc *sc, struct aq_rxring *rx, uint nslots)
 		if (m == NULL)
 			break;
 
-		m->m_data += (m->m_ext.ext_size - MCLBYTES);
+		m->m_data += (m->m_ext.ext_size - (MCLBYTES + ETHER_ALIGN));
 		m->m_data += ETHER_ALIGN;
 		m->m_len = m->m_pkthdr.len = MCLBYTES;
 
@@ -2123,6 +2309,8 @@ aq_rx_fill_slots(struct aq_softc *sc, struct aq_rxring *rx, uint nslots)
 		}
 		as->as_m = m;
 
+		bus_dmamap_sync(sc->sc_dmat, as->as_map, 0,
+		    as->as_map->dm_mapsize, BUS_DMASYNC_PREREAD);
 		htolem64(&rd->buf_addr, as->as_map->dm_segs[0].ds_addr);
 		rd->hdr_addr = 0;
 		p++;
@@ -2174,7 +2362,7 @@ aq_rxeof(struct aq_softc *sc, struct aq_rxring *rx)
 	uint32_t end, idx;
 	uint16_t pktlen, status;
 	uint32_t rxd_type;
-	struct mbuf *m;
+	struct mbuf *m, *mb;
 	struct mbuf_list ml = MBUF_LIST_INITIALIZER();
 	int rxfree;
 
@@ -2203,12 +2391,22 @@ aq_rxeof(struct aq_softc *sc, struct aq_rxring *rx)
 			break;
 
 		rxfree++;
-		m = as->as_m;
+		mb = as->as_m;
 		as->as_m = NULL;
 
 		pktlen = lemtoh16(&rxd->pkt_len);
 		rxd_type = lemtoh32(&rxd->type);
-		/* rss hash */
+		if ((rxd_type & AQ_RXDESC_TYPE_RSSTYPE) != 0) {
+			mb->m_pkthdr.ph_flowid = lemtoh32(&rxd->rss_hash);
+			mb->m_pkthdr.csum_flags |= M_FLOWID;
+		}
+
+		mb->m_pkthdr.len = 0;
+		mb->m_next = NULL;
+		*rx->rx_m_tail = mb;
+		rx->rx_m_tail = &mb->m_next;
+
+		m = rx->rx_m_head;
 
 #if NVLAN > 0
 		if (rxd_type & (AQ_RXDESC_TYPE_VLAN | AQ_RXDESC_TYPE_VLAN2)) {
@@ -2230,16 +2428,35 @@ aq_rxeof(struct aq_softc *sc, struct aq_rxring *rx)
 		    (rxd_type & AQ_RXDESC_TYPE_DMA_ERR)) {
 			printf("%s:rx: rx error (status %x type %x)\n",
 			    DEVNAME(sc), status, rxd_type);
-			m_freem(m);
+			rx->rx_m_error = 1;
+		}
+
+		if (status & AQ_RXDESC_STATUS_EOP) {
+			mb->m_len = pktlen - m->m_pkthdr.len;
+			m->m_pkthdr.len = pktlen;
+			if (rx->rx_m_error != 0) {
+				ifp->if_ierrors++;
+				m_freem(m);
+			} else {
+				ml_enqueue(&ml, m);
+			}
+
+			rx->rx_m_head = NULL;
+			rx->rx_m_tail = &rx->rx_m_head;
+			rx->rx_m_error = 0;
 		} else {
-			m->m_pkthdr.len = m->m_len = pktlen;
-			ml_enqueue(&ml, m);
+			mb->m_len = MCLBYTES;
+			m->m_pkthdr.len += mb->m_len;
 		}
 
 		idx++;
 		if (idx == AQ_RXD_NUM)
 			idx = 0;
 	}
+
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&rx->rx_mem), 0,
+	    AQ_DMA_LEN(&rx->rx_mem), BUS_DMASYNC_PREREAD);
+
 	rx->rx_cons = idx;
 
 	if (rxfree > 0) {
@@ -2275,6 +2492,8 @@ aq_txeof(struct aq_softc *sc, struct aq_txring *tx)
 		as = &tx->tx_slots[idx];
 
 		if (as->as_m != NULL) {
+			bus_dmamap_sync(sc->sc_dmat, as->as_map, 0,
+			    as->as_map->dm_mapsize, BUS_DMASYNC_POSTWRITE);
 			bus_dmamap_unload(sc->sc_dmat, as->as_map);
 
 			m_freem(as->as_m);
@@ -2286,6 +2505,9 @@ aq_txeof(struct aq_softc *sc, struct aq_txring *tx)
 			idx = 0;
 		free++;
 	}
+
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&tx->tx_mem), 0,
+	    AQ_DMA_LEN(&tx->tx_mem), BUS_DMASYNC_PREREAD);
 
 	tx->tx_cons = idx;
 
@@ -2408,6 +2630,46 @@ aq_start(struct ifqueue *ifq)
 }
 
 int
+aq_intr_queue(void *arg)
+{
+	struct aq_queues *aq = arg;
+	struct aq_softc *sc = aq->q_sc;
+	uint32_t status;
+	uint32_t clear;
+
+	status = AQ_READ_REG(sc, AQ_INTR_STATUS_REG);
+	clear = 0;
+	if (status & (1 << aq->q_tx.tx_irq)) {
+		clear |= (1 << aq->q_tx.tx_irq);
+		aq_txeof(sc, &aq->q_tx);
+	}
+
+	if (status & (1 << aq->q_rx.rx_irq)) {
+		clear |= (1 << aq->q_rx.rx_irq);
+		aq_rxeof(sc, &aq->q_rx);
+	}
+
+	AQ_WRITE_REG(sc, AQ_INTR_STATUS_CLR_REG, clear);
+	return (clear != 0);
+}
+
+int
+aq_intr_link(void *arg)
+{
+	struct aq_softc *sc = arg;
+	uint32_t status;
+
+	status = AQ_READ_REG(sc, AQ_INTR_STATUS_REG);
+	if (status & (1 << sc->sc_linkstat_irq)) {
+		aq_update_link_status(sc);
+		AQ_WRITE_REG(sc, AQ_INTR_STATUS_REG, (1 << sc->sc_linkstat_irq));
+		return 1;
+	}
+
+	return 0;
+}
+
+int
 aq_intr(void *arg)
 {
 	struct aq_softc *sc = arg;
@@ -2462,7 +2724,7 @@ aq_queue_up(struct aq_softc *sc, struct aq_queues *aq)
 	struct aq_rxring *rx;
 	struct aq_txring *tx;
 	struct aq_slot *as;
-	int i;
+	int i, mtu;
 
 	rx = &aq->q_rx;
 	rx->rx_slots = mallocarray(sizeof(*as), AQ_RXD_NUM, M_DEVBUF,
@@ -2500,11 +2762,11 @@ aq_queue_up(struct aq_softc *sc, struct aq_queues *aq)
 		goto destroy_rx_ring;
 	}
 
+	mtu = sc->sc_arpcom.ac_if.if_hardmtu;
 	for (i = 0; i < AQ_TXD_NUM; i++) {
 		as = &tx->tx_slots[i];
-		if (bus_dmamap_create(sc->sc_dmat, MCLBYTES,
-		    AQ_TX_MAX_SEGMENTS, MCLBYTES, 0,
-		    BUS_DMA_WAITOK | BUS_DMA_ALLOCNOW | BUS_DMA_64BIT,
+		if (bus_dmamap_create(sc->sc_dmat, mtu, AQ_TX_MAX_SEGMENTS,
+		    MCLBYTES, 0, BUS_DMA_WAITOK | BUS_DMA_ALLOCNOW | BUS_DMA_64BIT,
 		    &as->as_map) != 0) {
 			printf("%s: failed to allocated tx dma maps %d\n",
 			    DEVNAME(sc), aq->q_index);
@@ -2518,6 +2780,14 @@ aq_queue_up(struct aq_softc *sc, struct aq_queues *aq)
 		    aq->q_index);
 		goto destroy_tx_slots;
 	}
+
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&tx->tx_mem),
+	    0, AQ_DMA_LEN(&tx->tx_mem),
+	    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
+
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&rx->rx_mem),
+	    0, AQ_DMA_LEN(&rx->rx_mem),
+	    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 
 	aq_txring_reset(sc, tx, 1);
 	aq_rxring_reset(sc, rx, 1);
@@ -2549,14 +2819,26 @@ aq_queue_down(struct aq_softc *sc, struct aq_queues *aq)
 		tx->tx_slots = NULL;
 	}
 
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&tx->tx_mem),
+	    0, AQ_DMA_LEN(&tx->tx_mem),
+	    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
+
 	aq_dmamem_free(sc, &tx->tx_mem);
 
 	rx = &aq->q_rx;
+	m_freem(rx->rx_m_head);
+	rx->rx_m_head = NULL;
+	rx->rx_m_tail = &rx->rx_m_head;
+	rx->rx_m_error = 0;
 	aq_rxring_reset(sc, &aq->q_rx, 0);
 	if (rx->rx_slots != NULL) {
 		aq_free_slots(sc, rx->rx_slots, AQ_RXD_NUM, AQ_RXD_NUM);
 		rx->rx_slots = NULL;
 	}
+
+	bus_dmamap_sync(sc->sc_dmat, AQ_DMA_MAP(&rx->rx_mem),
+	    0, AQ_DMA_LEN(&rx->rx_mem),
+	    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
 
 	aq_dmamem_free(sc, &rx->rx_mem);
 }
@@ -2600,7 +2882,8 @@ aq_up(struct aq_softc *sc)
 	for (i = 0; i < sc->sc_nqueues; i++) {
 		struct aq_queues *aq = &sc->sc_queues[i];
 
-		if_rxr_init(&aq->q_rx.rx_rxr, 1, AQ_RXD_NUM - 1);
+		if_rxr_init(&aq->q_rx.rx_rxr, howmany(ifp->if_hardmtu, MCLBYTES),
+		    AQ_RXD_NUM - 1);
 		aq_rx_fill(sc, &aq->q_rx);
 
 		ifq_clr_oactive(aq->q_tx.tx_ifq);
@@ -2625,7 +2908,6 @@ aq_down(struct aq_softc *sc)
 	aq_enable_intr(sc, 1, 0);
 	intr_barrier(sc->sc_ih);
 
-	AQ_WRITE_REG_BIT(sc, TPB_TX_BUF_REG, TPB_TX_BUF_EN, 0);
 	AQ_WRITE_REG_BIT(sc, RPB_RPF_RX_REG, RPB_RPF_RX_BUF_EN, 0);
 	for (i = 0; i < sc->sc_nqueues; i++) {
 		/* queue intr barrier? */

@@ -1,4 +1,4 @@
-/* $OpenBSD: acpiac.c,v 1.34 2021/10/30 23:24:47 deraadt Exp $ */
+/* $OpenBSD: acpiac.c,v 1.36 2022/04/06 18:59:27 naddy Exp $ */
 /*
  * Copyright (c) 2005 Marco Peereboom <marco@openbsd.org>
  *
@@ -39,7 +39,7 @@ int  acpiac_notify(struct aml_node *, int, void *);
 void acpiac_refresh(void *);
 int acpiac_getpsr(struct acpiac_softc *);
 
-struct cfattach acpiac_ca = {
+const struct cfattach acpiac_ca = {
 	sizeof(struct acpiac_softc),
 	acpiac_match,
 	acpiac_attach,
@@ -118,9 +118,11 @@ void
 acpiac_refresh(void *arg)
 {
 	struct acpiac_softc *sc = arg;
+	extern int hw_power;
 
 	acpiac_getpsr(sc);
 	sc->sc_sens[0].value = sc->sc_ac_stat;
+	hw_power = (sc->sc_ac_stat == PSR_ONLINE);
 }
 
 int
@@ -142,7 +144,6 @@ int
 acpiac_notify(struct aml_node *node, int notify_type, void *arg)
 {
 	struct acpiac_softc *sc = arg;
-	extern int hw_power;
 
 	dnprintf(10, "acpiac_notify: %.2x %s\n", notify_type,
 	    DEVNAME(sc));
@@ -162,6 +163,5 @@ acpiac_notify(struct aml_node *node, int notify_type, void *arg)
 		dnprintf(10, "A/C status: %d\n", sc->sc_ac_stat);
 		break;
 	}
-	hw_power = (sc->sc_ac_stat == PSR_ONLINE);
 	return (0);
 }

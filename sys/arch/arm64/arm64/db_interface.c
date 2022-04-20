@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_interface.c,v 1.10 2021/05/30 15:05:32 visa Exp $	*/
+/*	$OpenBSD: db_interface.c,v 1.12 2022/04/14 19:47:11 naddy Exp $	*/
 /*	$NetBSD: db_interface.c,v 1.34 2003/10/26 23:11:15 chris Exp $	*/
 
 /*
@@ -469,7 +469,7 @@ db_stopcpu(int cpu)
 }
 #endif
 
-struct db_command db_machine_command_table[] = {
+const struct db_command db_machine_command_table[] = {
 #ifdef MULTIPROCESSOR
 	{ "cpuinfo",    db_cpuinfo_cmd,         0,      NULL },
 	{ "startcpu",   db_startproc_cmd,       0,      NULL },
@@ -499,10 +499,7 @@ db_machine_init(void)
 {
 #ifdef MULTIPROCESSOR
 	int i;
-#endif
 
-	db_machine_commands_install(db_machine_command_table);
-#ifdef MULTIPROCESSOR
 	for (i = 0; i < MAXCPUS; i++) {
 		if (cpu_info[i] != NULL)
 			cpu_info[i]->ci_ddb_paused = CI_DDB_RUNNING;

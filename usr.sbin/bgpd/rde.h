@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.h,v 1.247 2022/03/02 16:51:43 claudio Exp $ */
+/*	$OpenBSD: rde.h,v 1.251 2022/03/22 10:53:08 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Claudio Jeker <claudio@openbsd.org> and
@@ -38,12 +38,12 @@ enum peer_state {
 };
 
 LIST_HEAD(prefix_list, prefix);
+TAILQ_HEAD(prefix_queue, prefix);
 RB_HEAD(rib_tree, rib_entry);
 
 struct rib_entry {
 	RB_ENTRY(rib_entry)	 rib_e;
-	struct prefix_list	 prefix_h;
-	struct prefix		*active;	/* for fast access */
+	struct prefix_queue	 prefix_h;
 	struct pt_entry		*prefix;
 	uint16_t		 rib_id;
 	uint16_t		 lock;
@@ -316,7 +316,8 @@ struct pt_entry_vpn6 {
 struct prefix {
 	union {
 		struct {
-			LIST_ENTRY(prefix)	 rib, nexthop;
+			TAILQ_ENTRY(prefix)	 rib;
+			LIST_ENTRY(prefix)	 nexthop;
 			struct rib_entry	*re;
 		} list;
 		struct {
@@ -333,7 +334,7 @@ struct prefix {
 	uint32_t			 path_id_tx;
 	uint8_t				 validation_state;
 	uint8_t				 nhflags;
-	uint8_t				 eor;
+	uint8_t				 unused;
 	uint8_t				 flags;
 #define	PREFIX_FLAG_WITHDRAW	0x01	/* enqueued on withdraw queue */
 #define	PREFIX_FLAG_UPDATE	0x02	/* enqueued on update queue */
@@ -341,6 +342,7 @@ struct prefix {
 #define	PREFIX_FLAG_STALE	0x08	/* stale entry (graceful reload) */
 #define	PREFIX_FLAG_MASK	0x0f	/* mask for the prefix types */
 #define	PREFIX_FLAG_ADJOUT	0x10	/* prefix is in the adj-out rib */
+#define	PREFIX_FLAG_EOR		0x20	/* prefix is EoR */
 #define	PREFIX_NEXTHOP_LINKED	0x40	/* prefix is linked onto nexthop list */
 #define	PREFIX_FLAG_LOCKED	0x80	/* locked by rib walker */
 };
@@ -498,8 +500,10 @@ communities_unref(struct rde_community *comm)
 int	community_to_rd(struct community *, uint64_t *);
 
 /* rde_decide.c */
-int	prefix_eligible(struct prefix *);
-void	prefix_evaluate(struct rib_entry *, struct prefix *, struct prefix *);
+int		 prefix_eligible(struct prefix *);
+struct prefix	*prefix_best(struct rib_entry *);
+void		 prefix_evaluate(struct rib_entry *, struct prefix *,
+		     struct prefix *);
 
 /* rde_filter.c */
 void	rde_apply_set(struct filter_set_head *, struct rde_peer *,
@@ -547,7 +551,7 @@ pt_unref(struct pt_entry *pt)
 extern uint16_t	rib_size;
 
 struct rib	*rib_new(char *, u_int, uint16_t);
-void		 rib_update(struct rib *);
+int		 rib_update(struct rib *);
 struct rib	*rib_byid(uint16_t);
 uint16_t	 rib_find(char *);
 void		 rib_free(struct rib *);

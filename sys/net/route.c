@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.402 2022/02/22 01:15:02 guenther Exp $	*/
+/*	$OpenBSD: route.c,v 1.405 2022/04/20 09:38:25 bluhm Exp $	*/
 /*	$NetBSD: route.c,v 1.14 1996/02/13 22:00:46 christos Exp $	*/
 
 /*
@@ -148,10 +148,10 @@ struct cpumem *		rtcounters;
 int			rttrash;	/* routes not in table but not freed */
 int			ifatrash;	/* ifas not in ifp list but not free */
 
-struct pool		rtentry_pool;	/* pool for rtentry structures */
-struct pool		rttimer_pool;	/* pool for rttimer structures */
+struct pool	rtentry_pool;		/* pool for rtentry structures */
+struct pool	rttimer_pool;		/* pool for rttimer structures */
+struct pool	rttimer_queue_pool;	/* pool for rttimer_queue structures */
 
-void	rt_timer_init(void);
 int	rt_setgwroute(struct rtentry *, u_int);
 void	rt_putgwroute(struct rtentry *);
 int	rtflushclone1(struct rtentry *, void *, u_int);
@@ -184,7 +184,7 @@ route_init(void)
 {
 	rtcounters = counters_alloc(rts_ncounters);
 
-	pool_init(&rtentry_pool, sizeof(struct rtentry), 0, IPL_SOFTNET, 0,
+	pool_init(&rtentry_pool, sizeof(struct rtentry), 0, IPL_MPFLOOR, 0,
 	    "rtentry", NULL);
 
 	while (rt_hashjitter == 0)
@@ -1362,7 +1362,6 @@ rt_ifa_purge_walker(struct rtentry *rt, void *vifa, unsigned int rtableid)
  */
 
 LIST_HEAD(, rttimer_queue)	rttimer_queue_head;
-static int			rt_init_done = 0;
 
 #define RTTIMER_CALLOUT(r)	{					\
 	if (r->rtt_func != NULL) {					\
@@ -1389,28 +1388,22 @@ rt_timer_init(void)
 {
 	static struct timeout	rt_timer_timeout;
 
-	if (rt_init_done)
-		panic("rt_timer_init: already initialized");
-
-	pool_init(&rttimer_pool, sizeof(struct rttimer), 0, IPL_SOFTNET, 0,
-	    "rttmr", NULL);
+	pool_init(&rttimer_pool, sizeof(struct rttimer), 0,
+	    IPL_MPFLOOR, 0, "rttmr", NULL);
+	pool_init(&rttimer_queue_pool, sizeof(struct rttimer_queue), 0,
+	    IPL_MPFLOOR, 0, "rttmrq", NULL);
 
 	LIST_INIT(&rttimer_queue_head);
 	timeout_set_proc(&rt_timer_timeout, rt_timer_timer, &rt_timer_timeout);
 	timeout_add_sec(&rt_timer_timeout, 1);
-	rt_init_done = 1;
 }
 
 struct rttimer_queue *
-rt_timer_queue_create(u_int timeout)
+rt_timer_queue_create(int timeout)
 {
 	struct rttimer_queue	*rtq;
 
-	if (rt_init_done == 0)
-		rt_timer_init();
-
-	if ((rtq = malloc(sizeof(*rtq), M_RTABLE, M_NOWAIT|M_ZERO)) == NULL)
-		return (NULL);
+	rtq = pool_get(&rttimer_queue_pool, PR_WAITOK | PR_ZERO);
 
 	rtq->rtq_timeout = timeout;
 	rtq->rtq_count = 0;
@@ -1421,7 +1414,7 @@ rt_timer_queue_create(u_int timeout)
 }
 
 void
-rt_timer_queue_change(struct rttimer_queue *rtq, long timeout)
+rt_timer_queue_change(struct rttimer_queue *rtq, int timeout)
 {
 	rtq->rtq_timeout = timeout;
 }
@@ -1445,7 +1438,7 @@ rt_timer_queue_destroy(struct rttimer_queue *rtq)
 	}
 
 	LIST_REMOVE(rtq, rtq_link);
-	free(rtq, M_RTABLE, sizeof(*rtq));
+	pool_put(&rttimer_queue_pool, rtq);
 }
 
 unsigned long
@@ -1475,10 +1468,10 @@ rt_timer_add(struct rtentry *rt, void (*func)(struct rtentry *,
     struct rttimer *), struct rttimer_queue *queue, u_int rtableid)
 {
 	struct rttimer	*r;
-	long		 current_time;
+	time_t		 current_time;
 
 	current_time = getuptime();
-	rt->rt_expire = getuptime() + queue->rtq_timeout;
+	rt->rt_expire = current_time + queue->rtq_timeout;
 
 	/*
 	 * If there's already a timer with this action, destroy it before
@@ -1519,7 +1512,7 @@ rt_timer_timer(void *arg)
 	struct timeout		*to = (struct timeout *)arg;
 	struct rttimer_queue	*rtq;
 	struct rttimer		*r;
-	long			 current_time;
+	time_t			 current_time;
 
 	current_time = getuptime();
 

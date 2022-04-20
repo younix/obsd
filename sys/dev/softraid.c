@@ -1,4 +1,4 @@
-/* $OpenBSD: softraid.c,v 1.421 2022/01/09 05:42:37 jsg Exp $ */
+/* $OpenBSD: softraid.c,v 1.425 2022/04/16 19:19:58 naddy Exp $ */
 /*
  * Copyright (c) 2007, 2008, 2009 Marco Peereboom <marco@peereboom.us>
  * Copyright (c) 2008 Chris Kuethe <ckuethe@openbsd.org>
@@ -83,7 +83,7 @@ void		sr_attach(struct device *, struct device *, void *);
 int		sr_detach(struct device *, int);
 void		sr_map_root(void);
 
-struct cfattach softraid_ca = {
+const struct cfattach softraid_ca = {
 	sizeof(struct sr_softc), sr_match, sr_attach, sr_detach,
 };
 
@@ -175,7 +175,7 @@ struct			sr_hotplug_list_head	sr_hotplug_callbacks;
 extern void		(*softraid_disk_attach)(struct disk *, int);
 
 /* scsi glue */
-struct scsi_adapter sr_switch = {
+const struct scsi_adapter sr_switch = {
 	sr_scsi_cmd, NULL, sr_scsi_probe, NULL, sr_scsi_ioctl
 };
 
@@ -404,6 +404,7 @@ sr_rw(struct sr_softc *sc, dev_t dev, char *buf, size_t size, daddr_t blkno,
 	size_t			bufsize, dma_bufsize;
 	int			rv = 1;
 	char			*dma_buf;
+	int			s;
 
 	DNPRINTF(SR_D_MISC, "%s: sr_rw(0x%x, %p, %zu, %lld 0x%lx)\n",
 	    DEVNAME(sc), dev, buf, size, (long long)blkno, flags);
@@ -437,8 +438,11 @@ sr_rw(struct sr_softc *sc, dev_t dev, char *buf, size_t size, daddr_t blkno,
 		b.b_resid = bufsize;
 		b.b_vp = vp;
 
-		if ((b.b_flags & B_READ) == 0)
+		if ((b.b_flags & B_READ) == 0) {
+			s = splbio();
 			vp->v_numoutput++;
+			splx(s);
+		}
 
 		LIST_INIT(&b.b_dep);
 		VOP_STRATEGY(vp, &b);
@@ -1508,10 +1512,10 @@ sr_map_root(void)
 	u_char			duid[8];
 	int			i;
 
-	DNPRINTF(SR_D_MISC, "%s: sr_map_root\n", DEVNAME(sc));
-
 	if (sc == NULL)
 		return;
+
+	DNPRINTF(SR_D_MISC, "%s: sr_map_root\n", DEVNAME(sc));
 
 	bzero(duid, sizeof(duid));
 	if (bcmp(rootduid, duid, sizeof(duid)) == 0) {
@@ -1980,6 +1984,7 @@ sr_ccb_rw(struct sr_discipline *sd, int chunk, daddr_t blkno,
 {
 	struct sr_chunk		*sc = sd->sd_vol.sv_chunks[chunk];
 	struct sr_ccb		*ccb = NULL;
+	int			s;
 
 	ccb = sr_ccb_get(sd);
 	if (ccb == NULL)
@@ -2006,8 +2011,11 @@ sr_ccb_rw(struct sr_discipline *sd, int chunk, daddr_t blkno,
 	ccb->ccb_buf.b_vp = sc->src_vn;
 	ccb->ccb_buf.b_bq = NULL;
 
-	if (!ISSET(ccb->ccb_buf.b_flags, B_READ))
+	if (!ISSET(ccb->ccb_buf.b_flags, B_READ)) {
+		s = splbio();
 		ccb->ccb_buf.b_vp->v_numoutput++;
+		splx(s);
+	}
 
 	LIST_INIT(&ccb->ccb_buf.b_dep);
 
@@ -4538,6 +4546,9 @@ sr_quiesce(void)
 	struct sr_softc		*sc = softraid0;
 	struct sr_discipline	*sd, *nsd;
 
+	if (sc == NULL)
+		return;
+
 	/* Shutdown disciplines in reverse attach order. */
 	TAILQ_FOREACH_REVERSE_SAFE(sd, &sc->sc_dis_list,
 	    sr_discipline_list, sd_link, nsd)
@@ -4549,6 +4560,9 @@ sr_shutdown(int dying)
 {
 	struct sr_softc		*sc = softraid0;
 	struct sr_discipline	*sd;
+
+	if (sc == NULL)
+		return;
 
 	DNPRINTF(SR_D_MISC, "%s: sr_shutdown\n", DEVNAME(sc));
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.189 2022/02/10 18:58:46 tb Exp $ */
+/*	$OpenBSD: main.c,v 1.198 2022/04/20 04:40:33 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -44,15 +44,10 @@
 #include "extern.h"
 #include "version.h"
 
-/*
- * Maximum number of TAL files we'll load.
- */
-#define	TALSZ_MAX	8
-
 const char	*tals[TALSZ_MAX];
 const char	*taldescs[TALSZ_MAX];
 unsigned int	 talrepocnt[TALSZ_MAX];
-size_t		 talsz;
+int		 talsz;
 
 size_t	entity_queue;
 int	timeout = 60*60;
@@ -335,54 +330,21 @@ rrdp_http_done(unsigned int id, enum http_result res, const char *last_mod)
  * These are always relative to the directory in which "mft" sits.
  */
 static void
-queue_add_from_mft(const char *path, const struct mftfile *file,
-    struct repo *rp)
-{
-	char		*nfile, *npath = NULL;
-
-	if (path != NULL)
-		if ((npath = strdup(path)) == NULL)
-			err(1, NULL);
-	if ((nfile = strdup(file->file)) == NULL)
-		err(1, NULL);
-
-	entityq_add(npath, nfile, file->type, file->location, rp, NULL, 0, -1);
-}
-
-/*
- * Loops over queue_add_from_mft() for all files.
- * The order here is important: we want to parse the revocation
- * list *before* we parse anything else.
- * FIXME: set the type of file in the mftfile so that we don't need to
- * keep doing the check (this should be done in the parser, where we
- * check the suffix anyway).
- */
-static void
-queue_add_from_mft_set(const struct mft *mft, const char *name, struct repo *rp)
+queue_add_from_mft(const struct mft *mft, struct repo *rp)
 {
 	size_t			 i;
 	const struct mftfile	*f;
+	char			*nfile, *npath = NULL;
 
 	for (i = 0; i < mft->filesz; i++) {
 		f = &mft->files[i];
-		if (f->type != RTYPE_CRL)
-			continue;
-		queue_add_from_mft(mft->path, f, rp);
-	}
-
-	for (i = 0; i < mft->filesz; i++) {
-		f = &mft->files[i];
-		switch (f->type) {
-		case RTYPE_CER:
-		case RTYPE_ROA:
-		case RTYPE_GBR:
-			queue_add_from_mft(mft->path, f, rp);
-			break;
-		case RTYPE_CRL:
-			continue;
-		default:
-			warnx("%s: unsupported file: %s", name, f->file);
-		}
+		if (mft->path != NULL)
+			if ((npath = strdup(mft->path)) == NULL)
+				err(1, NULL);
+		if ((nfile = strdup(f->file)) == NULL)
+			err(1, NULL);
+		entityq_add(npath, nfile, f->type, f->location, rp, NULL, 0,
+		    -1);
 	}
 }
 
@@ -561,8 +523,7 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 		}
 		mft = mft_read(b);
 		if (!mft->stale)
-			queue_add_from_mft_set(mft, file,
-			    repo_byid(mft->repoid));
+			queue_add_from_mft(mft, repo_byid(mft->repoid));
 		else
 			st->mfts_stale++;
 		mft_free(mft);
@@ -659,11 +620,11 @@ rrdp_process(struct ibuf *b)
  * This may be zero.
  * Don't exceded "max" filenames.
  */
-static size_t
+static int
 tal_load_default(void)
 {
 	static const char *confdir = "/etc/rpki";
-	size_t s = 0;
+	int s = 0;
 	char *path;
 	DIR *dirp;
 	struct dirent *dp;
@@ -711,6 +672,34 @@ check_fs_size(int fd, const char *cachedir)
 	}
 }
 
+static pid_t
+process_start(const char *title, int *fd)
+{
+	int		 fl = SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
+	pid_t		 pid;
+	int		 pair[2];
+
+	if (socketpair(AF_UNIX, fl, 0, pair) == -1)
+		err(1, "socketpair");
+	if ((pid = fork()) == -1)
+		err(1, "fork");
+
+	if (pid == 0) {
+		setproctitle("%s", title);
+		/* change working directory to the cache directory */
+		if (fchdir(cachefd) == -1)
+			err(1, "fchdir");
+		if (timeout)
+			alarm(timeout);
+		close(pair[1]);
+		*fd = pair[0];
+	} else {
+		close(pair[0]);
+		*fd = pair[1];
+	}
+	return pid;
+}
+
 void
 suicide(int sig __attribute__((unused)))
 {
@@ -722,11 +711,8 @@ suicide(int sig __attribute__((unused)))
 int
 main(int argc, char *argv[])
 {
-	int		 rc, c, st, proc, rsync, http, rrdp, hangup = 0;
-	int		 fl = SOCK_STREAM | SOCK_CLOEXEC | SOCK_NONBLOCK;
-	size_t		 i;
+	int		 rc, c, i, st, proc, rsync, http, rrdp, hangup = 0;
 	pid_t		 pid, procpid, rsyncpid, httppid, rrdppid;
-	int		 fd[2];
 	struct pollfd	 pfd[NPFD];
 	struct msgbuf	*queues[NPFD];
 	struct ibuf	*b, *httpbuf = NULL, *procbuf = NULL;
@@ -737,8 +723,8 @@ main(int argc, char *argv[])
 	const char	*errs, *name;
 	struct vrp_tree	 vrps = RB_INITIALIZER(&vrps);
 	struct brk_tree  brks = RB_INITIALIZER(&brks);
-	struct rusage	ru;
-	struct timeval	start_time, now_time;
+	struct rusage	 ru;
+	struct timeval	 start_time, now_time;
 
 	gettimeofday(&start_time, NULL);
 
@@ -804,15 +790,12 @@ main(int argc, char *argv[])
 				errx(1, "-s: %s", errs);
 			if (timeout == 0)
 				repo_timeout = 24*60*60;
-			else if (timeout < 1)
-				errx(1, "-s: %i too small", timeout);
 			else
 				repo_timeout = timeout / 4;
 			break;
 		case 't':
 			if (talsz >= TALSZ_MAX)
-				err(1,
-				    "too many tal files specified");
+				err(1, "too many tal files specified");
 			tals[talsz++] = optarg;
 			break;
 		case 'T':
@@ -865,7 +848,6 @@ main(int argc, char *argv[])
 
 	check_fs_size(cachefd, cachedir);
 
-
 	if (talsz == 0)
 		talsz = tal_load_default();
 	if (talsz == 0)
@@ -877,33 +859,11 @@ main(int argc, char *argv[])
 	 * manifests, certificates, etc.) and returning contents.
 	 */
 
-	if (socketpair(AF_UNIX, fl, 0, fd) == -1)
-		err(1, "socketpair");
-	if ((procpid = fork()) == -1)
-		err(1, "fork");
-
+	procpid = process_start("parser", &proc);
 	if (procpid == 0) {
-		close(fd[1]);
-
-		setproctitle("parser");
-		/* change working directory to the cache directory */
-		if (fchdir(cachefd) == -1)
-			err(1, "fchdir");
-
-		if (timeout)
-			alarm(timeout);
-
-		/* Only allow access to the cache directory. */
-		if (unveil(".", "r") == -1)
-			err(1, "%s: unveil", cachedir);
-		if (pledge("stdio rpath", NULL) == -1)
-			err(1, "pledge");
-		proc_parser(fd[0]);
+		proc_parser(proc);
 		errx(1, "parser process returned");
 	}
-
-	close(fd[0]);
-	proc = fd[1];
 
 	/*
 	 * Create a process that will do the rsync'ing.
@@ -913,32 +873,12 @@ main(int argc, char *argv[])
 	 */
 
 	if (!noop) {
-		if (socketpair(AF_UNIX, fl, 0, fd) == -1)
-			err(1, "socketpair");
-		if ((rsyncpid = fork()) == -1)
-			err(1, "fork");
-
+		rsyncpid = process_start("rsync", &rsync);
 		if (rsyncpid == 0) {
 			close(proc);
-			close(fd[1]);
-
-			setproctitle("rsync");
-			/* change working directory to the cache directory */
-			if (fchdir(cachefd) == -1)
-				err(1, "fchdir");
-
-			if (timeout)
-				alarm(timeout);
-
-			if (pledge("stdio rpath proc exec unveil", NULL) == -1)
-				err(1, "pledge");
-
-			proc_rsync(rsync_prog, bind_addr, fd[0]);
+			proc_rsync(rsync_prog, bind_addr, rsync);
 			errx(1, "rsync process returned");
 		}
-
-		close(fd[0]);
-		rsync = fd[1];
 	} else {
 		rsync = -1;
 		rsyncpid = -1;
@@ -950,34 +890,15 @@ main(int argc, char *argv[])
 	 * where the data should be written to.
 	 */
 
-	if (!noop) {
-		if (socketpair(AF_UNIX, fl, 0, fd) == -1)
-			err(1, "socketpair");
-		if ((httppid = fork()) == -1)
-			err(1, "fork");
+	if (!noop && rrdpon) {
+		httppid = process_start("http", &http);
 
 		if (httppid == 0) {
 			close(proc);
 			close(rsync);
-			close(fd[1]);
-
-			setproctitle("http");
-			/* change working directory to the cache directory */
-			if (fchdir(cachefd) == -1)
-				err(1, "fchdir");
-
-			if (timeout)
-				alarm(timeout);
-
-			if (pledge("stdio rpath inet dns recvfd", NULL) == -1)
-				err(1, "pledge");
-
-			proc_http(bind_addr, fd[0]);
+			proc_http(bind_addr, http);
 			errx(1, "http process returned");
 		}
-
-		close(fd[0]);
-		http = fd[1];
 	} else {
 		http = -1;
 		httppid = -1;
@@ -990,34 +911,14 @@ main(int argc, char *argv[])
 	 */
 
 	if (!noop && rrdpon) {
-		if (socketpair(AF_UNIX, fl, 0, fd) == -1)
-			err(1, "socketpair");
-		if ((rrdppid = fork()) == -1)
-			err(1, "fork");
-
+		rrdppid = process_start("rrdp", &rrdp);
 		if (rrdppid == 0) {
 			close(proc);
 			close(rsync);
 			close(http);
-			close(fd[1]);
-
-			setproctitle("rrdp");
-			/* change working directory to the cache directory */
-			if (fchdir(cachefd) == -1)
-				err(1, "fchdir");
-
-			if (timeout)
-				alarm(timeout);
-
-			if (pledge("stdio recvfd", NULL) == -1)
-				err(1, "pledge");
-
-			proc_rrdp(fd[0]);
-			/* NOTREACHED */
+			proc_rrdp(rrdp);
+			errx(1, "rrdp process returned");
 		}
-
-		close(fd[0]);
-		rrdp = fd[1];
 	} else {
 		rrdp = -1;
 		rrdppid = -1;
@@ -1097,7 +998,7 @@ main(int argc, char *argv[])
 
 		for (i = 0; i < NPFD; i++) {
 			if (pfd[i].revents & (POLLERR|POLLNVAL)) {
-				warnx("poll[%zu]: bad fd", i);
+				warnx("poll[%d]: bad fd", i);
 				hangup = 1;
 			}
 			if (pfd[i].revents & POLLHUP)
@@ -1105,12 +1006,12 @@ main(int argc, char *argv[])
 			if (pfd[i].revents & POLLOUT) {
 				switch (msgbuf_write(queues[i])) {
 				case 0:
-					warnx("write[%zu]: "
+					warnx("write[%d]: "
 					    "connection closed", i);
 					hangup = 1;
 					break;
 				case -1:
-					warn("write[%zu]", i);
+					warn("write[%d]", i);
 					hangup = 1;
 					break;
 				}
@@ -1239,7 +1140,8 @@ main(int argc, char *argv[])
 
 	logx("all files parsed: generating output");
 
-	repo_cleanup(&fpt);
+	if (!noop)
+		repo_cleanup(&fpt, cachefd);
 
 	gettimeofday(&now_time, NULL);
 	timersub(&now_time, &start_time, &stats.elapsed_time);

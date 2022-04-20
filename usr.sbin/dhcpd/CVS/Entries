@@ -6,13 +6,10 @@
 /confpars.c/1.36/Thu Apr 23 15:00:27 2020//
 /convert.c/1.5/Sat Feb  6 23:50:10 2016//
 /db.c/1.18/Mon Feb 13 23:04:05 2017//
-/dhcp-options.5/1.31/Wed May  8 22:00:55 2019//
 /dhcp.c/1.57/Tue Jul 11 10:28:24 2017//
 /dhcp.h/1.11/Wed May  8 22:00:55 2019//
-/dhcpd.8/1.29/Tue Aug 29 08:20:18 2017//
 /dhcpd.c/1.57/Tue Aug  6 11:07:37 2019//
 /dhcpd.conf/1.1/Tue Apr 13 23:41:48 2004//
-/dhcpd.conf.5/1.26/Sat May 16 16:58:11 2020//
 /dhcpd.leases.5/1.13/Mon Jul 27 18:48:04 2015//
 /dhctoken.h/1.8/Mon Apr 24 14:58:36 2017//
 /icmp.c/1.19/Thu Oct  3 13:36:15 2019//
@@ -34,4 +31,7 @@
 /memory.c/1.31/Fri Feb 11 13:34:01 2022//
 /parse.c/1.28/Mon Jan 24 14:35:16 2022//
 /sync.c/1.24/Mon Jan 24 14:35:16 2022//
+/dhcp-options.5/1.32/Wed Apr 20 14:28:26 2022//
+/dhcpd.8/1.30/Wed Apr 20 14:28:26 2022//
+/dhcpd.conf.5/1.27/Wed Apr 20 14:28:26 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: wds.c,v 1.57 2020/09/22 19:32:53 krw Exp $	*/
+/*	$OpenBSD: wds.c,v 1.59 2022/04/16 19:19:59 naddy Exp $	*/
 /*	$NetBSD: wds.c,v 1.13 1996/11/03 16:20:31 mycroft Exp $	*/
 
 #undef	WDSDIAG
@@ -166,14 +166,14 @@ int	wds_ipoll(struct wds_softc *, struct wds_scb *, int);
 void	wds_timeout(void *);
 int	wdsprint(void *, const char *);
 
-struct scsi_adapter wds_switch = {
+const struct scsi_adapter wds_switch = {
 	wds_scsi_cmd, NULL, NULL, NULL, NULL
 };
 
 int	wdsprobe(struct device *, void *, void *);
 void	wdsattach(struct device *, struct device *, void *);
 
-struct cfattach wds_ca = {
+const struct cfattach wds_ca = {
 	sizeof(struct wds_softc), wdsprobe, wdsattach
 };
 

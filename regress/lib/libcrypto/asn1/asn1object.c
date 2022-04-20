@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1object.c,v 1.3 2022/03/05 14:16:13 jsing Exp $ */
+/* $OpenBSD: asn1object.c,v 1.6 2022/03/19 17:37:10 jsing Exp $ */
 /*
  * Copyright (c) 2017, 2021, 2022 Joel Sing <jsing@openbsd.org>
  *
@@ -119,18 +119,6 @@ struct asn1_object_test asn1_object_tests[] = {
 		.der_len = 5,
 	},
 	{
-		.oid = "2.5 4.10",
-		.txt = "organizationName",
-		.content = {
-			0x55, 0x04, 0x0a,
-		},
-		.content_len = 3,
-		.der = {
-			0x06, 0x03, 0x55, 0x04, 0x0a,
-		},
-		.der_len = 5,
-	},
-	{
 		.oid = "2.5.0.0",
 		.txt = "2.5.0.0",
 		.content = {
@@ -170,63 +158,23 @@ struct asn1_object_test asn1_object_tests[] = {
 	},
 	{
 		.oid = "2.00005.0000000000004.10",
-		.content = {
-			0x55, 0x04, 0x0a,
-		},
-		.content_len = 3,
-		.der = {
-			0x06, 0x03, 0x55, 0x04, 0x0a,
-		},
-		.der_len = 5,
-		.want_error = 0, /* XXX */
+		.want_error = ASN1_R_INVALID_NUMBER,
 	},
 	{
 		.oid = "2..5.4.10",
-		.content = {
-			0x50, 0x05, 0x04, 0x0a,
-		},
-		.content_len = 4,
-		.der = {
-			0x06, 0x04, 0x50, 0x05, 0x04, 0x0a,
-		},
-		.der_len = 6,
-		.want_error = 0, /* XXX */
+		.want_error = ASN1_R_INVALID_NUMBER,
 	},
 	{
 		.oid = "2.5..4.10",
-		.content = {
-			0x55, 0x00, 0x04, 0x0a,
-		},
-		.content_len = 4,
-		.der = {
-			0x06, 0x04, 0x55, 0x00, 0x04, 0x0a,
-		},
-		.der_len = 6,
-		.want_error = 0, /* XXX */
+		.want_error = ASN1_R_INVALID_NUMBER,
 	},
 	{
 		.oid = "2.5.4..10",
-		.content = {
-			0x55, 0x04, 0x00, 0x0a,
-		},
-		.content_len = 4,
-		.der = {
-			0x06, 0x04, 0x55, 0x04, 0x00, 0x0a,
-		},
-		.der_len = 6,
-		.want_error = 0, /* XXX */
+		.want_error = ASN1_R_INVALID_NUMBER,
 	},
 	{
 		.oid = "2.5.4.10.",
-		.content = {
-			0x55, 0x04, 0x0a,
-		},
-		.content_len = 3,
-		.der = {
-			0x06, 0x03, 0x55, 0x04, 0x0a,
-		},
-		.der_len = 5,
-		.want_error = 0, /* XXX */
+		.want_error = ASN1_R_INVALID_NUMBER,
 	},
 	{
 		.oid = "3.5.4.10",
@@ -245,12 +193,20 @@ struct asn1_object_test asn1_object_tests[] = {
 		.want_error = ASN1_R_MISSING_SECOND_NUMBER,
 	},
 	{
+		.oid = "2.5 4.10",
+		.want_error = ASN1_R_INVALID_SEPARATOR,
+	},
+	{
 		.oid = "2,5,4,10",
 		.want_error = ASN1_R_INVALID_SEPARATOR,
 	},
 	{
 		.oid = "2.5,4.10",
 		.want_error = ASN1_R_INVALID_DIGIT,
+	},
+	{
+		.oid = "2a.5.4.10",
+		.want_error = ASN1_R_INVALID_SEPARATOR,
 	},
 	{
 		.oid = "2.5a.4.10",
@@ -453,7 +409,10 @@ asn1_object_txt_test(void)
 		goto failed;
 	}
 
-	BIO_reset(bio);
+	if ((ret = BIO_reset(bio)) <= 0) {
+		fprintf(stderr, "FAIL: BIO_reset failed: ret = %d\n", ret);
+		goto failed;
+	}
 	ret = i2a_ASN1_OBJECT(bio, aobj);
 	if (ret < 0 || (unsigned long)ret != strlen(obj_txt)) {
 		fprintf(stderr, "FAIL: i2a_ASN1_OBJECT() returned %d, "

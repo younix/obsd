@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.36 2022/02/10 17:33:28 claudio Exp $ */
+/*	$OpenBSD: x509.c,v 1.41 2022/04/15 12:59:44 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -38,6 +38,10 @@ ASN1_OBJECT	*roa_oid;	/* id-ct-routeOriginAuthz CMS content type */
 ASN1_OBJECT	*mft_oid;	/* id-ct-rpkiManifest CMS content type */
 ASN1_OBJECT	*gbr_oid;	/* id-ct-rpkiGhostbusters CMS content type */
 ASN1_OBJECT	*bgpsec_oid;	/* id-kp-bgpsec-router Key Purpose */
+ASN1_OBJECT	*cnt_type_oid;	/* pkcs-9 id-contentType */
+ASN1_OBJECT	*msg_dgst_oid;	/* pkcs-9 id-messageDigest */
+ASN1_OBJECT	*sign_time_oid;	/* pkcs-9 id-signingTime */
+ASN1_OBJECT	*bin_sign_time_oid;	/* pkcs-9 id-aa-binarySigningTime */
 
 void
 x509_init_oid(void)
@@ -62,6 +66,16 @@ x509_init_oid(void)
 		    "1.2.840.113549.1.9.16.1.35");
 	if ((bgpsec_oid = OBJ_txt2obj("1.3.6.1.5.5.7.3.30", 1)) == NULL)
 		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.3.30");
+	if ((cnt_type_oid = OBJ_txt2obj("1.2.840.113549.1.9.3", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.3");
+	if ((msg_dgst_oid = OBJ_txt2obj("1.2.840.113549.1.9.4", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.4");
+	if ((sign_time_oid = OBJ_txt2obj("1.2.840.113549.1.9.5", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.5");
+	if ((bin_sign_time_oid =
+	    OBJ_txt2obj("1.2.840.113549.1.9.16.2.46", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed",
+		    "1.2.840.113549.1.9.16.2.46");
 }
 
 /*
@@ -69,22 +83,18 @@ x509_init_oid(void)
  * Returns the AKI or NULL if it could not be parsed.
  * The AKI is formatted as a hex string.
  */
-char *
-x509_get_aki(X509 *x, int ta, const char *fn)
+int
+x509_get_aki(X509 *x, const char *fn, char **aki)
 {
 	const unsigned char	*d;
 	AUTHORITY_KEYID		*akid;
 	ASN1_OCTET_STRING	*os;
-	int			 dsz, crit;
-	char			*res = NULL;
+	int			 dsz, crit, rc = 0;
 
+	*aki = NULL;
 	akid = X509_get_ext_d2i(x, NID_authority_key_identifier, &crit, NULL);
-	if (akid == NULL) {
-		if (!ta)
-			warnx("%s: RFC 6487 section 4.8.3: AKI: "
-			    "extension missing", fn);
-		return NULL;
-	}
+	if (akid == NULL)
+		return 1;
 	if (crit != 0) {
 		warnx("%s: RFC 6487 section 4.8.3: "
 		    "AKI: extension not non-critical", fn);
@@ -114,11 +124,11 @@ x509_get_aki(X509 *x, int ta, const char *fn)
 		goto out;
 	}
 
-	res = hex_encode(d, dsz);
-
+	*aki = hex_encode(d, dsz);
+	rc = 1;
 out:
 	AUTHORITY_KEYID_free(akid);
-	return res;
+	return rc;
 }
 
 /*
@@ -126,19 +136,17 @@ out:
  * Returns the SKI or NULL if it could not be parsed.
  * The SKI is formatted as a hex string.
  */
-char *
-x509_get_ski(X509 *x, const char *fn)
+int
+x509_get_ski(X509 *x, const char *fn, char **ski)
 {
 	const unsigned char	*d;
 	ASN1_OCTET_STRING	*os;
-	int			 dsz, crit;
-	char			*res = NULL;
+	int			 dsz, crit, rc = 0;
 
+	*ski = NULL;
 	os = X509_get_ext_d2i(x, NID_subject_key_identifier, &crit, NULL);
-	if (os == NULL) {
-		warnx("%s: RFC 6487 section 4.8.2: SKI: extension missing", fn);
-		return NULL;
-	}
+	if (os == NULL)
+		return 1;
 	if (crit != 0) {
 		warnx("%s: RFC 6487 section 4.8.2: "
 		    "SKI: extension not non-critical", fn);
@@ -155,10 +163,11 @@ x509_get_ski(X509 *x, const char *fn)
 		goto out;
 	}
 
-	res = hex_encode(d, dsz);
+	*ski = hex_encode(d, dsz);
+	rc = 1;
 out:
 	ASN1_OCTET_STRING_free(os);
-	return res;
+	return rc;
 }
 
 /*
@@ -267,19 +276,18 @@ x509_get_pubkey(X509 *x, const char *fn)
  * Returns NULL on failure, on success returns the AIA URI
  * (which has to be freed after use).
  */
-char *
-x509_get_aia(X509 *x, const char *fn)
+int
+x509_get_aia(X509 *x, const char *fn, char **aia)
 {
 	ACCESS_DESCRIPTION		*ad;
 	AUTHORITY_INFO_ACCESS		*info;
-	char				*aia = NULL;
-	int				 crit;
+	int				 crit, rc = 0;
 
+	*aia = NULL;
 	info = X509_get_ext_d2i(x, NID_info_access, &crit, NULL);
-	if (info == NULL) {
-		warnx("%s: RFC 6487 section 4.8.7: AIA: extension missing", fn);
-		return NULL;
-	}
+	if (info == NULL)
+		return 1;
+
 	if (crit != 0) {
 		warnx("%s: RFC 6487 section 4.8.7: "
 		    "AIA: extension not non-critical", fn);
@@ -298,28 +306,15 @@ x509_get_aia(X509 *x, const char *fn)
 		    "expected caIssuers, have %d", fn, OBJ_obj2nid(ad->method));
 		goto out;
 	}
-	if (ad->location->type != GEN_URI) {
-		warnx("%s: RFC 6487 section 4.8.7: AIA: "
-		    "want GEN_URI type, have %d", fn, ad->location->type);
-		goto out;
-	}
 
-	if (ASN1_STRING_length(ad->location->d.uniformResourceIdentifier)
-	    > MAX_URI_LENGTH) {
-		warnx("%s: RFC 6487 section 4.8.7: AIA: "
-		    "URI exceeds max length of %d", fn, MAX_URI_LENGTH);
+	if (!x509_location(fn, "AIA: caIssuers", NULL, ad->location, aia))
 		goto out;
-	}
 
-	aia = strndup(
-	    ASN1_STRING_get0_data(ad->location->d.uniformResourceIdentifier),
-	    ASN1_STRING_length(ad->location->d.uniformResourceIdentifier));
-	if (aia == NULL)
-		err(1, NULL);
+	rc = 1;
 
 out:
 	AUTHORITY_INFO_ACCESS_free(info);
-	return aia;
+	return rc;
 }
 
 /*
@@ -350,21 +345,20 @@ x509_get_expire(X509 *x, const char *fn, time_t *tt)
  * Returns NULL on failure, the crl URI on success which has to be freed
  * after use.
  */
-char *
-x509_get_crl(X509 *x, const char *fn)
+int
+x509_get_crl(X509 *x, const char *fn, char **crl)
 {
 	CRL_DIST_POINTS		*crldp;
 	DIST_POINT		*dp;
+	GENERAL_NAMES		*names;
 	GENERAL_NAME		*name;
-	char			*crl = NULL;
-	int			 crit;
+	int			 i, crit, rc = 0;
 
+	*crl = NULL;
 	crldp = X509_get_ext_d2i(x, NID_crl_distribution_points, &crit, NULL);
-	if (crldp == NULL) {
-		warnx("%s: RFC 6487 section 4.8.6: CRL: "
-		    "no CRL distribution point extension", fn);
-		return NULL;
-	}
+	if (crldp == NULL)
+		return 1;
+
 	if (crit != 0) {
 		warnx("%s: RFC 6487 section 4.8.6: "
 		    "CRL distribution point: extension not non-critical", fn);
@@ -390,35 +384,27 @@ x509_get_crl(X509 *x, const char *fn)
 		goto out;
 	}
 
-	if (sk_GENERAL_NAME_num(dp->distpoint->name.fullname) != 1) {
-		warnx("%s: RFC 6487 section 4.8.6: CRL: "
-		    "want 1 full name, have %d", fn,
-		    sk_GENERAL_NAME_num(dp->distpoint->name.fullname));
-		goto out;
+	names = dp->distpoint->name.fullname;
+	for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
+		name = sk_GENERAL_NAME_value(names, i);
+		/* Don't warn on non-rsync URI, so check this afterward. */
+		if (!x509_location(fn, "CRL distribution point", NULL, name,
+		    crl))
+			goto out;
+		if (strncasecmp(*crl, "rsync://", 8) == 0) {
+			rc = 1;
+			goto out;
+		}
+		free(*crl);
+		*crl = NULL;
 	}
 
-	name = sk_GENERAL_NAME_value(dp->distpoint->name.fullname, 0);
-	if (name->type != GEN_URI) {
-		warnx("%s: RFC 6487 section 4.8.6: CRL: "
-		    "want URI type, have %d", fn, name->type);
-		goto out;
-	}
+	warnx("%s: RFC 6487 section 4.8.6: no rsync URI "
+	    "in CRL distributionPoint", fn);
 
-	if (ASN1_STRING_length(name->d.uniformResourceIdentifier)
-	    > MAX_URI_LENGTH) {
-		warnx("%s: RFC 6487 section 4.8.6: CRL: "
-		    "URI exceeds max length of %d", fn, MAX_URI_LENGTH);
-		goto out;
-	}
-
-	crl = strndup(ASN1_STRING_get0_data(name->d.uniformResourceIdentifier),
-	    ASN1_STRING_length(name->d.uniformResourceIdentifier));
-	if (crl == NULL)
-		err(1, NULL);
-
-out:
+ out:
 	CRL_DIST_POINTS_free(crldp);
-	return crl;
+	return rc;
 }
 
 /*
@@ -490,8 +476,42 @@ x509_get_time(const ASN1_TIME *at, time_t *t)
 	memset(&tm, 0, sizeof(tm));
 	if (ASN1_time_parse(at->data, at->length, &tm, 0) == -1)
 		return 0;
-	if ((*t = mktime(&tm)) == -1)
-		errx(1, "mktime failed");
+	if ((*t = timegm(&tm)) == -1)
+		errx(1, "timegm failed");
+	return 1;
+}
+
+/*
+ * Extract and validate an accessLocation, RFC 6487, 4.8 and RFC 8192, 3.2.
+ * Returns 0 on failure and 1 on success.
+ */
+int
+x509_location(const char *fn, const char *descr, const char *proto,
+    GENERAL_NAME *location, char **out)
+{
+	ASN1_IA5STRING	*uri;
+
+	if (*out != NULL) {
+		warnx("%s: RFC 6487 section 4.8: %s already specified", fn,
+		    descr);
+		return 0;
+	}
+
+	if (location->type != GEN_URI) {
+		warnx("%s: RFC 6487 section 4.8: %s not URI", fn, descr);
+		return 0;
+	}
+
+	uri = location->d.uniformResourceIdentifier;
+
+	if (!valid_uri(uri->data, uri->length, proto)) {
+		warnx("%s: RFC 6487 section 4.8: %s bad location", fn, descr);
+		return 0;
+	}
+
+	if ((*out = strndup(uri->data, uri->length)) == NULL)
+		err(1, NULL);
+
 	return 1;
 }
 

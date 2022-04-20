@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.121 2022/02/14 14:46:16 job Exp $ */
+/*	$OpenBSD: extern.h,v 1.129 2022/04/20 10:46:20 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -22,6 +22,7 @@
 #include <sys/time.h>
 
 #include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
 enum cert_as_type {
 	CERT_AS_ID, /* single identifier */
@@ -160,6 +161,7 @@ enum rtype {
 	RTYPE_CER,
 	RTYPE_CRL,
 	RTYPE_GBR,
+	RTYPE_ASPA,
 	RTYPE_REPO,
 	RTYPE_FILE,
 };
@@ -192,7 +194,9 @@ struct mft {
 	char		*aia; /* AIA */
 	char		*aki; /* AKI */
 	char		*ski; /* SKI */
-	time_t		 valid_from;
+	char		*crl; /* CRL file name */
+	unsigned char	 crlhash[SHA256_DIGEST_LENGTH];
+	time_t		 valid_since;
 	time_t		 valid_until;
 	size_t		 filesz; /* number of filenames */
 	unsigned int	 repoid;
@@ -410,7 +414,7 @@ extern int filemode;
 extern const char *tals[];
 extern const char *taldescs[];
 extern unsigned int talrepocnt[];
-extern size_t talsz;
+extern int talsz;
 
 /* Routines for RPKI entities. */
 
@@ -421,9 +425,10 @@ struct tal	*tal_read(struct ibuf *);
 
 void		 cert_buffer(struct ibuf *, const struct cert *);
 void		 cert_free(struct cert *);
-struct cert	*cert_parse(const char *, const unsigned char *, size_t);
-struct cert	*ta_parse(const char *, const unsigned char *, size_t,
-		    const unsigned char *, size_t);
+struct cert	*cert_parse_pre(const char *, const unsigned char *, size_t);
+struct cert	*cert_parse(const char *, struct cert *);
+struct cert	*ta_parse(const char *, struct cert *, const unsigned char *,
+		    size_t);
 struct cert	*cert_read(struct ibuf *);
 void		 cert_insert_brks(struct brk_tree *, struct cert *);
 
@@ -460,6 +465,7 @@ int		 valid_ta(const char *, struct auth_tree *,
 int		 valid_cert(const char *, struct auth *, const struct cert *);
 int		 valid_roa(const char *, struct auth *, struct roa *);
 int		 valid_filehash(int, const char *, size_t);
+int		 valid_hash(unsigned char *, size_t, const char *, size_t);
 int		 valid_uri(const char *, size_t, const char *);
 int		 valid_origin(const char *, const char *);
 
@@ -526,7 +532,7 @@ struct repo	*ta_lookup(int, struct tal *);
 struct repo	*repo_lookup(int, const char *, const char *);
 struct repo	*repo_byid(unsigned int);
 int		 repo_queued(struct repo *, struct entity *);
-void		 repo_cleanup(struct filepath_tree *);
+void		 repo_cleanup(struct filepath_tree *, int);
 void		 repo_free(void);
 
 void		 rsync_finish(unsigned int, int);
@@ -577,25 +583,28 @@ struct ibuf	*io_buf_recvfd(int, struct ibuf **);
 /* X509 helpers. */
 
 void		 x509_init_oid(void);
-char		*x509_get_aia(X509 *, const char *);
-char		*x509_get_aki(X509 *, int, const char *);
-char		*x509_get_ski(X509 *, const char *);
+int		 x509_get_aia(X509 *, const char *, char **);
+int		 x509_get_aki(X509 *, const char *, char **);
+int		 x509_get_ski(X509 *, const char *, char **);
 int		 x509_get_expire(X509 *, const char *, time_t *);
-char		*x509_get_crl(X509 *, const char *);
+int		 x509_get_crl(X509 *, const char *, char **);
 char		*x509_crl_get_aki(X509_CRL *, const char *);
 char		*x509_get_pubkey(X509 *, const char *);
 enum cert_purpose	 x509_get_purpose(X509 *, const char *);
 int		 x509_get_time(const ASN1_TIME *, time_t *);
 char		*x509_convert_seqnum(const char *, const ASN1_INTEGER *);
+int		 x509_location(const char *, const char *, const char *,
+		    GENERAL_NAME *, char **);
 
 /* printers */
 char		*time2str(time_t);
+void		 x509_print(const X509 *);
 void		 tal_print(const struct tal *);
 void		 cert_print(const struct cert *);
 void		 crl_print(const struct crl *);
-void		 mft_print(const struct mft *);
-void		 roa_print(const struct roa *);
-void		 gbr_print(const struct gbr *);
+void		 mft_print(const X509 *, const struct mft *);
+void		 roa_print(const X509 *, const struct roa *);
+void		 gbr_print(const X509 *, const struct gbr *);
 
 /* Output! */
 
@@ -626,9 +635,13 @@ void		logx(const char *fmt, ...)
 time_t		getmonotime(void);
 
 int	mkpath(const char *);
+int	mkpathat(int, const char *);
 
 #define RPKI_PATH_OUT_DIR	"/var/db/rpki-client"
 #define RPKI_PATH_BASE_DIR	"/var/cache/rpki-client"
+
+/* Maximum number of TAL files we'll load. */
+#define	TALSZ_MAX	8
 
 /* Maximum number of IP and AS ranges accepted in any single file */
 #define MAX_IP_SIZE		200000

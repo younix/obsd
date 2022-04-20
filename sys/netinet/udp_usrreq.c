@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.274 2022/03/14 22:38:43 tb Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.277 2022/03/21 23:37:09 bluhm Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -42,10 +42,10 @@
  *    documentation and/or other materials provided with the distribution.
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgements:
- * 	This product includes software developed by the University of
- * 	California, Berkeley and its contributors.
- * 	This product includes software developed at the Information
- * 	Technology Division, US Naval Research Laboratory.
+ *	This product includes software developed by the University of
+ *	California, Berkeley and its contributors.
+ *	This product includes software developed at the Information
+ *	Technology Division, US Naval Research Laboratory.
  * 4. Neither the name of the NRL nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -107,7 +107,7 @@
 #include <net/pfvar.h>
 #endif
 
-#ifdef PIPEX 
+#ifdef PIPEX
 #include <netinet/if_ether.h>
 #include <net/pipex.h>
 #endif
@@ -342,7 +342,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 	}
 
 	if (m->m_flags & (M_BCAST|M_MCAST)) {
-		struct inpcb *last;
+		SIMPLEQ_HEAD(, inpcb) inpcblist;
+
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
 		 * for which the local and remote addresses and ports match
@@ -363,8 +364,9 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 		 * Locate pcb(s) for datagram.
 		 * (Algorithm copied from raw_intr().)
 		 */
-		last = NULL;
-		NET_ASSERT_LOCKED();
+		NET_ASSERT_WLOCKED();
+		SIMPLEQ_INIT(&inpcblist);
+		mtx_enter(&udbtable.inpt_mtx);
 		TAILQ_FOREACH(inp, &udbtable.inpt_queue, inp_queue) {
 			if (inp->inp_socket->so_state & SS_CANTRCVMORE)
 				continue;
@@ -386,8 +388,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 				    inp->inp_ip6_minhlim > ip6->ip6_hlim)
 					continue;
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
-					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
-					    &ip6->ip6_dst))
+					if (!IN6_ARE_ADDR_EQUAL(
+					    &inp->inp_laddr6, &ip6->ip6_dst))
 						continue;
 			} else
 #endif /* INET6 */
@@ -405,8 +407,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 #ifdef INET6
 			if (ip6) {
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
-					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6,
-					    &ip6->ip6_src) ||
+					if (!IN6_ARE_ADDR_EQUAL(
+					    &inp->inp_faddr6, &ip6->ip6_src) ||
 					    inp->inp_fport != uh->uh_sport)
 						continue;
 			} else
@@ -418,16 +420,9 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 					continue;
 			}
 
-			if (last != NULL) {
-				struct mbuf *n;
+			in_pcbref(inp);
+			SIMPLEQ_INSERT_TAIL(&inpcblist, inp, inp_notify);
 
-				n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
-				if (n != NULL) {
-					udp_sbappend(last, n, ip, ip6, iphlen,
-					    uh, &srcsa.sa, 0);
-				}
-			}
-			last = inp;
 			/*
 			 * Don't look for additional matches if this one does
 			 * not have either the SO_REUSEPORT or SO_REUSEADDR
@@ -436,12 +431,13 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			 * port.  It assumes that an application will never
 			 * clear these options after setting them.
 			 */
-			if ((last->inp_socket->so_options & (SO_REUSEPORT |
+			if ((inp->inp_socket->so_options & (SO_REUSEPORT |
 			    SO_REUSEADDR)) == 0)
 				break;
 		}
+		mtx_leave(&udbtable.inpt_mtx);
 
-		if (last == NULL) {
+		if (SIMPLEQ_EMPTY(&inpcblist)) {
 			/*
 			 * No matching pcb found; discard datagram.
 			 * (No need to send an ICMP Port Unreachable
@@ -451,7 +447,20 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			goto bad;
 		}
 
-		udp_sbappend(last, m, ip, ip6, iphlen, uh, &srcsa.sa, 0);
+		while ((inp = SIMPLEQ_FIRST(&inpcblist)) != NULL) {
+			struct mbuf *n;
+
+			SIMPLEQ_REMOVE_HEAD(&inpcblist, inp_notify);
+			if (SIMPLEQ_EMPTY(&inpcblist))
+				n = m;
+			else
+				n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
+			if (n != NULL) {
+				udp_sbappend(inp, n, ip, ip6, iphlen, uh,
+				    &srcsa.sa, 0);
+			}
+			in_pcbunref(inp);
+		}
 		return IPPROTO_DONE;
 	}
 	/*
@@ -504,7 +513,7 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			tdb_unref(tdb);
 			goto bad;
 		}
-		/* create ipsec options while we know that tdb cannot be modified */
+		/* create ipsec options, id is not modified after creation */
 		if (tdb && tdb->tdb_ids)
 			ipsecflowinfo = tdb->tdb_ids->id_flow;
 		tdb_unref(tdb);
@@ -1126,7 +1135,7 @@ udp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
 		if (inp->inp_pipex) {
 			struct pipex_session *session;
 
-			if (addr != NULL) 
+			if (addr != NULL)
 				session =
 				    pipex_l2tp_userland_lookup_session(m,
 					mtod(addr, struct sockaddr *));

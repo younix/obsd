@@ -43,7 +43,6 @@
 /ptrace.h/1.16/Mon Mar 16 11:58:46 2020//
 /radioio.h/1.5/Wed Jan 14 21:15:36 2015//
 /resource.h/1.14/Fri Oct 25 04:42:48 2013//
-/resourcevar.h/1.24/Fri Jun 21 09:39:48 2019//
 /scsiio.h/1.10/Wed Sep  5 17:17:47 2012//
 /select.h/1.17/Mon Sep 12 19:41:20 2016//
 /selinfo.h/1.5/Tue Jul 18 19:20:26 2017//
@@ -64,7 +63,6 @@
 /ttycom.h/1.17/Sat Jun 16 13:55:03 2018//
 /ttydefaults.h/1.7/Tue Mar 12 11:01:25 2019//
 /types.h/1.48/Sat Feb  9 04:54:11 2019//
-/ucred.h/1.13/Thu Jun 21 13:58:21 2018//
 /uio.h/1.19/Mon Aug 20 16:00:22 2018//
 /un.h/1.14/Sat Jul 18 15:00:01 2015//
 /unistd.h/1.31/Mon Jul 20 00:56:10 2015//
@@ -105,7 +103,6 @@
 /reboot.h/1.20/Sun Nov 21 20:15:22 2021//
 /socketvar.h/1.101/Sun Nov 21 20:15:22 2021//
 /sockio.h/1.84/Sun Nov 21 20:15:22 2021//
-/eventvar.h/1.13/Fri Feb 11 13:33:56 2022//
 /exec.h/1.47/Fri Feb 11 13:33:56 2022//
 /exec_elf.h/1.94/Mon Jan 24 14:35:16 2022//
 /file.h/1.65/Mon Jan 24 14:35:16 2022//
@@ -118,18 +115,12 @@
 /stat.h/1.29/Mon Jan 24 14:35:16 2022//
 /systm.h/1.155/Mon Jan 24 14:35:16 2022//
 /tty.h/1.40/Mon Jan 24 14:35:16 2022//
-/vnode.h/1.163/Mon Jan 24 14:35:16 2022//
 /acct.h/1.12/Mon Mar  7 09:08:07 2022//
-/atomic.h/1.8/Tue Mar 15 08:20:19 2022//
 /core.h/1.8/Mon Mar  7 09:08:07 2022//
-/device.h/1.62/Mon Mar  7 09:08:07 2022//
-/event.h/1.66/Mon Mar  7 09:08:07 2022//
 /ktrace.h/1.41/Mon Mar  7 09:08:07 2022//
 /mbuf.h/1.254/Tue Mar 15 08:13:53 2022//
-/param.h/1.137/Mon Mar  7 09:08:07 2022//
 /proc.h/1.329/Tue Mar 15 08:20:19 2022//
 /protosw.h/1.35/Mon Mar  7 09:08:07 2022//
-/refcnt.h/1.5/Tue Mar 15 08:20:19 2022//
 /signalvar.h/1.53/Mon Mar  7 09:08:07 2022//
 /socket.h/1.102/Mon Mar  7 09:08:07 2022//
 /statvfs.h/1.4/Mon Mar  7 09:08:07 2022//
@@ -138,4 +129,13 @@
 /sysctl.h/1.227/Mon Mar  7 09:08:07 2022//
 /syslimits.h/1.15/Mon Mar  7 09:08:07 2022//
 /unpcb.h/1.25/Mon Mar  7 09:08:07 2022//
+/atomic.h/1.9/Wed Apr 20 14:28:22 2022//
+/device.h/1.63/Wed Apr 20 14:28:22 2022//
+/event.h/1.67/Wed Apr 20 14:28:22 2022//
+/eventvar.h/1.14/Wed Apr 20 14:28:22 2022//
+/param.h/1.138/Wed Apr 20 14:28:22 2022//
+/refcnt.h/1.6/Wed Apr 20 14:28:22 2022//
+/resourcevar.h/1.25/Wed Apr 20 14:28:22 2022//
+/ucred.h/1.14/Wed Apr 20 14:28:22 2022//
+/vnode.h/1.165/Wed Apr 20 14:28:22 2022//
 D
