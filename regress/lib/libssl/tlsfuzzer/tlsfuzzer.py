@@ -1,4 +1,4 @@
-#   $OpenBSD: tlsfuzzer.py,v 1.43 2021/09/03 14:50:36 tb Exp $
+#   $OpenBSD: tlsfuzzer.py,v 1.45 2022/05/14 17:58:11 tb Exp $
 #
 # Copyright (c) 2020 Theo Buehler <tb@openbsd.org>
 #
@@ -49,7 +49,7 @@ class Test:
 
     def __repr__(self):
         return "<Test: %s tls12_args: %s tls13_args: %s>" % (
-                self.name, self.tls12_args, tls13_args
+                self.name, self.tls12_args, self.tls13_args
             )
 
 class TestGroup:
@@ -297,6 +297,9 @@ tls13_unsupported_tests = TestGroup("TLSv1.3 tests for unsupported features", [
 
     # need server to react to HTTP GET for /keyupdate
     Test("test-tls13-keyupdate-from-server.py"),
+
+    # needs an echo server
+    Test("test-tls13-lengths.py"),
 
     # Weird test: tests servers that don't support 1.3
     Test("test-tls13-non-support.py"),
@@ -557,6 +560,8 @@ tls12_unsupported_tests = TestGroup("TLSv1.2 for unsupported features", [
     Test("test-record-size-limit.py"),
     # expects the server to send the heartbeat extension
     Test("test-heartbeat.py"),
+    # needs an echo server
+    Test("test-lengths.py"),
 ])
 
 # These tests take a ton of time to fail against an 1.3 server,

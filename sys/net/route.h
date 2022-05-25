@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.189 2022/04/20 09:38:26 bluhm Exp $	*/
+/*	$OpenBSD: route.h,v 1.194 2022/05/05 13:57:40 claudio Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -34,6 +34,12 @@
 
 #ifndef _NET_ROUTE_H_
 #define _NET_ROUTE_H_
+
+/*
+ * Locks used to protect struct members in this file:
+ *	I	immutable after creation
+ *	T	rttimer_mtx		route timer lists
+ */
 
 /*
  * Kernel resident routing tables.
@@ -400,21 +406,21 @@ rtstat_inc(enum rtstat_counters c)
  * These allow functions to be called for routes at specific times.
  */
 struct rttimer {
-	TAILQ_ENTRY(rttimer)	rtt_next;  /* entry on timer queue */
-	LIST_ENTRY(rttimer)	rtt_link;  /* multiple timers per rtentry */
-	struct rttimer_queue	*rtt_queue;/* back pointer to queue */
-	struct rtentry		*rtt_rt;   /* Back pointer to the route */
-	void			(*rtt_func)(struct rtentry *,
-						 struct rttimer *);
-	time_t			rtt_time; /* When this timer was registered */
-	u_int			rtt_tableid;	/* routing table id of rtt_rt */
+	TAILQ_ENTRY(rttimer)	rtt_next;	/* [T] entry on timer queue */
+	LIST_ENTRY(rttimer)	rtt_link;	/* [T] timers per rtentry */
+	struct rttimer_queue	*rtt_queue;	/* [T] back pointer to queue */
+	struct rtentry		*rtt_rt;	/* [I] back pointer to route */
+	time_t			rtt_time;	/* [I] when timer registered */
+	u_int			rtt_tableid;	/* [I] rtable id of rtt_rt */
 };
 
 struct rttimer_queue {
-	TAILQ_HEAD(, rttimer)		rtq_head;
-	LIST_ENTRY(rttimer_queue)	rtq_link;
-	unsigned long			rtq_count;
-	int				rtq_timeout;
+	TAILQ_HEAD(, rttimer)		rtq_head;	/* [T] */
+	LIST_ENTRY(rttimer_queue)	rtq_link;	/* [T] */
+	void				(*rtq_func)	/* [I] callback */
+					    (struct rtentry *, u_int);
+	unsigned long			rtq_count;	/* [T] */
+	int				rtq_timeout;	/* [T] */
 };
 
 const char	*rtlabel_id2name(u_int16_t);
@@ -451,16 +457,16 @@ void	 rtm_proposal(struct ifnet *, struct rt_addrinfo *, int, uint8_t);
 int	 rt_setgate(struct rtentry *, struct sockaddr *, u_int);
 struct rtentry *rt_getll(struct rtentry *);
 
-void			 rt_timer_init(void);
-int			 rt_timer_add(struct rtentry *,
-		             void(*)(struct rtentry *, struct rttimer *),
-			     struct rttimer_queue *, u_int);
-void			 rt_timer_remove_all(struct rtentry *);
-struct rttimer_queue	*rt_timer_queue_create(int);
-void			 rt_timer_queue_change(struct rttimer_queue *, int);
-void			 rt_timer_queue_destroy(struct rttimer_queue *);
-unsigned long		 rt_timer_queue_count(struct rttimer_queue *);
-void			 rt_timer_timer(void *);
+void		rt_timer_init(void);
+int		rt_timer_add(struct rtentry *,
+		    struct rttimer_queue *, u_int);
+void		rt_timer_remove_all(struct rtentry *);
+void		rt_timer_queue_init(struct rttimer_queue *, int,
+		    void(*)(struct rtentry *, u_int));
+void		rt_timer_queue_change(struct rttimer_queue *, int);
+void		rt_timer_queue_flush(struct rttimer_queue *);
+unsigned long	rt_timer_queue_count(struct rttimer_queue *);
+void		rt_timer_timer(void *);
 
 int	 rt_mpls_set(struct rtentry *, struct sockaddr *, uint8_t);
 void	 rt_mpls_clear(struct rtentry *);
@@ -477,11 +483,12 @@ int	 rt_ifa_del(struct ifaddr *, int, struct sockaddr *, unsigned int);
 void	 rt_ifa_purge(struct ifaddr *);
 int	 rt_ifa_addlocal(struct ifaddr *);
 int	 rt_ifa_dellocal(struct ifaddr *);
-void	 rtredirect(struct sockaddr *, struct sockaddr *, struct sockaddr *, struct rtentry **, unsigned int);
+void	 rtredirect(struct sockaddr *, struct sockaddr *, struct sockaddr *,
+	    struct rtentry **, unsigned int);
 int	 rtrequest(int, struct rt_addrinfo *, u_int8_t, struct rtentry **,
-	     u_int);
+	    u_int);
 int	 rtrequest_delete(struct rt_addrinfo *, u_int8_t, struct ifnet *,
-	     struct rtentry **, u_int);
+	    struct rtentry **, u_int);
 int	 rt_if_track(struct ifnet *);
 int	 rt_if_linkstate_change(struct rtentry *, void *, u_int);
 int	 rtdeletemsg(struct rtentry *, struct ifnet *, u_int);

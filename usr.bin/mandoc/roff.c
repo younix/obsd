@@ -1,4 +1,4 @@
-/* $OpenBSD: roff.c,v 1.253 2022/04/13 13:11:33 schwarze Exp $ */
+/* $OpenBSD: roff.c,v 1.260 2022/05/19 15:17:51 schwarze Exp $ */
 /*
  * Copyright (c) 2010-2015, 2017-2022 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008-2012, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -205,6 +205,8 @@ static	int		 roff_evalpar(struct roff *, int,
 static	int		 roff_evalstrcond(const char *, int *);
 static	int		 roff_expand(struct roff *, struct buf *,
 				int, int, char);
+static	void		 roff_expand_patch(struct buf *, int,
+				const char *, int);
 static	void		 roff_free1(struct roff *);
 static	void		 roff_freereg(struct roffreg *);
 static	void		 roff_freestr(struct roffkv *);
@@ -225,15 +227,19 @@ static	int		 roff_line_ignore(ROFF_ARGS);
 static	void		 roff_man_alloc1(struct roff_man *);
 static	void		 roff_man_free1(struct roff_man *);
 static	int		 roff_manyarg(ROFF_ARGS);
+static	int		 roff_mc(ROFF_ARGS);
 static	int		 roff_noarg(ROFF_ARGS);
 static	int		 roff_nop(ROFF_ARGS);
 static	int		 roff_nr(ROFF_ARGS);
 static	int		 roff_onearg(ROFF_ARGS);
 static	enum roff_tok	 roff_parse(struct roff *, char *, int *,
 				int, int);
+static	int		 roff_parse_comment(struct roff *, struct buf *,
+				int, int, char);
 static	int		 roff_parsetext(struct roff *, struct buf *,
 				int, int *);
 static	int		 roff_renamed(ROFF_ARGS);
+static	int		 roff_req_or_macro(ROFF_ARGS);
 static	int		 roff_return(ROFF_ARGS);
 static	int		 roff_rm(ROFF_ARGS);
 static	int		 roff_rn(ROFF_ARGS);
@@ -377,7 +383,7 @@ static	struct roffmac	 roffs[TOKEN_NONE] = {
 	{ roff_noarg, NULL, NULL, 0 },  /* fi */
 	{ roff_onearg, NULL, NULL, 0 },  /* ft */
 	{ roff_onearg, NULL, NULL, 0 },  /* ll */
-	{ roff_onearg, NULL, NULL, 0 },  /* mc */
+	{ roff_mc, NULL, NULL, 0 },  /* mc */
 	{ roff_noarg, NULL, NULL, 0 },  /* nf */
 	{ roff_onearg, NULL, NULL, 0 },  /* po */
 	{ roff_onearg, NULL, NULL, 0 },  /* rj */
@@ -1228,416 +1234,342 @@ deroff(char **dest, const struct roff_node *n)
 /* --- main functions of the roff parser ---------------------------------- */
 
 /*
+ * Save comments preceding the title macro, for example in order to
+ * preserve Copyright and license headers in HTML output,
+ * provide diagnostics about RCS ids and trailing whitespace in comments,
+ * then discard comments including preceding whitespace.
+ * This function also handles input line continuation.
+ */
+static int
+roff_parse_comment(struct roff *r, struct buf *buf, int ln, int pos, char ec)
+{
+	struct roff_node *n;	/* used for header comments */
+	const char	*start;	/* start of the string to process */
+	const char	*cp;	/* for RCS id parsing */
+	char		*stesc;	/* start of an escape sequence ('\\') */
+	char		*ep;	/* end of comment string */
+	int		 rcsid;	/* kind of RCS id seen */
+
+	for (start = stesc = buf->buf + pos;; stesc++) {
+		/*
+		 * XXX Ugly hack: Remove the newline character that
+		 * mparse_buf_r() appended to mark the end of input
+		 * if it is not preceded by an escape character.
+		 */
+		if (stesc[0] == '\n') {
+			assert(stesc[1] == '\0');
+			stesc[0] = '\0';
+		}
+
+		/* The line ends without continuation or comment. */
+		if (stesc[0] == '\0')
+			return ROFF_CONT;
+
+		/* Unescaped byte: skip it. */
+		if (stesc[0] != ec)
+			continue;
+
+		/*
+		 * XXX Ugly hack: Do not attempt to append another line
+		 * if the function mparse_buf_r() appended a newline
+		 * character to indicate the end of input.
+		 */
+		if (stesc[1] == '\n') {
+			assert(stesc[2] == '\0');
+			stesc[0] = '\0';
+			return ROFF_CONT;
+		}
+
+		/*
+		 * An escape character at the end of an input line
+		 * requests line continuation.
+		 */
+		if (stesc[1] == '\0') {
+			stesc[0] = '\0';
+			return ROFF_IGN | ROFF_APPEND;
+		}
+
+		/* Found a comment: process it. */
+		if (stesc[1] == '"' || stesc[1] == '#')
+			break;
+
+		/* Escaped escape character: skip them both. */
+		if (stesc[1] == ec)
+			stesc++;
+	}
+
+	/* Look for an RCS id in the comment. */
+
+	rcsid = 0;
+	if ((cp = strstr(stesc + 2, "$" "OpenBSD")) != NULL) {
+		rcsid = 1 << MANDOC_OS_OPENBSD;
+		cp += 8;
+	} else if ((cp = strstr(stesc + 2, "$" "NetBSD")) != NULL) {
+		rcsid = 1 << MANDOC_OS_NETBSD;
+		cp += 7;
+	}
+	if (cp != NULL && isalnum((unsigned char)*cp) == 0 &&
+	    strchr(cp, '$') != NULL) {
+		if (r->man->meta.rcsids & rcsid)
+			mandoc_msg(MANDOCERR_RCS_REP, ln,
+			    (int)(stesc - buf->buf) + 2, "%s", stesc + 1);
+		r->man->meta.rcsids |= rcsid;
+	}
+
+	/* Warn about trailing whitespace at the end of the comment. */
+
+	ep = strchr(stesc + 2, '\0') - 1;
+	if (*ep == '\n')
+		*ep-- = '\0';
+	if (*ep == ' ' || *ep == '\t')
+		mandoc_msg(MANDOCERR_SPACE_EOL,
+		    ln, (int)(ep - buf->buf), NULL);
+
+	/* Save comments preceding the title macro in the syntax tree. */
+
+	if (r->options & MPARSE_COMMENT) {
+		while (*ep == ' ' || *ep == '\t')
+			ep--;
+		ep[1] = '\0';
+		n = roff_node_alloc(r->man, ln, stesc + 1 - buf->buf,
+		    ROFFT_COMMENT, TOKEN_NONE);
+		n->string = mandoc_strdup(stesc + 2);
+		roff_node_append(r->man, n);
+		n->flags |= NODE_VALID | NODE_ENDED;
+		r->man->next = ROFF_NEXT_SIBLING;
+	}
+
+	/* The comment requests line continuation. */
+
+	if (stesc[1] == '#') {
+		*stesc = '\0';
+		return ROFF_IGN | ROFF_APPEND;
+	}
+
+	/* Discard the comment including preceding whitespace. */
+
+	while (stesc > start && stesc[-1] == ' ' &&
+	    (stesc == start + 1 || stesc[-2] != '\\'))
+		stesc--;
+	*stesc = '\0';
+	return ROFF_CONT;
+}
+
+/*
  * In the current line, expand escape sequences that produce parsable
  * input text.  Also check the syntax of the remaining escape sequences,
  * which typically produce output glyphs or change formatter state.
  */
 static int
-roff_expand(struct roff *r, struct buf *buf, int ln, int pos, char newesc)
+roff_expand(struct roff *r, struct buf *buf, int ln, int pos, char ec)
 {
-	struct mctx	*ctx;	/* current macro call context */
-	char		 ubuf[24]; /* buffer to print the number */
-	struct roff_node *n;	/* used for header comments */
-	const char	*start;	/* start of the string to process */
-	char		*stesc;	/* start of an escape sequence ('\\') */
-	const char	*esct;	/* type of esccape sequence */
-	char		*ep;	/* end of comment string */
-	const char	*stnam;	/* start of the name, after "[(*" */
-	const char	*cp;	/* end of the name, e.g. before ']' */
-	const char	*res;	/* the string to be substituted */
-	char		*nbuf;	/* new buffer to copy buf->buf to */
-	size_t		 maxl;  /* expected length of the escape name */
-	size_t		 naml;	/* actual length of the escape name */
-	size_t		 asz;	/* length of the replacement */
-	size_t		 rsz;	/* length of the rest of the string */
-	int		 inaml;	/* length returned from mandoc_escape() */
+	char		 ubuf[24];	/* buffer to print a number */
+	struct mctx	*ctx;		/* current macro call context */
+	const char	*res;		/* the string to be pasted */
+	const char	*src;		/* source for copying */
+	char		*dst;		/* destination for copying */
+	int		 iesc;		/* index of leading escape char */
+	int		 inam;		/* index of the escape name */
+	int		 iarg;		/* index beginning the argument */
+	int		 iendarg;	/* index right after the argument */
+	int		 iend;		/* index right after the sequence */
+	int		 deftype;	/* type of definition to paste */
+	int		 argi;		/* macro argument index */
+	int		 quote_args;	/* true for \\$@, false for \\$* */
+	int		 asz;		/* length of the replacement */
+	int		 rsz;		/* length of the rest of the string */
+	int		 npos;		/* position in numeric expression */
 	int		 expand_count;	/* to avoid infinite loops */
-	int		 npos;	/* position in numeric expression */
-	int		 arg_complete; /* argument not interrupted by eol */
-	int		 quote_args; /* true for \\$@, false for \\$* */
-	int		 done;	/* no more input available */
-	int		 deftype; /* type of definition to paste */
-	int		 rcsid;	/* kind of RCS id seen */
-	enum mandocerr	 err;	/* for escape sequence problems */
-	char		 sign;	/* increment number register */
-	char		 term;	/* character terminating the escape */
-
-	/* Search forward for comments. */
-
-	done = 0;
-	start = buf->buf + pos;
-	for (stesc = buf->buf + pos; *stesc != '\0'; stesc++) {
-		if (stesc[0] != newesc || stesc[1] == '\0')
-			continue;
-		stesc++;
-		if (*stesc != '"' && *stesc != '#')
-			continue;
-
-		/* Comment found, look for RCS id. */
-
-		rcsid = 0;
-		if ((cp = strstr(stesc, "$" "OpenBSD")) != NULL) {
-			rcsid = 1 << MANDOC_OS_OPENBSD;
-			cp += 8;
-		} else if ((cp = strstr(stesc, "$" "NetBSD")) != NULL) {
-			rcsid = 1 << MANDOC_OS_NETBSD;
-			cp += 7;
-		}
-		if (cp != NULL &&
-		    isalnum((unsigned char)*cp) == 0 &&
-		    strchr(cp, '$') != NULL) {
-			if (r->man->meta.rcsids & rcsid)
-				mandoc_msg(MANDOCERR_RCS_REP, ln,
-				    (int)(stesc - buf->buf) + 1,
-				    "%s", stesc + 1);
-			r->man->meta.rcsids |= rcsid;
-		}
-
-		/* Handle trailing whitespace. */
-
-		ep = strchr(stesc--, '\0') - 1;
-		if (*ep == '\n') {
-			done = 1;
-			ep--;
-		}
-		if (*ep == ' ' || *ep == '\t')
-			mandoc_msg(MANDOCERR_SPACE_EOL,
-			    ln, (int)(ep - buf->buf), NULL);
-
-		/*
-		 * Save comments preceding the title macro
-		 * in the syntax tree.
-		 */
-
-		if (newesc != ASCII_ESC && r->options & MPARSE_COMMENT) {
-			while (*ep == ' ' || *ep == '\t')
-				ep--;
-			ep[1] = '\0';
-			n = roff_node_alloc(r->man,
-			    ln, stesc + 1 - buf->buf,
-			    ROFFT_COMMENT, TOKEN_NONE);
-			n->string = mandoc_strdup(stesc + 2);
-			roff_node_append(r->man, n);
-			n->flags |= NODE_VALID | NODE_ENDED;
-			r->man->next = ROFF_NEXT_SIBLING;
-		}
-
-		/* Line continuation with comment. */
-
-		if (stesc[1] == '#') {
-			*stesc = '\0';
-			return ROFF_IGN | ROFF_APPEND;
-		}
-
-		/* Discard normal comments. */
-
-		while (stesc > start && stesc[-1] == ' ' &&
-		    (stesc == start + 1 || stesc[-2] != '\\'))
-			stesc--;
-		*stesc = '\0';
-		break;
-	}
-	if (stesc == start)
-		return ROFF_CONT;
-	stesc--;
-
-	/* Notice the end of the input. */
-
-	if (*stesc == '\n') {
-		*stesc-- = '\0';
-		done = 1;
-	}
 
 	expand_count = 0;
-	while (stesc >= start) {
-		if (*stesc != newesc) {
+	while (buf->buf[pos] != '\0') {
+
+		/*
+		 * Skip plain ASCII characters.
+		 * If we have a non-standard escape character,
+		 * escape literal backslashes because all processing in
+		 * subsequent functions uses the standard escaping rules.
+		 */
+
+		if (buf->buf[pos] != ec) {
+			if (ec != ASCII_ESC && buf->buf[pos] == '\\') {
+				roff_expand_patch(buf, pos, "\\e", pos + 1);
+				pos++;
+			}
+			pos++;
+			continue;
+		}
+
+		/*
+		 * Parse escape sequences,
+		 * issue diagnostic messages when appropriate,
+		 * and skip sequences that do not need expansion.
+		 * If we have a non-standard escape character, translate
+		 * it to backslashes and translate backslashes to \e.
+		 */
+
+		if (roff_escape(buf->buf, ln, pos,
+		    &iesc, &iarg, &iendarg, &iend) != ESCAPE_EXPAND) {
+			while (pos < iend) {
+				if (buf->buf[pos] == ec) {
+					buf->buf[pos] = '\\';
+					if (pos + 1 < iend)
+						pos++;
+				} else if (buf->buf[pos] == '\\') {
+					roff_expand_patch(buf,
+					    pos, "\\e", pos + 1);
+					pos++;
+					iend++;
+				}
+				pos++;
+			}
+			continue;
+		}
+
+		/*
+		 * Treat "\E" just like "\";
+		 * it only makes a difference in copy mode.
+		 */
+
+		inam = iesc + 1;
+		while (buf->buf[inam] == 'E')
+			inam++;
+
+		/* Handle expansion. */
+
+		res = NULL;
+		switch (buf->buf[inam]) {
+		case '*':
+			if (iendarg == iarg)
+				break;
+			deftype = ROFFDEF_USER | ROFFDEF_PRE;
+			if ((res = roff_getstrn(r, buf->buf + iarg,
+			    iendarg - iarg, &deftype)) != NULL)
+				break;
 
 			/*
-			 * If we have a non-standard escape character,
-			 * escape literal backslashes because all
-			 * processing in subsequent functions uses
-			 * the standard escaping rules.
+			 * If not overriden,
+			 * let \*(.T through to the formatters.
 			 */
 
-			if (newesc != ASCII_ESC && *stesc == '\\') {
-				*stesc = '\0';
-				buf->sz = mandoc_asprintf(&nbuf, "%s\\e%s",
-				    buf->buf, stesc + 1) + 1;
-				start = nbuf + pos;
-				stesc = nbuf + (stesc - buf->buf);
-				free(buf->buf);
-				buf->buf = nbuf;
-			}
-
-			/* Search backwards for the next escape. */
-
-			stesc--;
-			continue;
-		}
-
-		/* If it is escaped, skip it. */
-
-		for (cp = stesc - 1; cp >= start; cp--)
-			if (*cp != r->escape)
-				break;
-
-		if ((stesc - cp) % 2 == 0) {
-			while (stesc > cp)
-				*stesc-- = '\\';
-			continue;
-		} else if (stesc[1] != '\0') {
-			*stesc = '\\';
-		} else {
-			*stesc-- = '\0';
-			if (done)
-				continue;
-			else
-				return ROFF_IGN | ROFF_APPEND;
-		}
-
-		/* Decide whether to expand or to check only. */
-
-		term = '\0';
-		cp = stesc + 1;
-		while (*cp == 'E')
-			cp++;
-		esct = cp;
-		switch (*esct) {
-		case '*':
-		case '$':
-			res = NULL;
-			break;
-		case 'B':
-		case 'w':
-			term = cp[1];
-			/* FALLTHROUGH */
-		case 'n':
-			sign = cp[1];
-			if (sign == '+' || sign == '-')
-				cp++;
-			res = ubuf;
-			break;
-		default:
-			err = MANDOCERR_OK;
-			switch(mandoc_escape(&cp, &stnam, &inaml)) {
-			case ESCAPE_SPECIAL:
-				if (mchars_spec2cp(stnam, inaml) >= 0)
-					break;
-				/* FALLTHROUGH */
-			case ESCAPE_ERROR:
-				err = MANDOCERR_ESC_BAD;
-				break;
-			case ESCAPE_UNDEF:
-				err = MANDOCERR_ESC_UNDEF;
-				break;
-			case ESCAPE_UNSUPP:
-				err = MANDOCERR_ESC_UNSUPP;
-				break;
-			default:
-				break;
-			}
-			if (err != MANDOCERR_OK)
-				mandoc_msg(err, ln, (int)(stesc - buf->buf),
-				    "%.*s", (int)(cp - stesc), stesc);
-			stesc--;
-			continue;
-		}
-
-		if (EXPAND_LIMIT < ++expand_count) {
-			mandoc_msg(MANDOCERR_ROFFLOOP,
-			    ln, (int)(stesc - buf->buf), NULL);
-			return ROFF_IGN;
-		}
-
-		/*
-		 * The third character decides the length
-		 * of the name of the string or register.
-		 * Save a pointer to the name.
-		 */
-
-		if (term == '\0') {
-			switch (*++cp) {
-			case '\0':
-				maxl = 0;
-				break;
-			case '(':
-				cp++;
-				maxl = 2;
-				break;
-			case '[':
-				cp++;
-				term = ']';
-				maxl = 0;
-				break;
-			default:
-				maxl = 1;
-				break;
-			}
-		} else {
-			cp += 2;
-			maxl = 0;
-		}
-		stnam = cp;
-
-		/* Advance to the end of the name. */
-
-		naml = 0;
-		arg_complete = 1;
-		while (maxl == 0 || naml < maxl) {
-			if (*cp == '\0') {
-				mandoc_msg(MANDOCERR_ESC_BAD, ln,
-				    (int)(stesc - buf->buf), "%s", stesc);
-				arg_complete = 0;
-				break;
-			}
-			if (maxl == 0 && *cp == term) {
-				cp++;
-				break;
-			}
-			if (*cp++ != '\\' || *esct != 'w') {
-				naml++;
+			if (iendarg - iarg == 2 &&
+			    buf->buf[iarg] == '.' &&
+			    buf->buf[iarg + 1] == 'T') {
+				roff_setstrn(&r->strtab, ".T", 2, NULL, 0, 0);
+				pos = iend;
 				continue;
 			}
-			switch (mandoc_escape(&cp, NULL, NULL)) {
-			case ESCAPE_SPECIAL:
-			case ESCAPE_UNICODE:
-			case ESCAPE_NUMBERED:
-			case ESCAPE_UNDEF:
-			case ESCAPE_OVERSTRIKE:
-				naml++;
-				break;
-			default:
-				break;
-			}
-		}
 
-		/*
-		 * Retrieve the replacement string; if it is
-		 * undefined, resume searching for escapes.
-		 */
-
-		switch (*esct) {
-		case '*':
-			if (arg_complete) {
-				deftype = ROFFDEF_USER | ROFFDEF_PRE;
-				res = roff_getstrn(r, stnam, naml, &deftype);
-
-				/*
-				 * If not overriden, let \*(.T
-				 * through to the formatters.
-				 */
-
-				if (res == NULL && naml == 2 &&
-				    stnam[0] == '.' && stnam[1] == 'T') {
-					roff_setstrn(&r->strtab,
-					    ".T", 2, NULL, 0, 0);
-					stesc--;
-					continue;
-				}
-			}
+			mandoc_msg(MANDOCERR_STR_UNDEF, ln, iesc,
+			    "%.*s", iendarg - iarg, buf->buf + iarg);
 			break;
+
 		case '$':
 			if (r->mstackpos < 0) {
-				mandoc_msg(MANDOCERR_ARG_UNDEF, ln,
-				    (int)(stesc - buf->buf), "%.3s", stesc);
+				mandoc_msg(MANDOCERR_ARG_UNDEF, ln, iesc,
+				    "%.*s", iend - iesc, buf->buf + iesc);
 				break;
 			}
 			ctx = r->mstack + r->mstackpos;
-			npos = esct[1] - '1';
-			if (npos >= 0 && npos <= 8) {
-				res = npos < ctx->argc ?
-				    ctx->argv[npos] : "";
+			argi = buf->buf[iarg] - '1';
+			if (argi >= 0 && argi <= 8) {
+				if (argi < ctx->argc)
+					res = ctx->argv[argi];
 				break;
 			}
-			if (esct[1] == '*')
+			if (buf->buf[iarg] == '*')
 				quote_args = 0;
-			else if (esct[1] == '@')
+			else if (buf->buf[iarg] == '@')
 				quote_args = 1;
 			else {
-				mandoc_msg(MANDOCERR_ARG_NONUM, ln,
-				    (int)(stesc - buf->buf), "%.3s", stesc);
+				mandoc_msg(MANDOCERR_ARG_NONUM, ln, iesc,
+				    "%.*s", iend - iesc, buf->buf + iesc);
 				break;
 			}
 			asz = 0;
-			for (npos = 0; npos < ctx->argc; npos++) {
-				if (npos)
+			for (argi = 0; argi < ctx->argc; argi++) {
+				if (argi)
 					asz++;  /* blank */
 				if (quote_args)
 					asz += 2;  /* quotes */
-				asz += strlen(ctx->argv[npos]);
+				asz += strlen(ctx->argv[argi]);
 			}
-			if (asz != 3) {
-				rsz = buf->sz - (stesc - buf->buf) - 3;
-				if (asz < 3)
-					memmove(stesc + asz, stesc + 3, rsz);
-				buf->sz += asz - 3;
-				nbuf = mandoc_realloc(buf->buf, buf->sz);
-				start = nbuf + pos;
-				stesc = nbuf + (stesc - buf->buf);
-				buf->buf = nbuf;
-				if (asz > 3)
-					memmove(stesc + asz, stesc + 3, rsz);
+			if (asz != iend - iesc) {
+				rsz = buf->sz - iend;
+				if (asz < iend - iesc)
+					memmove(buf->buf + iesc + asz,
+					    buf->buf + iend, rsz);
+				buf->sz = iesc + asz + rsz;
+				buf->buf = mandoc_realloc(buf->buf, buf->sz);
+				if (asz > iend - iesc)
+					memmove(buf->buf + iesc + asz,
+					    buf->buf + iend, rsz);
 			}
-			for (npos = 0; npos < ctx->argc; npos++) {
-				if (npos)
-					*stesc++ = ' ';
+			dst = buf->buf + iesc;
+			for (argi = 0; argi < ctx->argc; argi++) {
+				if (argi)
+					*dst++ = ' ';
 				if (quote_args)
-					*stesc++ = '"';
-				cp = ctx->argv[npos];
-				while (*cp != '\0')
-					*stesc++ = *cp++;
+					*dst++ = '"';
+				src = ctx->argv[argi];
+				while (*src != '\0')
+					*dst++ = *src++;
 				if (quote_args)
-					*stesc++ = '"';
+					*dst++ = '"';
 			}
 			continue;
 		case 'B':
 			npos = 0;
-			ubuf[0] = arg_complete &&
-			    roff_evalnum(r, ln, stnam, &npos,
-			      NULL, ROFFNUM_SCALE) &&
-			    stnam + npos + 1 == cp ? '1' : '0';
+			ubuf[0] = iendarg > iarg && iend > iendarg &&
+			    roff_evalnum(r, ln, buf->buf + iarg, &npos,
+					 NULL, ROFFNUM_SCALE) &&
+			    npos == iendarg - iarg ? '1' : '0';
 			ubuf[1] = '\0';
+			res = ubuf;
 			break;
 		case 'n':
-			if (arg_complete)
+			if (iendarg > iarg)
 				(void)snprintf(ubuf, sizeof(ubuf), "%d",
-				    roff_getregn(r, stnam, naml, sign));
+				    roff_getregn(r, buf->buf + iarg,
+				    iendarg - iarg, buf->buf[inam + 1]));
 			else
 				ubuf[0] = '\0';
+			res = ubuf;
 			break;
 		case 'w':
-			/* use even incomplete args */
-			(void)snprintf(ubuf, sizeof(ubuf), "%d",
-			    24 * (int)naml);
+			(void)snprintf(ubuf, sizeof(ubuf),
+			    "%d", (iendarg - iarg) * 24);
+			res = ubuf;
+			break;
+		default:
 			break;
 		}
-
-		if (res == NULL) {
-			if (*esct == '*')
-				mandoc_msg(MANDOCERR_STR_UNDEF,
-				    ln, (int)(stesc - buf->buf),
-				    "%.*s", (int)naml, stnam);
+		if (res == NULL)
 			res = "";
-		} else if (buf->sz + strlen(res) > SHRT_MAX) {
-			mandoc_msg(MANDOCERR_ROFFLOOP,
-			    ln, (int)(stesc - buf->buf), NULL);
+		if (++expand_count > EXPAND_LIMIT ||
+		    buf->sz + strlen(res) > SHRT_MAX) {
+			mandoc_msg(MANDOCERR_ROFFLOOP, ln, iesc, NULL);
 			return ROFF_IGN;
 		}
-
-		/* Replace the escape sequence by the string. */
-
-		*stesc = '\0';
-		buf->sz = mandoc_asprintf(&nbuf, "%s%s%s",
-		    buf->buf, res, cp) + 1;
-
-		/* Prepare for the next replacement. */
-
-		start = nbuf + pos;
-		stesc = nbuf + (stesc - buf->buf) + strlen(res);
-		free(buf->buf);
-		buf->buf = nbuf;
+		roff_expand_patch(buf, iesc, res, iend);
 	}
 	return ROFF_CONT;
+}
+
+/*
+ * Replace the substring from the start position (inclusive)
+ * to end position (exclusive) with the repl(acement) string.
+ */
+static void
+roff_expand_patch(struct buf *buf, int start, const char *repl, int end)
+{
+	char	*nbuf;
+
+	buf->buf[start] = '\0';
+	buf->sz = mandoc_asprintf(&nbuf, "%s%s%s", buf->buf, repl,
+	    buf->buf + end) + 1;
+	free(buf->buf);
+	buf->buf = nbuf;
 }
 
 /*
@@ -1852,7 +1784,12 @@ roff_parseln(struct roff *r, int ln, struct buf *buf, int *offs, size_t len)
 		assert(e == ROFF_CONT);
 	}
 
-	/* Expand some escape sequences. */
+	/* Handle comments and escape sequences. */
+
+	e = roff_parse_comment(r, buf, ln, pos, r->escape);
+	if ((e & ROFF_MASK) == ROFF_IGN)
+		return e;
+	assert(e == ROFF_CONT);
 
 	e = roff_expand(r, buf, ln, pos, r->escape);
 	if ((e & ROFF_MASK) == ROFF_IGN)
@@ -1902,7 +1839,6 @@ roff_parseln(struct roff *r, int ln, struct buf *buf, int *offs, size_t len)
 	/*
 	 * If a scope is open, go to the child handler for that macro,
 	 * as it may want to preprocess before doing anything with it.
-	 * Don't do so if an equation is open.
 	 */
 
 	if (r->last) {
@@ -1910,19 +1846,27 @@ roff_parseln(struct roff *r, int ln, struct buf *buf, int *offs, size_t len)
 		return (*roffs[t].sub)(r, t, buf, ln, ppos, pos, offs);
 	}
 
-	/* No scope is open.  This is a new request or macro. */
-
 	r->options &= ~MPARSE_COMMENT;
 	spos = pos;
 	t = roff_parse(r, buf->buf, &pos, ln, ppos);
+	return roff_req_or_macro(r, t, buf, ln, spos, pos, offs);
+}
 
-	/* Tables ignore most macros. */
+/*
+ * Handle a new request or macro.
+ * May be called outside any scope or from inside a conditional scope.
+ */
+static int
+roff_req_or_macro(ROFF_ARGS) {
 
-	if (r->tbl != NULL && (t == TOKEN_NONE || t == ROFF_TS ||
-	    t == ROFF_br || t == ROFF_ce || t == ROFF_rj || t == ROFF_sp)) {
+	/* For now, tables ignore most macros and some request. */
+
+	if (r->tbl != NULL && (tok == TOKEN_NONE || tok == ROFF_TS ||
+	    tok == ROFF_br || tok == ROFF_ce || tok == ROFF_rj ||
+	    tok == ROFF_sp)) {
 		mandoc_msg(MANDOCERR_TBLMACRO,
-		    ln, pos, "%s", buf->buf + spos);
-		if (t != TOKEN_NONE)
+		    ln, ppos, "%s", buf->buf + ppos);
+		if (tok != TOKEN_NONE)
 			return ROFF_IGN;
 		while (buf->buf[pos] != '\0' && buf->buf[pos] != ' ')
 			pos++;
@@ -1935,9 +1879,9 @@ roff_parseln(struct roff *r, int ln, struct buf *buf, int *offs, size_t len)
 
 	/* For now, let high level macros abort .ce mode. */
 
-	if (ctl && roffce_node != NULL &&
-	    (t == TOKEN_NONE || t == ROFF_Dd || t == ROFF_EQ ||
-	     t == ROFF_TH || t == ROFF_TS)) {
+	if (roffce_node != NULL &&
+	    (tok == TOKEN_NONE || tok == ROFF_Dd || tok == ROFF_EQ ||
+	     tok == ROFF_TH || tok == ROFF_TS)) {
 		r->man->last = roffce_node;
 		r->man->next = ROFF_NEXT_SIBLING;
 		roffce_lines = 0;
@@ -1949,12 +1893,12 @@ roff_parseln(struct roff *r, int ln, struct buf *buf, int *offs, size_t len)
 	 * Let the standard macro set parsers handle it.
 	 */
 
-	if (t == TOKEN_NONE)
+	if (tok == TOKEN_NONE)
 		return ROFF_CONT;
 
-	/* Execute a roff request or a user defined macro. */
+	/* Execute a roff request or a user-defined macro. */
 
-	return (*roffs[t].proc)(r, t, buf, ln, spos, pos, offs);
+	return (*roffs[tok].proc)(r, tok, buf, ln, ppos, pos, offs);
 }
 
 /*
@@ -1997,8 +1941,10 @@ roff_endparse(struct roff *r)
 }
 
 /*
- * Parse a roff node's type from the input buffer.  This must be in the
- * form of ".foo xxx" in the usual way.
+ * Parse the request or macro name at buf[*pos].
+ * Return ROFF_RENAMED, ROFF_USERDEF, or a ROFF_* token value.
+ * For empty, undefined, mdoc(7), and man(7) macros, return TOKEN_NONE.
+ * As a side effect, set r->current_string to the definition or to NULL.
  */
 static enum roff_tok
 roff_parse(struct roff *r, char *buf, int *pos, int ln, int ppos)
@@ -2273,12 +2219,8 @@ roff_block_sub(ROFF_ARGS)
 	int		i, j;
 
 	/*
-	 * First check whether a custom macro exists at this level.  If
-	 * it does, then check against it.  This is some of groff's
-	 * stranger behaviours.  If we encountered a custom end-scope
-	 * tag and that tag also happens to be a "real" macro, then we
-	 * need to try interpreting it again as a real macro.  If it's
-	 * not, then return ignore.  Else continue.
+	 * If a custom end marker is a user-defined or predefined macro
+	 * or a request, interpret it.
 	 */
 
 	if (r->last->end) {
@@ -2304,20 +2246,17 @@ roff_block_sub(ROFF_ARGS)
 		}
 	}
 
-	/*
-	 * If we have no custom end-query or lookup failed, then try
-	 * pulling it out of the hashtable.
-	 */
+	/* Handle the standard end marker. */
 
 	t = roff_parse(r, buf->buf, &pos, ln, ppos);
+	if (t == ROFF_cblock)
+		return roff_cblock(r, t, buf, ln, ppos, pos, offs);
 
-	if (t != ROFF_cblock) {
-		if (tok != ROFF_ig)
-			roff_setstr(r, r->last->name, buf->buf + ppos, 2);
-		return ROFF_IGN;
-	}
+	/* Not an end marker, so append the line to the block. */
 
-	return (*roffs[t].proc)(r, t, buf, ln, ppos, pos, offs);
+	if (tok != ROFF_ig)
+		roff_setstr(r, r->last->name, buf->buf + ppos, 2);
+	return ROFF_IGN;
 }
 
 static int
@@ -2397,27 +2336,18 @@ static int
 roff_cond_sub(ROFF_ARGS)
 {
 	struct roffnode	*bl;
-	int		 irc, rr;
+	int		 irc, rr, spos;
 	enum roff_tok	 t;
 
 	rr = 0;  /* If arguments follow "\}", skip them. */
 	irc = roff_cond_checkend(r, tok, buf, ln, ppos, pos, &rr);
+	spos = pos;
 	t = roff_parse(r, buf->buf, &pos, ln, ppos);
 
-	/* For now, let high level macros abort .ce mode. */
-
-	if (roffce_node != NULL &&
-	    (t == TOKEN_NONE || t == ROFF_Dd || t == ROFF_EQ ||
-             t == ROFF_TH || t == ROFF_TS)) {
-		r->man->last = roffce_node;
-		r->man->next = ROFF_NEXT_SIBLING;
-		roffce_lines = 0;
-		roffce_node = NULL;
-	}
-
 	/*
-	 * Fully handle known macros when they are structurally
-	 * required or when the conditional evaluated to true.
+	 * Handle requests and macros if the conditional evaluated
+	 * to true or if they are structurally required.
+	 * The .break request is always handled specially.
 	 */
 
 	if (t == ROFF_break) {
@@ -2430,11 +2360,11 @@ roff_cond_sub(ROFF_ARGS)
 					break;
 			}
 		}
-	} else if (t != TOKEN_NONE &&
-	    (rr || roffs[t].flags & ROFFMAC_STRUCT))
-		irc |= (*roffs[t].proc)(r, t, buf, ln, ppos, pos, offs);
-	else
-		irc |= rr ? ROFF_CONT : ROFF_IGN;
+	} else if (rr || (t < TOKEN_NONE && roffs[t].flags & ROFFMAC_STRUCT)) {
+		irc |= roff_req_or_macro(r, t, buf, ln, spos, pos, offs);
+		if (irc & ROFF_WHILE)
+			irc &= ~(ROFF_LOOPCONT | ROFF_LOOPEXIT);
+	}
 	return irc;
 }
 
@@ -3728,6 +3658,54 @@ roff_eo(ROFF_ARGS)
 }
 
 static int
+roff_mc(ROFF_ARGS)
+{
+	struct roff_node	*n;
+	char			*cp;
+
+	/* Parse the first argument. */
+
+	cp = buf->buf + pos;
+	if (*cp != '\0')
+		cp++;
+	if (buf->buf[pos] == '\\') {
+		switch (mandoc_escape((const char **)&cp, NULL, NULL)) {
+		case ESCAPE_SPECIAL:
+		case ESCAPE_UNICODE:
+		case ESCAPE_NUMBERED:
+			break;
+		default:
+			*cp = '\0';
+			mandoc_msg(MANDOCERR_MC_ESC, ln, pos,
+			    "mc %s", buf->buf + pos);
+			buf->buf[pos] = '\0';
+			break;
+		}
+	}
+
+	/* Ignore additional arguments. */
+
+	while (*cp == ' ')
+		*cp++ = '\0';
+	if (*cp != '\0') {
+		mandoc_msg(MANDOCERR_MC_DIST, ln, (int)(cp - buf->buf),
+		    "mc ... %s", cp);
+		*cp = '\0';
+	}
+
+	/* Create the .mc node. */
+
+	roff_elem_alloc(r->man, ln, ppos, tok);
+	n = r->man->last;
+	if (buf->buf[pos] != '\0')
+		roff_word_alloc(r->man, ln, pos, buf->buf + pos);
+	n->flags |= NODE_LINE | NODE_VALID | NODE_ENDED;
+	r->man->last = n;
+	r->man->next = ROFF_NEXT_SIBLING;
+	return ROFF_IGN;
+}
+
+static int
 roff_nop(ROFF_ARGS)
 {
 	while (buf->buf[pos] == ' ')
@@ -3868,8 +3846,9 @@ static int
 roff_shift(ROFF_ARGS)
 {
 	struct mctx	*ctx;
-	int		 levels, i;
+	int		 argpos, levels, i;
 
+	argpos = pos;
 	levels = 1;
 	if (buf->buf[pos] != '\0' &&
 	    roff_evalnum(r, ln, buf->buf, &pos, &levels, 0) == 0) {
@@ -3884,8 +3863,12 @@ roff_shift(ROFF_ARGS)
 	ctx = r->mstack + r->mstackpos;
 	if (levels > ctx->argc) {
 		mandoc_msg(MANDOCERR_SHIFT,
-		    ln, pos, "%d, but max is %d", levels, ctx->argc);
+		    ln, argpos, "%d, but max is %d", levels, ctx->argc);
 		levels = ctx->argc;
+	}
+	if (levels < 0) {
+		mandoc_msg(MANDOCERR_ARG_NEG, ln, argpos, "shift %d", levels);
+		levels = 0;
 	}
 	if (levels == 0)
 		return ROFF_IGN;

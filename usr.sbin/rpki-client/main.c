@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.198 2022/04/20 04:40:33 tb Exp $ */
+/*	$OpenBSD: main.c,v 1.205 2022/05/23 13:39:14 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -499,7 +499,8 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 			break;
 		}
 		cert = cert_read(b);
-		if (cert->purpose == CERT_PURPOSE_CA) {
+		switch (cert->purpose) {
+		case CERT_PURPOSE_CA:
 			/*
 			 * Process the revocation list from the
 			 * certificate *first*, since it might mark that
@@ -507,11 +508,15 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 			 * process the MFT.
 			 */
 			queue_add_from_cert(cert);
-		} else if (cert->purpose == CERT_PURPOSE_BGPSEC_ROUTER) {
+			break;
+		case CERT_PURPOSE_BGPSEC_ROUTER:
 			cert_insert_brks(brktree, cert);
 			st->brks++;
-		} else
+			break;
+		default:
 			st->certs_fail++;
+			break;
+		}
 		cert_free(cert);
 		break;
 	case RTYPE_MFT:
@@ -618,7 +623,7 @@ rrdp_process(struct ibuf *b)
  * Assign filenames ending in ".tal" in "/etc/rpki" into "tals",
  * returning the number of files found and filled-in.
  * This may be zero.
- * Don't exceded "max" filenames.
+ * Don't exceed "max" filenames.
  */
 static int
 tal_load_default(void)
@@ -689,7 +694,7 @@ process_start(const char *title, int *fd)
 		/* change working directory to the cache directory */
 		if (fchdir(cachefd) == -1)
 			err(1, "fchdir");
-		if (timeout)
+		if (!filemode && timeout > 0)
 			alarm(timeout);
 		close(pair[1]);
 		*fd = pair[0];
@@ -722,7 +727,7 @@ main(int argc, char *argv[])
 	const char	*cachedir = NULL, *outputdir = NULL;
 	const char	*errs, *name;
 	struct vrp_tree	 vrps = RB_INITIALIZER(&vrps);
-	struct brk_tree  brks = RB_INITIALIZER(&brks);
+	struct brk_tree	 brks = RB_INITIALIZER(&brks);
 	struct rusage	 ru;
 	struct timeval	 start_time, now_time;
 
@@ -861,8 +866,10 @@ main(int argc, char *argv[])
 
 	procpid = process_start("parser", &proc);
 	if (procpid == 0) {
-		proc_parser(proc);
-		errx(1, "parser process returned");
+		if (!filemode)
+			proc_parser(proc);
+		else
+			proc_filemode(proc);
 	}
 
 	/*
@@ -877,7 +884,6 @@ main(int argc, char *argv[])
 		if (rsyncpid == 0) {
 			close(proc);
 			proc_rsync(rsync_prog, bind_addr, rsync);
-			errx(1, "rsync process returned");
 		}
 	} else {
 		rsync = -1;
@@ -897,7 +903,6 @@ main(int argc, char *argv[])
 			close(proc);
 			close(rsync);
 			proc_http(bind_addr, http);
-			errx(1, "http process returned");
 		}
 	} else {
 		http = -1;
@@ -917,14 +922,13 @@ main(int argc, char *argv[])
 			close(rsync);
 			close(http);
 			proc_rrdp(rrdp);
-			errx(1, "rrdp process returned");
 		}
 	} else {
 		rrdp = -1;
 		rrdppid = -1;
 	}
 
-	if (timeout) {
+	if (!filemode && timeout > 0) {
 		/*
 		 * Commit suicide eventually
 		 * cron will normally start a new one
@@ -962,8 +966,8 @@ main(int argc, char *argv[])
 	queues[3] = &rrdpq;
 
 	/*
-	 * Prime the process with our TAL file.
-	 * This will contain (hopefully) links to our manifest and we
+	 * Prime the process with our TAL files.
+	 * These will (hopefully) contain links to manifests and we
 	 * can get the ball rolling.
 	 */
 
@@ -1161,26 +1165,26 @@ main(int argc, char *argv[])
 	if (outputfiles(&vrps, &brks, &stats))
 		rc = 1;
 
-	logx("Processing time %lld seconds "
-	    "(%lld seconds user, %lld seconds system)",
+	printf("Processing time %lld seconds "
+	    "(%lld seconds user, %lld seconds system)\n",
 	    (long long)stats.elapsed_time.tv_sec,
 	    (long long)stats.user_time.tv_sec,
 	    (long long)stats.system_time.tv_sec);
-	logx("Route Origin Authorizations: %zu (%zu failed parse, %zu invalid)",
+	printf("Route Origin Authorizations: %zu (%zu failed parse, %zu invalid)\n",
 	    stats.roas, stats.roas_fail, stats.roas_invalid);
-	logx("BGPsec Router Certificates: %zu", stats.brks);
-	logx("Certificates: %zu (%zu invalid)",
+	printf("BGPsec Router Certificates: %zu\n", stats.brks);
+	printf("Certificates: %zu (%zu invalid)\n",
 	    stats.certs, stats.certs_fail);
-	logx("Trust Anchor Locators: %zu (%zu invalid)",
+	printf("Trust Anchor Locators: %zu (%zu invalid)\n",
 	    stats.tals, talsz - stats.tals);
-	logx("Manifests: %zu (%zu failed parse, %zu stale)",
+	printf("Manifests: %zu (%zu failed parse, %zu stale)\n",
 	    stats.mfts, stats.mfts_fail, stats.mfts_stale);
-	logx("Certificate revocation lists: %zu", stats.crls);
-	logx("Ghostbuster records: %zu", stats.gbrs);
-	logx("Repositories: %zu", stats.repos);
-	logx("Cleanup: removed %zu files, %zu directories, %zu superfluous",
+	printf("Certificate revocation lists: %zu\n", stats.crls);
+	printf("Ghostbuster records: %zu\n", stats.gbrs);
+	printf("Repositories: %zu\n", stats.repos);
+	printf("Cleanup: removed %zu files, %zu directories, %zu superfluous\n",
 	    stats.del_files, stats.del_dirs, stats.extra_files);
-	logx("VRP Entries: %zu (%zu unique)", stats.vrps, stats.uniqs);
+	printf("VRP Entries: %zu (%zu unique)\n", stats.vrps, stats.uniqs);
 
 	/* Memory cleanup. */
 	repo_free();

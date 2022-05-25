@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.129 2022/04/20 10:46:20 job Exp $ */
+/*	$OpenBSD: extern.h,v 1.138 2022/05/24 09:20:49 claudio Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -23,6 +23,14 @@
 
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
+
+/*
+ * Enumeration for ASN.1 explicit tags in RSC eContent
+ */
+enum rsc_resourceblock_tag {
+	RSRCBLK_TYPE_ASID,
+	RSRCBLK_TYPE_IPADDRBLK,
+};
 
 enum cert_as_type {
 	CERT_AS_ID, /* single identifier */
@@ -164,6 +172,7 @@ enum rtype {
 	RTYPE_ASPA,
 	RTYPE_REPO,
 	RTYPE_FILE,
+	RTYPE_RSC,
 };
 
 enum location {
@@ -232,6 +241,29 @@ struct roa {
 	time_t		 expires; /* do not use after */
 };
 
+struct rscfile {
+	char		*filename; /* an optional filename on the checklist */
+	unsigned char	 hash[SHA256_DIGEST_LENGTH]; /* the digest */
+};
+
+/*
+ * A Signed Checklist (RSC)
+ */
+struct rsc {
+	int		 talid; /* RSC covered by what TAL */
+	int		 valid; /* eContent resources covered by EE's 3779? */
+	struct cert_ip	*ips; /* IP prefixes */
+	size_t		 ipsz; /* number of IP prefixes */
+	struct cert_as	*as; /* AS resources */
+	size_t		 asz; /* number of AS resources */
+	struct rscfile	*files; /* FileAndHashes in the RSC */
+	size_t		 filesz; /* number of FileAndHashes */
+	char		*aia; /* AIA */
+	char		*aki; /* AKI */
+	char		*ski; /* SKI */
+	time_t		 expires; /* Not After of the RSC EE */
+};
+
 /*
  * A single Ghostbuster record
  */
@@ -291,7 +323,6 @@ struct crl {
  * Tree of CRLs sorted by uri
  */
 RB_HEAD(crl_tree, crl);
-RB_PROTOTYPE(crl_tree, crl, entry, crlcmp);
 
 /*
  * An authentication tuple.
@@ -307,10 +338,9 @@ struct auth {
  * Tree of auth sorted by ski
  */
 RB_HEAD(auth_tree, auth);
-RB_PROTOTYPE(auth_tree, auth, entry, authcmp);
 
 struct auth	*auth_find(struct auth_tree *, const char *);
-void		 auth_insert(struct auth_tree *, struct cert *, struct auth *);
+struct auth	*auth_insert(struct auth_tree *, struct cert *, struct auth *);
 
 enum http_result {
 	HTTP_FAILED,	/* anything else */
@@ -359,7 +389,7 @@ struct entity {
 	char		*path;		/* path relative to repository */
 	char		*file;		/* filename or valid repo path */
 	unsigned char	*data;		/* optional data blob */
-	size_t		 datasz; 	/* length of optional data blob */
+	size_t		 datasz;	/* length of optional data blob */
 	unsigned int	 repoid;	/* repository identifier */
 	int		 talid;		/* tal identifier */
 	enum rtype	 type;		/* type of entity (not RTYPE_EOF) */
@@ -452,8 +482,14 @@ void		 gbr_free(struct gbr *);
 struct gbr	*gbr_parse(X509 **, const char *, const unsigned char *,
 		    size_t);
 
+void		 rsc_free(struct rsc *);
+struct rsc	*rsc_parse(X509 **, const char *, const unsigned char *,
+		    size_t);
+
 /* crl.c */
 struct crl	*crl_parse(const char *, const unsigned char *, size_t);
+struct crl	*crl_get(struct crl_tree *, const struct auth *);
+int		 crl_insert(struct crl_tree *, struct crl *);
 void		 crl_free(struct crl *);
 
 /* Validation of our objects. */
@@ -466,8 +502,12 @@ int		 valid_cert(const char *, struct auth *, const struct cert *);
 int		 valid_roa(const char *, struct auth *, struct roa *);
 int		 valid_filehash(int, const char *, size_t);
 int		 valid_hash(unsigned char *, size_t, const char *, size_t);
+int		 valid_filename(const char *, size_t);
 int		 valid_uri(const char *, size_t, const char *);
 int		 valid_origin(const char *, const char *);
+int		 valid_x509(char *, X509_STORE_CTX *, X509 *, struct auth *,
+		    struct crl *, int);
+int		 valid_rsc(const char *, struct auth *, struct rsc *);
 
 /* Working with CMS. */
 unsigned char	*cms_parse_validate(X509 **, const char *,
@@ -508,6 +548,7 @@ void		 entity_free(struct entity *);
 void		 entity_read_req(struct ibuf *, struct entity *);
 void		 entityq_flush(struct entityq *, struct repo *);
 void		 proc_parser(int) __attribute__((noreturn));
+void		 proc_filemode(int) __attribute__((noreturn));
 
 /* Rsync-specific. */
 
@@ -516,8 +557,8 @@ void		 proc_rsync(char *, char *, int) __attribute__((noreturn));
 
 /* HTTP and RRDP processes. */
 
-void		 proc_http(char *, int);
-void		 proc_rrdp(int);
+void		 proc_http(char *, int) __attribute__((noreturn));
+void		 proc_rrdp(int) __attribute__((noreturn));
 
 /* Repository handling */
 int		 filepath_add(struct filepath_tree *, char *);
@@ -595,6 +636,7 @@ int		 x509_get_time(const ASN1_TIME *, time_t *);
 char		*x509_convert_seqnum(const char *, const ASN1_INTEGER *);
 int		 x509_location(const char *, const char *, const char *,
 		    GENERAL_NAME *, char **);
+int		 x509_inherits(X509 *);
 
 /* printers */
 char		*time2str(time_t);
@@ -605,6 +647,7 @@ void		 crl_print(const struct crl *);
 void		 mft_print(const X509 *, const struct mft *);
 void		 roa_print(const X509 *, const struct roa *);
 void		 gbr_print(const X509 *, const struct gbr *);
+void		 rsc_print(const X509 *, const struct rsc *);
 
 /* Output! */
 
@@ -659,8 +702,9 @@ int	mkpathat(int, const char *);
 /* Maximum depth of the RPKI tree. */
 #define MAX_CERT_DEPTH		12
 
-/* Maximum number of concurrent rsync processes. */
-#define MAX_RSYNC_PROCESSES	16
+/* Maximum number of concurrent http and rsync requests. */
+#define MAX_HTTP_REQUESTS	64
+#define MAX_RSYNC_REQUESTS	16
 
 /* Maximum allowd repositories per tal */
 #define MAX_REPO_PER_TAL	1000

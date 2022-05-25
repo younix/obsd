@@ -1,4 +1,4 @@
-/*	$OpenBSD: io.c,v 1.18 2021/12/05 12:26:27 jsg Exp $ */
+/*	$OpenBSD: io.c,v 1.20 2022/05/15 16:43:34 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -222,7 +222,6 @@ io_buf_read(int fd, struct ibuf **ib)
 	return NULL;
 }
 
-
 /*
  * Read data from socket but receive a file descriptor at the same time.
  */
@@ -247,7 +246,7 @@ io_buf_recvfd(int fd, struct ibuf **ib)
 	if ((b = ibuf_dynamic(sizeof(sz), INT32_MAX)) == NULL)
 		err(1, NULL);
 	*ib = b;
-	
+
 	memset(&msg, 0, sizeof(msg));
 	memset(&cmsgbuf, 0, sizeof(cmsgbuf));
 

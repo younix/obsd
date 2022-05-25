@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip.c,v 1.21 2021/12/26 12:32:28 tb Exp $ */
+/*	$OpenBSD: ip.c,v 1.25 2022/05/15 16:43:34 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -27,7 +27,7 @@
 
 #include "extern.h"
 
-#define   PREFIX_SIZE(x)  (((x) + 7) / 8)
+#define	PREFIX_SIZE(x)	(((x) + 7) / 8)
 
 /*
  * Parse an IP address family.
@@ -154,7 +154,7 @@ ip_addr_check_overlap(const struct cert_ip *ip, const char *fn,
 		    memcmp(ips[i].min, ip->max, sz) >= 0)
 			continue;
 		socktype = (ips[i].afi == AFI_IPV4) ? AF_INET : AF_INET6,
-		warnx("%s: RFC 3779 section 2.2.3.5: "
+		    warnx("%s: RFC 3779 section 2.2.3.5: "
 		    "cannot have overlapping IP addresses", fn);
 		ip_addr_print(&ip->ip, ip->afi, buf, sizeof(buf));
 		warnx("%s: certificate IP: %s", fn, buf);
@@ -189,17 +189,9 @@ ip_addr_parse(const ASN1_BIT_STRING *p,
 	/* Weird OpenSSL-ism to get unused bit count. */
 
 	if ((p->flags & ASN1_STRING_FLAG_BITS_LEFT))
-		unused = p->flags & ~ASN1_STRING_FLAG_BITS_LEFT;
+		unused = p->flags & 0x07;
 
-	if (unused < 0) {
-		warnx("%s: RFC 3779 section 2.2.3.8: "
-		    "unused bit count must be non-negative", fn);
-		return 0;
-	} else if (unused >= 8) {
-		warnx("%s: RFC 3779 section 2.2.3.8: "
-		    "unused bit count must mask an unsigned char", fn);
-		return 0;
-	} else if (p->length == 0 && unused != 0) {
+	if (p->length == 0 && unused != 0) {
 		warnx("%s: RFC 3779 section 2.2.3.8: "
 		    "unused bit count must be zero if length is zero", fn);
 		return 0;
@@ -227,7 +219,7 @@ ip_addr_parse(const ASN1_BIT_STRING *p,
 		return 0;
 	}
 
-	memset (addr, 0, sizeof(struct ip_addr));
+	memset(addr, 0, sizeof(struct ip_addr));
 	addr->prefixlen = p->length * 8 - unused;
 	memcpy(addr->addr, p->data, p->length);
 	return 1;

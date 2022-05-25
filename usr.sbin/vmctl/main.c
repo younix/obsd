@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.68 2021/07/12 15:09:22 beck Exp $	*/
+/*	$OpenBSD: main.c,v 1.71 2022/05/13 00:17:20 yasuoka Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -401,28 +401,36 @@ parse_network(struct parse_result *res, char *word)
 	return (0);
 }
 
-int
-parse_size(struct parse_result *res, char *word)
+void
+parse_size(struct parse_result *res, char *word, const char *type)
 {
-	long long val = 0;
+	char		 result[FMT_SCALED_STRSIZE];
+	long long 	 val = 0;
 
 	if (word != NULL) {
-		if (scan_scaled(word, &val) != 0) {
-			warn("invalid size: %s", word);
-			return (-1);
-		}
+		if (scan_scaled(word, &val) != 0)
+			err(1, "invalid %s size: %s", type, word);
 	}
 
-	if (val < (1024 * 1024)) {
-		warnx("size must be at least one megabyte");
-		return (-1);
-	} else
-		res->size = val / 1024 / 1024;
+	if (val < (1024 * 1024))
+		errx(1, "%s size must be at least 1MB", type);
 
-	if ((res->size * 1024 * 1024) != val)
-		warnx("size rounded to %lld megabytes", res->size);
+	if (strcmp("memory", type) == 0 && val > VMM_MAX_VM_MEM_SIZE) {
+		if (fmt_scaled(VMM_MAX_VM_MEM_SIZE, result) == 0)
+			errx(1, "memory size too large (limit is %s)", result);
+		else
+			errx(1, "memory size too large");
+	}
 
-	return (0);
+	/* Round down to the megabyte. */
+	res->size = (val / (1024 * 1024)) * (1024 * 1024);
+
+	if (res->size != (size_t)val) {
+		if (fmt_scaled(res->size, result) == 0)
+			warnx("%s size rounded to %s", type, result);
+		else
+			warnx("%s size rounded to %zuB", type, res->size);
+	}
 }
 
 int
@@ -569,8 +577,7 @@ ctl_create(struct parse_result *res, int argc, char *argv[])
 			input = optarg;
 			break;
 		case 's':
-			if (parse_size(res, optarg) != 0)
-				errx(1, "invalid size: %s", optarg);
+			parse_size(res, optarg, "disk");
 			break;
 		default:
 			ctl_usage(res->ctl);
@@ -653,9 +660,8 @@ ctl_convert(const char *srcfile, const char *dstfile, int dsttype, size_t dstsiz
 	/* align to megabytes */
 	dst.size = ALIGNSZ(dstsize, 1048576);
 
-	if ((ret = create_imagefile(dst.type, dst.disk, NULL,
-	   dst.size / 1048576, &format)) != 0) {
-		errno = ret;
+	if ((ret = create_imagefile(dst.type, dst.disk, NULL, dst.size,
+	    &format)) != 0) {
 		errstr = "failed to create destination image file";
 		goto done;
 	}
@@ -856,8 +862,7 @@ ctl_start(struct parse_result *res, int argc, char *argv[])
 		case 'm':
 			if (res->size)
 				errx(1, "memory specified multiple times");
-			if (parse_size(res, optarg) != 0)
-				errx(1, "invalid memory size: %s", optarg);
+			parse_size(res, optarg, "memory");
 			break;
 		case 'n':
 			if (parse_network(res, optarg) != 0)

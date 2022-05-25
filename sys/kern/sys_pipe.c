@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_pipe.c,v 1.136 2022/02/13 13:05:51 visa Exp $	*/
+/*	$OpenBSD: sys_pipe.c,v 1.138 2022/05/09 14:49:55 visa Exp $	*/
 
 /*
  * Copyright (c) 1996 John S. Dyson

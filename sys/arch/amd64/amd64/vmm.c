@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmm.c,v 1.305 2022/03/28 06:28:47 tb Exp $	*/
+/*	$OpenBSD: vmm.c,v 1.311 2022/05/20 22:42:09 dv Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -42,6 +42,11 @@
 
 #include <dev/isa/isareg.h>
 #include <dev/pv/pvreg.h>
+
+#ifdef MP_LOCKDEBUG
+#include <ddb/db_output.h>
+extern int __mp_lock_spinout;
+#endif /* MP_LOCKDEBUG */
 
 /* #define VMM_DEBUG */
 
@@ -140,7 +145,7 @@ int vm_rwregs(struct vm_rwregs_params *, int);
 int vm_mprotect_ept(struct vm_mprotect_ept_params *);
 int vm_rwvmparams(struct vm_rwvmparams_params *, int);
 int vm_find(uint32_t, struct vm **);
-int vcpu_readregs_vmx(struct vcpu *, uint64_t, struct vcpu_reg_state *);
+int vcpu_readregs_vmx(struct vcpu *, uint64_t, int, struct vcpu_reg_state *);
 int vcpu_readregs_svm(struct vcpu *, uint64_t, struct vcpu_reg_state *);
 int vcpu_writeregs_vmx(struct vcpu *, uint64_t, int, struct vcpu_reg_state *);
 int vcpu_writeregs_svm(struct vcpu *, uint64_t, struct vcpu_reg_state *);
@@ -978,7 +983,7 @@ vm_rwregs(struct vm_rwregs_params *vrwp, int dir)
 	if (vmm_softc->mode == VMM_MODE_VMX ||
 	    vmm_softc->mode == VMM_MODE_EPT)
 		ret = (dir == 0) ?
-		    vcpu_readregs_vmx(vcpu, vrwp->vrwp_mask, vrs) :
+		    vcpu_readregs_vmx(vcpu, vrwp->vrwp_mask, 1, vrs) :
 		    vcpu_writeregs_vmx(vcpu, vrwp->vrwp_mask, 1, vrs);
 	else if (vmm_softc->mode == VMM_MODE_SVM ||
 	    vmm_softc->mode == VMM_MODE_RVI)
@@ -1328,16 +1333,25 @@ int
 vmm_start(void)
 {
 	struct cpu_info *self = curcpu();
-	int ret = 0;
 #ifdef MULTIPROCESSOR
 	struct cpu_info *ci;
 	CPU_INFO_ITERATOR cii;
-	int i;
-#endif
+#ifdef MP_LOCKDEBUG
+	int nticks;
+#endif /* MP_LOCKDEBUG */
+#endif /* MULTIPROCESSOR */
 
 	/* VMM is already running */
 	if (self->ci_flags & CPUF_VMM)
 		return (0);
+
+	/* Start VMM on this CPU */
+	start_vmm_on_cpu(self);
+	if (!(self->ci_flags & CPUF_VMM)) {
+		printf("%s: failed to enter VMM mode\n",
+			self->ci_dev->dv_xname);
+		return (EIO);
+	}
 
 #ifdef MULTIPROCESSOR
 	/* Broadcast start VMM IPI */
@@ -1346,25 +1360,23 @@ vmm_start(void)
 	CPU_INFO_FOREACH(cii, ci) {
 		if (ci == self)
 			continue;
-		for (i = 100000; (!(ci->ci_flags & CPUF_VMM)) && i>0;i--)
-			delay(10);
-		if (!(ci->ci_flags & CPUF_VMM)) {
-			printf("%s: failed to enter VMM mode\n",
-				ci->ci_dev->dv_xname);
-			ret = EIO;
+#ifdef MP_LOCKDEBUG
+		nticks = __mp_lock_spinout;
+#endif /* MP_LOCKDEBUG */
+		while (!(ci->ci_flags & CPUF_VMM)) {
+			CPU_BUSY_CYCLE();
+#ifdef MP_LOCKDEBUG
+			if (--nticks <= 0) {
+				db_printf("%s: spun out", __func__);
+				db_enter();
+				nticks = __mp_lock_spinout;
+			}
+#endif /* MP_LOCKDEBUG */
 		}
 	}
 #endif /* MULTIPROCESSOR */
 
-	/* Start VMM on this CPU */
-	start_vmm_on_cpu(self);
-	if (!(self->ci_flags & CPUF_VMM)) {
-		printf("%s: failed to enter VMM mode\n",
-			self->ci_dev->dv_xname);
-		ret = EIO;
-	}
-
-	return (ret);
+	return (0);
 }
 
 /*
@@ -1376,16 +1388,25 @@ int
 vmm_stop(void)
 {
 	struct cpu_info *self = curcpu();
-	int ret = 0;
 #ifdef MULTIPROCESSOR
 	struct cpu_info *ci;
 	CPU_INFO_ITERATOR cii;
-	int i;
-#endif
+#ifdef MP_LOCKDEBUG
+	int nticks;
+#endif /* MP_LOCKDEBUG */
+#endif /* MULTIPROCESSOR */
 
 	/* VMM is not running */
 	if (!(self->ci_flags & CPUF_VMM))
 		return (0);
+
+	/* Stop VMM on this CPU */
+	stop_vmm_on_cpu(self);
+	if (self->ci_flags & CPUF_VMM) {
+		printf("%s: failed to exit VMM mode\n",
+			self->ci_dev->dv_xname);
+		return (EIO);
+	}
 
 #ifdef MULTIPROCESSOR
 	/* Stop VMM on other CPUs */
@@ -1394,25 +1415,23 @@ vmm_stop(void)
 	CPU_INFO_FOREACH(cii, ci) {
 		if (ci == self)
 			continue;
-		for (i = 100000; (ci->ci_flags & CPUF_VMM) && i>0 ;i--)
-			delay(10);
-		if (ci->ci_flags & CPUF_VMM) {
-			printf("%s: failed to exit VMM mode\n",
-				ci->ci_dev->dv_xname);
-			ret = EIO;
+#ifdef MP_LOCKDEBUG
+		nticks = __mp_lock_spinout;
+#endif /* MP_LOCKDEBUG */
+		while ((ci->ci_flags & CPUF_VMM)) {
+			CPU_BUSY_CYCLE();
+#ifdef MP_LOCKDEBUG
+			if (--nticks <= 0) {
+				db_printf("%s: spunout", __func__);
+				db_enter();
+				nticks = __mp_lock_spinout;
+			}
+#endif /* MP_LOCKDEBUG */
 		}
 	}
 #endif /* MULTIPROCESSOR */
 
-	/* Stop VMM on this CPU */
-	stop_vmm_on_cpu(self);
-	if (self->ci_flags & CPUF_VMM) {
-		printf("%s: failed to exit VMM mode\n",
-			self->ci_dev->dv_xname);
-		ret = EIO;
-	}
-
-	return (ret);
+	return (0);
 }
 
 /*
@@ -1536,7 +1555,9 @@ vmclear_on_cpu(struct cpu_info *ci)
 static int
 vmx_remote_vmclear(struct cpu_info *ci, struct vcpu *vcpu)
 {
-	int ret = 0, nticks = 200000000;
+#ifdef MP_LOCKDEBUG
+	int nticks = __mp_lock_spinout;
+#endif /* MP_LOCKDEBUG */
 
 	rw_enter_write(&ci->ci_vmcs_lock);
 	atomic_swap_ulong(&ci->ci_vmcs_pa, vcpu->vc_control_pa);
@@ -1544,16 +1565,18 @@ vmx_remote_vmclear(struct cpu_info *ci, struct vcpu *vcpu)
 
 	while (ci->ci_vmcs_pa != VMX_VMCS_PA_CLEAR) {
 		CPU_BUSY_CYCLE();
+#ifdef MP_LOCKDEBUG
 		if (--nticks <= 0) {
-			printf("%s: spun out\n", __func__);
-			ret = 1;
-			break;
+			db_printf("%s: spun out\n", __func__);
+			db_enter();
+			nticks = __mp_lock_spinout;
 		}
+#endif /* MP_LOCKDEBUG */
 	}
 	atomic_swap_uint(&vcpu->vc_vmx_vmcs_state, VMCS_CLEARED);
 	rw_exit_write(&ci->ci_vmcs_lock);
 
-	return (ret);
+	return (0);
 }
 #endif /* MULTIPROCESSOR */
 
@@ -1575,7 +1598,7 @@ vm_create_check_mem_ranges(struct vm_create_params *vcp)
 {
 	size_t i, memsize = 0;
 	struct vm_mem_range *vmr, *pvmr;
-	const paddr_t maxgpa = (uint64_t)VMM_MAX_VM_MEM_SIZE * 1024 * 1024;
+	const paddr_t maxgpa = VMM_MAX_VM_MEM_SIZE;
 
 	if (vcp->vcp_nmemranges == 0 ||
 	    vcp->vcp_nmemranges > VMM_MAX_MEM_RANGES)
@@ -1635,7 +1658,6 @@ vm_create_check_mem_ranges(struct vm_create_params *vcp)
 
 	if (memsize % (1024 * 1024) != 0)
 		return (0);
-	memsize /= 1024 * 1024;
 	return (memsize);
 }
 
@@ -1987,6 +2009,7 @@ vcpu_reload_vmcs_vmx(struct vcpu *vcpu)
  * Parameters:
  *  vcpu: the vcpu to read register values from
  *  regmask: the types of registers to read
+ *  loadvmcs: bit to indicate whether the VMCS has to be loaded first
  *  vrs: output parameter where register values are stored
  *
  * Return values:
@@ -1994,7 +2017,7 @@ vcpu_reload_vmcs_vmx(struct vcpu *vcpu)
  *  EINVAL: an error reading registers occurred
  */
 int
-vcpu_readregs_vmx(struct vcpu *vcpu, uint64_t regmask,
+vcpu_readregs_vmx(struct vcpu *vcpu, uint64_t regmask, int loadvmcs,
     struct vcpu_reg_state *vrs)
 {
 	int i, ret = 0;
@@ -2005,6 +2028,11 @@ vcpu_readregs_vmx(struct vcpu *vcpu, uint64_t regmask,
 	uint64_t *drs = vrs->vrs_drs;
 	struct vcpu_segment_info *sregs = vrs->vrs_sregs;
 	struct vmx_msr_store *msr_store;
+
+	if (loadvmcs) {
+		if (vcpu_reload_vmcs_vmx(vcpu))
+			return (EINVAL);
+	}
 
 #ifdef VMM_DEBUG
 	/* VMCS should be loaded... */
@@ -2394,6 +2422,7 @@ out:
 	if (loadvmcs) {
 		if (vmclear(&vcpu->vc_control_pa))
 			ret = EINVAL;
+		atomic_swap_uint(&vcpu->vc_vmx_vmcs_state, VMCS_CLEARED);
 	}
 	return (ret);
 }
@@ -4632,7 +4661,7 @@ vmm_translate_gva(struct vcpu *vcpu, uint64_t va, uint64_t *pa, int mode)
 
 	if (vmm_softc->mode == VMM_MODE_EPT ||
 	    vmm_softc->mode == VMM_MODE_VMX) {
-		if (vcpu_readregs_vmx(vcpu, VM_RWREGS_ALL, &vrs))
+		if (vcpu_readregs_vmx(vcpu, VM_RWREGS_ALL, 1, &vrs))
 			return (EINVAL);
 	} else if (vmm_softc->mode == VMM_MODE_RVI ||
 	    vmm_softc->mode == VMM_MODE_SVM) {
@@ -4988,19 +5017,27 @@ vcpu_run_vmx(struct vcpu *vcpu, struct vm_run_params *vrp)
 		vmm_fpusave(vcpu);
 		intr_restore(s);
 
-		TRACEPOINT(vmm, guest_exit, vcpu, vrp, exit_reason);
-
 		atomic_swap_uint(&vcpu->vc_vmx_vmcs_state, VMCS_LAUNCHED);
 		exit_reason = VM_EXIT_NONE;
 
 		/* If we exited successfully ... */
 		if (ret == 0) {
-			/*
-			 * ret == 0 implies we entered the guest, and later
-			 * exited for some valid reason
-			 */
 			exitinfo = vmx_get_exit_info(
 			    &vcpu->vc_gueststate.vg_rip, &exit_reason);
+			if (!(exitinfo & VMX_EXIT_INFO_HAVE_RIP)) {
+				printf("%s: cannot read guest rip\n", __func__);
+				ret = EINVAL;
+				break;
+			}
+			if (!(exitinfo & VMX_EXIT_INFO_HAVE_REASON)) {
+				printf("%s: cant read exit reason\n", __func__);
+				ret = EINVAL;
+				break;
+			}
+			vcpu->vc_gueststate.vg_exit_reason = exit_reason;
+			TRACEPOINT(vmm, guest_exit, vcpu, vrp, exit_reason);
+
+			/* Update our state */
 			if (vmread(VMCS_GUEST_IA32_RFLAGS,
 			    &vcpu->vc_gueststate.vg_rflags)) {
 				printf("%s: can't read guest rflags during "
@@ -5009,24 +5046,10 @@ vcpu_run_vmx(struct vcpu *vcpu, struct vm_run_params *vrp)
 				break;
                         }
 
-			/* Update our state */
-			if (!(exitinfo & VMX_EXIT_INFO_HAVE_RIP)) {
-				printf("%s: cannot read guest rip\n", __func__);
-				ret = EINVAL;
-				break;
-			}
-
-			if (!(exitinfo & VMX_EXIT_INFO_HAVE_REASON)) {
-				printf("%s: cant read exit reason\n", __func__);
-				ret = EINVAL;
-				break;
-			}
-
 			/*
 			 * Handle the exit. This will alter "ret" to EAGAIN if
 			 * the exit handler determines help from vmd is needed.
 			 */
-			vcpu->vc_gueststate.vg_exit_reason = exit_reason;
 			ret = vmx_handle_exit(vcpu);
 
 			if (vcpu->vc_gueststate.vg_rflags & PSL_I)
@@ -5118,7 +5141,7 @@ vcpu_run_vmx(struct vcpu *vcpu, struct vm_run_params *vrp)
 	vcpu->vc_last_pcpu = curcpu();
 
 	/* Copy the VCPU register state to the exit structure */
-	if (vcpu_readregs_vmx(vcpu, VM_RWREGS_ALL, &vcpu->vc_exit.vrs))
+	if (vcpu_readregs_vmx(vcpu, VM_RWREGS_ALL, 0, &vcpu->vc_exit.vrs))
 		ret = EINVAL;
 	vcpu->vc_exit.cpl = vmm_get_guest_cpu_cpl(vcpu);
 
@@ -5739,14 +5762,16 @@ vmx_fault_page(struct vcpu *vcpu, paddr_t gpa)
 	int fault_type, ret;
 
 	fault_type = vmx_get_guest_faulttype();
-	if (fault_type == -1) {
+	switch (fault_type) {
+	case -1:
 		printf("%s: invalid fault type\n", __func__);
 		return (EINVAL);
-	}
-
-	if (fault_type == VM_FAULT_PROTECT) {
+	case VM_FAULT_PROTECT:
 		vcpu->vc_exit.vee.vee_fault_type = VEE_FAULT_PROTECT;
 		return (EAGAIN);
+	default:
+		vcpu->vc_exit.vee.vee_fault_type = VEE_FAULT_HANDLED;
+		break;
 	}
 
 	/* We may sleep during uvm_fault(9), so reload VMCS. */
@@ -7325,16 +7350,12 @@ vcpu_run_svm(struct vcpu *vcpu, struct vm_run_params *vrp)
 		vmcb->v_tlb_control = SVM_TLB_CONTROL_FLUSH_NONE;
 		svm_set_clean(vcpu, SVM_CLEANBITS_ALL);
 
-		/* Record the exit reason on successful exit */
+		/* If we exited successfully ... */
 		if (ret == 0) {
 			exit_reason = vmcb->v_exitcode;
 			vcpu->vc_gueststate.vg_exit_reason = exit_reason;
-		}
+			TRACEPOINT(vmm, guest_exit, vcpu, vrp, exit_reason);
 
-		TRACEPOINT(vmm, guest_exit, vcpu, vrp, exit_reason);
-
-		/* If we exited successfully ... */
-		if (ret == 0) {
 			vcpu->vc_gueststate.vg_rflags = vmcb->v_rflags;
 
 			/*

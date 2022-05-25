@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmctl.c,v 1.79 2021/06/10 19:50:05 dv Exp $	*/
+/*	$OpenBSD: vmctl.c,v 1.83 2022/05/13 00:17:20 yasuoka Exp $	*/
 
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
@@ -59,7 +59,7 @@ struct imsgbuf *ibuf;
  * Parameters:
  *  start_id: optional ID of the VM
  *  name: optional name of the VM
- *  memsize: memory size (MB) of the VM to create
+ *  memsize: memory size (in bytes) of the VM to create
  *  nnics: number of vionet network interfaces to create
  *  nics: switch names of the network interfaces to create
  *  ndisks: number of disk images
@@ -73,7 +73,7 @@ struct imsgbuf *ibuf;
  *  ENOMEM if a memory allocation failure occurred.
  */
 int
-vm_start(uint32_t start_id, const char *name, int memsize, int nnics,
+vm_start(uint32_t start_id, const char *name, size_t memsize, int nnics,
     char **nics, int ndisks, char **disks, int *disktypes, char *kernel,
     char *iso, char *instance, unsigned int bootdevice)
 {
@@ -122,7 +122,7 @@ vm_start(uint32_t start_id, const char *name, int memsize, int nnics,
 
 	/*
 	 * XXX: vmd(8) fills in the actual memory ranges. vmctl(8)
-	 * just passes in the actual memory size in MB here.
+	 * just passes in the actual memory size here.
 	 */
 	vcp->vcp_nmemranges = 1;
 	vcp->vcp_memranges[0].vmr_size = memsize;
@@ -793,8 +793,7 @@ print_vm_info(struct vmop_info_result *list, size_t ct)
 			(void)strlcpy(curmem, "-", sizeof(curmem));
 			(void)strlcpy(maxmem, "-", sizeof(maxmem));
 
-			(void)fmt_scaled(vir->vir_memory_size * 1024 * 1024,
-			    maxmem);
+			(void)fmt_scaled(vir->vir_memory_size, maxmem);
 
 			if (running) {
 				if (*vmi->vir_ttyname == '\0')
@@ -926,7 +925,7 @@ open_imagefile(int type, const char *imgfile_path, int flags,
  *  type        : format of the image file
  *  imgfile_path: path to the image file to create
  *  base_path   : path to the qcow2 base image
- *  imgsize     : size of the image file to create (in MB)
+ *  imgsize     : size of the image file to create (in bytes)
  *  format      : string identifying the format
  *
  * Return:
@@ -936,7 +935,7 @@ open_imagefile(int type, const char *imgfile_path, int flags,
  */
 int
 create_imagefile(int type, const char *imgfile_path, const char *base_path,
-    long imgsize, const char **format)
+    uint64_t imgsize, const char **format)
 {
 	int	 ret;
 

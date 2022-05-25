@@ -1,5 +1,5 @@
 # ex:ts=8 sw=4:
-# $OpenBSD: Cache.pm,v 1.4 2022/04/20 09:24:07 espie Exp $
+# $OpenBSD: Cache.pm,v 1.10 2022/05/20 20:31:38 espie Exp $
 #
 # Copyright (c) 2022 Marc Espie <espie@openbsd.org>
 #
@@ -44,8 +44,18 @@ sub pipe_locate
 	    '-d', OpenBSD::Paths->updateinfodb, '--');
 	my $state = $self->{state};
 	$state->errsay("Running #1", join(' ', @params))
-	    if $state->defines("TEST_CACHING_VERBOSE");
+	    if $state->defines("CACHING_VERBOSE");
 	return @params;
+}
+
+# this is a hack to talk to quirks: the interface expects a list of
+# search objects such that the last one can do add_stem, so we oblige
+# (probably TODO: add a secondary interface in quirks, but this can do
+# in the meantime)
+sub add_stem
+{
+	my ($self, $stem) = @_;
+	$self->{stems}{$stem} = 1;
 }
 
 sub prime_update_info_cache
@@ -55,6 +65,9 @@ sub prime_update_info_cache
 	my $progress = $state->progress;
 	my $uncached = {};
 	my $found = {};
+
+	my $pseudo_search = [$self];
+
 	# figure out a list of names to precache
 
 	# okay, so basically instead of hitting locate once for each
@@ -71,18 +84,31 @@ sub prime_update_info_cache
 			next if $stem =~ m/^partial\-/;
 			$stem =~ s/\%.*//; # zap branch info
 			$stem =~ s/\-\-.*//; # and set flavors
-			$self->{stems}{$stem} = 1;
+			$self->add_stem($stem);
+			$state->run_quirks(
+			    sub {
+			    	my $quirks = shift;
+				$quirks->tweak_search($pseudo_search, $h, 
+				    $state);
+			    });
 		}
 	}
-	# TODO actually ask quirks to extend the stemlist !
 	my @list = sort keys %{$self->{stems}};
 	return if @list == 0;
+
+	my $total = scalar @list;
 	$progress->set_header(
-	    $state->f("Precaching update information for #1 names...", 
-		scalar(@list)));
-	open my $fh, "-|", $self->pipe_locate(map { "$_-[0-9]*"} @list) or die $!;
+	    $state->f("Reading update info for installed packages", 
+		$total));
+	my $done = 0;
+	my $oldname = ""; 
+	# This can't go much faster, I've tried splitting the params
+	# and running several locate(1) in //, but this yields negligible
+	# gains for a lot of added complexity (reduced from 18 to 14 seconds
+	# on my usual package install).
+	open my $fh, "-|", $self->pipe_locate(map { "$_-[0-9]*"} @list) 
+	    or $state->fatal("Can't run locate: #1", $!);
 	while (<$fh>) {
-		$progress->working(100);
 		if (m/^(.*?)\:(.*)/) {
 			my ($pkgname, $value) = ($1, $2);
 			$found->{OpenBSD::PackageName::splitstem($pkgname)} = 1;
@@ -91,13 +117,18 @@ sub prime_update_info_cache
 			if ($value =~ m/\@option\s+always-update/) {
 				$uncached->{$pkgname} = 1;
 			}
+			if ($pkgname ne $oldname) {
+				$oldname = $pkgname;
+				$done++;
+			}
+			$progress->show($done, $total);
 		}
 	}
 	close($fh);
 	for my $pkgname (keys %$uncached) {
 		delete $self->{raw_data}{$pkgname}
 	}
-	return unless $state->defines("TEST_CACHING_VERBOSE");
+	return unless $state->defines("CACHING_VERBOSE");
 	for my $k (@list) {
 		if (!defined $found->{$k}) {
 			$state->say("No cache entry for #1", $k);
@@ -117,7 +148,7 @@ sub get_cached_info
 		my $stem = OpenBSD::PackageName::splitstem($name);
 		if (exists $self->{stems}{$stem}) {
 			$state->say("Negative caching for #1", $name)
-			    if $state->defines("TEST_CACHING_VERBOSE");
+			    if $state->defines("CACHING_VERBOSE");
 			return undef;
 		}
 		$content = '';
@@ -136,7 +167,7 @@ sub get_cached_info
 	}
 	if ($content eq '') {
 		$state->say("Cache miss for #1", $name)
-		    if $state->defines("TEST_CACHING_VERBOSE");
+		    if $state->defines("CACHING_VERBOSE");
 		return undef;
 	}
 	open my $fh2, "<", \$content;

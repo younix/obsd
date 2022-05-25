@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip6_input.c,v 1.241 2022/04/20 09:38:26 bluhm Exp $	*/
+/*	$OpenBSD: ip6_input.c,v 1.245 2022/05/05 13:57:40 claudio Exp $	*/
 /*	$KAME: ip6_input.c,v 1.188 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
@@ -113,11 +113,14 @@
 #include <netinet/ip_carp.h>
 #endif
 
+struct niqueue ip6intrq = NIQUEUE_INITIALIZER(IPQ_MAXLEN, NETISR_IPV6);
+
 struct cpumem *ip6counters;
 
 uint8_t ip6_soiikey[IP6_SOIIKEY_LEN];
 
 int ip6_ours(struct mbuf **, int *, int, int);
+int ip6_local(struct mbuf **, int *, int, int);
 int ip6_check_rh0hdr(struct mbuf *, int *);
 int ip6_hbhchcheck(struct mbuf *, int *, int *, int *);
 int ip6_hopopts_input(u_int32_t *, u_int32_t *, struct mbuf **, int *);
@@ -158,6 +161,47 @@ ip6_init(void)
 	mq_init(&ip6send_mq, 64, IPL_SOFTNET);
 
 	ip6counters = counters_alloc(ip6s_ncounters);
+#ifdef MROUTING
+	rt_timer_queue_init(&ip6_mrouterq, MCAST_EXPIRE_TIMEOUT,
+	    &mf6c_expire_route);
+#endif
+}
+
+/*
+ * Enqueue packet for local delivery.  Queuing is used as a boundary
+ * between the network layer (input/forward path) running with shared
+ * NET_RLOCK_IN_SOFTNET() and the transport layer needing it exclusively.
+ */
+int
+ip6_ours(struct mbuf **mp, int *offp, int nxt, int af)
+{
+	/* We are already in a IPv4/IPv6 local deliver loop. */
+	if (af != AF_UNSPEC)
+		return ip6_local(mp, offp, nxt, af);
+
+	niq_enqueue(&ip6intrq, *mp);
+	*mp = NULL;
+	return IPPROTO_DONE;
+}
+
+/*
+ * Dequeue and process locally delivered packets.
+ */
+void
+ip6intr(void)
+{
+	struct mbuf *m;
+	int off, nxt;
+
+	while ((m = niq_dequeue(&ip6intrq)) != NULL) {
+#ifdef DIAGNOSTIC
+		if ((m->m_flags & M_PKTHDR) == 0)
+			panic("ip6intr no HDR");
+#endif
+		off = 0;
+		nxt = ip6_local(&m, &off, IPPROTO_IPV6, AF_UNSPEC);
+		KASSERT(nxt == IPPROTO_DONE);
+	}
 }
 
 void
@@ -536,8 +580,10 @@ ip6_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 }
 
 int
-ip6_ours(struct mbuf **mp, int *offp, int nxt, int af)
+ip6_local(struct mbuf **mp, int *offp, int nxt, int af)
 {
+	NET_ASSERT_WLOCKED();
+
 	if (ip6_hbhchcheck(*mp, offp, &nxt, NULL))
 		return IPPROTO_DONE;
 
@@ -1456,12 +1502,13 @@ ip6_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp,
 		NET_LOCK();
 		error = sysctl_int_bounded(oldp, oldlenp, newp, newlen,
 		    &ip6_mtudisc_timeout, 0, INT_MAX);
-		rt_timer_queue_change(icmp6_mtudisc_timeout_q,
+		rt_timer_queue_change(&icmp6_mtudisc_timeout_q,
 		    ip6_mtudisc_timeout);
 		NET_UNLOCK();
 		return (error);
 	case IPV6CTL_IFQUEUE:
-		return (EOPNOTSUPP);
+		return (sysctl_niq(name + 1, namelen - 1,
+		    oldp, oldlenp, newp, newlen, &ip6intrq));
 	case IPV6CTL_SOIIKEY:
 		return (ip6_sysctl_soiikey(oldp, oldlenp, newp, newlen));
 	default:

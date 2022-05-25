@@ -12,11 +12,9 @@
 /dcn10_dpp.h/1.3/Mon Jan 24 14:35:15 2022//
 /dcn10_dpp_cm.c/1.3/Mon Jan 24 14:35:15 2022//
 /dcn10_dpp_dscl.c/1.5/Mon Jan 24 14:35:15 2022//
-/dcn10_hubbub.c/1.5/Mon Jan 24 14:35:15 2022//
 /dcn10_hubbub.h/1.3/Mon Jan 24 14:35:15 2022//
 /dcn10_hubp.c/1.4/Mon Jan 24 14:35:15 2022//
 /dcn10_hubp.h/1.3/Mon Jan 24 14:35:15 2022//
-/dcn10_hw_sequencer.c/1.7/Mon Jan 24 14:35:15 2022//
 /dcn10_hw_sequencer.h/1.4/Mon Jan 24 14:35:15 2022//
 /dcn10_hw_sequencer_debug.c/1.2/Mon Jan 24 14:35:15 2022//
 /dcn10_init.c/1.3/Mon Jan 24 14:35:15 2022//
@@ -30,4 +28,6 @@
 /dcn10_resource.c/1.5/Mon Jan 24 14:35:15 2022//
 /dcn10_stream_encoder.c/1.4/Mon Jan 24 14:35:15 2022//
 /dcn10_stream_encoder.h/1.4/Mon Jan 24 14:35:15 2022//
+/dcn10_hubbub.c/1.6/Wed May 25 14:32:35 2022//
+/dcn10_hw_sequencer.c/1.10/Wed May 25 14:32:36 2022//
 D

@@ -90,7 +90,6 @@
 /timer_getoverrun.c/1.6/Sat Sep 12 13:13:34 2015//
 /timer_gettime.c/1.7/Sat Sep 12 13:13:34 2015//
 /timer_settime.c/1.7/Sat Sep 12 13:13:34 2015//
-/truncate.2/1.20/Tue Feb 11 13:19:17 2020//
 /vfork.2/1.20/Thu Sep 10 17:55:21 2015//
 /w_accept.c/1.1/Sat May  7 19:05:22 2016//
 /w_accept4.c/1.1/Sat May  7 19:05:22 2016//
@@ -187,4 +186,5 @@
 /sync.2/1.17/Wed Apr 20 14:28:02 2022//
 /sysctl.2/1.48/Wed Apr 20 14:28:02 2022//
 /write.2/1.44/Wed Apr 20 14:28:02 2022//
+/truncate.2/1.21/Wed May 25 14:32:12 2022//
 D

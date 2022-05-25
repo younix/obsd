@@ -30,11 +30,8 @@
 /cwsr_trap_handler.h/1.4/Mon Jan 24 14:35:14 2022//
 /cwsr_trap_handler_gfx8.asm/1.3/Mon Jan 24 14:35:14 2022//
 /cwsr_trap_handler_gfx9.asm/1.3/Mon Jan 24 14:35:14 2022//
-/kfd_device.c/1.9/Mon Jan 24 14:35:14 2022//
-/kfd_device_queue_manager.c/1.9/Mon Jan 24 14:35:14 2022//
 /kfd_device_queue_manager.h/1.4/Mon Jan 24 14:35:14 2022//
 /kfd_device_queue_manager_v9.c/1.4/Mon Jan 24 14:35:14 2022//
-/kfd_events.c/1.4/Mon Jan 24 14:35:14 2022//
 /kfd_flat_memory.c/1.4/Mon Jan 24 14:35:14 2022//
 /kfd_int_process_v9.c/1.4/Mon Jan 24 14:35:14 2022//
 /kfd_iommu.c/1.4/Mon Jan 24 14:35:14 2022//
@@ -60,4 +57,7 @@
 /kfd_chardev.c/1.5/Wed Apr 20 14:28:20 2022//
 /kfd_crat.c/1.6/Wed Apr 20 14:28:20 2022//
 /kfd_smi_events.c/1.3/Wed Apr 20 14:28:20 2022//
+/kfd_device.c/1.10/Wed May 25 14:32:35 2022//
+/kfd_device_queue_manager.c/1.10/Wed May 25 14:32:35 2022//
+/kfd_events.c/1.5/Wed May 25 14:32:35 2022//
 D

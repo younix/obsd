@@ -1,7 +1,7 @@
 #! /usr/bin/perl
 
 # ex:ts=8 sw=4:
-# $OpenBSD: PkgAdd.pm,v 1.128 2022/04/16 09:32:40 espie Exp $
+# $OpenBSD: PkgAdd.pm,v 1.134 2022/05/11 17:17:35 espie Exp $
 #
 # Copyright (c) 2003-2014 Marc Espie <espie@openbsd.org>
 #
@@ -26,11 +26,17 @@ package OpenBSD::PackingList;
 
 sub uses_old_libs
 {
-	my $plist = shift;
+	my ($plist, $state) = @_;
 	require OpenBSD::RequiredBy;
 
-	return  grep {/^\.libs\d*\-/o}
-	    OpenBSD::Requiring->new($plist->pkgname)->list;
+	if (grep {/^\.libs\d*\-/o}
+	    OpenBSD::Requiring->new($plist->pkgname)->list) {
+	    	$state->say("#1 still uses old .libs",  $plist->pkgname)
+		    if $state->verbose >= 3;
+		return 1;
+	} else {
+	    	return 0;
+	}
 }
 
 sub has_different_sig
@@ -78,7 +84,7 @@ sub hash_files
 	my ($self, $sha, $state) = @_;
 	return if $self->{link} or $self->{symlink} or $self->{nochecksum};
 	if (defined $self->{d}) {
-		$sha->{$self->{d}->key} = $self;
+		push @{$sha->{$self->{d}->key}}, $self;
 	}
 }
 
@@ -88,20 +94,28 @@ sub tie_files
 	return if $self->{link} or $self->{symlink} or $self->{nochecksum};
 	# XXX python doesn't like this, overreliance on timestamps
 	return if $self->{name} =~ m/\.py$/ && !defined $self->{ts};
-	if (defined $sha->{$self->{d}->key}) {
-		my $tied = $sha->{$self->{d}->key};
-		# don't tie if there's a problem with the file
-		my $realname = $tied->realname($state);
-		return unless -f $realname;
-		# and do a sanity check that this file wasn't altered
-		return unless (stat _)[7] == $self->{size};
+	if (exists $sha->{$self->{d}->key}) {
+		my ($tied, $realname);
+		for my $c (@{$sha->{$self->{d}->key}}) {
+			# don't tie if there's a problem with the file
+			$realname = $c->realname($state);
+			next unless -f $realname;
+			# and do a sanity check that this file wasn't altered
+			next unless (stat _)[7] == $self->{size};
+			$tied = $c;
+			last if $tied->name eq $self->name;
+		}
+		return if !defined $tied;
 		if ($state->defines('checksum')) {
 			my $d = $self->compute_digest($realname, $self->{d});
 			# XXX we don't have to display anything here
 			# because delete will take care of that
 			return unless $d->equals($self->{d});
 		}
+		# so we found a match that find_extractible will use
 		$self->{tieto} = $tied;
+		# and we also need to tell size computation we won't be
+		# needing extra room for this.
 		$tied->{tied} = 1;
 		$state->say("Tying #1 to #2", $self->stringize,
 		    $tied->realname($state)) if $state->verbose >= 3;
@@ -331,13 +345,11 @@ sub display_timestamp
 sub find_kept_handle
 {
 	my ($set, $n, $state) = @_;
-	unless (defined $n->{location} && defined $n->{location}{update_info}) {
-		$n->complete($state);
-	}
 	my $plist = $n->dependency_info;
 	return if !defined $plist;
 	my $pkgname = $plist->pkgname;
 	if ($set->{quirks}) {
+		$n->{location}->decorate($plist);
 		display_timestamp($pkgname, $plist, $state);
 	}
 	# condition for no update
@@ -345,7 +357,7 @@ sub find_kept_handle
 	    (!$state->{allow_replacing} ||
 	      !$state->defines('installed') &&
 	      !$plist->has_different_sig($state) &&
-	      !$plist->uses_old_libs)) {
+	      !$plist->uses_old_libs($state))) {
 	      	$set->check_security($state, $plist, $n);
 	      	return;
 	}
@@ -382,6 +394,23 @@ sub figure_out_kept
 
 	for my $n ($set->newer) {
 		$set->find_kept_handle($n, $state);
+	}
+}
+
+sub precomplete_handle
+{
+	my ($set, $n, $state) = @_;
+	unless (defined $n->{location} && defined $n->{location}{update_info}) {
+		$n->complete($state);
+	}
+}
+
+sub precomplete
+{
+	my ($set, $state) = @_;
+
+	for my $n ($set->newer) {
+		$set->precomplete_handle($n, $state);
 	}
 }
 
@@ -950,14 +979,13 @@ sub process_set
 		return ();
 	}
 
+	$set->precomplete($state);
 	for my $handle ($set->newer) {
 		if ($state->tracker->is_installed($handle->pkgname)) {
 			$set->move_kept($handle);
 			$handle->{tweaked} = OpenBSD::Add::tweak_package_status($handle->pkgname, $state);
 		}
 	}
-
-	$set->figure_out_kept($state);
 
 	if (newer_has_errors($set, $state)) {
 		return ();
@@ -972,6 +1000,8 @@ sub process_set
 		$set->solver->check_for_loops($state);
 		return (@deps, $set);
 	}
+
+	$set->figure_out_kept($state);
 
 	if ($set->newer == 0 && $set->older_to_do == 0) {
 		$state->tracker->uptodate($set);

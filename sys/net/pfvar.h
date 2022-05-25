@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfvar.h,v 1.505 2021/12/26 01:00:32 sashan Exp $ */
+/*	$OpenBSD: pfvar.h,v 1.507 2022/04/29 09:55:43 mbuhl Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -749,6 +749,7 @@ struct pf_state {
 	u_int8_t		 pad[3];
 
 	TAILQ_ENTRY(pf_state)	 sync_list;
+	TAILQ_ENTRY(pf_state)	 sync_snap;
 	TAILQ_ENTRY(pf_state)	 entry_list;
 	SLIST_ENTRY(pf_state)	 gc_list;
 	RB_ENTRY(pf_state)	 entry_id;
@@ -797,6 +798,7 @@ struct pf_state {
 	pf_refcnt_t		 refcnt;
 	u_int16_t		 delay;
 	u_int8_t		 rt;
+	u_int8_t		 snapped;
 };
 
 /*
@@ -1877,7 +1879,7 @@ int		 pfi_dynaddr_setup(struct pf_addr_wrap *, sa_family_t);
 void		 pfi_dynaddr_remove(struct pf_addr_wrap *);
 void		 pfi_dynaddr_copyout(struct pf_addr_wrap *);
 void		 pfi_update_status(const char *, struct pf_status *);
-int		 pfi_get_ifaces(const char *, struct pfi_kif *, int *);
+void		 pfi_get_ifaces(const char *, struct pfi_kif *, int *);
 int		 pfi_set_flags(const char *, int);
 int		 pfi_clear_flags(const char *, int);
 void		 pfi_xcommit(void);

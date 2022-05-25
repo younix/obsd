@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip6_divert.c,v 1.65 2022/02/25 23:51:04 guenther Exp $ */
+/*      $OpenBSD: ip6_divert.c,v 1.67 2022/05/09 19:33:46 bluhm Exp $ */
 
 /*
  * Copyright (c) 2009 Michele Marchetto <michele@openbsd.org>
@@ -177,30 +177,37 @@ fail:
 	return (error ? error : EINVAL);
 }
 
-int
+void
 divert6_packet(struct mbuf *m, int dir, u_int16_t divert_port)
 {
-	struct inpcb *inp;
-	struct socket *sa = NULL;
-	struct sockaddr_in6 addr;
+	struct inpcb *inp = NULL;
+	struct socket *so;
+	struct sockaddr_in6 sin6;
 
-	inp = NULL;
 	div6stat_inc(div6s_ipackets);
 
 	if (m->m_len < sizeof(struct ip6_hdr) &&
 	    (m = m_pullup(m, sizeof(struct ip6_hdr))) == NULL) {
 		div6stat_inc(div6s_errors);
-		return (0);
+		goto bad;
 	}
 
+	mtx_enter(&divb6table.inpt_mtx);
 	TAILQ_FOREACH(inp, &divb6table.inpt_queue, inp_queue) {
-		if (inp->inp_lport == divert_port)
-			break;
+		if (inp->inp_lport != divert_port)
+			continue;
+		in_pcbref(inp);
+		break;
+	}
+	mtx_leave(&divb6table.inpt_mtx);
+	if (inp == NULL) {
+		div6stat_inc(div6s_noport);
+		goto bad;
 	}
 
-	memset(&addr, 0, sizeof(addr));
-	addr.sin6_family = AF_INET6;
-	addr.sin6_len = sizeof(addr);
+	memset(&sin6, 0, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(sin6);
 
 	if (dir == PF_IN) {
 		struct ifaddr *ifa;
@@ -208,36 +215,42 @@ divert6_packet(struct mbuf *m, int dir, u_int16_t divert_port)
 
 		ifp = if_get(m->m_pkthdr.ph_ifidx);
 		if (ifp == NULL) {
-			m_freem(m);
-			return (0);
+			div6stat_inc(div6s_errors);
+			goto bad;
 		}
 		TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family != AF_INET6)
 				continue;
-			addr.sin6_addr = satosin6(ifa->ifa_addr)->sin6_addr;
+			sin6.sin6_addr = satosin6(ifa->ifa_addr)->sin6_addr;
 			break;
 		}
 		if_put(ifp);
 	}
 
-	if (inp) {
-		sa = inp->inp_socket;
-		if (sbappendaddr(sa, &sa->so_rcv, sin6tosa(&addr), m, NULL) == 0) {
-			div6stat_inc(div6s_fullsock);
-			m_freem(m);
-			return (0);
-		} else {
-			KERNEL_LOCK();
-			sorwakeup(inp->inp_socket);
-			KERNEL_UNLOCK();
-		}
+	so = inp->inp_socket;
+	/*
+	 * XXXSMP sbappendaddr() is not MP safe and this function is called
+	 * from pf with shared netlock.  To call only one sbappendaddr() from
+	 * divert_packet(), protect it with kernel lock.  All other places
+	 * call sbappendaddr() with exclusive net lock.  This blocks
+	 * divert_packet() as we have the shared lock.
+	 */
+	KERNEL_LOCK();
+	if (sbappendaddr(so, &so->so_rcv, sin6tosa(&sin6), m, NULL) == 0) {
+		KERNEL_UNLOCK();
+		div6stat_inc(div6s_fullsock);
+		goto bad;
 	}
+	sorwakeup(inp->inp_socket);
+	KERNEL_UNLOCK();
 
-	if (sa == NULL) {
-		div6stat_inc(div6s_noport);
-		m_freem(m);
-	}
-	return (0);
+	in_pcbunref(inp);
+	return;
+
+ bad:
+	if (inp != NULL)
+		in_pcbunref(inp);
+	m_freem(m);
 }
 
 /*ARGSUSED*/

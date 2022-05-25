@@ -1,5 +1,4 @@
 /Makefile/1.19/Sun May 12 21:01:46 2019//
-/auth.c/1.39/Fri Nov 17 20:48:30 2017//
 /cbcp.c/1.9/Sat Jul 28 22:57:27 2018//
 /cbcp.h/1.2/Fri Sep 13 18:19:45 2002//
 /ccp.c/1.13/Tue Oct 27 23:59:53 2009//
@@ -26,3 +25,4 @@ D/pppstats////
 /main.c/1.55/Mon Nov 15 19:06:15 2021//
 /sys-bsd.c/1.32/Mon Nov 15 19:06:15 2021//
 /pppd.8/1.48/Wed Apr 20 14:28:27 2022//
+/auth.c/1.40/Wed May 25 14:32:46 2022//

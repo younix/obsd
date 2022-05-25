@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmctl.h,v 1.34 2021/01/27 07:21:12 deraadt Exp $	*/
+/*	$OpenBSD: vmctl.h,v 1.37 2022/05/13 00:17:20 yasuoka Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -48,7 +48,7 @@ struct parse_result {
 	char			*name;
 	char			*path;
 	char			*isopath;
-	long long		 size;
+	size_t			 size;
 	int			 nifs;
 	char			**nets;
 	int			 nnets;
@@ -77,7 +77,7 @@ extern struct imsgbuf	*ibuf;
 int	 vmmaction(struct parse_result *);
 int	 parse_ifs(struct parse_result *, char *, int);
 int	 parse_network(struct parse_result *, char *);
-int	 parse_size(struct parse_result *, char *);
+void	 parse_size(struct parse_result *, char *, const char *);
 int	 parse_disktype(const char *, const char **);
 int	 parse_disk(struct parse_result *, char *, int);
 int	 parse_vmid(struct parse_result *, char *, int);
@@ -90,10 +90,10 @@ __dead void
 /* vmctl.c */
 int	 open_imagefile(int, const char *, int,
 	    struct virtio_backing *, off_t *);
-int	 create_imagefile(int, const char *, const char *, long, const char **);
+int	 create_imagefile(int, const char *, const char *, uint64_t, const char **);
 int	 create_raw_imagefile(const char *, long);
 int	 create_qc2_imagefile(const char *, const char *, long);
-int	 vm_start(uint32_t, const char *, int, int, char **, int,
+int	 vm_start(uint32_t, const char *, size_t, int, char **, int,
 	    char **, int *, char *, char *, char *, unsigned int);
 int	 vm_start_complete(struct imsg *, int *, int);
 void	 terminate_vm(uint32_t, const char *, unsigned int);

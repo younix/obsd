@@ -41,7 +41,6 @@
 /siphash.h/1.1/Fri Sep 11 09:18:27 2015//
 /softfloat.h/1.1/Sun Sep 13 14:23:43 2015//
 /spawn.h/1.1/Sun Oct  4 07:57:21 2015//
-/stdio.h/1.7/Tue Sep  6 19:56:36 2016//
 /stdlib.h/1.16/Fri May 10 15:03:24 2019//
 /string.h/1.6/Thu Jan 18 08:23:44 2018//
 /syslog.h/1.4/Mon Mar 21 22:41:28 2016//
@@ -65,3 +64,4 @@ D/sys////
 /dlfcn.h/1.4/Sat May  1 08:41:50 2021//
 /login_cap.h/1.2/Thu Sep  2 14:22:30 2021//
 /search.h/1.2/Mon Jan 24 14:35:13 2022//
+/stdio.h/1.8/Wed May 25 14:32:11 2022//

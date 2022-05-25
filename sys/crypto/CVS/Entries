@@ -49,10 +49,10 @@
 /sha2.c/1.19/Wed Sep  1 16:07:39 2021//
 /cryptosoft.h/1.16/Thu Sep  2 14:22:31 2021//
 /crypto.c/1.92/Mon Nov 15 19:06:15 2021//
-/cryptodev.h/1.81/Mon Nov 15 19:06:15 2021//
 /cryptosoft.c/1.91/Mon Nov 15 19:06:15 2021//
 /xform.c/1.61/Mon Nov 15 19:06:15 2021//
 /xform.h/1.32/Mon Nov 15 19:06:15 2021//
 /blf.c/1.8/Mon Jan 24 14:35:14 2022//
 /blf.h/1.7/Mon Jan 24 14:35:14 2022//
+/cryptodev.h/1.82/Wed May 25 14:32:34 2022//
 D

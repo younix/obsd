@@ -20,7 +20,6 @@
 /bn_word.c/1.13/Tue Jul  5 02:54:35 2016//
 D/asm////
 /bn_rand.c/1.25/Thu Sep  2 14:22:30 2021//
-/bn_nist.c/1.19/Sun Nov 21 20:15:22 2021//
 /bn.h/1.52/Mon Jan 24 14:35:14 2022//
 /bn_exp2.c/1.13/Fri Feb 11 13:33:29 2022//
 /bn_gcd.c/1.16/Mon Jan 24 14:35:14 2022//
@@ -31,3 +30,4 @@ D/asm////
 /bn_x931p.c/1.13/Mon Jan 24 14:35:14 2022//
 /bn_exp.c/1.32/Wed Apr 20 14:28:03 2022//
 /bn_sqrt.c/1.10/Wed Apr 20 14:28:03 2022//
+/bn_nist.c/1.20/Wed May 25 14:32:12 2022//

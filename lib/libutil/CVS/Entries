@@ -9,7 +9,6 @@
 /getrawpartition.3/1.10/Wed May 15 18:42:30 2019//
 /login.3/1.6/Wed Jun  5 03:40:26 2013//
 /login.c/1.11/Mon Dec 28 20:11:36 2015//
-/login_fbtab.c/1.16/Fri Nov 27 01:57:59 2015//
 /login_tty.c/1.9/Mon Jun 30 00:26:22 2014//
 /logout.c/1.10/Fri Jun 28 13:32:43 2019//
 /logwtmp.c/1.11/Fri Jun 28 13:32:43 2019//
@@ -21,25 +20,20 @@
 /opendev.c/1.15/Thu Jun 30 15:04:58 2011//
 /opendisk.3/1.9/Thu Sep 10 15:16:43 2015//
 /opendisk.c/1.7/Mon Jun 30 00:26:22 2014//
-/openpty.3/1.19/Thu Apr 20 19:30:42 2017//
 /passwd.c/1.56/Fri Jun 28 13:32:43 2019//
 /pidfile.3/1.7/Wed Jun  5 03:40:26 2013//
 /pidfile.c/1.14/Fri Jun 28 14:20:40 2019//
 /pkcs5_pbkdf2.3/1.5/Wed Jun  5 03:40:26 2013//
 /pkcs5_pbkdf2.c/1.11/Thu Nov 21 16:07:24 2019//
-/pty.c/1.21/Thu Apr 20 17:48:30 2017//
 /pw_lock.3/1.20/Sun Aug 14 14:57:16 2016//
 /readlabel.c/1.15/Fri Jun 28 13:32:43 2019//
 /readlabelfs.3/1.8/Wed Jun  5 03:40:26 2013//
-/util.h/1.36/Fri Aug 30 03:57:56 2019//
 /uu_lock.3/1.1/Fri Aug 30 03:57:56 2019//
 /uucplock.c/1.21/Wed Jul  3 03:24:04 2019//
 /bcrypt_pbkdf.c/1.16/Thu Dec 17 19:39:58 2020//
 /getmaxpartitions.c/1.11/Sat May  1 08:41:50 2021//
 /getrawpartition.c/1.11/Sat May  1 08:41:50 2021//
-/imsg_init.3/1.24/Sat May  1 08:41:50 2021//
 /ober_add_string.3/1.2/Sat May  1 08:41:50 2021//
-/imsg-buffer.c/1.13/Wed Sep  1 16:07:37 2021//
 /imsg.h/1.6/Wed Sep  1 16:07:37 2021//
 /login_fbtab.3/1.15/Wed Sep  1 16:07:37 2021//
 /ober_get_string.3/1.6/Wed Sep  1 16:07:37 2021//
@@ -55,4 +49,10 @@
 /fmt_scaled.c/1.22/Tue Mar 15 08:19:57 2022//
 /pw_init.3/1.15/Mon Mar  7 09:08:07 2022//
 /isduid.3/1.4/Wed Apr 20 14:28:05 2022//
+/imsg-buffer.c/1.14/Wed May 25 14:32:16 2022//
+/imsg_init.3/1.25/Wed May 25 14:32:16 2022//
+/login_fbtab.c/1.17/Wed May 25 14:32:16 2022//
+/openpty.3/1.20/Wed May 25 14:32:16 2022//
+/pty.c/1.22/Wed May 25 14:32:16 2022//
+/util.h/1.38/Wed May 25 14:32:16 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509_asid.c,v 1.30 2021/12/25 15:46:05 tb Exp $ */
+/*	$OpenBSD: x509_asid.c,v 1.34 2022/05/12 20:00:06 tb Exp $ */
 /*
  * Contributed to the OpenSSL Project by the American Registry for
  * Internet Numbers ("ARIN").
@@ -918,6 +918,7 @@ asid_contains(ASIdOrRanges *parent, ASIdOrRanges *child)
 
 	if (child == NULL || parent == child)
 		return 1;
+
 	if (parent == NULL)
 		return 0;
 
@@ -944,20 +945,39 @@ asid_contains(ASIdOrRanges *parent, ASIdOrRanges *child)
 }
 
 /*
- * Test whether a is a subset of b.
+ * Test whether child is a subset of parent.
  */
 int
-X509v3_asid_subset(ASIdentifiers *a, ASIdentifiers *b)
+X509v3_asid_subset(ASIdentifiers *child, ASIdentifiers *parent)
 {
-	return (a == NULL ||
-	    a == b ||
-	    (b != NULL &&
-	     !X509v3_asid_inherits(a) &&
-	     !X509v3_asid_inherits(b) &&
-	     asid_contains(b->asnum->u.asIdsOrRanges,
-	     a->asnum->u.asIdsOrRanges) &&
-	     asid_contains(b->rdi->u.asIdsOrRanges,
-	     a->rdi->u.asIdsOrRanges)));
+	if (child == NULL || child == parent)
+		return 1;
+
+	if (parent == NULL)
+		return 0;
+
+	if (X509v3_asid_inherits(child) || X509v3_asid_inherits(parent))
+		return 0;
+
+	if (child->asnum != NULL) {
+		if (parent->asnum == NULL)
+			return 0;
+
+		if (!asid_contains(parent->asnum->u.asIdsOrRanges,
+		    child->asnum->u.asIdsOrRanges))
+			return 0;
+	}
+
+	if (child->rdi != NULL) {
+		if (parent->rdi == NULL)
+			return 0;
+
+		if (!asid_contains(parent->rdi->u.asIdsOrRanges,
+		    child->rdi->u.asIdsOrRanges))
+			return 0;
+	}
+
+	return 1;
 }
 
 /*
@@ -999,21 +1019,23 @@ asid_validate_path_internal(X509_STORE_CTX *ctx, STACK_OF(X509) *chain,
 		goto err;
 
 	/*
-	 * Figure out where to start.  If we don't have an extension to
-	 * check, we're done.  Otherwise, check canonical form and
-	 * set up for walking up the chain.
+	 * Figure out where to start. If we don't have an extension to check,
+	 * (either extracted from the leaf or passed by the caller), we're done.
+	 * Otherwise, check canonical form and set up for walking up the chain.
 	 */
 	if (ext != NULL) {
 		i = -1;
 		x = NULL;
+		if (!X509v3_asid_is_canonical(ext))
+			validation_err(X509_V_ERR_INVALID_EXTENSION);
 	} else {
 		i = 0;
 		x = sk_X509_value(chain, i);
+		if ((X509_get_extension_flags(x) & EXFLAG_INVALID) != 0)
+			goto done;
 		if ((ext = x->rfc3779_asid) == NULL)
 			goto done;
 	}
-	if (!X509v3_asid_is_canonical(ext))
-		validation_err(X509_V_ERR_INVALID_EXTENSION);
 	if (ext->asnum != NULL) {
 		switch (ext->asnum->type) {
 		case ASIdentifierChoice_inherit:
@@ -1042,13 +1064,13 @@ asid_validate_path_internal(X509_STORE_CTX *ctx, STACK_OF(X509) *chain,
 	for (i++; i < sk_X509_num(chain); i++) {
 		x = sk_X509_value(chain, i);
 
+		if ((X509_get_extension_flags(x) & EXFLAG_INVALID) != 0)
+			validation_err(X509_V_ERR_INVALID_EXTENSION);
 		if (x->rfc3779_asid == NULL) {
 			if (child_as != NULL || child_rdi != NULL)
 				validation_err(X509_V_ERR_UNNESTED_RESOURCE);
 			continue;
 		}
-		if (!X509v3_asid_is_canonical(x->rfc3779_asid))
-			validation_err(X509_V_ERR_INVALID_EXTENSION);
 		if (x->rfc3779_asid->asnum == NULL && child_as != NULL) {
 			validation_err(X509_V_ERR_UNNESTED_RESOURCE);
 			child_as = NULL;

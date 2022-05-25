@@ -4,7 +4,6 @@
 /invalid.in/1.2/Tue Jul  4 14:53:23 2017//
 /invalid.out_ascii/1.2/Tue Jul  4 14:53:23 2017//
 /invalid.out_html/1.5/Tue Sep  3 18:17:50 2019//
-/invalid.out_lint/1.5/Tue Jul  4 14:53:23 2017//
 /invalid.out_utf8/1.2/Tue Jul  4 14:53:23 2017//
 /latin1.in/1.6/Tue Aug 21 16:01:38 2018//
 /latin1.out_html/1.10/Tue Sep  3 18:17:50 2019//
@@ -36,4 +35,5 @@
 /nogroff.out_ascii/1.7/Thu Sep  2 14:22:31 2021//
 /nogroff.out_html/1.9/Thu Sep  2 14:22:31 2021//
 /nogroff.out_utf8/1.9/Thu Sep  2 14:22:31 2021//
+/invalid.out_lint/1.6/Wed May 25 14:32:25 2022//
 D

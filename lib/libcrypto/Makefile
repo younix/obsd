@@ -1,4 +1,4 @@
-# $OpenBSD: Makefile,v 1.72 2022/03/23 15:13:31 tb Exp $
+# $OpenBSD: Makefile,v 1.74 2022/05/08 20:59:32 tb Exp $
 
 LIB=	crypto
 LIBREBUILD=y
@@ -40,6 +40,7 @@ CFLAGS+= -I${LCRYPTO_SRC}/ecdh
 CFLAGS+= -I${LCRYPTO_SRC}/ecdsa
 CFLAGS+= -I${LCRYPTO_SRC}/evp
 CFLAGS+= -I${LCRYPTO_SRC}/hmac
+CFLAGS+= -I${LCRYPTO_SRC}/kdf
 CFLAGS+= -I${LCRYPTO_SRC}/modes
 CFLAGS+= -I${LCRYPTO_SRC}/ocsp
 CFLAGS+= -I${LCRYPTO_SRC}/rsa
@@ -203,6 +204,9 @@ SRCS+= hmac.c hm_ameth.c hm_pmeth.c
 # idea/
 SRCS+= i_cbc.c i_cfb64.c i_ofb64.c i_ecb.c i_skey.c
 
+# kdf/
+SRCS+= hkdf_evp.c kdf_err.c
+
 # lhash/
 SRCS+= lhash.c lh_stats.c
 
@@ -327,6 +331,7 @@ SRCS+= pcy_cache.c pcy_node.c pcy_data.c pcy_map.c pcy_tree.c pcy_lib.c
 	${LCRYPTO_SRC}/hkdf \
 	${LCRYPTO_SRC}/hmac \
 	${LCRYPTO_SRC}/idea \
+	${LCRYPTO_SRC}/kdf \
 	${LCRYPTO_SRC}/lhash \
 	${LCRYPTO_SRC}/md4 \
 	${LCRYPTO_SRC}/md5 \
@@ -372,7 +377,6 @@ HDRS=\
 	${LCRYPTO_SRC}/conf/conf_api.h \
 	${LCRYPTO_SRC}/crypto.h \
 	${LCRYPTO_SRC}/ct/ct.h \
-	${LCRYPTO_SRC}/ct/cterr.h \
 	${LCRYPTO_SRC}/curve25519/curve25519.h \
 	${LCRYPTO_SRC}/des/des.h \
 	${LCRYPTO_SRC}/dh/dh.h \
@@ -388,6 +392,7 @@ HDRS=\
 	${LCRYPTO_SRC}/hkdf/hkdf.h \
 	${LCRYPTO_SRC}/hmac/hmac.h \
 	${LCRYPTO_SRC}/idea/idea.h \
+	${LCRYPTO_SRC}/kdf/kdf.h \
 	${LCRYPTO_SRC}/lhash/lhash.h \
 	${LCRYPTO_SRC}/md4/md4.h \
 	${LCRYPTO_SRC}/md5/md5.h \

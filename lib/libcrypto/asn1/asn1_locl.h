@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_locl.h,v 1.24 2022/03/26 14:47:58 jsing Exp $ */
+/* $OpenBSD: asn1_locl.h,v 1.32 2022/05/17 09:17:20 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -171,9 +171,9 @@ const ASN1_TEMPLATE *asn1_do_adb(ASN1_VALUE **pval, const ASN1_TEMPLATE *tt, int
 int asn1_do_lock(ASN1_VALUE **pval, int op, const ASN1_ITEM *it);
 
 void asn1_enc_init(ASN1_VALUE **pval, const ASN1_ITEM *it);
-void asn1_enc_free(ASN1_VALUE **pval, const ASN1_ITEM *it);
+void asn1_enc_cleanup(ASN1_VALUE **pval, const ASN1_ITEM *it);
+int asn1_enc_save(ASN1_VALUE **pval, CBS *cbs, const ASN1_ITEM *it);
 int asn1_enc_restore(int *len, unsigned char **out, ASN1_VALUE **pval, const ASN1_ITEM *it);
-int asn1_enc_save(ASN1_VALUE **pval, const unsigned char *in, int inlen, const ASN1_ITEM *it);
 
 int i2d_ASN1_BOOLEAN(int a, unsigned char **pp);
 int d2i_ASN1_BOOLEAN(int *a, const unsigned char **pp, long length);
@@ -193,14 +193,24 @@ int UTF8_putc(unsigned char *str, int len, unsigned long value);
 
 int asn1_d2i_read_bio(BIO *in, BUF_MEM **pb);
 
+int asn1_get_identifier_cbs(CBS *cbs, int der_mode, uint8_t *out_class,
+    int *out_constructed, uint32_t *out_tag_number);
+int asn1_get_length_cbs(CBS *cbs, int der_mode, int *out_indefinite,
+    size_t *out_length);
 int asn1_get_object_cbs(CBS *cbs, int der_mode, uint8_t *out_class,
     int *out_constructed, uint32_t *out_tag_number, int *out_indefinite,
-    uint32_t *out_length);
+    size_t *out_length);
 int asn1_get_primitive(CBS *cbs, int der_mode, uint32_t *out_tag_number,
     CBS *out_content);
 
 int asn1_tag2charwidth(int tag);
 
+int asn1_abs_set_unused_bits(ASN1_BIT_STRING *abs, uint8_t unused_bits);
+int c2i_ASN1_BIT_STRING_cbs(ASN1_BIT_STRING **out_abs, CBS *cbs);
+
+int c2i_ASN1_INTEGER_cbs(ASN1_INTEGER **out_aint, CBS *cbs);
+
+int c2i_ASN1_OBJECT_cbs(ASN1_OBJECT **out_aobj, CBS *content);
 int i2t_ASN1_OBJECT_internal(const ASN1_OBJECT *aobj, char *buf, int buf_len,
     int no_name);
 ASN1_OBJECT *t2i_ASN1_OBJECT_internal(const char *oid);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: fdisk.c,v 1.143 2022/03/11 22:29:55 krw Exp $	*/
+/*	$OpenBSD: fdisk.c,v 1.145 2022/05/12 11:04:27 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -187,6 +187,8 @@ main(int argc, char *argv[])
 			Xwrite(NULL, &mbr);
 		break;
 	case INIT_MBRBOOTCODE:
+		if (GPT_read(ANYGPT) == 0)
+			errx(1, "-u not available for GPT");
 		if (MBR_read(0, 0, &mbr))
 			errx(1, "Can't read MBR!");
 		memcpy(mbr.mbr_code, default_dmbr.dmbr_boot,
@@ -275,10 +277,10 @@ get_default_dmbr(const char *mbrfile)
 
 	sz = sizeof(*dmbr);
 	len = read(fd, dmbr, sz);
-	close(fd);
-
 	if (len == -1)
 		err(1, "read('%s')", mbrfile);
 	else if (len != sz)
 		errx(1, "read('%s'): read %zd bytes of %zd", mbrfile, len, sz);
+
+	close(fd);
 }

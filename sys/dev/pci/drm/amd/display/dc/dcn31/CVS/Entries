@@ -5,7 +5,6 @@
 /dcn31_hubbub.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hubp.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hubp.h/1.1/Mon Jan 24 14:35:15 2022//
-/dcn31_hwseq.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_hwseq.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_init.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_init.h/1.1/Mon Jan 24 14:35:15 2022//
@@ -13,7 +12,8 @@
 /dcn31_optc.h/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_panel_cntl.c/1.1/Mon Jan 24 14:35:15 2022//
 /dcn31_panel_cntl.h/1.1/Mon Jan 24 14:35:15 2022//
-/dcn31_resource.c/1.2/Fri Feb 11 13:33:52 2022//
 /dcn31_resource.h/1.1/Mon Jan 24 14:35:15 2022//
-/dcn31_hubbub.c/1.2/Mon Mar  7 09:08:07 2022//
+/dcn31_hubbub.c/1.4/Wed May 25 14:32:36 2022//
+/dcn31_hwseq.c/1.2/Wed May 25 14:32:36 2022//
+/dcn31_resource.c/1.3/Wed May 25 14:32:36 2022//
 D

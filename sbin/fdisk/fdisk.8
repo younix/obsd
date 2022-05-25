@@ -1,4 +1,4 @@
-.\"	$OpenBSD: fdisk.8,v 1.112 2022/03/31 17:27:19 naddy Exp $
+.\"	$OpenBSD: fdisk.8,v 1.114 2022/05/12 14:10:05 krw Exp $
 .\"
 .\"
 .\" Copyright (c) 1997 Tobias Weingartner
@@ -15,7 +15,7 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: March 31 2022 $
+.Dd $Mdocdate: May 12 2022 $
 .Dt FDISK 8
 .Os
 .Sh NAME
@@ -64,7 +64,7 @@ The free space is maximized by deleting
 all existing partitions except the boot partitions
 .Sq APFS ISC ,
 .Sq APFS ,
-.Sq APFS Recovry ,
+.Sq APFS Recovery ,
 .Sq BIOS Boot ,
 .Sq HiFive FSBL
 and
@@ -74,7 +74,7 @@ If one of
 .Sq APFS ISC ,
 .Sq APFS ,
 or
-.Sq APFS Recovry
+.Sq APFS Recovery
 is detected then any existing
 .Sq EFI system
 will also be preserved.
@@ -170,6 +170,7 @@ This is useful for writing new MBR bootcode onto an existing drive, and is
 equivalent to the DOS command
 .Dq FDISK /MBR .
 Note that this option will overwrite the NT disk signature, if present.
+Not available when editing a GPT.
 .It Fl v
 Print the contents of the MBR, the Primary GPT and the Secondary GPT.
 Also print more detailed GPT header and partition entry information.

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.156 2022/04/20 00:47:32 krw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.161 2022/05/09 15:09:50 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -44,7 +44,6 @@ int		 parsepn(const char *);
 int		 ask_num(const char *, int, int, int);
 int		 ask_pid(const int);
 struct uuid	*ask_uuid(const struct uuid *);
-char		*ask_string(const char *, const char *);
 
 extern const unsigned char	manpage[];
 extern const int		manpage_sz;
@@ -119,9 +118,6 @@ int
 gedit(const int pn)
 {
 	struct uuid		 oldtype;
-	char			*name;
-	uint16_t		*utf;
-	int			 i;
 
 	oldtype = gp[pn].gp_type;
 
@@ -137,26 +133,11 @@ gedit(const int pn)
 	}
 
 	if (GPT_get_lba_start(pn) == -1 ||
-	    GPT_get_lba_end(pn) == -1) {
+	    GPT_get_lba_end(pn) == -1 ||
+	    GPT_get_name(pn) == -1) {
 		return -1;
 	}
 
-	name = ask_string("Partition name", utf16le_to_string(gp[pn].gp_name));
-	if (strlen(name) >= GPTPARTNAMESIZE) {
-		printf("partition name must be < %d characters\n",
-		    GPTPARTNAMESIZE);
-		return -1;
-	}
-	/*
-	 * N.B.: simple memcpy() could copy trash from static buf! This
-	 * would create false positives for the partition having changed.
-	 */
-	utf = string_to_utf16le(name);
-	for (i = 0; i < GPTPARTNAMESIZE; i++) {
-		gp[pn].gp_name[i] = utf[i];
-		if (utf[i] == 0)
-			break;
-	}
 	return 0;
 }
 
@@ -272,37 +253,31 @@ Xedit(char *args, struct mbr *mbr)
 int
 gsetpid(const int pn)
 {
-	struct uuid		 gp_type, gp_guid;
 	uint32_t		 status;
 
 	GPT_print_parthdr(TERSE);
 	GPT_print_part(pn, "s", TERSE);
 
-	uuid_dec_le(&gp[pn].gp_type, &gp_type);
-	if (PRT_protected_guid(&gp_type)) {
+	if (PRT_protected_guid(&gp[pn].gp_type)) {
 		printf("can't edit partition type %s\n",
-		    PRT_uuid_to_typename(&gp_type));
+		    PRT_uuid_to_sname(&gp[pn].gp_type));
 		return -1;
 	}
 
-	gp_type = *ask_uuid(&gp_type);
-	if (PRT_protected_guid(&gp_type)) {
+	gp[pn].gp_type = *ask_uuid(&gp[pn].gp_type);
+	if (PRT_protected_guid(&gp[pn].gp_type)) {
 		printf("can't change partition type to %s\n",
-		    PRT_uuid_to_typename(&gp_type));
+		    PRT_uuid_to_sname(&gp[pn].gp_type));
 		return -1;
 	}
 
-	uuid_dec_le(&gp[pn].gp_guid, &gp_guid);
-	if (uuid_is_nil(&gp_guid, NULL)) {
-		uuid_create(&gp_guid, &status);
+	if (uuid_is_nil(&gp[pn].gp_guid, NULL)) {
+		uuid_create(&gp[pn].gp_guid, &status);
 		if (status != uuid_s_ok) {
 			printf("could not create guid for partition\n");
 			return -1;
 		}
 	}
-
-	uuid_enc_le(&gp[pn].gp_type, &gp_type);
-	uuid_enc_le(&gp[pn].gp_guid, &gp_guid);
 
 	return 0;
 }
@@ -402,24 +377,24 @@ Xwrite(char *args, struct mbr *mbr)
 	int			i, n;
 
 	for (i = 0, n = 0; i < NDOSPART; i++)
-		if (mbr->mbr_prt[i].prt_id == 0xA6)
+		if (mbr->mbr_prt[i].prt_id == DOSPTYP_OPENBSD)
 			n++;
-	if (n >= 2) {
+	if (n > 1) {
 		warnx("MBR contains more than one OpenBSD partition!");
-		if (!ask_yn("Write MBR anyway?"))
+		if (ask_yn("Write MBR anyway?") == 0)
 			return CMD_CONT;
 	}
 
 	if (gh.gh_sig == GPTSIGNATURE) {
 		printf("Writing GPT.\n");
 		if (GPT_write() == -1) {
-			warn("error writing GPT");
+			warnx("error writing GPT");
 			return CMD_CONT;
 		}
 	} else {
 		printf("Writing MBR at offset %llu.\n", mbr->mbr_lba_self);
 		if (MBR_write(mbr) == -1) {
-			warn("error writing MBR");
+			warnx("error writing MBR");
 			return CMD_CONT;
 		}
 		GPT_zap_headers();
@@ -488,7 +463,7 @@ Xflag(char *args, struct mbr *mbr)
 			return CMD_CONT;
 		}
 		if (gh.gh_sig == GPTSIGNATURE)
-			gp[pn].gp_attrs = htole64(val);
+			gp[pn].gp_attrs = val;
 		else
 			mbr->mbr_prt[pn].prt_flag = val;
 		printf("Partition %d flag value set to 0x%llx.\n", pn, val);
@@ -496,9 +471,9 @@ Xflag(char *args, struct mbr *mbr)
 		if (gh.gh_sig == GPTSIGNATURE) {
 			for (i = 0; i < gh.gh_part_num; i++) {
 				if (i == pn)
-					gp[i].gp_attrs = htole64(GPTDOSACTIVE);
+					gp[i].gp_attrs = GPTDOSACTIVE;
 				else
-					gp[i].gp_attrs = htole64(0);
+					gp[i].gp_attrs = 0;
 			}
 		} else {
 			for (i = 0; i < NDOSPART; i++) {
@@ -648,7 +623,7 @@ ask_uuid(const struct uuid *olduuid)
 			uuid_create_nil(&uuid, NULL);
 			goto done;
 		default:
-			uuid = *PRT_type_to_uuid(num);
+			uuid = *PRT_type_to_guid(num);
 			if (uuid_is_nil(&uuid, NULL) == 0)
 				goto done;
 			printf("'%s' has no associated UUID\n", lbuf);
@@ -659,19 +634,4 @@ ask_uuid(const struct uuid *olduuid)
  done:
 	free(dflt);
 	return &uuid;
-}
-
-char *
-ask_string(const char *prompt, const char *oval)
-{
-	static char		buf[UUID_STR_LEN + 1];
-
-	buf[0] = '\0';
-	printf("%s: [%s] ", prompt, oval ? oval : "");
-	string_from_line(buf, sizeof(buf), UNTRIMMED);
-
-	if (buf[0] == '\0' && oval)
-		strlcpy(buf, oval, sizeof(buf));
-
-	return buf;
 }

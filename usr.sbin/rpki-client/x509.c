@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.41 2022/04/15 12:59:44 tb Exp $ */
+/*	$OpenBSD: x509.c,v 1.45 2022/05/15 16:43:35 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -42,6 +42,7 @@ ASN1_OBJECT	*cnt_type_oid;	/* pkcs-9 id-contentType */
 ASN1_OBJECT	*msg_dgst_oid;	/* pkcs-9 id-messageDigest */
 ASN1_OBJECT	*sign_time_oid;	/* pkcs-9 id-signingTime */
 ASN1_OBJECT	*bin_sign_time_oid;	/* pkcs-9 id-aa-binarySigningTime */
+ASN1_OBJECT	*rsc_oid;	/* id-ct-signedChecklist */
 
 void
 x509_init_oid(void)
@@ -76,6 +77,9 @@ x509_init_oid(void)
 	    OBJ_txt2obj("1.2.840.113549.1.9.16.2.46", 1)) == NULL)
 		errx(1, "OBJ_txt2obj for %s failed",
 		    "1.2.840.113549.1.9.16.2.46");
+	if ((rsc_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.48", 1)) == NULL)
+		errx(1, "OBJ_txt2obj for %s failed",
+		    "1.2.840.113549.1.9.16.1.48");
 }
 
 /*
@@ -179,10 +183,15 @@ x509_get_purpose(X509 *x, const char *fn)
 {
 	EXTENDED_KEY_USAGE		*eku = NULL;
 	int				 crit;
-	enum cert_purpose		 purpose = 0;
+	enum cert_purpose		 purpose = CERT_PURPOSE_INVALID;
 
 	if (X509_check_ca(x) == 1) {
 		purpose = CERT_PURPOSE_CA;
+		goto out;
+	}
+
+	if (X509_get_extension_flags(x) & EXFLAG_BCONS) {
+		warnx("%s: Basic Constraints ext in non-CA cert", fn);
 		goto out;
 	}
 
@@ -335,7 +344,51 @@ x509_get_expire(X509 *x, const char *fn, time_t *tt)
 		return 0;
 	}
 	return 1;
+}
 
+/*
+ * Check whether the RFC 3779 extensions are set to inherit.
+ * Return 1 if both AS & IP are set to inherit.
+ * Return 0 on failure (such as missing extensions or no inheritance).
+ */
+int
+x509_inherits(X509 *x)
+{
+	STACK_OF(IPAddressFamily)	*addrblk = NULL;
+	ASIdentifiers			*asidentifiers = NULL;
+	const IPAddressFamily		*af;
+	int		 		 i, rc = 0;
+
+	addrblk = X509_get_ext_d2i(x, NID_sbgp_ipAddrBlock, NULL, NULL);
+	if (addrblk == NULL)
+		goto out;
+
+	/*
+	 * Check by hand, since X509v3_addr_inherits() success only means that
+	 * at least one address family inherits, not all of them.
+	 */
+	for (i = 0; i < sk_IPAddressFamily_num(addrblk); i++) {
+		af = sk_IPAddressFamily_value(addrblk, i);
+		if (af->ipAddressChoice->type != IPAddressChoice_inherit)
+			goto out;
+	}
+
+	asidentifiers = X509_get_ext_d2i(x, NID_sbgp_autonomousSysNum, NULL,
+	    NULL);
+	if (asidentifiers == NULL)
+		goto out;
+
+	/* We need to have AS numbers and don't want RDIs. */
+	if (asidentifiers->asnum == NULL || asidentifiers->rdi != NULL)
+		goto out;
+	if (!X509v3_asid_inherits(asidentifiers))
+		goto out;
+
+	rc = 1;
+ out:
+	ASIdentifiers_free(asidentifiers);
+	sk_IPAddressFamily_pop_free(addrblk, IPAddressFamily_free);
+	return rc;
 }
 
 /*

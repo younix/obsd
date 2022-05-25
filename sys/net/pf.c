@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.1126 2022/03/17 18:27:55 sthen Exp $ */
+/*	$OpenBSD: pf.c,v 1.1132 2022/05/23 11:17:35 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -102,11 +102,6 @@
 #else
 struct pfsync_deferral;
 #endif /* NPFSYNC > 0 */
-
-#ifdef DDB
-#include <machine/db_machdep.h>
-#include <ddb/db_interface.h>
-#endif
 
 /*
  * Global variables
@@ -227,6 +222,8 @@ u_int16_t		 pf_calc_mss(struct pf_addr *, sa_family_t, int,
 static __inline int	 pf_set_rt_ifp(struct pf_state *, struct pf_addr *,
 			    sa_family_t, struct pf_src_node **);
 struct pf_divert	*pf_get_divert(struct mbuf *);
+int			 pf_walk_option(struct pf_pdesc *, struct ip *,
+			    int, int, u_short *);
 int			 pf_walk_header(struct pf_pdesc *, struct ip *,
 			    u_short *);
 int			 pf_walk_option6(struct pf_pdesc *, struct ip6_hdr *,
@@ -1294,9 +1291,9 @@ pf_purge(void *xnloops)
 	/*
 	 * process a fraction of the state table every second
 	 * Note:
-	 * 	we no longer need PF_LOCK() here, because
-	 * 	pf_purge_expired_states() uses pf_state_lock to maintain
-	 * 	consistency.
+	 *     we no longer need PF_LOCK() here, because
+	 *     pf_purge_expired_states() uses pf_state_lock to maintain
+	 *     consistency.
 	 */
 	if (pf_default_rule.timeout[PFTM_INTERVAL] > 0)
 		pf_purge_expired_states(1 + (pf_status.states
@@ -1522,7 +1519,7 @@ pf_purge_expired_states(u_int32_t maxcheck)
 	time_t			 now;
 
 	PF_ASSERT_UNLOCKED();
- 
+
 	rw_enter_read(&pf_state_list.pfs_rwl);
 
 	mtx_enter(&pf_state_list.pfs_mtx);
@@ -1556,7 +1553,7 @@ pf_purge_expired_states(u_int32_t maxcheck)
 			cur = NULL;
 			break;
 		}
- 
+
 		cur = TAILQ_NEXT(cur, entry_list);
 	} while (maxcheck--);
 
@@ -1572,7 +1569,7 @@ pf_purge_expired_states(u_int32_t maxcheck)
 	SLIST_FOREACH(st, &gcl, gc_list) {
 		if (st->timeout != PFTM_UNLINKED)
 			pf_remove_state(st);
- 
+
 		pf_free_state(st);
 	}
 	PF_STATE_EXIT_WRITE();
@@ -3405,7 +3402,7 @@ pf_find_tcpopt(u_int8_t *opt, u_int8_t *opts, size_t hlen, u_int8_t type,
 		default:
 			if (opt[0] == type &&
 			    opt[1] >= min_typelen)
-			        return (opt);
+				return (opt);
 		}
 
 		opt += MAX(opt[1], 2); /* evade infinite loops */
@@ -3956,7 +3953,7 @@ pf_test_rule(struct pf_pdesc *pd, struct pf_rule **rm, struct pf_state **sm,
 	    rtable_l2(ctx.act.rtableid) != pd->rdomain)
 		pd->destchg = 1;
 
-	if (r->action == PF_PASS && pd->badopts && ! r->allow_opts) {
+	if (r->action == PF_PASS && pd->badopts != 0 && ! r->allow_opts) {
 		REASON_SET(&ctx.reason, PFRES_IPOPTIONS);
 #if NPFLOG > 0
 		pd->pflog |= PF_LOG_FORCE;
@@ -6382,6 +6379,62 @@ pf_get_divert(struct mbuf *m)
 }
 
 int
+pf_walk_option(struct pf_pdesc *pd, struct ip *h, int off, int end,
+    u_short *reason)
+{
+	uint8_t	type, length, opts[15 * 4 - sizeof(struct ip)];
+
+	/* IP header in payload of ICMP packet may be too short */
+	if (pd->m->m_pkthdr.len < end) {
+		DPFPRINTF(LOG_NOTICE, "IP option too short");
+		REASON_SET(reason, PFRES_SHORT);
+		return (PF_DROP);
+	}
+
+	KASSERT(end - off <= sizeof(opts));
+	m_copydata(pd->m, off, end - off, opts);
+	end -= off;
+	off = 0;
+
+	while (off < end) {
+		type = opts[off];
+		if (type == IPOPT_EOL)
+			break;
+		if (type == IPOPT_NOP) {
+			off++;
+			continue;
+		}
+		if (off + 2 > end) {
+			DPFPRINTF(LOG_NOTICE, "IP length opt");
+			REASON_SET(reason, PFRES_IPOPTIONS);
+			return (PF_DROP);
+		}
+		length = opts[off + 1];
+		if (length < 2) {
+			DPFPRINTF(LOG_NOTICE, "IP short opt");
+			REASON_SET(reason, PFRES_IPOPTIONS);
+			return (PF_DROP);
+		}
+		if (off + length > end) {
+			DPFPRINTF(LOG_NOTICE, "IP long opt");
+			REASON_SET(reason, PFRES_IPOPTIONS);
+			return (PF_DROP);
+		}
+		switch (type) {
+		case IPOPT_RA:
+			SET(pd->badopts, PF_OPT_ROUTER_ALERT);
+			break;
+		default:
+			SET(pd->badopts, PF_OPT_OTHER);
+			break;
+		}
+		off += length;
+	}
+
+	return (PF_PASS);
+}
+
+int
 pf_walk_header(struct pf_pdesc *pd, struct ip *h, u_short *reason)
 {
 	struct ip6_ext		 ext;
@@ -6393,11 +6446,27 @@ pf_walk_header(struct pf_pdesc *pd, struct ip *h, u_short *reason)
 		REASON_SET(reason, PFRES_SHORT);
 		return (PF_DROP);
 	}
-	if (hlen != sizeof(struct ip))
-		pd->badopts++;
+	if (hlen != sizeof(struct ip)) {
+		if (pf_walk_option(pd, h, pd->off + sizeof(struct ip),
+		    pd->off + hlen, reason) != PF_PASS)
+			return (PF_DROP);
+		/* header options which contain only padding is fishy */
+		if (pd->badopts == 0)
+			SET(pd->badopts, PF_OPT_OTHER);
+	}
 	end = pd->off + ntohs(h->ip_len);
 	pd->off += hlen;
 	pd->proto = h->ip_p;
+	/* IGMP packets have router alert options, allow them */
+	if (pd->proto == IPPROTO_IGMP) {
+		/* According to RFC 1112 ttl must be set to 1. */
+		if ((h->ip_ttl != 1) || !IN_MULTICAST(h->ip_dst.s_addr)) {
+			DPFPRINTF(LOG_NOTICE, "Invalid IGMP");
+			REASON_SET(reason, PFRES_IPOPTIONS);
+			return (PF_DROP);
+		}
+		CLR(pd->badopts, PF_OPT_ROUTER_ALERT);
+	}
 	/* stop walking over non initial fragments */
 	if ((h->ip_off & htons(IP_OFFMASK)) != 0)
 		return (PF_PASS);
@@ -6455,7 +6524,10 @@ pf_walk_option6(struct pf_pdesc *pd, struct ip6_hdr *h, int off, int end,
 			return (PF_DROP);
 		}
 		switch (opt.ip6o_type) {
+		case IP6OPT_PADN:
+			break;
 		case IP6OPT_JUMBO:
+			SET(pd->badopts, PF_OPT_JUMBO);
 			if (pd->jumbolen != 0) {
 				DPFPRINTF(LOG_NOTICE, "IPv6 multiple jumbo");
 				REASON_SET(reason, PFRES_IPOPTIONS);
@@ -6480,7 +6552,11 @@ pf_walk_option6(struct pf_pdesc *pd, struct ip6_hdr *h, int off, int end,
 				return (PF_DROP);
 			}
 			break;
+		case IP6OPT_ROUTER_ALERT:
+			SET(pd->badopts, PF_OPT_ROUTER_ALERT);
+			break;
 		default:
+			SET(pd->badopts, PF_OPT_OTHER);
 			break;
 		}
 		off += sizeof(opt) + opt.ip6o_len;
@@ -6494,6 +6570,7 @@ pf_walk_header6(struct pf_pdesc *pd, struct ip6_hdr *h, u_short *reason)
 {
 	struct ip6_frag		 frag;
 	struct ip6_ext		 ext;
+	struct icmp6_hdr	 icmp6;
 	struct ip6_rthdr	 rthdr;
 	u_int32_t		 end;
 	int			 hdr_cnt, fraghdr_cnt = 0, rthdr_cnt = 0;
@@ -6506,9 +6583,22 @@ pf_walk_header6(struct pf_pdesc *pd, struct ip6_hdr *h, u_short *reason)
 	for (hdr_cnt = 0; hdr_cnt < pf_hdr_limit; hdr_cnt++) {
 		switch (pd->proto) {
 		case IPPROTO_ROUTING:
-		case IPPROTO_HOPOPTS:
 		case IPPROTO_DSTOPTS:
-			pd->badopts++;
+			SET(pd->badopts, PF_OPT_OTHER);
+			break;
+		case IPPROTO_HOPOPTS:
+			if (!pf_pull_hdr(pd->m, pd->off, &ext, sizeof(ext),
+			    NULL, reason, AF_INET6)) {
+				DPFPRINTF(LOG_NOTICE, "IPv6 short exthdr");
+				return (PF_DROP);
+			}
+			if (pf_walk_option6(pd, h, pd->off + sizeof(ext),
+			    pd->off + (ext.ip6e_len + 1) * 8, reason)
+			    != PF_PASS)
+				return (PF_DROP);
+			/* option header which contains only padding is fishy */
+			if (pd->badopts == 0)
+				SET(pd->badopts, PF_OPT_OTHER);
 			break;
 		}
 		switch (pd->proto) {
@@ -6587,19 +6677,11 @@ pf_walk_header6(struct pf_pdesc *pd, struct ip6_hdr *h, u_short *reason)
 			/* reassembly needs the ext header before the frag */
 			if (pd->fragoff == 0)
 				pd->extoff = pd->off;
-			if (pd->proto == IPPROTO_HOPOPTS && pd->fragoff == 0) {
-				if (pf_walk_option6(pd, h,
-				    pd->off + sizeof(ext),
-				    pd->off + (ext.ip6e_len + 1) * 8, reason)
-				    != PF_PASS)
-					return (PF_DROP);
-				if (ntohs(h->ip6_plen) == 0 &&
-				    pd->jumbolen != 0) {
-					DPFPRINTF(LOG_NOTICE,
-					    "IPv6 missing jumbo");
-					REASON_SET(reason, PFRES_IPOPTIONS);
-					return (PF_DROP);
-				}
+			if (pd->proto == IPPROTO_HOPOPTS && pd->fragoff == 0 &&
+			    ntohs(h->ip6_plen) == 0 && pd->jumbolen != 0) {
+				DPFPRINTF(LOG_NOTICE, "IPv6 missing jumbo");
+				REASON_SET(reason, PFRES_IPOPTIONS);
+				return (PF_DROP);
 			}
 			if (pd->proto == IPPROTO_AH)
 				pd->off += (ext.ip6e_len + 2) * 4;
@@ -6607,9 +6689,43 @@ pf_walk_header6(struct pf_pdesc *pd, struct ip6_hdr *h, u_short *reason)
 				pd->off += (ext.ip6e_len + 1) * 8;
 			pd->proto = ext.ip6e_nxt;
 			break;
+		case IPPROTO_ICMPV6:
+			/* fragments may be short, ignore inner header then */
+			if (pd->fragoff != 0 && end < pd->off + sizeof(icmp6)) {
+				pd->off = pd->fragoff;
+				pd->proto = IPPROTO_FRAGMENT;
+				return (PF_PASS);
+			}
+			if (!pf_pull_hdr(pd->m, pd->off, &icmp6, sizeof(icmp6),
+			    NULL, reason, AF_INET6)) {
+				DPFPRINTF(LOG_NOTICE, "IPv6 short icmp6hdr");
+				return (PF_DROP);
+			}
+			/* ICMP multicast packets have router alert options */
+			switch (icmp6.icmp6_type) {
+			case MLD_LISTENER_QUERY:
+			case MLD_LISTENER_REPORT:
+			case MLD_LISTENER_DONE:
+			case MLDV2_LISTENER_REPORT:
+				/*
+				 * According to RFC 2710 all MLD messages are
+				 * sent with hop-limit (ttl) set to 1, and link
+				 * local source address.  If either one is
+				 * missing then MLD message is invalid and
+				 * should be discarded.
+				 */
+				if ((h->ip6_hlim != 1) ||
+				    !IN6_IS_ADDR_LINKLOCAL(&h->ip6_src)) {
+					DPFPRINTF(LOG_NOTICE, "Invalid MLD");
+					REASON_SET(reason, PFRES_IPOPTIONS);
+					return (PF_DROP);
+				}
+				CLR(pd->badopts, PF_OPT_ROUTER_ALERT);
+				break;
+			}
+			return (PF_PASS);
 		case IPPROTO_TCP:
 		case IPPROTO_UDP:
-		case IPPROTO_ICMPV6:
 			/* fragments may be short, ignore inner header then */
 			if (pd->fragoff != 0 && end < pd->off +
 			    (pd->proto == IPPROTO_TCP ? sizeof(struct tcphdr) :
@@ -7167,7 +7283,7 @@ done:
 	if (action != PF_DROP) {
 		if (s) {
 			/* The non-state case is handled in pf_test_rule() */
-			if (action == PF_PASS && pd.badopts &&
+			if (action == PF_PASS && pd.badopts != 0 &&
 			    !(s->state_flags & PFSTATE_ALLOWOPTS)) {
 				action = PF_DROP;
 				REASON_SET(&reason, PFRES_IPOPTIONS);
@@ -7289,13 +7405,13 @@ done:
 	case PF_DIVERT:
 		switch (pd.af) {
 		case AF_INET:
-			if (!divert_packet(pd.m, pd.dir, r->divert.port))
-				pd.m = NULL;
+			divert_packet(pd.m, pd.dir, r->divert.port);
+			pd.m = NULL;
 			break;
 #ifdef INET6
 		case AF_INET6:
-			if (!divert6_packet(pd.m, pd.dir, r->divert.port))
-				pd.m = NULL;
+			divert6_packet(pd.m, pd.dir, r->divert.port);
+			pd.m = NULL;
 			break;
 #endif /* INET6 */
 		}

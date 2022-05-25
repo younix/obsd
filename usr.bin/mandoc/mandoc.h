@@ -1,6 +1,6 @@
-/* $OpenBSD: mandoc.h,v 1.216 2021/08/14 13:51:46 schwarze Exp $ */
+/* $OpenBSD: mandoc.h,v 1.219 2022/05/19 15:17:50 schwarze Exp $ */
 /*
- * Copyright (c) 2012-2021 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2012-2022 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2010, 2011, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -165,6 +165,7 @@ enum	mandocerr {
 	MANDOCERR_SM_BAD, /* invalid Boolean argument: macro arg */
 	MANDOCERR_CHAR_FONT, /* argument contains two font escapes */
 	MANDOCERR_FT_BAD, /* unknown font, skipping request: ft font */
+	MANDOCERR_MC_DIST, /* ignoring distance argument: mc ... arg */
 	MANDOCERR_TR_ODD, /* odd number of characters in request: tr char */
 
 	/* related to plain text */
@@ -215,11 +216,13 @@ enum	mandocerr {
 	MANDOCERR_NAMESC, /* escaped character not allowed in a name: name */
 	MANDOCERR_ARG_UNDEF, /* using macro argument outside macro */
 	MANDOCERR_ARG_NONUM, /* argument number is not numeric */
+	MANDOCERR_ARG_NEG, /* negative argument, using 0: request arg */
 	MANDOCERR_BD_FILE, /* NOT IMPLEMENTED: Bd -file */
 	MANDOCERR_BD_NOARG, /* skipping display without arguments: Bd */
 	MANDOCERR_BL_NOTYPE, /* missing list type, using -item: Bl */
 	MANDOCERR_CE_NONUM, /* argument is not numeric, using 1: ce ... */
 	MANDOCERR_CHAR_ARG, /* argument is not a character: char ... */
+	MANDOCERR_MC_ESC, /* skipping unusable escape sequence: mc arg */
 	MANDOCERR_NM_NONAME, /* missing manual name, using "": Nm */
 	MANDOCERR_OS_UNAME, /* uname(3) system call failed, using UNKNOWN */
 	MANDOCERR_ST_BAD, /* unknown standard specifier: St standard */
@@ -282,11 +285,12 @@ enum	mandocerr {
 };
 
 enum	mandoc_esc {
-	ESCAPE_ERROR = 0, /* bail! unparsable escape */
-	ESCAPE_UNSUPP, /* unsupported escape; ignore it */
-	ESCAPE_IGNORE, /* escape to be ignored */
-	ESCAPE_UNDEF, /* undefined escape; print literal character */
-	ESCAPE_SPECIAL, /* a regular special character */
+	ESCAPE_EXPAND = 0, /* interpolation and iterative call needed */
+	ESCAPE_ERROR, /* non-fatal error: unparsable escape */
+	ESCAPE_UNSUPP, /* unsupported escape: warn and ignore */
+	ESCAPE_IGNORE, /* valid escape to be ignored */
+	ESCAPE_UNDEF, /* undefined escape: print literal character */
+	ESCAPE_SPECIAL, /* special character escape */
 	ESCAPE_FONT, /* a generic font mode */
 	ESCAPE_FONTBOLD, /* bold font mode */
 	ESCAPE_FONTITALIC, /* italic font mode */

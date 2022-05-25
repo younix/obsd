@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_var.h,v 1.91 2022/04/20 09:38:26 bluhm Exp $	*/
+/*	$OpenBSD: ip_var.h,v 1.93 2022/05/05 13:57:40 claudio Exp $	*/
 /*	$NetBSD: ip_var.h,v 1.16 1996/02/13 23:43:20 christos Exp $	*/
 
 /*
@@ -217,7 +217,7 @@ extern int ipmforwarding;		/* enable multicast forwarding */
 extern int ipmultipath;			/* enable multipath routing */
 extern int la_hold_total;
 
-extern struct rttimer_queue *ip_mtudisc_timeout_q;
+extern struct rttimer_queue ip_mtudisc_timeout_q;
 extern struct pool ipqent_pool;
 struct route;
 struct inpcb;
@@ -248,7 +248,6 @@ void	 ip_stripoptions(struct mbuf *);
 int	 ip_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 void	 ip_savecontrol(struct inpcb *, struct mbuf **, struct ip *,
 	    struct mbuf *);
-void	 ipintr(void);
 int	 ip_input_if(struct mbuf **, int *, int, int, struct ifnet *);
 int	 ip_deliver(struct mbuf **, int *, int, int);
 void	 ip_forward(struct mbuf *, struct ifnet *, struct rtentry *, int);

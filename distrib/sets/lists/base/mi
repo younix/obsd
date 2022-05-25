@@ -759,14 +759,14 @@
 ./usr/lib/libreadline.so.4.0
 ./usr/lib/librpcsvc.so.2.0
 ./usr/lib/libskey.so.6.0
-./usr/lib/libsndio.so.7.1
+./usr/lib/libsndio.so.7.2
 ./usr/lib/libssl.so.52.0
 ./usr/lib/libtermcap.so.14.0
 ./usr/lib/libtermlib.so.14.0
 ./usr/lib/libtls.so.25.0
 ./usr/lib/libusbhid.so.7.1
 ./usr/lib/libutil.so.16.0
-./usr/lib/libz.so.6.0
+./usr/lib/libz.so.6.1
 ./usr/lib/locate
 ./usr/lib/locate/src.db
 ./usr/lib/pkgconfig
@@ -2796,6 +2796,8 @@
 ./usr/sbin/zic
 ./usr/share
 ./usr/share/btrace
+./usr/share/btrace/kprofile.bt
+./usr/share/btrace/runqlat.bt
 ./usr/share/calendar
 ./usr/share/calendar/calendar.all
 ./usr/share/calendar/calendar.birthday

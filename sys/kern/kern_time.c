@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_time.c,v 1.154 2021/06/18 15:59:14 cheloha Exp $	*/
+/*	$OpenBSD: kern_time.c,v 1.156 2022/05/05 09:45:15 bluhm Exp $	*/
 /*	$NetBSD: kern_time.c,v 1.20 1996/02/18 11:57:06 fvdl Exp $	*/
 
 /*
@@ -36,6 +36,7 @@
 #include <sys/resourcevar.h>
 #include <sys/kernel.h>
 #include <sys/systm.h>
+#include <sys/mutex.h>
 #include <sys/rwlock.h>
 #include <sys/proc.h>
 #include <sys/ktrace.h>
@@ -775,6 +776,8 @@ itimerdecr(struct itimerspec *itp, long nsec)
 	return (0);
 }
 
+struct mutex ratecheck_mtx = MUTEX_INITIALIZER(IPL_HIGH);
+
 /*
  * ratecheck(): simple time-based rate-limit checking.  see ratecheck(9)
  * for usage and rationale.
@@ -787,6 +790,7 @@ ratecheck(struct timeval *lasttime, const struct timeval *mininterval)
 
 	getmicrouptime(&tv);
 
+	mtx_enter(&ratecheck_mtx);
 	timersub(&tv, lasttime, &delta);
 
 	/*
@@ -798,9 +802,12 @@ ratecheck(struct timeval *lasttime, const struct timeval *mininterval)
 		*lasttime = tv;
 		rv = 1;
 	}
+	mtx_leave(&ratecheck_mtx);
 
 	return (rv);
 }
+
+struct mutex ppsratecheck_mtx = MUTEX_INITIALIZER(IPL_HIGH);
 
 /*
  * ppsratecheck(): packets (or events) per second limitation.
@@ -813,6 +820,7 @@ ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
 
 	microuptime(&tv);
 
+	mtx_enter(&ppsratecheck_mtx);
 	timersub(&tv, lasttime, &delta);
 
 	/*
@@ -837,20 +845,11 @@ ppsratecheck(struct timeval *lasttime, int *curpps, int maxpps)
 	else
 		rv = 0;
 
-#if 1 /*DIAGNOSTIC?*/
 	/* be careful about wrap-around */
 	if (*curpps + 1 > *curpps)
 		*curpps = *curpps + 1;
-#else
-	/*
-	 * assume that there's not too many calls to this function.
-	 * not sure if the assumption holds, as it depends on *caller's*
-	 * behavior, not the behavior of this function.
-	 * IMHO it is wrong to make assumption on the caller's behavior,
-	 * so the above #if is #if 1, not #ifdef DIAGNOSTIC.
-	 */
-	*curpps = *curpps + 1;
-#endif
+
+	mtx_leave(&ppsratecheck_mtx);
 
 	return (rv);
 }

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cms.c,v 1.16 2022/03/28 13:04:01 claudio Exp $ */
+/*	$OpenBSD: cms.c,v 1.19 2022/05/15 16:43:34 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -27,10 +27,10 @@
 
 #include "extern.h"
 
-extern ASN1_OBJECT     *cnt_type_oid;
-extern ASN1_OBJECT     *msg_dgst_oid;
-extern ASN1_OBJECT     *sign_time_oid;
-extern ASN1_OBJECT     *bin_sign_time_oid;
+extern ASN1_OBJECT	*cnt_type_oid;
+extern ASN1_OBJECT	*msg_dgst_oid;
+extern ASN1_OBJECT	*sign_time_oid;
+extern ASN1_OBJECT	*bin_sign_time_oid;
 
 /*
  * Parse and validate a self-signed CMS message, where the signing X509
@@ -224,6 +224,12 @@ cms_parse_validate(X509 **xp, const char *fn, const unsigned char *der,
 	}
 	*xp = X509_dup(sk_X509_value(certs, 0));
 
+	/* Cache X509v3 extensions, see X509_check_ca(3). */
+	if (X509_check_purpose(*xp, -1, -1) <= 0) {
+		cryptowarnx("%s: could not cache X509v3 extensions", fn);
+		goto out;
+	}
+
 	if (CMS_SignerInfo_get0_signer_id(si, &kid, NULL, NULL) != 1 ||
 	    kid == NULL) {
 		warnx("%s: RFC 6488: could not extract SKI from SID", fn);
@@ -274,7 +280,7 @@ out:
  */
 int
 ASN1_frame(const char *fn, size_t sz,
-	const unsigned char **cnt, long *cntsz, int *tag)
+    const unsigned char **cnt, long *cntsz, int *tag)
 {
 	int	 ret, pcls;
 
@@ -292,7 +298,7 @@ ASN1_frame(const char *fn, size_t sz,
  */
 int
 cms_econtent_version(const char *fn, const unsigned char **d, size_t dsz,
-	long *version)
+    long *version)
 {
 	ASN1_INTEGER	*aint = NULL;
 	long		 plen;

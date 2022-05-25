@@ -1,4 +1,4 @@
-/*	$OpenBSD: kroute.c,v 1.244 2022/03/08 12:58:57 claudio Exp $ */
+/*	$OpenBSD: kroute.c,v 1.246 2022/05/23 13:40:12 deraadt Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -1448,12 +1448,11 @@ kr_redistribute(int type, struct ktable *kt, struct kroute *kr)
 		return;
 
 	/*
-	 * We consider the loopback net, multicast and experimental addresses
+	 * We consider the loopback net and multicast addresses
 	 * as not redistributable.
 	 */
 	a = ntohl(kr->prefix.s_addr);
-	if (IN_MULTICAST(a) || IN_BADCLASS(a) ||
-	    (a >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
+	if (IN_MULTICAST(a) || (a >> IN_CLASSA_NSHIFT) == IN_LOOPBACKNET)
 		return;
 
 	/* Check if the nexthop is the loopback addr. */
@@ -3385,14 +3384,14 @@ fetchtable(struct ktable *kt, uint8_t fib_prio)
 			}
 
 		if (sa->sa_family == AF_INET) {
-			if (rtm->rtm_priority == fib_prio)  {
+			if (rtm->rtm_priority == fib_prio) {
 				send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r,
 				    fib_prio);
 				free(kr);
 			} else
 				kroute_insert(kt, kr);
 		} else if (sa->sa_family == AF_INET6) {
-			if (rtm->rtm_priority == fib_prio)  {
+			if (rtm->rtm_priority == fib_prio) {
 				send_rt6msg(kr_state.fd, RTM_DELETE, kt,
 				    &kr6->r, fib_prio);
 				free(kr6);

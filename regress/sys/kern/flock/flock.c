@@ -38,7 +38,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <termios.h>
 #include <unistd.h>
+#include <util.h>
 
 #include "util.h"
 
@@ -1286,6 +1288,7 @@ test15(int fd)
 		err(1, "reading from pipe (child)");
 
 	fd2 = dup(fd);
+	FAIL(fd2 == -1);
 	if (flock(fd, LOCK_SH) < 0)
 		err(1, "flock shared");
 
@@ -1713,6 +1716,50 @@ test24(int fd)
 	SUCCEED;
 }
 
+/*
+ * Test 25 - use after free regression
+ *
+ * Discovered by syzkaller.
+ */
+static int
+test25(int fd)
+{
+	struct flock fl;
+	int master, res, slave;
+
+	res = openpty(&master, &slave, NULL, NULL, NULL);
+	FAIL(res == -1);
+	close(master);
+
+	fl.l_start = 0;
+	fl.l_len = 0;
+	fl.l_pid = 0;
+	fl.l_type = F_RDLCK;
+	fl.l_whence = SEEK_SET;
+	res = fcntl(slave, F_SETLKW, &fl);
+	FAIL(res != 0);
+
+	fl.l_start = 3;
+	fl.l_len = 0x7ffffffffffffffd;
+	fl.l_pid = 0;
+	fl.l_type = F_UNLCK;
+	fl.l_whence = SEEK_END;
+	res = fcntl(slave, F_SETLKW, &fl);
+	FAIL(res != 0);
+
+	fl.l_start = 0;
+	fl.l_len = 0;
+	fl.l_pid = 0;
+	fl.l_type = F_RDLCK;
+	fl.l_whence = SEEK_SET;
+	res = fcntl(slave, F_SETLKW, &fl);
+	FAIL(res != 0);
+
+	close(slave);
+
+	SUCCEED;
+}
+
 static struct test tests[] = {
 	{	test1,		0	},
 	{	test2,		0	},
@@ -1738,6 +1785,7 @@ static struct test tests[] = {
 	{	test22,		0	},
 	{	test23,		0	},
 	{	test24,		0	},
+	{	test25,		0	},
 };
 
 static int test_count = sizeof(tests) / sizeof(tests[0]);

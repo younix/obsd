@@ -5,7 +5,6 @@
 /ex_args.c/1.12/Wed Jan  6 22:28:52 2016//
 /ex_argv.c/1.20/Fri May 27 09:18:12 2016//
 /ex_at.c/1.14/Fri May 27 09:18:12 2016//
-/ex_bang.c/1.11/Tue Apr 18 01:45:35 2017//
 /ex_cd.c/1.15/Fri May 27 09:18:12 2016//
 /ex_cmd.c/1.12/Fri Jul 13 20:06:10 2018//
 /ex_delete.c/1.7/Wed Nov 12 04:28:41 2014//
@@ -30,7 +29,6 @@
 /ex_script.c/1.27/Tue Apr 18 01:45:35 2017//
 /ex_set.c/1.6/Wed Nov 12 04:28:41 2014//
 /ex_shell.c/1.15/Sat Mar 28 12:54:37 2015//
-/ex_shift.c/1.9/Thu Apr 30 10:40:21 2020//
 /ex_stop.c/1.6/Wed Nov 12 04:28:41 2014//
 /ex_subst.c/1.30/Tue Apr 18 01:45:35 2017//
 /ex_txt.c/1.17/Thu Apr 30 10:40:21 2020//
@@ -49,4 +47,6 @@
 /ex_source.c/1.11/Mon Nov 15 19:06:15 2021//
 /ex_tag.c/1.26/Mon Nov 15 19:06:15 2021//
 /ex.c/1.22/Mon Mar  7 09:08:07 2022//
+/ex_bang.c/1.12/Wed May 25 14:32:42 2022//
+/ex_shift.c/1.10/Wed May 25 14:32:42 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: validate.c,v 1.30 2022/04/19 09:52:29 claudio Exp $ */
+/*	$OpenBSD: validate.c,v 1.38 2022/05/15 16:43:35 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -29,6 +29,8 @@
 #include <unistd.h>
 
 #include "extern.h"
+
+extern ASN1_OBJECT	*certpol_oid;
 
 /*
  * Walk up the chain of certificates trying to match our AS number to
@@ -228,10 +230,10 @@ valid_roa(const char *fn, struct auth *a, struct roa *roa)
 int
 valid_filehash(int fd, const char *hash, size_t hlen)
 {
-	SHA256_CTX ctx;
-	char	filehash[SHA256_DIGEST_LENGTH];
-	char	buffer[8192];
-	ssize_t	nr;
+	SHA256_CTX	ctx;
+	char		filehash[SHA256_DIGEST_LENGTH];
+	char		buffer[8192];
+	ssize_t		nr;
 
 	if (hlen != sizeof(filehash))
 		errx(1, "bad hash size");
@@ -269,6 +271,22 @@ valid_hash(unsigned char *buf, size_t len, const char *hash, size_t hlen)
 
 	if (memcmp(hash, filehash, sizeof(filehash)) != 0)
 		return 0;
+	return 1;
+}
+
+/*
+ * Validate that a filename only contains characters from the POSIX portable
+ * filename character set [A-Za-z0-9._-], see IEEE Std 1003.1-2013, 3.278.
+ */
+int
+valid_filename(const char *fn, size_t len)
+{
+	const unsigned char *c;
+	size_t i;
+
+	for (c = fn, i = 0; i < len; i++, c++)
+		if (!isalnum(*c) && *c != '-' && *c != '_' && *c != '.')
+			return 0;
 	return 1;
 }
 
@@ -324,6 +342,173 @@ valid_origin(const char *uri, const char *proto)
 	/* compare hosts including the / for the start of the path section */
 	if (strncasecmp(uri, proto, to - proto + 1) != 0)
 		return 0;
+
+	return 1;
+}
+
+/*
+ * Walk the certificate tree to the root and build a certificate
+ * chain from cert->x509. All certs in the tree are validated and
+ * can be loaded as trusted stack into the validator.
+ */
+static void
+build_chain(const struct auth *a, STACK_OF(X509) **chain)
+{
+	*chain = NULL;
+
+	if (a == NULL)
+		return;
+
+	if ((*chain = sk_X509_new_null()) == NULL)
+		err(1, "sk_X509_new_null");
+	for (; a != NULL; a = a->parent) {
+		assert(a->cert->x509 != NULL);
+		if (!sk_X509_push(*chain, a->cert->x509))
+			errx(1, "sk_X509_push");
+	}
+}
+
+/*
+ * Add the CRL based on the certs SKI value.
+ * No need to insert any other CRL since those were already checked.
+ */
+static void
+build_crls(const struct crl *crl, STACK_OF(X509_CRL) **crls)
+{
+	*crls = NULL;
+
+	if (crl == NULL)
+		return;
+	if ((*crls = sk_X509_CRL_new_null()) == NULL)
+		errx(1, "sk_X509_CRL_new_null");
+	if (!sk_X509_CRL_push(*crls, crl->x509_crl))
+		err(1, "sk_X509_CRL_push");
+}
+
+/*
+ * Validate the X509 certificate.  If crl is NULL don't check CRL.
+ * Returns 1 for valid certificates, returns 0 if there is a verify error
+ */
+int
+valid_x509(char *file, X509_STORE_CTX *store_ctx, X509 *x509, struct auth *a,
+    struct crl *crl, int nowarn)
+{
+	X509_VERIFY_PARAM	*params;
+	ASN1_OBJECT		*cp_oid;
+	STACK_OF(X509)		*chain;
+	STACK_OF(X509_CRL)	*crls = NULL;
+	unsigned long		 flags;
+	int			 c;
+
+	build_chain(a, &chain);
+	build_crls(crl, &crls);
+
+	assert(store_ctx != NULL);
+	assert(x509 != NULL);
+	if (!X509_STORE_CTX_init(store_ctx, NULL, x509, NULL))
+		cryptoerrx("X509_STORE_CTX_init");
+
+	if ((params = X509_STORE_CTX_get0_param(store_ctx)) == NULL)
+		cryptoerrx("X509_STORE_CTX_get0_param");
+	if ((cp_oid = OBJ_dup(certpol_oid)) == NULL)
+		cryptoerrx("OBJ_dup");
+	if (!X509_VERIFY_PARAM_add0_policy(params, cp_oid))
+		cryptoerrx("X509_VERIFY_PARAM_add0_policy");
+
+	flags = X509_V_FLAG_CRL_CHECK;
+	flags |= X509_V_FLAG_EXPLICIT_POLICY;
+	flags |= X509_V_FLAG_INHIBIT_MAP;
+	X509_STORE_CTX_set_flags(store_ctx, flags);
+	X509_STORE_CTX_set_depth(store_ctx, MAX_CERT_DEPTH);
+	X509_STORE_CTX_set0_trusted_stack(store_ctx, chain);
+	X509_STORE_CTX_set0_crls(store_ctx, crls);
+
+	if (X509_verify_cert(store_ctx) <= 0) {
+		c = X509_STORE_CTX_get_error(store_ctx);
+		if (!nowarn || verbose > 1)
+			warnx("%s: %s", file, X509_verify_cert_error_string(c));
+		X509_STORE_CTX_cleanup(store_ctx);
+		sk_X509_free(chain);
+		sk_X509_CRL_free(crls);
+		return 0;
+	}
+
+	X509_STORE_CTX_cleanup(store_ctx);
+	sk_X509_free(chain);
+	sk_X509_CRL_free(crls);
+	return 1;
+}
+
+/*
+ * Validate our RSC: check that all items in the ResourceBlock are contained.
+ * Returns 1 if valid, 0 otherwise.
+ */
+int
+valid_rsc(const char *fn, struct auth *a, struct rsc *rsc)
+{
+	size_t		i;
+	uint32_t	min, max;
+	char		buf1[64], buf2[64];
+
+	for (i = 0; i < rsc->asz; i++) {
+		if (rsc->as[i].type == CERT_AS_INHERIT) {
+			warnx("%s: RSC ResourceBlock: illegal inherit", fn);
+			return 0;
+		}
+
+		min = rsc->as[i].type == CERT_AS_RANGE ? rsc->as[i].range.min
+		    : rsc->as[i].id;
+		max = rsc->as[i].type == CERT_AS_RANGE ? rsc->as[i].range.max
+		    : rsc->as[i].id;
+
+		if (valid_as(a, min, max))
+			continue;
+
+		switch (rsc->as[i].type) {
+		case CERT_AS_ID:
+			warnx("%s: RSC resourceBlock: uncovered AS Identifier: "
+			    "%u", fn, rsc->as[i].id);
+			break;
+		case CERT_AS_RANGE:
+			warnx("%s: RSC resourceBlock: uncovered AS Range: "
+			    "%u--%u", fn, min, max);
+			break;
+		default:
+			break;
+		}
+		return 0;
+	}
+
+	for (i = 0; i < rsc->ipsz; i++) {
+		if (rsc->ips[i].type == CERT_IP_INHERIT) {
+			warnx("%s: RSC ResourceBlock: illegal inherit", fn);
+			return 0;
+		}
+
+		if (valid_ip(a, rsc->ips[i].afi, rsc->ips[i].min,
+		    rsc->ips[i].max))
+			continue;
+
+		switch (rsc->ips[i].type) {
+		case CERT_IP_RANGE:
+			ip_addr_print(&rsc->ips[i].range.min,
+			    rsc->ips[i].afi, buf1, sizeof(buf1));
+			ip_addr_print(&rsc->ips[i].range.max,
+			    rsc->ips[i].afi, buf2, sizeof(buf2));
+			warnx("%s: RSC ResourceBlock: uncovered IP Range: "
+			    "%s--%s", fn, buf1, buf2);
+			break;
+		case CERT_IP_ADDR:
+			ip_addr_print(&rsc->ips[i].ip,
+			    rsc->ips[i].afi, buf1, sizeof(buf1));
+			warnx("%s: RSC ResourceBlock: uncovered IP: "
+			    "%s", fn, buf1);
+			break;
+		default:
+			break;
+		}
+		return 0;
+	}
 
 	return 1;
 }

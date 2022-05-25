@@ -1101,7 +1101,6 @@
 ./usr/include/openssl/conf_api.h
 ./usr/include/openssl/crypto.h
 ./usr/include/openssl/ct.h
-./usr/include/openssl/cterr.h
 ./usr/include/openssl/curve25519.h
 ./usr/include/openssl/des.h
 ./usr/include/openssl/dh.h
@@ -1118,6 +1117,7 @@
 ./usr/include/openssl/hkdf.h
 ./usr/include/openssl/hmac.h
 ./usr/include/openssl/idea.h
+./usr/include/openssl/kdf.h
 ./usr/include/openssl/lhash.h
 ./usr/include/openssl/md4.h
 ./usr/include/openssl/md5.h
@@ -1910,6 +1910,7 @@
 ./usr/share/man/man3/EVP_PKCS82PKEY.3
 ./usr/share/man/man3/EVP_PKEY_CTX_ctrl.3
 ./usr/share/man/man3/EVP_PKEY_CTX_new.3
+./usr/share/man/man3/EVP_PKEY_CTX_set_hkdf_md.3
 ./usr/share/man/man3/EVP_PKEY_add1_attr.3
 ./usr/share/man/man3/EVP_PKEY_asn1_get_count.3
 ./usr/share/man/man3/EVP_PKEY_asn1_new.3

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vioqcow2.c,v 1.17 2022/01/04 15:21:40 claudio Exp $	*/
+/*	$OpenBSD: vioqcow2.c,v 1.20 2022/05/20 22:06:47 dv Exp $	*/
 
 /*
  * Copyright (c) 2018 Ori Bernstein <ori@eigenstate.org>
@@ -176,7 +176,7 @@ virtio_qcow2_get_base(int fd, char *path, size_t npath, const char *dpath)
 	/*
 	 * Relative paths should be interpreted relative to the disk image,
 	 * rather than relative to the directory vmd happens to be running in,
-	 * since this is the only userful interpretation.
+	 * since this is the only useful interpretation.
 	 */
 	if (path[0] == '/') {
 		if (realpath(path, expanded) == NULL ||
@@ -533,7 +533,7 @@ mkcluster(struct qcdisk *disk, struct qcdisk *base, off_t off, off_t src_phys)
 
 	/* Grow the disk */
 	if (ftruncate(disk->fd, disk->end + disk->clustersz) < 0)
-		fatalx("%s: could not grow disk", __func__);
+		fatal("%s: could not grow disk", __func__);
 	if (src_phys > 0)
 		copy_cluster(disk, base, disk->end, src_phys);
 	cluster = disk->end;
@@ -619,7 +619,7 @@ inc_refs(struct qcdisk *disk, off_t off, int newcluster)
  *
  * Parameters:
  *  imgfile_path: path to the image file to create
- *  imgsize     : size of the image file to create (in MB)
+ *  imgsize     : size of the image file to create (in bytes)
  *
  * Return:
  *  EEXIST: The requested image file already exists
@@ -628,21 +628,19 @@ inc_refs(struct qcdisk *disk, off_t off, int newcluster)
  */
 int
 virtio_qcow2_create(const char *imgfile_path,
-    const char *base_path, long imgsize)
+    const char *base_path, uint64_t disksz)
 {
 	struct qcheader hdr, basehdr;
 	int fd, ret;
 	ssize_t base_len;
-	uint64_t l1sz, refsz, disksz, initsz, clustersz;
+	uint64_t l1sz, refsz, initsz, clustersz;
 	uint64_t l1off, refoff, v, i, l1entrysz, refentrysz;
 	uint16_t refs;
-
-	disksz = 1024 * 1024 * imgsize;
 
 	if (base_path) {
 		fd = open(base_path, O_RDONLY);
 		if (read(fd, &basehdr, sizeof(basehdr)) != sizeof(basehdr))
-			err(1, "failure to read base image header");
+			errx(1, "failure to read base image header");
 		close(fd);
 		if (strncmp(basehdr.magic,
 		    VM_MAGIC_QCOW, strlen(VM_MAGIC_QCOW)) != 0)

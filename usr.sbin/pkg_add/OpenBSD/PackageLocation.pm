@@ -1,5 +1,5 @@
 # ex:ts=8 sw=4:
-# $OpenBSD: PackageLocation.pm,v 1.57 2022/04/19 12:51:32 espie Exp $
+# $OpenBSD: PackageLocation.pm,v 1.60 2022/05/08 13:31:40 espie Exp $
 #
 # Copyright (c) 2003-2007 Marc Espie <espie@openbsd.org>
 #
@@ -35,6 +35,12 @@ sub new
 
 }
 
+sub decorate
+{
+	my ($self, $plist) = @_;
+	$self->{repository}->decorate($plist, $self);
+}
+
 sub url
 {
 	my $self = shift;
@@ -64,15 +70,10 @@ OpenBSD::Auto::cache(update_info,
 	my $state = $self->{repository}{state};
 	my $info = $self->{repository}->get_cached_info($name);
 	if (defined $info && 
-	    !defined $state->defines("TEST_CACHING_RECHECK")) {
+	    !defined $state->defines("CACHING_RECHECK")) {
 		return $info;
 	}
-	my $result = $self->plist(\&OpenBSD::PackingList::UpdateInfoOnly,
-	    sub {
-		return 0 if $_[0] =~ m/^\@option\s+always-update\b/m;
-		return 1 if $_[0] =~ m/^\@(?:newgroup|newuser|cwd)\b/m;
-		return 0;
-	    });
+	my $result = $self->plist(\&OpenBSD::PackingList::UpdateInfoOnly);
 	if (defined $info) {
 		my $s1 = OpenBSD::Signature->from_plist($info);
 		my $s2 = OpenBSD::Signature->from_plist($result);
@@ -131,13 +132,12 @@ sub _set_callback
 
 sub find_contents
 {
-	my ($self, $extra) = @_;
+	my $self = shift;
 
 	while (my $e = $self->next) {
 		if ($e->isFile && is_info_name($e->{name})) {
 			if ($e->{name} eq CONTENTS ) {
-				my $v = 
-				    $self->{extra_content}.$e->contents($extra);
+				my $v = $e->contents;
 				return $v;
 			}
 		} else {
@@ -149,17 +149,10 @@ sub find_contents
 
 sub contents
 {
-	my ($self, $extra) = @_;
+	my $self = shift;
 	if (!defined $self->{contents}) {
 		if (!$self->_opened) {
 			return;
-		}
-		if (defined $extra) {
-			my $contents = $self->find_contents($extra);
-			if ($contents) {
-				$self->unput;
-			}
-			return $contents;
 		}
 		$self->{contents} = $self->find_contents;
 	}
@@ -252,7 +245,7 @@ sub info
 
 sub plist
 {
-	my ($self, $code, $extra) = @_;
+	my ($self, $code) = @_;
 	require OpenBSD::PackingList;
 
 	if (defined $self->{dir} && -f $self->{dir}.CONTENTS) {
@@ -262,7 +255,7 @@ sub plist
 		$plist->set_infodir($self->{dir});
 		return $plist;
 	}
-	if (my $value = $self->contents($extra)) {
+	if (my $value = $self->contents) {
 		return OpenBSD::PackingList->fromfile(\$value, $code);
 	}
 	# hopeless
