@@ -13,4 +13,8 @@
 /sfclock.c/1.2/Wed Apr 20 14:28:18 2022//
 /sfuart.c/1.5/Wed Apr 20 14:28:18 2022//
 /simplebus.c/1.5/Wed Apr 20 14:28:18 2022//
+/sfgpio.c/1.2/Mon Jun  6 14:34:11 2022//
+/stfclock.c/1.2/Sun Jun 12 10:51:55 2022//
+/stfpinctrl.c/1.1/Wed Jun  8 08:40:53 2022//
+/stftemp.c/1.1/Sun Jun 12 10:51:55 2022//
 D

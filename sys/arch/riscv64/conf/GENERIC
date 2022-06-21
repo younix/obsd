@@ -1,4 +1,4 @@
-#	$OpenBSD: GENERIC,v 1.35 2022/02/18 10:51:43 visa Exp $
+#	$OpenBSD: GENERIC,v 1.40 2022/06/12 10:51:55 kettenis Exp $
 #
 # For further information on compiling OpenBSD kernels, see the config(8)
 # man page.
@@ -56,7 +56,13 @@ iic*		at mpfiic?
 # SiFive SoCs
 sfclock*	at fdt? early 1 # PRCI
 sfcc*		at fdt? early 1	# L2 Cache Controller
+sfgpio*		at fdt?
 sfuart*		at fdt?
+
+# StarFive SoCs
+stfclock*	at fdt? early 1
+stfpinctrl*	at fdt? early 1
+stftemp*	at fdt?
 
 virtio*		at fdt?
 virtio*		at pci?
@@ -73,6 +79,7 @@ plic*		at fdt? early 1
 
 syscon*		at fdt? early 1
 gfrtc*		at fdt?
+gpiorestart*	at fdt?
 
 cad*		at fdt?
 dwge*		at fdt?
@@ -89,6 +96,8 @@ ociic*		at fdt?
 iic*		at ociic?
 dapmic*		at iic?
 titmp*		at iic?
+
+xhci*		at fdt?
 
 # PCI
 ppb*		at pci?		# PCI-PCI bridges

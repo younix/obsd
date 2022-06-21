@@ -2,7 +2,6 @@
 /Symbols.map/1.4/Sat May  7 19:05:23 2016//
 /chacha_private.h/1.1/Fri Feb  9 22:13:04 2018//
 /dir.h/1.4/Mon Jan 23 11:04:19 2017//
-/ld.so.1/1.24/Fri May  8 10:57:50 2020//
 /path.c/1.8/Tue Dec 17 17:16:32 2019//
 /path.h/1.2/Mon Jan 23 11:04:19 2017//
 /sod.h/1.4/Mon Jan 23 11:04:19 2017//
@@ -43,3 +42,4 @@ D/riscv64////
 /trace.c/1.5/Mon Jan 24 14:35:14 2022//
 /util.c/1.49/Mon Jan 24 14:35:14 2022//
 /util.h/1.37/Mon Jan 24 14:35:14 2022//
+/ld.so.1/1.25/Tue Jun 21 09:30:13 2022//

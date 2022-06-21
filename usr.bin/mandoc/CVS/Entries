@@ -1,5 +1,4 @@
 /cgi.h.example/1.6/Sat Mar 18 16:48:07 2017//
-/chars.c/1.49/Thu Feb 13 16:16:03 2020//
 /dba.c/1.7/Thu Feb  9 18:26:17 2017//
 /dba.h/1.2/Wed Aug 17 20:46:06 2016//
 /dba_array.c/1.1/Mon Aug  1 10:32:39 2016//
@@ -68,7 +67,6 @@
 /tbl_data.c/1.46/Tue Sep 14 08:17:38 2021//
 /tbl_layout.c/1.37/Thu Sep  2 14:22:33 2021//
 /main.c/1.262/Wed Oct 20 17:29:16 2021//
-/mdoc_validate.c/1.305/Wed Oct 20 17:29:16 2021//
 /out.c/1.57/Wed Oct 20 17:29:16 2021//
 /term.h/1.76/Wed Oct 20 17:29:16 2021//
 /term_tab.c/1.5/Wed Oct 20 17:29:16 2021//
@@ -86,17 +84,19 @@
 /man.c/1.136/Wed May 25 14:32:40 2022//
 /man_macro.c/1.109/Wed May 25 14:32:40 2022//
 /man_term.c/1.190/Wed May 25 14:32:40 2022//
-/mandoc.1/1.184/Wed May 25 14:32:40 2022//
 /mandoc.c/1.89/Wed May 25 14:32:40 2022//
-/mandoc.h/1.219/Wed May 25 14:32:40 2022//
-/mandoc_msg.c/1.16/Wed May 25 14:32:40 2022//
 /read.c/1.192/Wed May 25 14:32:40 2022//
-/roff.c/1.260/Wed May 25 14:32:40 2022//
 /roff.h/1.57/Wed May 25 14:32:40 2022//
-/roff_escape.c/1.2/Fri May 20 13:06:26 2022//
-/roff_int.h/1.19/Wed May 25 14:32:40 2022//
 /tag.c/1.37/Wed May 25 14:32:40 2022//
 /tbl_html.c/1.35/Wed May 25 14:32:40 2022//
 /tbl_term.c/1.65/Wed May 25 14:32:40 2022//
 /term.c/1.146/Wed May 25 14:32:40 2022//
+/chars.c/1.50/Tue Jun 21 09:30:32 2022//
+/mandoc.1/1.186/Tue Jun 21 09:30:32 2022//
+/mandoc.h/1.221/Tue Jun 21 09:30:32 2022//
+/mandoc_msg.c/1.18/Tue Jun 21 09:30:32 2022//
+/mdoc_validate.c/1.306/Tue Jun 21 09:30:32 2022//
+/roff.c/1.266/Tue Jun 21 09:30:32 2022//
+/roff_escape.c/1.14/Tue Jun 21 09:30:32 2022//
+/roff_int.h/1.20/Tue Jun 21 09:30:32 2022//
 D

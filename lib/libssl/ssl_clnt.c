@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.141 2022/02/05 14:54:10 jsing Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.146 2022/06/07 17:45:13 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -652,9 +652,8 @@ ssl3_send_client_hello(SSL *s)
 		}
 		s->version = max_version;
 
-		if (sess == NULL ||
-		    sess->ssl_version != s->version ||
-		    (!sess->session_id_length && !sess->tlsext_tick) ||
+		if (sess == NULL || sess->ssl_version != s->version ||
+		    (sess->session_id_length == 0 && sess->tlsext_tick == NULL) ||
 		    sess->not_resumable) {
 			if (!ssl_get_new_session(s, 0))
 				goto err;
@@ -816,7 +815,6 @@ ssl3_get_server_hello(SSL *s)
 	const SSL_CIPHER *cipher;
 	const SSL_METHOD *method;
 	unsigned long alg_k;
-	size_t outlen;
 	int al, ret;
 
 	s->internal->first_packet = 1;
@@ -923,16 +921,26 @@ ssl3_get_server_hello(SSL *s)
 	 * Check if we want to resume the session based on external
 	 * pre-shared secret.
 	 */
-	if (s->internal->tls_session_secret_cb) {
+	if (s->internal->tls_session_secret_cb != NULL) {
 		SSL_CIPHER *pref_cipher = NULL;
-		s->session->master_key_length = sizeof(s->session->master_key);
-		if (s->internal->tls_session_secret_cb(s, s->session->master_key,
-		    &s->session->master_key_length, NULL, &pref_cipher,
-		    s->internal->tls_session_secret_cb_arg)) {
-			s->session->cipher = pref_cipher ? pref_cipher :
-			    ssl3_get_cipher_by_value(cipher_suite);
-			s->s3->flags |= SSL3_FLAGS_CCS_OK;
+		int master_key_length = sizeof(s->session->master_key);
+
+		if (!s->internal->tls_session_secret_cb(s,
+		    s->session->master_key, &master_key_length, NULL,
+		    &pref_cipher, s->internal->tls_session_secret_cb_arg)) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
+			goto err;
 		}
+		if (master_key_length <= 0) {
+			SSLerror(s, ERR_R_INTERNAL_ERROR);
+			goto err;
+		}
+		s->session->master_key_length = master_key_length;
+
+		if ((s->session->cipher = pref_cipher) == NULL)
+			s->session->cipher =
+			    ssl3_get_cipher_by_value(cipher_suite);
+		s->s3->flags |= SSL3_FLAGS_CCS_OK;
 	}
 
 	if (s->session->session_id_length != 0 &&
@@ -966,9 +974,9 @@ ssl3_get_server_hello(SSL *s)
 		 * zero length session identifier.
 		 */
 		if (!CBS_write_bytes(&session_id, s->session->session_id,
-		    sizeof(s->session->session_id), &outlen))
+		    sizeof(s->session->session_id),
+		    &s->session->session_id_length))
 			goto err;
-		s->session->session_id_length = outlen;
 
 		s->session->ssl_version = s->version;
 	}
@@ -1596,6 +1604,7 @@ ssl3_get_new_session_ticket(SSL *s)
 {
 	uint32_t lifetime_hint;
 	CBS cbs, session_ticket;
+	unsigned int session_id_length = 0;
 	int al, ret;
 
 	if ((ret = ssl3_get_message(s, SSL3_ST_CR_SESSION_TICKET_A,
@@ -1647,12 +1656,15 @@ ssl3_get_new_session_ticket(SSL *s)
 	 *
 	 * We choose the former approach because this fits in with
 	 * assumptions elsewhere in OpenSSL. The session ID is set
-	 * to the SHA256 (or SHA1 is SHA256 is disabled) hash of the
-	 * ticket.
+	 * to the SHA256 hash of the ticket.
 	 */
-	EVP_Digest(CBS_data(&session_ticket), CBS_len(&session_ticket),
-	    s->session->session_id, &s->session->session_id_length,
-	    EVP_sha256(), NULL);
+	if (!EVP_Digest(CBS_data(&session_ticket), CBS_len(&session_ticket),
+	    s->session->session_id, &session_id_length, EVP_sha256(), NULL)) {
+		al = SSL_AD_INTERNAL_ERROR;
+		SSLerror(s, ERR_R_EVP_LIB);
+		goto fatal_err;
+	}
+	s->session->session_id_length = session_id_length;
 
 	return (1);
 

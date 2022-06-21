@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.424 2022/05/23 13:40:12 deraadt Exp $ */
+/*	$OpenBSD: parse.y,v 1.430 2022/06/15 14:09:30 claudio Exp $ */
 
 /*
  * Copyright (c) 2002, 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -193,7 +193,7 @@ typedef struct {
 		struct filter_prefixlen	prefixlen;
 		struct prefixset_item	*prefixset_item;
 		struct {
-			uint8_t			enc_alg;
+			enum auth_enc_alg	enc_alg;
 			uint8_t			enc_key_len;
 			char			enc_key[IPSEC_ENC_KEY_LEN];
 		}			encspec;
@@ -220,6 +220,7 @@ typedef struct {
 %token	FROM TO ANY
 %token	CONNECTED STATIC
 %token	COMMUNITY EXTCOMMUNITY LARGECOMMUNITY DELETE
+%token	MAXCOMMUNITIES MAXEXTCOMMUNITIES MAXLARGECOMMUNITIES
 %token	PREFIX PREFIXLEN PREFIXSET
 %token	ROASET ORIGINSET OVS EXPIRES
 %token	ASSET SOURCEAS TRANSITAS PEERAS MAXASLEN MAXASSEQ
@@ -706,8 +707,9 @@ conf_main	: AS as4number		{
 			TAILQ_INSERT_TAIL(conf->listen_addrs, la, entry);
 		}
 		| FIBPRIORITY NUMBER		{
-			if ($2 <= RTP_NONE || $2 > RTP_MAX) {
-				yyerror("invalid fib-priority");
+			if ($2 <= RTP_LOCAL || $2 > RTP_MAX) {
+				yyerror("fib-priority %lld must be between "
+				    "%u and %u", $2, RTP_LOCAL + 1, RTP_MAX);
 				YYERROR;
 			}
 			conf->fib_priority = $2;
@@ -872,7 +874,7 @@ conf_main	: AS as4number		{
 				    RT_TABLEID_MAX);
 				YYERROR;
 			}
-			if (ktable_exists($2, NULL) != 1) {
+			if (!ktable_exists($2, NULL)) {
 				yyerror("rtable id %lld does not exist", $2);
 				YYERROR;
 			}
@@ -1043,9 +1045,9 @@ network		: NETWORK prefix filter_set	{
 		}
 		| NETWORK family PRIORITY NUMBER filter_set	{
 			struct network	*n;
-			if ($4 < RTP_LOCAL && $4 > RTP_MAX) {
-				yyerror("priority %lld > max %d or < min %d", $4,
-				    RTP_MAX, RTP_LOCAL);
+			if ($4 <= RTP_LOCAL && $4 > RTP_MAX) {
+				yyerror("priority %lld must be between "
+				    "%u and %u", $4, RTP_LOCAL + 1, RTP_MAX);
 				YYERROR;
 			}
 
@@ -1607,7 +1609,7 @@ peeropts	: REMOTEAS as4number	{
 				curpeer->conf.auth.method = AUTH_IPSEC_IKE_AH;
 		}
 		| IPSEC espah inout SPI NUMBER STRING STRING encspec {
-			uint32_t	auth_alg;
+			enum auth_alg	auth_alg;
 			uint8_t		keylen;
 
 			if (curpeer->conf.auth.method &&
@@ -1624,10 +1626,10 @@ peeropts	: REMOTEAS as4number	{
 			}
 
 			if (!strcmp($6, "sha1")) {
-				auth_alg = SADB_AALG_SHA1HMAC;
+				auth_alg = AUTH_AALG_SHA1HMAC;
 				keylen = 20;
 			} else if (!strcmp($6, "md5")) {
-				auth_alg = SADB_AALG_MD5HMAC;
+				auth_alg = AUTH_AALG_MD5HMAC;
 				keylen = 16;
 			} else {
 				yyerror("unknown auth algorithm \"%s\"", $6);
@@ -1858,11 +1860,11 @@ encspec		: /* nada */	{
 		| STRING STRING {
 			bzero(&$$, sizeof($$));
 			if (!strcmp($1, "3des") || !strcmp($1, "3des-cbc")) {
-				$$.enc_alg = SADB_EALG_3DESCBC;
+				$$.enc_alg = AUTH_EALG_3DESCBC;
 				$$.enc_key_len = 21; /* XXX verify */
 			} else if (!strcmp($1, "aes") ||
 			    !strcmp($1, "aes-128-cbc")) {
-				$$.enc_alg = SADB_X_EALG_AES;
+				$$.enc_alg = AUTH_EALG_AES;
 				$$.enc_key_len = 16;
 			} else {
 				yyerror("unknown enc algorithm \"%s\"", $1);
@@ -2337,6 +2339,46 @@ filter_elm	: filter_prefix_h	{
 				YYERROR;
 			}
 			free($3);
+		}
+		| MAXCOMMUNITIES NUMBER {
+			if ($2 < 0 || $2 > INT16_MAX) {
+				yyerror("bad max-comunities %lld", $2);
+				YYERROR;
+			}
+			if (fmopts.m.maxcomm != 0) {
+				yyerror("%s already specified",
+				    "max-communities");
+				YYERROR;
+			}
+			/*
+			 * Offset by 1 since 0 means not used.
+			 * The match function then uses >= to compensate.
+			 */
+			fmopts.m.maxcomm = $2 + 1;
+		}
+		| MAXEXTCOMMUNITIES NUMBER {
+			if ($2 < 0 || $2 > INT16_MAX) {
+				yyerror("bad max-ext-communities %lld", $2);
+				YYERROR;
+			}
+			if (fmopts.m.maxextcomm != 0) {
+				yyerror("%s already specified",
+				    "max-ext-communities");
+				YYERROR;
+			}
+			fmopts.m.maxextcomm = $2 + 1;
+		}
+		| MAXLARGECOMMUNITIES NUMBER {
+			if ($2 < 0 || $2 > INT16_MAX) {
+				yyerror("bad max-large-communities %lld", $2);
+				YYERROR;
+			}
+			if (fmopts.m.maxlargecomm != 0) {
+				yyerror("%s already specified",
+				    "max-large-communities");
+				YYERROR;
+			}
+			fmopts.m.maxlargecomm = $2 + 1;
 		}
 		| NEXTHOP address	{
 			if (fmopts.m.nexthop.flags) {
@@ -2999,6 +3041,9 @@ lookup(char *s)
 		{ "match",		MATCH},
 		{ "max-as-len",		MAXASLEN},
 		{ "max-as-seq",		MAXASSEQ},
+		{ "max-communities",	MAXCOMMUNITIES},
+		{ "max-ext-communities",	MAXEXTCOMMUNITIES},
+		{ "max-large-communities",	MAXLARGECOMMUNITIES},
 		{ "max-prefix",		MAXPREFIX},
 		{ "maxlen",		MAXLEN},
 		{ "md5sig",		MD5SIG},
@@ -3203,8 +3248,10 @@ expand_macro(void)
 		break;
 	}
 	val = symget(buf);
-	if (val == NULL)
+	if (val == NULL) {
 		yyerror("macro '%s' not defined", buf);
+		return (ERROR);
+	}
 	p = val + strlen(val) - 1;
 	lungetc(DONE_EXPAND);
 	while (p >= val) {
@@ -3452,7 +3499,9 @@ init_config(struct bgpd_config *c)
 	c->bgpid = get_bgpid();
 	c->fib_priority = RTP_BGP;
 	c->default_tableid = getrtable();
-	ktable_exists(c->default_tableid, &rdomid);
+	if (!ktable_exists(c->default_tableid, &rdomid))
+		fatalx("current routing table %u does not exist",
+		    c->default_tableid);
 	if (rdomid != c->default_tableid)
 		fatalx("current routing table %u is not a routing domain",
 		    c->default_tableid);
@@ -4189,7 +4238,7 @@ rib_add_fib(struct rde_rib *rr, u_int rtableid)
 {
 	u_int	rdom;
 
-	if (ktable_exists(rtableid, &rdom) != 1) {
+	if (!ktable_exists(rtableid, &rdom)) {
 		yyerror("rtable id %u does not exist", rtableid);
 		return (-1);
 	}

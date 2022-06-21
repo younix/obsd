@@ -1,4 +1,4 @@
-# $OpenBSD: RAMDISK,v 1.171 2022/03/31 14:44:49 krw Exp $
+# $OpenBSD: RAMDISK,v 1.173 2022/06/12 16:00:12 kettenis Exp $
 
 machine		arm64
 maxusers	4
@@ -110,10 +110,13 @@ apliic*		at fdt?
 iic*		at apliic?
 aplintc*	at fdt? early 1
 aplmbox*	at fdt?
+aplns*		at fdt?			# Apple NVME Storage controllers
+nvme*		at aplns?
 aplpcie*	at fdt?
 pci*		at aplpcie?
 aplpinctrl*	at fdt? early 1
 aplpmgr*	at fdt? early 1
+aplsart*	at fdt?
 aplsmc*		at fdt?
 aplspi*		at fdt?
 aplhidev*	at spi?
@@ -122,8 +125,6 @@ wskbd*		at aplkbd? mux 1
 aplspmi*	at fdt?
 aplpmu*		at aplspmi?
 exuart*		at fdt?
-aplns*		at fdt?			# Apple NVME Storage controllers
-nvme*		at aplns?
 
 # iMX
 imxccm*		at fdt? early 1
@@ -248,6 +249,7 @@ ppb*		at pci?			# PCI-PCI bridges
 pci*		at ppb?
 
 # PCI Ethernet
+aq*		at pci?			# Aquantia aQtion Ethernet
 bnxt*		at pci?			# Broadcom BCM573xx, BCM574xx
 bge*		at pci?			# Broadcom BCM57xx
 em*		at pci?			# Intel Pro/1000 Ethernet

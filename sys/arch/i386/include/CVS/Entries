@@ -65,7 +65,6 @@
 /atomic.h/1.19/Wed Sep  1 16:07:38 2021//
 /i82489var.h/1.15/Wed Sep  1 16:07:38 2021//
 /npx.h/1.20/Wed Sep  1 16:07:38 2021//
-/pmap.h/1.89/Wed Sep  1 16:07:38 2021//
 /smbiosvar.h/1.13/Wed Sep  1 16:07:38 2021//
 /vmparam.h/1.57/Wed Sep  1 16:07:38 2021//
 /cpu.h/1.175/Thu Sep  2 14:22:31 2021//
@@ -74,4 +73,5 @@
 /param.h/1.51/Fri Feb 11 13:33:48 2022//
 /pcb.h/1.25/Mon Mar  7 09:08:07 2022//
 /specialreg.h/1.79/Mon Mar  7 09:08:07 2022//
+/pmap.h/1.90/Tue Jun 21 09:30:25 2022//
 D

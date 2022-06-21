@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.109 2022/01/11 19:03:15 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.116 2022/06/07 17:49:22 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -224,7 +224,7 @@ SSL_SESSION_new(void)
 
 	ss->verify_result = 1; /* avoid 0 (= X509_V_OK) just in case */
 	ss->references = 1;
-	ss->timeout=60*5+4; /* 5 minute timeout by default */
+	ss->timeout = 60 * 5 + 4; /* 5 minutes 4 seconds timeout by default */
 	ss->time = time(NULL);
 	ss->prev = NULL;
 	ss->next = NULL;
@@ -244,7 +244,7 @@ const unsigned char *
 SSL_SESSION_get_id(const SSL_SESSION *ss, unsigned int *len)
 {
 	if (len != NULL)
-		*len = ss->session_id_length;
+		*len = (unsigned int)ss->session_id_length;
 	return ss->session_id;
 }
 
@@ -378,7 +378,7 @@ ssl_get_new_session(SSL *s, int session)
 		 * Don't allow the callback to set the session length to zero.
 		 * nor set it higher than it was.
 		 */
-		if (!tmp || (tmp > ss->session_id_length)) {
+		if (tmp == 0 || tmp > ss->session_id_length) {
 			/* The callback set an illegal length */
 			SSLerror(s, SSL_R_SSL_SESSION_ID_HAS_BAD_LENGTH);
 			SSL_SESSION_free(ss);
@@ -388,7 +388,7 @@ ssl_get_new_session(SSL *s, int session)
 
 		/* Finally, check for a conflict. */
 		if (SSL_has_matching_session_id(s, ss->session_id,
-			ss->session_id_length)) {
+		    ss->session_id_length)) {
 			SSLerror(s, SSL_R_SSL_SESSION_ID_CONFLICT);
 			SSL_SESSION_free(ss);
 			return (0);
@@ -435,8 +435,10 @@ ssl_session_from_cache(SSL *s, CBS *session_id)
 	memset(&data, 0, sizeof(data));
 
 	data.ssl_version = s->version;
-	data.session_id_length = CBS_len(session_id);
-	memcpy(data.session_id, CBS_data(session_id), CBS_len(session_id));
+
+	if (!CBS_write_bytes(session_id, data.session_id,
+	    sizeof(data.session_id), &data.session_id_length))
+		return NULL;
 
 	CRYPTO_r_lock(CRYPTO_LOCK_SSL_CTX);
 	sess = lh_SSL_SESSION_retrieve(s->session_ctx->internal->sessions, &data);
@@ -526,7 +528,6 @@ int
 ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block, int *alert)
 {
 	SSL_SESSION *sess = NULL;
-	size_t session_id_len;
 	int alert_desc = SSL_AD_INTERNAL_ERROR, fatal = 0;
 	int ticket_decrypted = 0;
 
@@ -555,11 +556,10 @@ ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block, int *alert)
 		 * ticket has been accepted so we copy it into sess.
 		 */
 		if (!CBS_write_bytes(session_id, sess->session_id,
-		    sizeof(sess->session_id), &session_id_len)) {
+		    sizeof(sess->session_id), &sess->session_id_length)) {
 			fatal = 1;
 			goto err;
 		}
-		sess->session_id_length = (unsigned int)session_id_len;
 		break;
 	default:
 		SSLerror(s, ERR_R_INTERNAL_ERROR);
@@ -721,26 +721,27 @@ remove_session_lock(SSL_CTX *ctx, SSL_SESSION *c, int lck)
 	SSL_SESSION *r;
 	int ret = 0;
 
-	if ((c != NULL) && (c->session_id_length != 0)) {
-		if (lck)
-			CRYPTO_w_lock(CRYPTO_LOCK_SSL_CTX);
-		if ((r = lh_SSL_SESSION_retrieve(ctx->internal->sessions, c)) == c) {
-			ret = 1;
-			r = lh_SSL_SESSION_delete(ctx->internal->sessions, c);
-			SSL_SESSION_list_remove(ctx, c);
-		}
-		if (lck)
-			CRYPTO_w_unlock(CRYPTO_LOCK_SSL_CTX);
+	if (c == NULL || c->session_id_length == 0)
+		return 0;
 
-		if (ret) {
-			r->not_resumable = 1;
-			if (ctx->internal->remove_session_cb != NULL)
-				ctx->internal->remove_session_cb(ctx, r);
-			SSL_SESSION_free(r);
-		}
-	} else
-		ret = 0;
-	return (ret);
+	if (lck)
+		CRYPTO_w_lock(CRYPTO_LOCK_SSL_CTX);
+	if ((r = lh_SSL_SESSION_retrieve(ctx->internal->sessions, c)) == c) {
+		ret = 1;
+		r = lh_SSL_SESSION_delete(ctx->internal->sessions, c);
+		SSL_SESSION_list_remove(ctx, c);
+	}
+	if (lck)
+		CRYPTO_w_unlock(CRYPTO_LOCK_SSL_CTX);
+
+	if (ret) {
+		r->not_resumable = 1;
+		if (ctx->internal->remove_session_cb != NULL)
+			ctx->internal->remove_session_cb(ctx, r);
+		SSL_SESSION_free(r);
+	}
+
+	return ret;
 }
 
 void

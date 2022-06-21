@@ -10,7 +10,6 @@
 /pkgpath.7/1.5/Mon Mar 27 10:37:43 2017//
 /securelevel.7/1.31/Wed Aug 21 20:44:09 2019//
 /mirroring-ports.7/1.28/Thu Dec 17 19:39:58 2020//
-/mandoc_char.7/1.43/Sat May  1 08:41:50 2021//
 /man.7/1.60/Thu Sep  2 14:22:31 2021//
 /mdoc.7/1.181/Mon Jan 24 14:35:14 2022//
 /packages.7/1.47/Mon Jan 24 14:35:14 2022//
@@ -21,5 +20,6 @@
 /utf8.7/1.9/Mon Mar  7 09:08:07 2022//
 /packages-specs.7/1.29/Wed Apr 20 14:28:15 2022//
 /hier.7/1.166/Wed May 25 14:32:29 2022//
-/roff.7/1.98/Wed May 25 14:32:29 2022//
+/mandoc_char.7/1.44/Tue Jun 21 09:30:23 2022//
+/roff.7/1.101/Tue Jun 21 09:30:23 2022//
 D

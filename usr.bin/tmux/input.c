@@ -1,4 +1,4 @@
-/* $OpenBSD: input.c,v 1.200 2022/03/08 12:01:19 nicm Exp $ */
+/* $OpenBSD: input.c,v 1.205 2022/06/11 16:59:33 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1078,6 +1078,9 @@ input_reply(struct input_ctx *ictx, const char *fmt, ...)
 	va_list			 ap;
 	char			*reply;
 
+	if (bev == NULL)
+		return;
+
 	va_start(ap, fmt);
 	xvasprintf(&reply, fmt, ap);
 	va_end(ap);
@@ -1798,6 +1801,8 @@ input_csi_dispatch_sm_private(struct input_ctx *ictx)
 			screen_write_mode_set(sctx, MODE_FOCUSON);
 			if (wp == NULL)
 				break;
+			if (!options_get_number(global_options, "focus-events"))
+				break;
 			if (wp->flags & PANE_FOCUSED)
 				bufferevent_write(wp->event, "\033[I", 3);
 			else
@@ -2287,6 +2292,8 @@ input_exit_osc(struct input_ctx *ictx)
 	option = 0;
 	while (*p >= '0' && *p <= '9')
 		option = option * 10 + *p++ - '0';
+	if (*p != ';' && *p != '\0')
+		return;
 	if (*p == ';')
 		p++;
 
@@ -2688,6 +2695,9 @@ input_osc_52(struct input_ctx *ictx, const char *p)
 	int			 outlen, state;
 	struct screen_write_ctx	 ctx;
 	struct paste_buffer	*pb;
+	const char*              allow = "cpqs01234567";
+	char                     flags[sizeof "cpqs01234567"] = "";
+	u_int			 i, j = 0;
 
 	if (wp == NULL)
 		return;
@@ -2701,6 +2711,12 @@ input_osc_52(struct input_ctx *ictx, const char *p)
 	if (*end == '\0')
 		return;
 	log_debug("%s: %s", __func__, end);
+
+	for (i = 0; p + i != end; i++) {
+		if (strchr(allow, p[i]) != NULL && strchr(flags, p[i]) == NULL)
+			flags[j++] = p[i];
+	}
+	log_debug("%s: %.*s %s", __func__, (int)(end - p - 1), p, flags);
 
 	if (strcmp(end, "?") == 0) {
 		if ((pb = paste_get_top(NULL)) != NULL)
@@ -2723,7 +2739,7 @@ input_osc_52(struct input_ctx *ictx, const char *p)
 	}
 
 	screen_write_start_pane(&ctx, wp, NULL);
-	screen_write_setselection(&ctx, out, outlen);
+	screen_write_setselection(&ctx, flags, out, outlen);
 	screen_write_stop(&ctx);
 	notify_pane("pane-set-clipboard", wp);
 

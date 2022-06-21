@@ -73,7 +73,6 @@
 /witness.h/1.5/Tue Apr 23 13:35:12 2019//
 /intrmap.h/1.3/Fri Dec 11 17:58:24 2020//
 /pciio.h/1.8/Fri Dec 11 17:58:24 2020//
-/pipe.h/1.27/Fri Dec 11 17:58:24 2020//
 /sensors.h/1.37/Fri Dec 11 17:58:24 2020//
 /stdarg.h/1.10/Fri Dec 11 17:58:24 2020//
 /timetc.h/1.12/Fri Dec 11 17:58:24 2020//
@@ -100,11 +99,9 @@
 /timeout.h/1.43/Thu Sep  2 14:22:33 2021//
 /specdev.h/1.40/Wed Oct 20 17:29:15 2021//
 /reboot.h/1.20/Sun Nov 21 20:15:22 2021//
-/socketvar.h/1.101/Sun Nov 21 20:15:22 2021//
 /sockio.h/1.84/Sun Nov 21 20:15:22 2021//
 /exec.h/1.47/Fri Feb 11 13:33:56 2022//
 /exec_elf.h/1.94/Mon Jan 24 14:35:16 2022//
-/file.h/1.65/Mon Jan 24 14:35:16 2022//
 /gmon.h/1.9/Mon Jan 24 14:35:16 2022//
 /hibernate.h/1.45/Mon Jan 24 14:35:16 2022//
 /kcov.h/1.8/Mon Jan 24 14:35:16 2022//
@@ -125,7 +122,6 @@
 /atomic.h/1.9/Wed Apr 20 14:28:22 2022//
 /device.h/1.63/Wed Apr 20 14:28:22 2022//
 /event.h/1.67/Wed Apr 20 14:28:22 2022//
-/eventvar.h/1.14/Wed Apr 20 14:28:22 2022//
 /param.h/1.138/Wed Apr 20 14:28:22 2022//
 /refcnt.h/1.6/Wed Apr 20 14:28:22 2022//
 /resourcevar.h/1.25/Wed Apr 20 14:28:22 2022//
@@ -138,4 +134,8 @@
 /syscall.h/1.234/Wed May 25 14:32:39 2022//
 /syscallargs.h/1.237/Wed May 25 14:32:39 2022//
 /sysctl.h/1.228/Wed May 25 14:32:39 2022//
+/eventvar.h/1.15/Tue Jun 21 09:30:31 2022//
+/file.h/1.66/Tue Jun 21 09:30:31 2022//
+/pipe.h/1.28/Tue Jun 21 09:30:31 2022//
+/socketvar.h/1.103/Tue Jun 21 09:30:31 2022//
 D

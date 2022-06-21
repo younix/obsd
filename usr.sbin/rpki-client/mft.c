@@ -1,5 +1,6 @@
-/*	$OpenBSD: mft.c,v 1.68 2022/05/23 14:10:18 tb Exp $ */
+/*	$OpenBSD: mft.c,v 1.72 2022/06/10 10:41:09 tb Exp $ */
 /*
+ * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
  * Permission to use, copy, modify, and distribute this software for any
@@ -269,33 +270,16 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 {
 	Manifest		*mft;
 	FileAndHash		*fh;
-	long			 mft_version;
 	int			 i, rc = 0;
 
 	if ((mft = d2i_Manifest(NULL, &d, dsz)) == NULL) {
-		cryptowarnx("%s: RFC 6486 section 4.2: Manifest: "
-		    "failed ASN.1 sequence parse", p->fn);
+		cryptowarnx("%s: RFC 6486 section 4: failed to parse Manifest",
+		    p->fn);
 		goto out;
 	}
 
-	/* Validate the optional version field */
-	if (mft->version != NULL) {
-		mft_version = ASN1_INTEGER_get(mft->version);
-		if (mft_version < 0) {
-			cryptowarnx("%s: ASN1_INTEGER_get failed", p->fn);
-			goto out;
-		}
-
-		switch (mft_version) {
-		case 0:
-			warnx("%s: incorrect encoding for version 0", p->fn);
-			goto out;
-		default:
-			warnx("%s: version %ld not supported (yet)", p->fn,
-			    mft_version);
-			goto out;
-		}
-	}
+	if (!valid_econtent_version(p->fn, mft->version))
+		goto out;
 
 	p->res->seqnum = x509_convert_seqnum(p->fn, mft->manifestNumber);
 	if (p->res->seqnum == NULL)
@@ -322,7 +306,7 @@ mft_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		goto out;
 	}
 
-	if (sk_FileAndHash_num(mft->fileList) > MAX_MANIFEST_ENTRIES) {
+	if (sk_FileAndHash_num(mft->fileList) >= MAX_MANIFEST_ENTRIES) {
 		warnx("%s: %d exceeds manifest entry limit (%d)", p->fn,
 		    sk_FileAndHash_num(mft->fileList), MAX_MANIFEST_ENTRIES);
 		goto out;

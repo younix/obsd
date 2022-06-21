@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.h,v 1.423 2022/05/23 13:40:11 deraadt Exp $ */
+/*	$OpenBSD: bgpd.h,v 1.432 2022/06/19 10:30:09 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -26,7 +26,6 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <net/if.h>
-#include <net/pfkeyv2.h>
 
 #include <poll.h>
 #include <stdarg.h>
@@ -74,13 +73,13 @@
 
 #define	SOCKET_NAME			"/var/run/bgpd.sock"
 
-#define	F_BGPD_INSERTED		0x0001
+#define	F_BGPD			0x0001
 #define	F_KERNEL		0x0002
 #define	F_CONNECTED		0x0004
 #define	F_NEXTHOP		0x0008
 #define	F_DOWN			0x0010
 #define	F_STATIC		0x0020
-#define	F_DYNAMIC		0x0040
+#define	F_BGPD_INSERTED		0x0040
 #define	F_REJECT		0x0080
 #define	F_BLACKHOLE		0x0100
 #define	F_LONGER		0x0200
@@ -90,7 +89,6 @@
 #define	F_CTL_ADJ_IN		0x2000	/* only set on requests */
 #define	F_CTL_ADJ_OUT		0x4000	/* only set on requests */
 #define	F_CTL_BEST		0x8000
-#define	F_RTLABEL		0x10000
 #define	F_CTL_SSV		0x20000	/* only used by bgpctl */
 #define	F_CTL_INVALID		0x40000 /* only set on requests */
 #define	F_CTL_OVS_VALID		0x80000
@@ -330,6 +328,18 @@ enum auth_method {
 	AUTH_IPSEC_IKE_AH
 };
 
+enum auth_alg {
+	AUTH_AALG_NONE,
+	AUTH_AALG_SHA1HMAC,
+	AUTH_AALG_MD5HMAC,
+};
+
+enum auth_enc_alg {
+	AUTH_EALG_NONE,
+	AUTH_EALG_3DESCBC,
+	AUTH_EALG_AES,
+};
+
 struct peer_auth {
 	char			md5key[TCP_MD5_KEY_LEN];
 	char			auth_key_in[IPSEC_AUTH_KEY_LEN];
@@ -339,13 +349,13 @@ struct peer_auth {
 	uint32_t		spi_in;
 	uint32_t		spi_out;
 	enum auth_method	method;
+	enum auth_alg		auth_alg_in;
+	enum auth_alg		auth_alg_out;
+	enum auth_enc_alg	enc_alg_in;
+	enum auth_enc_alg	enc_alg_out;
 	uint8_t			md5key_len;
-	uint8_t			auth_alg_in;
-	uint8_t			auth_alg_out;
 	uint8_t			auth_keylen_in;
 	uint8_t			auth_keylen_out;
-	uint8_t			enc_alg_in;
-	uint8_t			enc_alg_out;
 	uint8_t			enc_keylen_in;
 	uint8_t			enc_keylen_out;
 };
@@ -989,7 +999,7 @@ struct filter_peers {
 #define EXT_COMMUNITY_FLAG_VALID	0x01
 
 struct ext_comm_pairs {
-	short		type;
+	uint8_t		type;
 	uint8_t		subtype;
 	const char	*subname;
 };
@@ -1053,6 +1063,9 @@ struct filter_match {
 	struct filter_prefixset		prefixset;
 	struct filter_originset		originset;
 	struct filter_ovs		ovs;
+	int				maxcomm;
+	int				maxextcomm;
+	int				maxlargecomm;
 };
 
 struct filter_rule {
@@ -1281,30 +1294,27 @@ int		roa_cmp(struct roa *, struct roa *);
 RB_PROTOTYPE(roa_tree, roa, entry, roa_cmp);
 
 /* kroute.c */
-int		 kr_init(int *);
-int		 ktable_update(u_int, char *, int, uint8_t);
+int		 kr_init(int *, uint8_t);
+int		 ktable_update(u_int, char *, int);
 void		 ktable_preload(void);
-void		 ktable_postload(uint8_t);
+void		 ktable_postload(void);
 int		 ktable_exists(u_int, u_int *);
-int		 kr_change(u_int, struct kroute_full *, uint8_t);
-int		 kr_delete(u_int, struct kroute_full *, uint8_t);
+int		 kr_change(u_int, struct kroute_full *);
+int		 kr_delete(u_int, struct kroute_full *);
 int		 kr_flush(u_int);
-void		 kr_shutdown(uint8_t, u_int);
-void		 kr_fib_couple(u_int, uint8_t);
-void		 kr_fib_couple_all(uint8_t);
-void		 kr_fib_decouple(u_int, uint8_t);
-void		 kr_fib_decouple_all(uint8_t);
-void		 kr_fib_update_prio_all(uint8_t);
-int		 kr_dispatch_msg(u_int rdomain);
-int		 kr_nexthop_add(uint32_t, struct bgpd_addr *,
-		    struct bgpd_config *);
-void		 kr_nexthop_delete(uint32_t, struct bgpd_addr *,
-		    struct bgpd_config *);
+void		 kr_shutdown(void);
+void		 kr_fib_couple(u_int);
+void		 kr_fib_couple_all(void);
+void		 kr_fib_decouple(u_int);
+void		 kr_fib_decouple_all(void);
+void		 kr_fib_prio_set(uint8_t);
+int		 kr_dispatch_msg(void);
+int		 kr_nexthop_add(uint32_t, struct bgpd_addr *);
+void		 kr_nexthop_delete(uint32_t, struct bgpd_addr *);
 void		 kr_show_route(struct imsg *);
 void		 kr_ifinfo(char *);
 void		 kr_net_reload(u_int, uint64_t, struct network_head *);
 int		 kr_reload(void);
-struct in6_addr	*prefixlen2mask6(uint8_t prefixlen);
 int		 get_mpe_config(const char *, u_int *, u_int *);
 
 /* log.c */
@@ -1399,7 +1409,7 @@ const char	*log_in6addr(const struct in6_addr *);
 const char	*log_sockaddr(struct sockaddr *, socklen_t);
 const char	*log_as(uint32_t);
 const char	*log_rd(uint64_t);
-const char	*log_ext_subtype(short, uint8_t);
+const char	*log_ext_subtype(int, uint8_t);
 const char	*log_reason(const char *);
 const char	*log_rtr_error(enum rtr_error);
 int		 aspath_snprint(char *, size_t, void *, uint16_t);
@@ -1422,10 +1432,10 @@ int		 nlri_get_vpn6(u_char *, uint16_t, struct bgpd_addr *,
 		     uint8_t *, int);
 int		 prefix_compare(const struct bgpd_addr *,
 		    const struct bgpd_addr *, int);
-in_addr_t	 prefixlen2mask(uint8_t);
 void		 inet4applymask(struct in_addr *, const struct in_addr *, int);
 void		 inet6applymask(struct in6_addr *, const struct in6_addr *,
 		    int);
+void		 applymask(struct bgpd_addr *, const struct bgpd_addr *, int);
 const char	*aid2str(uint8_t);
 int		 aid2afi(uint8_t, uint16_t *, uint8_t *);
 int		 afi2aid(uint16_t, uint8_t, uint8_t *);

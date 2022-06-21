@@ -9,8 +9,8 @@
 /fpsetsticky.c/1.5/Thu Apr 17 09:01:25 2014//
 /infinity.c/1.6/Fri Mar 31 04:28:37 2006//
 /nan.c/1.1/Thu Jul 24 09:31:06 2008//
-/setjmp.S/1.13/Sun May 29 07:59:36 2016//
-/sigsetjmp.S/1.7/Sun May 22 23:56:30 2016//
 /Makefile.inc/1.15/Fri Dec 11 17:58:18 2020//
 /usertc.c/1.2/Fri Dec 11 17:58:18 2020//
+/setjmp.S/1.14/Tue Jun 21 09:30:09 2022//
+/sigsetjmp.S/1.8/Tue Jun 21 09:30:09 2022//
 D

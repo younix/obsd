@@ -20,7 +20,6 @@
 /ascii.out_utf8/1.4/Thu Sep  2 14:22:31 2021//
 /input.in/1.4/Thu Sep  2 14:22:31 2021//
 /input.out_ascii/1.6/Thu Sep  2 14:22:31 2021//
-/input.out_lint/1.7/Thu Sep  2 14:22:31 2021//
 /input.out_utf8/1.10/Thu Sep  2 14:22:31 2021//
 /latin1.out_ascii/1.6/Thu Sep  2 14:22:31 2021//
 /latin1.out_utf8/1.5/Thu Sep  2 14:22:31 2021//
@@ -35,5 +34,6 @@
 /nogroff.out_ascii/1.7/Thu Sep  2 14:22:31 2021//
 /nogroff.out_html/1.9/Thu Sep  2 14:22:31 2021//
 /nogroff.out_utf8/1.9/Thu Sep  2 14:22:31 2021//
-/invalid.out_lint/1.6/Wed May 25 14:32:25 2022//
+/input.out_lint/1.8/Tue Jun 21 09:30:20 2022//
+/invalid.out_lint/1.7/Tue Jun 21 09:30:20 2022//
 D

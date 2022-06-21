@@ -3,7 +3,6 @@
 /privsep_fdpass.c/1.11/Thu Jul  9 20:16:04 2015//
 /ringbuf.c/1.10/Sun Oct 16 22:12:50 2016//
 /syslog.conf.5/1.39/Sun Jan 13 11:07:47 2019//
-/syslogd.8/1.60/Thu Sep 27 08:33:25 2018//
 /ttymsg.c/1.19/Tue Sep 14 08:17:43 2021//
 /privsep.c/1.74/Mon Nov 15 19:06:16 2021//
 /Makefile/1.9/Mon Jan 24 14:35:16 2022//
@@ -12,5 +11,6 @@
 /parsemsg.h/1.1/Mon Jan 24 14:35:16 2022//
 /syslogd.h/1.36/Mon Jan 24 14:35:16 2022//
 /evbuffer_tls.c/1.13/Wed Apr 20 14:28:27 2022//
-/syslogd.c/1.274/Wed May 25 14:32:47 2022//
+/syslogd.8/1.61/Tue Jun 21 09:30:37 2022//
+/syslogd.c/1.275/Tue Jun 21 09:30:37 2022//
 D

@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-set-buffer.c,v 1.32 2021/08/21 10:22:39 nicm Exp $ */
+/* $OpenBSD: cmd-set-buffer.c,v 1.34 2022/06/09 09:12:55 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -69,8 +69,13 @@ cmd_set_buffer_exec(struct cmd *self, struct cmdq_item *item)
 		pb = paste_get_name(bufname);
 
 	if (cmd_get_entry(self) == &cmd_delete_buffer_entry) {
-		if (pb == NULL)
+		if (pb == NULL) {
+			if (bufname != NULL) {
+				cmdq_error(item, "unknown buffer: %s", bufname);
+				return (CMD_RETURN_ERROR);
+			}
 			pb = paste_get_top(&bufname);
+		}
 		if (pb == NULL) {
 			cmdq_error(item, "no buffer");
 			return (CMD_RETURN_ERROR);
@@ -80,8 +85,13 @@ cmd_set_buffer_exec(struct cmd *self, struct cmdq_item *item)
 	}
 
 	if (args_has(args, 'n')) {
-		if (pb == NULL)
+		if (pb == NULL) {
+			if (bufname != NULL) {
+				cmdq_error(item, "unknown buffer: %s", bufname);
+				return (CMD_RETURN_ERROR);
+			}
 			pb = paste_get_top(&bufname);
+		}
 		if (pb == NULL) {
 			cmdq_error(item, "no buffer");
 			return (CMD_RETURN_ERROR);
@@ -121,7 +131,7 @@ cmd_set_buffer_exec(struct cmd *self, struct cmdq_item *item)
 		return (CMD_RETURN_ERROR);
 	}
 	if (args_has(args, 'w') && tc != NULL)
- 		tty_set_selection(&tc->tty, bufdata, bufsize);
+ 		tty_set_selection(&tc->tty, "", bufdata, bufsize);
 
 	return (CMD_RETURN_NORMAL);
 }

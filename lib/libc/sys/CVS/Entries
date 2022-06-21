@@ -73,7 +73,6 @@
 /setreuid.2/1.12/Thu Feb  5 02:33:09 2015//
 /setsid.2/1.14/Sun May 31 23:54:25 2015//
 /setuid.2/1.23/Tue Sep  9 08:16:12 2014//
-/shmat.2/1.16/Sat Nov 15 22:19:53 2014//
 /shmget.2/1.17/Sat Nov 15 22:19:53 2014//
 /shutdown.2/1.15/Tue Sep  9 09:00:17 2014//
 /sigpending.2/1.8/Mon May 29 09:40:02 2017//
@@ -187,4 +186,5 @@
 /sysctl.2/1.48/Wed Apr 20 14:28:02 2022//
 /write.2/1.44/Wed Apr 20 14:28:02 2022//
 /truncate.2/1.21/Wed May 25 14:32:12 2022//
+/shmat.2/1.17/Tue Jun 21 09:30:10 2022//
 D

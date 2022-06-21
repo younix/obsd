@@ -1,4 +1,4 @@
-/*	$OpenBSD: validate.c,v 1.38 2022/05/15 16:43:35 tb Exp $ */
+/*	$OpenBSD: validate.c,v 1.40 2022/06/10 10:36:43 tb Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -46,15 +46,13 @@ valid_as(struct auth *a, uint32_t min, uint32_t max)
 		return 0;
 
 	/* Does this certificate cover our AS number? */
-	if (a->cert->asz) {
-		c = as_check_covered(min, max, a->cert->as, a->cert->asz);
-		if (c > 0)
-			return 1;
-		else if (c < 0)
-			return 0;
-	}
+	c = as_check_covered(min, max, a->cert->as, a->cert->asz);
+	if (c > 0)
+		return 1;
+	else if (c < 0)
+		return 0;
 
-	/* If it doesn't, walk up the chain. */
+	/* If it inherits, walk up the chain. */
 	return valid_as(a->parent, min, max);
 }
 
@@ -80,7 +78,7 @@ valid_ip(struct auth *a, enum afi afi,
 	else if (c < 0)
 		return 0;
 
-	/* If it doesn't, walk up the chain. */
+	/* If it inherits, walk up the chain. */
 	return valid_ip(a->parent, afi, min, max);
 }
 
@@ -511,4 +509,27 @@ valid_rsc(const char *fn, struct auth *a, struct rsc *rsc)
 	}
 
 	return 1;
+}
+
+int
+valid_econtent_version(const char *fn, const ASN1_INTEGER *aint)
+{
+	long version;
+
+	if (aint == NULL)
+		return 1;
+
+	if ((version = ASN1_INTEGER_get(aint)) < 0) {
+		warnx("%s: ASN1_INTEGER_get failed", fn);
+		return 0;
+	}
+
+	switch (version) {
+	case 0:
+		warnx("%s: incorrect encoding for version 0", fn);
+		return 0;
+	default:
+		warnx("%s: version %ld not supported (yet)", fn, version);
+		return 0;
+	}
 }

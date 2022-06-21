@@ -12,7 +12,6 @@
 /dsa_ssh2.prv/1.1/Thu Jan 17 13:21:28 2002//
 /dsa_ssh2.pub/1.1/Thu Jan 17 13:21:28 2002//
 /dynamic-forward.sh/1.13/Thu Sep 21 19:18:12 2017//
-/envpass.sh/1.4/Fri Mar  4 08:48:46 2005//
 /exit-status.sh/1.8/Sun Apr 30 23:34:55 2017//
 /forcecommand.sh/1.4/Sun Apr 30 23:34:55 2017//
 /host-expand.sh/1.5/Sun Apr 30 23:34:55 2017//
@@ -57,7 +56,6 @@
 D/misc////
 D/unittests////
 /agent-subprocess.sh/1.1/Fri Dec 11 17:58:22 2020//
-/multiplex.sh/1.33/Fri Dec 11 17:58:22 2020//
 /addrmatch.sh/1.6/Thu Dec 17 19:39:58 2020//
 /dhgex.sh/1.7/Sun Aug 29 08:01:51 2021//
 /agent.sh/1.20/Wed Sep  1 16:07:38 2021//
@@ -110,3 +108,5 @@ D/unittests////
 /agent-ptrace.sh/1.5/Wed May 25 14:32:26 2022//
 /forward-control.sh/1.11/Wed May 25 14:32:26 2022//
 /scp.sh/1.14/Wed May 25 14:32:26 2022//
+/envpass.sh/1.5/Tue Jun 21 09:30:21 2022//
+/multiplex.sh/1.34/Tue Jun 21 09:30:21 2022//

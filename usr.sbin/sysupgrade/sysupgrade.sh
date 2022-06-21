@@ -1,6 +1,6 @@
 #!/bin/ksh
 #
-# $OpenBSD: sysupgrade.sh,v 1.46 2022/03/03 10:12:08 sdk Exp $
+# $OpenBSD: sysupgrade.sh,v 1.48 2022/06/08 09:03:11 mglocker Exp $
 #
 # Copyright (c) 1997-2015 Todd Miller, Theo de Raadt, Ken Westerback
 # Copyright (c) 2015 Robert Peichaer <rpe@openbsd.org>
@@ -35,7 +35,7 @@ err()
 
 usage()
 {
-	echo "usage: ${0##*/} [-fkn] [-r | -s] [installurl]" 1>&2
+	echo "usage: ${0##*/} [-fkn] [-r | -s] [-b base-directory] [installurl]" 1>&2
 	return 1
 }
 
@@ -78,8 +78,9 @@ FORCE=false
 KEEP=false
 REBOOT=true
 
-while getopts fknrs arg; do
+while getopts b:fknrs arg; do
 	case ${arg} in
+	b)	SETSDIR=${OPTARG}/_sysupgrade;;
 	f)	FORCE=true;;
 	k)	KEEP=true;;
 	n)	REBOOT=false;;
@@ -112,7 +113,9 @@ esac
 	err "invalid installurl: $MIRROR"
 
 if ! $RELEASE && [[ ${#_KERNV[*]} == 2 ]]; then
-	SNAP=true
+	if [[ ${_KERNV[1]} != '-stable' ]]; then
+		SNAP=true
+	fi
 fi
 
 if $RELEASE && [[ ${_KERNV[1]} == '-beta' ]]; then

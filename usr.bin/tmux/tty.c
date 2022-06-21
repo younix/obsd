@@ -1,4 +1,4 @@
-/* $OpenBSD: tty.c,v 1.418 2022/03/24 09:05:57 nicm Exp $ */
+/* $OpenBSD: tty.c,v 1.420 2022/06/09 09:12:55 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -671,7 +671,7 @@ static void
 tty_force_cursor_colour(struct tty *tty, int c)
 {
 	u_char	r, g, b;
-	char	s[13] = "";
+	char	s[13];
 
 	if (c != -1)
 		c = colour_force_rgb(c);
@@ -814,7 +814,7 @@ tty_update_mode(struct tty *tty, int mode, struct screen *s)
 			tty_puts(tty, "\033[?1006h");
 		if (mode & MODE_MOUSE_ALL)
 			tty_puts(tty, "\033[?1000h\033[?1002h\033[?1003h");
-		if (mode & MODE_MOUSE_BUTTON)
+		else if (mode & MODE_MOUSE_BUTTON)
 			tty_puts(tty, "\033[?1000h\033[?1002h");
 		else if (mode & MODE_MOUSE_STANDARD)
 			tty_puts(tty, "\033[?1000h");
@@ -2082,11 +2082,12 @@ tty_cmd_cells(struct tty *tty, const struct tty_ctx *ctx)
 void
 tty_cmd_setselection(struct tty *tty, const struct tty_ctx *ctx)
 {
-	tty_set_selection(tty, ctx->ptr, ctx->num);
+	tty_set_selection(tty, ctx->ptr2, ctx->ptr, ctx->num);
 }
 
 void
-tty_set_selection(struct tty *tty, const char *buf, size_t len)
+tty_set_selection(struct tty *tty, const char *flags, const char *buf,
+    size_t len)
 {
 	char	*encoded;
 	size_t	 size;
@@ -2101,7 +2102,7 @@ tty_set_selection(struct tty *tty, const char *buf, size_t len)
 
 	b64_ntop(buf, len, encoded, size);
 	tty->flags |= TTY_NOBLOCK;
-	tty_putcode_ptr2(tty, TTYC_MS, "", encoded);
+	tty_putcode_ptr2(tty, TTYC_MS, flags, encoded);
 
 	free(encoded);
 }
