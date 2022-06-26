@@ -44,7 +44,6 @@
 /intel_atomic_plane.c/1.3/Mon Jan 24 14:35:15 2022//
 /intel_atomic_plane.h/1.3/Mon Jan 24 14:35:15 2022//
 /intel_audio.c/1.3/Mon Jan 24 14:35:15 2022//
-/intel_bios.c/1.3/Mon Jan 24 14:35:15 2022//
 /intel_bios.h/1.2/Mon Jan 24 14:35:15 2022//
 /intel_cdclk.c/1.3/Mon Jan 24 14:35:15 2022//
 /intel_color.c/1.3/Mon Jan 24 14:35:15 2022//
@@ -62,7 +61,6 @@
 /intel_ddi_buf_trans.h/1.1/Mon Jan 24 14:35:15 2022//
 /intel_de.h/1.2/Mon Jan 24 14:35:15 2022//
 /intel_display_debugfs.h/1.3/Mon Jan 24 14:35:15 2022//
-/intel_display_power.c/1.3/Mon Jan 24 14:35:15 2022//
 /intel_display_power.h/1.3/Mon Jan 24 14:35:15 2022//
 /intel_display_types.h/1.3/Mon Jan 24 14:35:15 2022//
 /intel_dmc.h/1.1/Mon Jan 24 14:35:15 2022//
@@ -116,7 +114,6 @@
 /intel_tc.c/1.4/Fri Feb 11 13:33:55 2022//
 /intel_tc.h/1.3/Mon Jan 24 14:35:15 2022//
 /intel_tv.c/1.3/Mon Jan 24 14:35:15 2022//
-/intel_vbt_defs.h/1.3/Mon Jan 24 14:35:15 2022//
 /intel_vdsc.c/1.3/Mon Jan 24 14:35:15 2022//
 /intel_vdsc.h/1.2/Mon Jan 24 14:35:15 2022//
 /intel_vga.c/1.4/Mon Jan 24 14:35:15 2022//
@@ -150,4 +147,7 @@
 /intel_opregion.c/1.7/Wed May 25 14:32:36 2022//
 /intel_psr.c/1.4/Wed May 25 14:32:36 2022//
 /intel_dsi_vbt.c/1.4/Tue Jun 21 09:30:30 2022//
+/intel_bios.c/1.4/Sun Jun 26 07:44:30 2022//
+/intel_display_power.c/1.4/Sun Jun 26 07:44:30 2022//
+/intel_vbt_defs.h/1.4/Sun Jun 26 07:44:30 2022//
 D

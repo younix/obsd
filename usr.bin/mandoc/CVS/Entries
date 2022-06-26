@@ -52,12 +52,9 @@
 /apropos.1/1.45/Sat May  1 08:41:52 2021//
 /man_html.c/1.132/Sat May  1 08:41:52 2021//
 /arch.c/1.14/Wed Sep  1 16:07:40 2021//
-/mdoc_html.c/1.217/Wed Sep  1 16:07:40 2021//
 /term_tag.c/1.6/Wed Sep  1 16:07:40 2021//
 /term_tag.h/1.4/Wed Sep  1 16:07:40 2021//
 /att.c/1.15/Tue Sep 14 08:17:38 2021//
-/html.c/1.146/Tue Sep 14 08:17:38 2021//
-/html.h/1.71/Tue Sep 14 08:17:38 2021//
 /libmandoc.h/1.65/Thu Sep  2 14:22:33 2021//
 /man_validate.c/1.126/Thu Sep  2 14:22:33 2021//
 /mdoc_man.c/1.135/Thu Sep  2 14:22:33 2021//
@@ -92,11 +89,14 @@
 /tbl_term.c/1.65/Wed May 25 14:32:40 2022//
 /term.c/1.146/Wed May 25 14:32:40 2022//
 /chars.c/1.50/Tue Jun 21 09:30:32 2022//
-/mandoc.1/1.186/Tue Jun 21 09:30:32 2022//
 /mandoc.h/1.221/Tue Jun 21 09:30:32 2022//
 /mandoc_msg.c/1.18/Tue Jun 21 09:30:32 2022//
 /mdoc_validate.c/1.306/Tue Jun 21 09:30:32 2022//
 /roff.c/1.266/Tue Jun 21 09:30:32 2022//
 /roff_escape.c/1.14/Tue Jun 21 09:30:32 2022//
 /roff_int.h/1.20/Tue Jun 21 09:30:32 2022//
+/html.c/1.147/Sun Jun 26 07:44:32 2022//
+/html.h/1.72/Sun Jun 26 07:44:32 2022//
+/mandoc.1/1.187/Sun Jun 26 07:44:32 2022//
+/mdoc_html.c/1.219/Sun Jun 26 07:44:32 2022//
 D

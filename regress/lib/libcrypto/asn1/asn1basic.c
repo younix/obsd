@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1basic.c,v 1.6 2022/04/27 17:43:06 jsing Exp $ */
+/* $OpenBSD: asn1basic.c,v 1.9 2022/06/25 15:49:28 jsing Exp $ */
 /*
  * Copyright (c) 2017, 2021 Joel Sing <jsing@openbsd.org>
  *
@@ -94,10 +94,14 @@ asn1_bit_string_test(void)
 		fprintf(stderr, "FAIL: i2d_ASN1_BIT_STRING\n");
 		goto failed;
 	}
-
 	if (!asn1_compare_bytes("BIT_STRING", p, len, asn1_bit_string_primitive,
 	    sizeof(asn1_bit_string_primitive)))
 		goto failed;
+	if (pp != p + len) {
+		fprintf(stderr, "FAIL: i2d_ASN1_BIT_STRING pp = %p, want %p\n",
+		    pp, p + len);
+		goto failed;
+	}
 
 	/* Test primitive decoding. */
 	q = p;
@@ -108,6 +112,11 @@ asn1_bit_string_test(void)
 	if (!asn1_compare_bytes("BIT_STRING primitive data", abs->data, abs->length,
 	    bs, sizeof(bs)))
 		goto failed;
+	if (q != p + len) {
+		fprintf(stderr, "FAIL: d2i_ASN1_BIT_STRING q = %p, want %p\n",
+		    q, p + len);
+		goto failed;
+	}
 
 	/* Test ASN1_BIT_STRING_get_bit(). */
 	for (i = 0; i < ((int)sizeof(bs) * 8); i++) {
@@ -190,6 +199,11 @@ asn1_boolean_test(void)
 		fprintf(stderr, "FAIL: i2d_ASN1_BOOLEAN false\n");
 		goto failed;
 	}
+	if (pp != p + len) {
+		fprintf(stderr, "FAIL: i2d_ASN1_BOOLEAN pp = %p, want %p\n",
+		    pp, p + len);
+		goto failed;
+	}
 
 	if (!asn1_compare_bytes("BOOLEAN false", p, len, asn1_boolean_false,
 	    sizeof(asn1_boolean_false)))
@@ -198,6 +212,11 @@ asn1_boolean_test(void)
 	q = p;
 	if (d2i_ASN1_BOOLEAN(NULL, &q, len) != 0) {
 		fprintf(stderr, "FAIL: BOOLEAN false did not decode to 0\n");
+		goto failed;
+	}
+	if (q != p + len) {
+		fprintf(stderr, "FAIL: d2i_ASN1_BOOLEAN q = %p, want %p\n",
+		    q, p + len);
 		goto failed;
 	}
 
@@ -215,6 +234,11 @@ asn1_boolean_test(void)
 		fprintf(stderr, "FAIL: i2d_ASN1_BOOLEAN true\n");
 		goto failed;
 	}
+	if (pp != p + len) {
+		fprintf(stderr, "FAIL: i2d_ASN1_BOOLEAN pp = %p, want %p\n",
+		    pp, p + len);
+		goto failed;
+	}
 
 	if (!asn1_compare_bytes("BOOLEAN true", p, len, asn1_boolean_true,
 	    sizeof(asn1_boolean_true)))
@@ -223,6 +247,11 @@ asn1_boolean_test(void)
 	q = p;
 	if (d2i_ASN1_BOOLEAN(NULL, &q, len) != 1) {
 		fprintf(stderr, "FAIL: BOOLEAN true did not decode to 1\n");
+		goto failed;
+	}
+	if (q != p + len) {
+		fprintf(stderr, "FAIL: d2i_ASN1_BOOLEAN q = %p, want %p\n",
+		    q, p + len);
 		goto failed;
 	}
 
@@ -360,6 +389,11 @@ asn1_integer_set_test(struct asn1_integer_test *ait)
 		fprintf(stderr, "FAIL: Not V_ASN1_NEG_INTEGER\n");
 		goto failed;
 	}
+	if (ASN1_INTEGER_get(aint) != ait->value) {
+		fprintf(stderr, "FAIL: ASN1_INTEGER_get() = %ld, want %ld\n",
+		    ASN1_INTEGER_get(aint), ait->value);
+		goto failed;
+	}
 	if ((len = i2d_ASN1_INTEGER(aint, NULL)) < 0) {
 		fprintf(stderr, "FAIL: i2d_ASN1_INTEGER() failed\n");
 		goto failed;
@@ -419,6 +453,11 @@ asn1_integer_content_test(struct asn1_integer_test *ait)
 	if (!asn1_compare_bytes("INTEGER content", p, len, ait->der,
 	    ait->der_len))
 		goto failed;
+	if (pp != p + len) {
+		fprintf(stderr, "FAIL: i2d_ASN1_INTEGER pp = %p, want %p\n",
+		    pp, p + len);
+		goto failed;
+	}
 
 	failed = 0;
 
@@ -446,6 +485,11 @@ asn1_integer_decode_test(struct asn1_integer_test *ait)
 		if (!asn1_compare_bytes("INTEGER content", aint->data,
 		    aint->length, ait->content, ait->content_len))
 			goto failed;
+		if (q != ait->der + ait->der_len) {
+			fprintf(stderr, "FAIL: d2i_ASN1_INTEGER q = %p, want %p\n",
+			    q, ait->der + ait->der_len);
+			goto failed;
+		}
 	} else if (ait->want_error == 0) {
 		fprintf(stderr, "FAIL: INTEGER failed to decode\n");
 		goto failed;
@@ -455,6 +499,180 @@ asn1_integer_decode_test(struct asn1_integer_test *ait)
 
  failed:
 	ASN1_INTEGER_free(aint);
+
+	return failed;
+}
+
+static int
+asn1_integer_set_val_test(void)
+{
+	ASN1_INTEGER *aint = NULL;
+	uint64_t uval;
+	int64_t val;
+	int failed = 1;
+
+	if ((aint = ASN1_INTEGER_new()) == NULL) {
+		fprintf(stderr, "FAIL: ASN1_INTEGER_new() == NULL\n");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set_uint64(aint, 0)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_set_uint64() failed with "
+		    "0\n");
+		goto failed;
+	}
+	if (!ASN1_INTEGER_get_uint64(&uval, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_uint64() failed with "
+		    "0\n");
+		goto failed;
+	}
+	if (uval != 0) {
+		fprintf(stderr, "FAIL: uval != 0\n");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set_uint64(aint, UINT64_MAX)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_set_uint64() failed with "
+		    "UINT64_MAX\n");
+		goto failed;
+	}
+	if (!ASN1_INTEGER_get_uint64(&uval, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_uint64() failed with "
+		    "UINT64_MAX\n");
+		goto failed;
+	}
+	if (uval != UINT64_MAX) {
+		fprintf(stderr, "FAIL: uval != UINT64_MAX\n");
+		goto failed;
+	}
+	if (ASN1_INTEGER_get_int64(&val, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_int64() succeeded "
+		    "with UINT64_MAX\n");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set_int64(aint, INT64_MIN)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_set_int64() failed with "
+		    "INT64_MIN\n");
+		goto failed;
+	}
+	if (!ASN1_INTEGER_get_int64(&val, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_int64() failed with "
+		    "INT64_MIN\n");
+		goto failed;
+	}
+	if (val != INT64_MIN) {
+		fprintf(stderr, "FAIL: val != INT64_MIN\n");
+		goto failed;
+	}
+	if (ASN1_INTEGER_get_uint64(&uval, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_uint64() succeeded "
+		    "with INT64_MIN\n");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set_int64(aint, INT64_MAX)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_set_int64() failed with "
+		    "INT64_MAX\n");
+		goto failed;
+	}
+	if (!ASN1_INTEGER_get_int64(&val, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_int64() failed with "
+		    "INT64_MAX\n");
+		goto failed;
+	}
+	if (val != INT64_MAX) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_int64() failed with "
+		    "INT64_MAX\n");
+		goto failed;
+	}
+	if (!ASN1_INTEGER_get_uint64(&uval, aint)) {
+		fprintf(stderr, "FAIL: ASN_INTEGER_get_uint64() failed with "
+		    "INT64_MAX\n");
+		goto failed;
+	}
+	if (uval != INT64_MAX) {
+		fprintf(stderr, "FAIL: uval != INT64_MAX\n");
+		goto failed;
+	}
+
+	failed = 0;
+
+ failed:
+	ASN1_INTEGER_free(aint);
+
+	return failed;
+}
+
+static int
+asn1_integer_cmp_test(void)
+{
+	ASN1_INTEGER *a = NULL, *b = NULL;
+	int failed = 1;
+
+	if ((a = ASN1_INTEGER_new()) == NULL)
+		goto failed;
+	if ((b = ASN1_INTEGER_new()) == NULL)
+		goto failed;
+
+	if (ASN1_INTEGER_cmp(a, b) != 0) {
+		fprintf(stderr, "FAIL: INTEGER 0 == 0");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set(b, 1)) {
+		fprintf(stderr, "FAIL: failed to set INTEGER");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(a, b) >= 0) {
+		fprintf(stderr, "FAIL: INTEGER 0 < 1");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(b, a) <= 0) {
+		fprintf(stderr, "FAIL: INTEGER 1 > 0");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set(b, -1)) {
+		fprintf(stderr, "FAIL: failed to set INTEGER");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(a, b) <= 0) {
+		fprintf(stderr, "FAIL: INTEGER 0 > -1");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(b, a) >= 0) {
+		fprintf(stderr, "FAIL: INTEGER -1 < 0");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set(a, 1)) {
+		fprintf(stderr, "FAIL: failed to set INTEGER");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(a, b) <= 0) {
+		fprintf(stderr, "FAIL: INTEGER 1 > -1");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(b, a) >= 0) {
+		fprintf(stderr, "FAIL: INTEGER -1 < 1");
+		goto failed;
+	}
+
+	if (!ASN1_INTEGER_set(b, 1)) {
+		fprintf(stderr, "FAIL: failed to set INTEGER");
+		goto failed;
+	}
+	if (ASN1_INTEGER_cmp(a, b) != 0) {
+		fprintf(stderr, "FAIL: INTEGER 1 == 1");
+		goto failed;
+	}
+
+	failed = 0;
+
+ failed:
+	ASN1_INTEGER_free(a);
+	ASN1_INTEGER_free(b);
 
 	return failed;
 }
@@ -474,6 +692,9 @@ asn1_integer_test(void)
 			failed |= asn1_integer_content_test(ait);
 		failed |= asn1_integer_decode_test(ait);
 	}
+
+	failed |= asn1_integer_cmp_test();
+	failed |= asn1_integer_set_val_test();
 
 	return failed;
 }

@@ -135,7 +135,6 @@
 /amdgpu_amdkfd_gfx_v10_3.c/1.2/Mon Jan 24 14:35:14 2022//
 /amdgpu_amdkfd_gfx_v9.c/1.4/Mon Jan 24 14:35:14 2022//
 /amdgpu_amdkfd_gfx_v9.h/1.3/Mon Jan 24 14:35:14 2022//
-/amdgpu_amdkfd_gpuvm.c/1.5/Mon Jan 24 14:35:14 2022//
 /amdgpu_atom.c/1.6/Mon Jan 24 14:35:14 2022//
 /amdgpu_atombios.c/1.6/Mon Jan 24 14:35:14 2022//
 /amdgpu_atombios.h/1.3/Mon Jan 24 14:35:14 2022//
@@ -399,4 +398,5 @@
 /sdma_v4_0.c/1.9/Tue Jun 21 09:30:29 2022//
 /sdma_v5_0.c/1.6/Tue Jun 21 09:30:29 2022//
 /sdma_v5_2.c/1.3/Tue Jun 21 09:30:29 2022//
+/amdgpu_amdkfd_gpuvm.c/1.6/Sun Jun 26 07:44:29 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: kroute.c,v 1.260 2022/06/19 10:30:09 claudio Exp $ */
+/*	$OpenBSD: kroute.c,v 1.270 2022/06/25 19:21:27 claudio Exp $ */
 
 /*
  * Copyright (c) 2022 Claudio Jeker <claudio@openbsd.org>
@@ -54,20 +54,36 @@ struct {
 	uint8_t			fib_prio;
 } kr_state;
 
-struct kroute_node {
-	RB_ENTRY(kroute_node)	 entry;
-	struct kroute		 r;
-	struct kroute_node	*next;
+struct kroute {
+	RB_ENTRY(kroute)	 entry;
+	struct kroute		*next;
+	struct in_addr		 prefix;
+	struct in_addr		 nexthop;
+	uint32_t		 mplslabel;
+	uint16_t		 flags;
+	uint16_t		 labelid;
+	u_short			 ifindex;
+	uint8_t			 prefixlen;
+	uint8_t			 priority;
 };
 
-struct kroute6_node {
-	RB_ENTRY(kroute6_node)	 entry;
-	struct kroute6		 r;
-	struct kroute6_node	*next;
+struct kroute6 {
+	RB_ENTRY(kroute6)	 entry;
+	struct kroute6		*next;
+	struct in6_addr		 prefix;
+	struct in6_addr		 nexthop;
+	uint32_t		 prefix_scope_id;	/* because ... */
+	uint32_t		 nexthop_scope_id;
+	uint32_t		 mplslabel;
+	uint16_t		 flags;
+	uint16_t		 labelid;
+	u_short			 ifindex;
+	uint8_t			 prefixlen;
+	uint8_t			 priority;
 };
 
-struct knexthop_node {
-	RB_ENTRY(knexthop_node)	 entry;
+struct knexthop {
+	RB_ENTRY(knexthop)	 entry;
 	struct bgpd_addr	 nexthop;
 	void			*kroute;
 };
@@ -82,16 +98,28 @@ struct kredist_node {
 
 struct kif_kr {
 	LIST_ENTRY(kif_kr)	 entry;
-	struct kroute_node	*kr;
+	struct kroute		*kr;
 };
 
 struct kif_kr6 {
 	LIST_ENTRY(kif_kr6)	 entry;
-	struct kroute6_node	*kr;
+	struct kroute6		*kr;
 };
 
 LIST_HEAD(kif_kr_head, kif_kr);
 LIST_HEAD(kif_kr6_head, kif_kr6);
+
+struct kif {
+	char			 ifname[IFNAMSIZ];
+	uint64_t		 baudrate;
+	u_int			 rdomain;
+	int			 flags;
+	u_short			 ifindex;
+	uint8_t			 if_type;
+	uint8_t			 link_state;
+	uint8_t			 nh_reachable;	/* for nexthop verification */
+	uint8_t			 depend_state;	/* for session depend on */
+};
 
 struct kif_node {
 	RB_ENTRY(kif_node)	 entry;
@@ -121,57 +149,50 @@ void	kr_redistribute(int, struct ktable *, struct kroute *);
 void	kr_redistribute6(int, struct ktable *, struct kroute6 *);
 struct kroute_full *kr_tofull(struct kroute *);
 struct kroute_full *kr6_tofull(struct kroute6 *);
-int	kroute_compare(struct kroute_node *, struct kroute_node *);
-int	kroute6_compare(struct kroute6_node *, struct kroute6_node *);
-int	knexthop_compare(struct knexthop_node *, struct knexthop_node *);
+int	kroute_compare(struct kroute *, struct kroute *);
+int	kroute6_compare(struct kroute6 *, struct kroute6 *);
+int	knexthop_compare(struct knexthop *, struct knexthop *);
 int	kredist_compare(struct kredist_node *, struct kredist_node *);
 int	kif_compare(struct kif_node *, struct kif_node *);
 
-struct kroute_node	*kroute_find(struct ktable *, const struct bgpd_addr *,
+struct kroute	*kroute_find(struct ktable *, const struct bgpd_addr *,
 			    uint8_t, uint8_t);
-struct kroute_node	*kroute_matchgw(struct kroute_node *,
-			    struct bgpd_addr *);
-int			 kroute_insert(struct ktable *, struct kroute_node *);
-int			 kroute_remove(struct ktable *, struct kroute_node *);
-void			 kroute_clear(struct ktable *);
+struct kroute	*kroute_matchgw(struct kroute *, struct bgpd_addr *);
+int		 kroute_insert(struct ktable *, struct kroute *);
+int		 kroute_remove(struct ktable *, struct kroute *);
+void		 kroute_clear(struct ktable *);
 
-struct kroute6_node	*kroute6_find(struct ktable *, const struct bgpd_addr *,
+struct kroute6	*kroute6_find(struct ktable *, const struct bgpd_addr *,
 			    uint8_t, uint8_t);
-struct kroute6_node	*kroute6_matchgw(struct kroute6_node *,
-			    struct bgpd_addr *);
-int			 kroute6_insert(struct ktable *, struct kroute6_node *);
-int			 kroute6_remove(struct ktable *, struct kroute6_node *);
-void			 kroute6_clear(struct ktable *);
+struct kroute6	*kroute6_matchgw(struct kroute6 *, struct bgpd_addr *);
+int		 kroute6_insert(struct ktable *, struct kroute6 *);
+int		 kroute6_remove(struct ktable *, struct kroute6 *);
+void		 kroute6_clear(struct ktable *);
 
-struct knexthop_node	*knexthop_find(struct ktable *, struct bgpd_addr *);
-int			 knexthop_insert(struct ktable *,
-			    struct knexthop_node *);
-int			 knexthop_remove(struct ktable *,
-			    struct knexthop_node *);
-void			 knexthop_clear(struct ktable *);
+struct knexthop	*knexthop_find(struct ktable *, struct bgpd_addr *);
+int		 knexthop_insert(struct ktable *, struct knexthop *);
+int		 knexthop_remove(struct ktable *, struct knexthop *);
+void		 knexthop_clear(struct ktable *);
 
-struct kif_node		*kif_find(int);
-int			 kif_insert(struct kif_node *);
-int			 kif_remove(struct kif_node *);
-void			 kif_clear(void);
+struct kif_node	*kif_find(int);
+int		 kif_insert(struct kif_node *);
+int		 kif_remove(struct kif_node *);
+void		 kif_clear(void);
 
-int			 kif_kr_insert(struct kroute_node *);
-int			 kif_kr_remove(struct kroute_node *);
+int		 kif_kr_insert(struct kroute *);
+int		 kif_kr_remove(struct kroute *);
 
-int			 kif_kr6_insert(struct kroute6_node *);
-int			 kif_kr6_remove(struct kroute6_node *);
+int		 kif_kr6_insert(struct kroute6 *);
+int		 kif_kr6_remove(struct kroute6 *);
 
-int			 kroute_validate(struct kroute *);
-int			 kroute6_validate(struct kroute6 *);
-void			 knexthop_validate(struct ktable *,
-			    struct knexthop_node *);
-void			 knexthop_track(struct ktable *, void *);
-void			 knexthop_send_update(struct knexthop_node *);
-struct kroute_node	*kroute_match(struct ktable *, struct bgpd_addr *, int);
-struct kroute6_node	*kroute6_match(struct ktable *, struct bgpd_addr *,
-			    int);
-void			 kroute_detach_nexthop(struct ktable *,
-			    struct knexthop_node *);
+int		 kroute_validate(struct kroute *);
+int		 kroute6_validate(struct kroute6 *);
+void		 knexthop_validate(struct ktable *, struct knexthop *);
+void		 knexthop_track(struct ktable *, void *);
+void		 knexthop_send_update(struct knexthop *);
+struct kroute	*kroute_match(struct ktable *, struct bgpd_addr *, int);
+struct kroute6	*kroute6_match(struct ktable *, struct bgpd_addr *, int);
+void		 kroute_detach_nexthop(struct ktable *, struct knexthop *);
 
 uint8_t		prefixlen_classful(in_addr_t);
 uint8_t		mask2prefixlen(in_addr_t);
@@ -192,14 +213,14 @@ int		dispatch_rtmsg_addr(struct rt_msghdr *, struct kroute_full *);
 int		kr_fib_delete(struct ktable *, struct kroute_full *, int);
 int		kr_fib_change(struct ktable *, struct kroute_full *, int, int);
 
-RB_PROTOTYPE(kroute_tree, kroute_node, entry, kroute_compare)
-RB_GENERATE(kroute_tree, kroute_node, entry, kroute_compare)
+RB_PROTOTYPE(kroute_tree, kroute, entry, kroute_compare)
+RB_GENERATE(kroute_tree, kroute, entry, kroute_compare)
 
-RB_PROTOTYPE(kroute6_tree, kroute6_node, entry, kroute6_compare)
-RB_GENERATE(kroute6_tree, kroute6_node, entry, kroute6_compare)
+RB_PROTOTYPE(kroute6_tree, kroute6, entry, kroute6_compare)
+RB_GENERATE(kroute6_tree, kroute6, entry, kroute6_compare)
 
-RB_PROTOTYPE(knexthop_tree, knexthop_node, entry, knexthop_compare)
-RB_GENERATE(knexthop_tree, knexthop_node, entry, knexthop_compare)
+RB_PROTOTYPE(knexthop_tree, knexthop, entry, knexthop_compare)
+RB_GENERATE(knexthop_tree, knexthop, entry, knexthop_compare)
 
 RB_PROTOTYPE(kredist_tree, kredist_node, entry, kredist_compare)
 RB_GENERATE(kredist_tree, kredist_node, entry, kredist_compare)
@@ -481,9 +502,9 @@ kr_change(u_int rtableid, struct kroute_full *kl)
 int
 kr4_change(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute_node	*kr;
-	int			 action = RTM_ADD;
-	uint16_t		 labelid;
+	struct kroute	*kr;
+	int		 action = RTM_ADD;
+	uint16_t	 labelid;
 
 	/* for blackhole and reject routes nexthop needs to be 127.0.0.1 */
 	if (kl->flags & (F_BLACKHOLE|F_REJECT))
@@ -504,34 +525,34 @@ kr4_change(struct ktable *kt, struct kroute_full *kl)
 			log_warn("%s", __func__);
 			return (-1);
 		}
-		kr->r.prefix.s_addr = kl->prefix.v4.s_addr;
-		kr->r.prefixlen = kl->prefixlen;
-		kr->r.nexthop.s_addr = kl->nexthop.v4.s_addr;
-		kr->r.flags = kl->flags | F_BGPD;
-		kr->r.priority = RTP_MINE;
-		kr->r.labelid = labelid;
+		kr->prefix.s_addr = kl->prefix.v4.s_addr;
+		kr->prefixlen = kl->prefixlen;
+		kr->nexthop.s_addr = kl->nexthop.v4.s_addr;
+		kr->flags = kl->flags | F_BGPD;
+		kr->priority = RTP_MINE;
+		kr->labelid = labelid;
 
 		if (kroute_insert(kt, kr) == -1) {
-			rtlabel_unref(kr->r.labelid);
+			rtlabel_unref(kr->labelid);
 			free(kr);
 			return (-1);
 		}
 	} else {
-		kr->r.nexthop.s_addr = kl->nexthop.v4.s_addr;
-		rtlabel_unref(kr->r.labelid);
-		kr->r.labelid = labelid;
+		kr->nexthop.s_addr = kl->nexthop.v4.s_addr;
+		rtlabel_unref(kr->labelid);
+		kr->labelid = labelid;
 		if (kl->flags & F_BLACKHOLE)
-			kr->r.flags |= F_BLACKHOLE;
+			kr->flags |= F_BLACKHOLE;
 		else
-			kr->r.flags &= ~F_BLACKHOLE;
+			kr->flags &= ~F_BLACKHOLE;
 		if (kl->flags & F_REJECT)
-			kr->r.flags |= F_REJECT;
+			kr->flags |= F_REJECT;
 		else
-			kr->r.flags &= ~F_REJECT;
+			kr->flags &= ~F_REJECT;
 	}
 
-	if (send_rtmsg(kr_state.fd, action, kt, &kr->r))
-		kr->r.flags |= F_BGPD_INSERTED;
+	if (send_rtmsg(kr_state.fd, action, kt, kr))
+		kr->flags |= F_BGPD_INSERTED;
 
 	return (0);
 }
@@ -539,10 +560,10 @@ kr4_change(struct ktable *kt, struct kroute_full *kl)
 int
 kr6_change(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute6_node	*kr6;
-	struct in6_addr		 lo6 = IN6ADDR_LOOPBACK_INIT;
-	int			 action = RTM_ADD;
-	uint16_t		 labelid;
+	struct kroute6	*kr6;
+	struct in6_addr	 lo6 = IN6ADDR_LOOPBACK_INIT;
+	int		 action = RTM_ADD;
+	uint16_t	 labelid;
 
 	/* for blackhole and reject routes nexthop needs to be ::1 */
 	if (kl->flags & (F_BLACKHOLE|F_REJECT))
@@ -562,36 +583,37 @@ kr6_change(struct ktable *kt, struct kroute_full *kl)
 			log_warn("%s", __func__);
 			return (-1);
 		}
-		memcpy(&kr6->r.prefix, &kl->prefix.v6, sizeof(struct in6_addr));
-		kr6->r.prefixlen = kl->prefixlen;
-		memcpy(&kr6->r.nexthop, &kl->nexthop.v6,
-		    sizeof(struct in6_addr));
-		kr6->r.flags = kl->flags | F_BGPD;
-		kr6->r.priority = RTP_MINE;
-		kr6->r.labelid = labelid;
+		memcpy(&kr6->prefix, &kl->prefix.v6, sizeof(struct in6_addr));
+		kr6->prefix_scope_id = kl->prefix.scope_id;
+		kr6->prefixlen = kl->prefixlen;
+		memcpy(&kr6->nexthop, &kl->nexthop.v6, sizeof(struct in6_addr));
+		kr6->nexthop_scope_id = kl->nexthop.scope_id;
+		kr6->flags = kl->flags | F_BGPD;
+		kr6->priority = RTP_MINE;
+		kr6->labelid = labelid;
 
 		if (kroute6_insert(kt, kr6) == -1) {
-			rtlabel_unref(kr6->r.labelid);
+			rtlabel_unref(kr6->labelid);
 			free(kr6);
 			return (-1);
 		}
 	} else {
-		memcpy(&kr6->r.nexthop, &kl->nexthop.v6,
-		    sizeof(struct in6_addr));
-		rtlabel_unref(kr6->r.labelid);
-		kr6->r.labelid = labelid;
+		memcpy(&kr6->nexthop, &kl->nexthop.v6, sizeof(struct in6_addr));
+		kr6->nexthop_scope_id = kl->nexthop.scope_id;
+		rtlabel_unref(kr6->labelid);
+		kr6->labelid = labelid;
 		if (kl->flags & F_BLACKHOLE)
-			kr6->r.flags |= F_BLACKHOLE;
+			kr6->flags |= F_BLACKHOLE;
 		else
-			kr6->r.flags &= ~F_BLACKHOLE;
+			kr6->flags &= ~F_BLACKHOLE;
 		if (kl->flags & F_REJECT)
-			kr6->r.flags |= F_REJECT;
+			kr6->flags |= F_REJECT;
 		else
-			kr6->r.flags &= ~F_REJECT;
+			kr6->flags &= ~F_REJECT;
 	}
 
-	if (send_rt6msg(kr_state.fd, action, kt, &kr6->r))
-		kr6->r.flags |= F_BGPD_INSERTED;
+	if (send_rt6msg(kr_state.fd, action, kt, kr6))
+		kr6->flags |= F_BGPD_INSERTED;
 
 	return (0);
 }
@@ -599,17 +621,17 @@ kr6_change(struct ktable *kt, struct kroute_full *kl)
 int
 krVPN4_change(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute_node	*kr;
-	int			 action = RTM_ADD;
-	uint32_t		 mplslabel = 0;
-	uint16_t		 labelid;
+	struct kroute	*kr;
+	int		 action = RTM_ADD;
+	uint32_t	 mplslabel = 0;
+	uint16_t	 labelid;
 
 	/* nexthop within 127/8 -> ignore silently */
 	if ((kl->nexthop.v4.s_addr & htonl(IN_CLASSA_NET)) ==
 	    htonl(INADDR_LOOPBACK & IN_CLASSA_NET))
 		return (0);
 
-	/* only single MPLS label are supported for now */
+	/* only a single MPLS label is supported for now */
 	if (kl->prefix.labellen != 3) {
 		log_warnx("%s: %s/%u has not a single label", __func__,
 		    log_addr(&kl->prefix), kl->prefixlen);
@@ -635,55 +657,55 @@ krVPN4_change(struct ktable *kt, struct kroute_full *kl)
 			log_warn("%s", __func__);
 			return (-1);
 		}
-		kr->r.prefix.s_addr = kl->prefix.v4.s_addr;
-		kr->r.prefixlen = kl->prefixlen;
-		kr->r.nexthop.s_addr = kl->nexthop.v4.s_addr;
-		kr->r.flags = kl->flags | F_BGPD | F_MPLS;
-		kr->r.priority = RTP_MINE;
-		kr->r.labelid = labelid;
-		kr->r.mplslabel = mplslabel;
-		kr->r.ifindex = kl->ifindex;
+		kr->prefix.s_addr = kl->prefix.v4.s_addr;
+		kr->prefixlen = kl->prefixlen;
+		kr->nexthop.s_addr = kl->nexthop.v4.s_addr;
+		kr->flags = kl->flags | F_BGPD | F_MPLS;
+		kr->priority = RTP_MINE;
+		kr->labelid = labelid;
+		kr->mplslabel = mplslabel;
+		kr->ifindex = kl->ifindex;
 
 		if (kroute_insert(kt, kr) == -1) {
-			rtlabel_unref(kr->r.labelid);
+			rtlabel_unref(kr->labelid);
 			free(kr);
 			return (-1);
 		}
 	} else {
-		kr->r.mplslabel = mplslabel;
-		kr->r.ifindex = kl->ifindex;
-		kr->r.nexthop.s_addr = kl->nexthop.v4.s_addr;
-		rtlabel_unref(kr->r.labelid);
-		kr->r.labelid = labelid;
+		kr->mplslabel = mplslabel;
+		kr->ifindex = kl->ifindex;
+		kr->nexthop.s_addr = kl->nexthop.v4.s_addr;
+		rtlabel_unref(kr->labelid);
+		kr->labelid = labelid;
 		if (kl->flags & F_BLACKHOLE)
-			kr->r.flags |= F_BLACKHOLE;
+			kr->flags |= F_BLACKHOLE;
 		else
-			kr->r.flags &= ~F_BLACKHOLE;
+			kr->flags &= ~F_BLACKHOLE;
 		if (kl->flags & F_REJECT)
-			kr->r.flags |= F_REJECT;
+			kr->flags |= F_REJECT;
 		else
-			kr->r.flags &= ~F_REJECT;
+			kr->flags &= ~F_REJECT;
 	}
 
-	if (send_rtmsg(kr_state.fd, action, kt, &kr->r))
-		kr->r.flags |= F_BGPD_INSERTED;
+	if (send_rtmsg(kr_state.fd, action, kt, kr))
+		kr->flags |= F_BGPD_INSERTED;
 	return (0);
 }
 
 int
 krVPN6_change(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute6_node	*kr6;
-	struct in6_addr		 lo6 = IN6ADDR_LOOPBACK_INIT;
-	int			 action = RTM_ADD;
-	uint32_t		 mplslabel = 0;
-	uint16_t		 labelid;
+	struct kroute6	*kr6;
+	struct in6_addr	 lo6 = IN6ADDR_LOOPBACK_INIT;
+	int		 action = RTM_ADD;
+	uint32_t	 mplslabel = 0;
+	uint16_t	 labelid;
 
 	/* nexthop to loopback -> ignore silently */
 	if (IN6_IS_ADDR_LOOPBACK(&kl->nexthop.v6))
 		return (0);
 
-	/* only single MPLS label are supported for now */
+	/* only a single MPLS label is supported for now */
 	if (kl->prefix.labellen != 3) {
 		log_warnx("%s: %s/%u has not a single label", __func__,
 		    log_addr(&kl->prefix), kl->prefixlen);
@@ -709,40 +731,38 @@ krVPN6_change(struct ktable *kt, struct kroute_full *kl)
 			log_warn("%s", __func__);
 			return (-1);
 		}
-		memcpy(&kr6->r.prefix, &kl->prefix.v6, sizeof(struct in6_addr));
-		kr6->r.prefixlen = kl->prefixlen;
-		memcpy(&kr6->r.nexthop, &kl->nexthop.v6,
-		    sizeof(struct in6_addr));
-		kr6->r.flags = kl->flags | F_BGPD | F_MPLS;
-		kr6->r.priority = RTP_MINE;
-		kr6->r.labelid = labelid;
-		kr6->r.mplslabel = mplslabel;
-		kr6->r.ifindex = kl->ifindex;
+		memcpy(&kr6->prefix, &kl->prefix.v6, sizeof(struct in6_addr));
+		kr6->prefixlen = kl->prefixlen;
+		memcpy(&kr6->nexthop, &kl->nexthop.v6, sizeof(struct in6_addr));
+		kr6->flags = kl->flags | F_BGPD | F_MPLS;
+		kr6->priority = RTP_MINE;
+		kr6->labelid = labelid;
+		kr6->mplslabel = mplslabel;
+		kr6->ifindex = kl->ifindex;
 
 		if (kroute6_insert(kt, kr6) == -1) {
-			rtlabel_unref(kr6->r.labelid);
+			rtlabel_unref(kr6->labelid);
 			free(kr6);
 			return (-1);
 		}
 	} else {
-		kr6->r.mplslabel = mplslabel;
-		kr6->r.ifindex = kl->ifindex;
-		memcpy(&kr6->r.nexthop, &kl->nexthop.v6,
-		    sizeof(struct in6_addr));
-		rtlabel_unref(kr6->r.labelid);
-		kr6->r.labelid = labelid;
+		kr6->mplslabel = mplslabel;
+		kr6->ifindex = kl->ifindex;
+		memcpy(&kr6->nexthop, &kl->nexthop.v6, sizeof(struct in6_addr));
+		rtlabel_unref(kr6->labelid);
+		kr6->labelid = labelid;
 		if (kl->flags & F_BLACKHOLE)
-			kr6->r.flags |= F_BLACKHOLE;
+			kr6->flags |= F_BLACKHOLE;
 		else
-			kr6->r.flags &= ~F_BLACKHOLE;
+			kr6->flags &= ~F_BLACKHOLE;
 		if (kl->flags & F_REJECT)
-			kr6->r.flags |= F_REJECT;
+			kr6->flags |= F_REJECT;
 		else
-			kr6->r.flags &= ~F_REJECT;
+			kr6->flags &= ~F_REJECT;
 	}
 
-	if (send_rt6msg(kr_state.fd, action, kt, &kr6->r))
-		kr6->r.flags |= F_BGPD_INSERTED;
+	if (send_rt6msg(kr_state.fd, action, kt, kr6))
+		kr6->flags |= F_BGPD_INSERTED;
 
 	return (0);
 }
@@ -773,26 +793,25 @@ kr_delete(u_int rtableid, struct kroute_full *kl)
 int
 kr_flush(u_int rtableid)
 {
-	struct ktable		*kt;
-	struct kroute_node	*kr, *next;
-	struct kroute6_node	*kr6, *next6;
+	struct ktable	*kt;
+	struct kroute	*kr, *next;
+	struct kroute6	*kr6, *next6;
 
 	if ((kt = ktable_get(rtableid)) == NULL)
 		/* too noisy during reloads, just ignore */
 		return (0);
 
 	RB_FOREACH_SAFE(kr, kroute_tree, &kt->krt, next)
-		if ((kr->r.flags & F_BGPD_INSERTED)) {
+		if ((kr->flags & F_BGPD_INSERTED)) {
 			if (kt->fib_sync)	/* coupled */
-				send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r);
+				send_rtmsg(kr_state.fd, RTM_DELETE, kt, kr);
 			if (kroute_remove(kt, kr) == -1)
 				return (-1);
 		}
 	RB_FOREACH_SAFE(kr6, kroute6_tree, &kt->krt6, next6)
-		if ((kr6->r.flags & F_BGPD_INSERTED)) {
+		if ((kr6->flags & F_BGPD_INSERTED)) {
 			if (kt->fib_sync)	/* coupled */
-				send_rt6msg(kr_state.fd, RTM_DELETE, kt,
-				    &kr6->r);
+				send_rt6msg(kr_state.fd, RTM_DELETE, kt, kr6);
 			if (kroute6_remove(kt, kr6) == -1)
 				return (-1);
 		}
@@ -804,16 +823,16 @@ kr_flush(u_int rtableid)
 int
 kr4_delete(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute_node	*kr;
+	struct kroute	*kr;
 
 	if ((kr = kroute_find(kt, &kl->prefix, kl->prefixlen,
 	    RTP_MINE)) == NULL)
 		return (0);
 
-	if (!(kr->r.flags & F_BGPD_INSERTED))
+	if (!(kr->flags & F_BGPD_INSERTED))
 		return (0);
 
-	send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r);
+	send_rtmsg(kr_state.fd, RTM_DELETE, kt, kr);
 
 	if (kroute_remove(kt, kr) == -1)
 		return (-1);
@@ -824,16 +843,16 @@ kr4_delete(struct ktable *kt, struct kroute_full *kl)
 int
 kr6_delete(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute6_node	*kr6;
+	struct kroute6	*kr6;
 
 	if ((kr6 = kroute6_find(kt, &kl->prefix, kl->prefixlen,
 	    RTP_MINE)) == NULL)
 		return (0);
 
-	if (!(kr6->r.flags & F_BGPD_INSERTED))
+	if (!(kr6->flags & F_BGPD_INSERTED))
 		return (0);
 
-	send_rt6msg(kr_state.fd, RTM_DELETE, kt, &kr6->r);
+	send_rt6msg(kr_state.fd, RTM_DELETE, kt, kr6);
 
 	if (kroute6_remove(kt, kr6) == -1)
 		return (-1);
@@ -844,16 +863,16 @@ kr6_delete(struct ktable *kt, struct kroute_full *kl)
 int
 krVPN4_delete(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute_node	*kr;
+	struct kroute	*kr;
 
 	if ((kr = kroute_find(kt, &kl->prefix, kl->prefixlen,
 	    RTP_MINE)) == NULL)
 		return (0);
 
-	if (!(kr->r.flags & F_BGPD_INSERTED))
+	if (!(kr->flags & F_BGPD_INSERTED))
 		return (0);
 
-	send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r);
+	send_rtmsg(kr_state.fd, RTM_DELETE, kt, kr);
 
 	if (kroute_remove(kt, kr) == -1)
 		return (-1);
@@ -864,16 +883,16 @@ krVPN4_delete(struct ktable *kt, struct kroute_full *kl)
 int
 krVPN6_delete(struct ktable *kt, struct kroute_full *kl)
 {
-	struct kroute6_node	*kr6;
+	struct kroute6	*kr6;
 
 	if ((kr6 = kroute6_find(kt, &kl->prefix, kl->prefixlen,
 	    RTP_MINE)) == NULL)
 		return (0);
 
-	if (!(kr6->r.flags & F_BGPD_INSERTED))
+	if (!(kr6->flags & F_BGPD_INSERTED))
 		return (0);
 
-	send_rt6msg(kr_state.fd, RTM_DELETE, kt, &kr6->r);
+	send_rt6msg(kr_state.fd, RTM_DELETE, kt, kr6);
 
 	if (kroute6_remove(kt, kr6) == -1)
 		return (-1);
@@ -895,9 +914,9 @@ kr_shutdown(void)
 void
 kr_fib_couple(u_int rtableid)
 {
-	struct ktable		*kt;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	struct ktable	*kt;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
 
 	if ((kt = ktable_get(rtableid)) == NULL)  /* table does not exist */
 		return;
@@ -908,14 +927,14 @@ kr_fib_couple(u_int rtableid)
 	kt->fib_sync = 1;
 
 	RB_FOREACH(kr, kroute_tree, &kt->krt)
-		if (kr->r.flags & F_BGPD) {
-			if (send_rtmsg(kr_state.fd, RTM_ADD, kt, &kr->r))
-				kr->r.flags |= F_BGPD_INSERTED;
+		if (kr->flags & F_BGPD) {
+			if (send_rtmsg(kr_state.fd, RTM_ADD, kt, kr))
+				kr->flags |= F_BGPD_INSERTED;
 		}
 	RB_FOREACH(kr6, kroute6_tree, &kt->krt6)
-		if (kr6->r.flags & F_BGPD) {
-			if (send_rt6msg(kr_state.fd, RTM_ADD, kt, &kr6->r))
-				kr6->r.flags |= F_BGPD_INSERTED;
+		if (kr6->flags & F_BGPD) {
+			if (send_rt6msg(kr_state.fd, RTM_ADD, kt, kr6))
+				kr6->flags |= F_BGPD_INSERTED;
 		}
 	log_info("kernel routing table %u (%s) coupled", kt->rtableid,
 	    kt->descr);
@@ -933,9 +952,9 @@ kr_fib_couple_all(void)
 void
 kr_fib_decouple(u_int rtableid)
 {
-	struct ktable		*kt;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	struct ktable	*kt;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
 
 	if ((kt = ktable_get(rtableid)) == NULL)  /* table does not exist */
 		return;
@@ -944,14 +963,14 @@ kr_fib_decouple(u_int rtableid)
 		return;
 
 	RB_FOREACH(kr, kroute_tree, &kt->krt)
-		if ((kr->r.flags & F_BGPD_INSERTED)) {
-			if (send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r))
-				kr->r.flags &= ~F_BGPD_INSERTED;
+		if ((kr->flags & F_BGPD_INSERTED)) {
+			if (send_rtmsg(kr_state.fd, RTM_DELETE, kt, kr))
+				kr->flags &= ~F_BGPD_INSERTED;
 		}
 	RB_FOREACH(kr6, kroute6_tree, &kt->krt6)
-		if ((kr6->r.flags & F_BGPD_INSERTED)) {
-			if (send_rt6msg(kr_state.fd, RTM_DELETE, kt, &kr6->r))
-				kr6->r.flags &= ~F_BGPD_INSERTED;
+		if ((kr6->flags & F_BGPD_INSERTED)) {
+			if (send_rt6msg(kr_state.fd, RTM_DELETE, kt, kr6))
+				kr6->flags &= ~F_BGPD_INSERTED;
 		}
 
 	kt->fib_sync = 0;
@@ -984,8 +1003,8 @@ kr_dispatch_msg(void)
 int
 kr_nexthop_add(u_int rtableid, struct bgpd_addr *addr)
 {
-	struct ktable		*kt;
-	struct knexthop_node	*h;
+	struct ktable	*kt;
+	struct knexthop	*h;
 
 	if ((kt = ktable_get(rtableid)) == NULL) {
 		log_warnx("%s: non-existent rtableid %d", __func__, rtableid);
@@ -1011,8 +1030,8 @@ kr_nexthop_add(u_int rtableid, struct bgpd_addr *addr)
 void
 kr_nexthop_delete(u_int rtableid, struct bgpd_addr *addr)
 {
-	struct ktable		*kt;
-	struct knexthop_node	*kn;
+	struct ktable	*kt;
+	struct knexthop	*kn;
 
 	if ((kt = ktable_get(rtableid)) == NULL) {
 		log_warnx("%s: non-existent rtableid %d", __func__,
@@ -1053,13 +1072,13 @@ void
 kr_show_route(struct imsg *imsg)
 {
 	struct ktable		*kt;
-	struct kroute_node	*kr, *kn;
-	struct kroute6_node	*kr6, *kn6;
+	struct kroute		*kr, *kn;
+	struct kroute6		*kr6, *kn6;
 	struct bgpd_addr	*addr;
 	int			 flags;
 	sa_family_t		 af;
 	struct ctl_show_nexthop	 snh;
-	struct knexthop_node	*h;
+	struct knexthop		*h;
 	struct kif_node		*kif;
 	u_int			 i;
 	u_short			 ifindex = 0;
@@ -1081,23 +1100,23 @@ kr_show_route(struct imsg *imsg)
 		memcpy(&af, (char *)imsg->data + sizeof(flags), sizeof(af));
 		if (!af || af == AF_INET)
 			RB_FOREACH(kr, kroute_tree, &kt->krt) {
-				if (flags && (kr->r.flags & flags) == 0)
+				if (flags && (kr->flags & flags) == 0)
 					continue;
 				kn = kr;
 				do {
 					send_imsg_session(IMSG_CTL_KROUTE,
-					    imsg->hdr.pid, kr_tofull(&kn->r),
+					    imsg->hdr.pid, kr_tofull(kn),
 					    sizeof(struct kroute_full));
 				} while ((kn = kn->next) != NULL);
 			}
 		if (!af || af == AF_INET6)
 			RB_FOREACH(kr6, kroute6_tree, &kt->krt6) {
-				if (flags && (kr6->r.flags & flags) == 0)
+				if (flags && (kr6->flags & flags) == 0)
 					continue;
 				kn6 = kr6;
 				do {
 					send_imsg_session(IMSG_CTL_KROUTE,
-					    imsg->hdr.pid, kr6_tofull(&kn6->r),
+					    imsg->hdr.pid, kr6_tofull(kn6),
 					    sizeof(struct kroute_full));
 				} while ((kn6 = kn6->next) != NULL);
 			}
@@ -1121,14 +1140,14 @@ kr_show_route(struct imsg *imsg)
 			kr = kroute_match(kt, addr, 1);
 			if (kr != NULL)
 				send_imsg_session(IMSG_CTL_KROUTE,
-				    imsg->hdr.pid, kr_tofull(&kr->r),
+				    imsg->hdr.pid, kr_tofull(kr),
 				    sizeof(struct kroute_full));
 			break;
 		case AID_INET6:
 			kr6 = kroute6_match(kt, addr, 1);
 			if (kr6 != NULL)
 				send_imsg_session(IMSG_CTL_KROUTE,
-				    imsg->hdr.pid, kr6_tofull(&kr6->r),
+				    imsg->hdr.pid, kr6_tofull(kr6),
 				    sizeof(struct kroute_full));
 			break;
 		}
@@ -1147,19 +1166,17 @@ kr_show_route(struct imsg *imsg)
 				switch (h->nexthop.aid) {
 				case AID_INET:
 					kr = h->kroute;
-					snh.valid = kroute_validate(&kr->r);
+					snh.valid = kroute_validate(kr);
 					snh.krvalid = 1;
-					memcpy(&snh.kr.kr4, &kr->r,
-					    sizeof(snh.kr.kr4));
-					ifindex = kr->r.ifindex;
+					snh.kr = *kr_tofull(kr);
+					ifindex = kr->ifindex;
 					break;
 				case AID_INET6:
 					kr6 = h->kroute;
-					snh.valid = kroute6_validate(&kr6->r);
+					snh.valid = kroute6_validate(kr6);
 					snh.krvalid = 1;
-					memcpy(&snh.kr.kr6, &kr6->r,
-					    sizeof(snh.kr.kr6));
-					ifindex = kr6->r.ifindex;
+					snh.kr = *kr6_tofull(kr6);
+					ifindex = kr6->ifindex;
 					break;
 				}
 				if ((kif = kif_find(ifindex)) != NULL)
@@ -1202,6 +1219,16 @@ kr_show_route(struct imsg *imsg)
 	send_imsg_session(IMSG_CTL_END, imsg->hdr.pid, NULL, 0);
 }
 
+static void
+kr_send_dependon(struct kif *kif)
+{
+	struct session_dependon sdon = { 0 };
+
+	strlcpy(sdon.ifname, kif->ifname, sizeof(sdon.ifname));
+	sdon.depend_state = kif->depend_state;
+	send_imsg_session(IMSG_SESSION_DEPENDON, 0, &sdon, sizeof(sdon));
+}
+	
 void
 kr_ifinfo(char *ifname)
 {
@@ -1209,8 +1236,7 @@ kr_ifinfo(char *ifname)
 
 	RB_FOREACH(kif, kif_tree, &kit)
 		if (!strcmp(ifname, kif->k.ifname)) {
-			send_imsg_session(IMSG_IFINFO, 0,
-			    &kif->k, sizeof(kif->k));
+			kr_send_dependon(&kif->k);
 			return;
 		}
 }
@@ -1536,13 +1562,13 @@ ktable_postload(void)
 int
 kr_reload(void)
 {
-	struct ktable		*kt;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
-	struct knexthop_node	*nh;
-	struct network		*n;
-	u_int			 rid;
-	int			 hasdyn = 0;
+	struct ktable	*kt;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
+	struct knexthop	*nh;
+	struct network	*n;
+	u_int		 rid;
+	int		 hasdyn = 0;
 
 	for (rid = 0; rid < krt_size; rid++) {
 		if ((kt = ktable_get(rid)) == NULL)
@@ -1563,9 +1589,9 @@ kr_reload(void)
 		if (hasdyn) {
 			/* only evaluate the full tree if we need */
 			RB_FOREACH(kr, kroute_tree, &kt->krt)
-				kr_redistribute(IMSG_NETWORK_ADD, kt, &kr->r);
+				kr_redistribute(IMSG_NETWORK_ADD, kt, kr);
 			RB_FOREACH(kr6, kroute6_tree, &kt->krt6)
-				kr_redistribute6(IMSG_NETWORK_ADD, kt, &kr6->r);
+				kr_redistribute6(IMSG_NETWORK_ADD, kt, kr6);
 		}
 	}
 
@@ -1602,8 +1628,10 @@ kr6_tofull(struct kroute6 *kr6)
 
 	kf.prefix.aid = AID_INET6;
 	memcpy(&kf.prefix.v6, &kr6->prefix, sizeof(struct in6_addr));
+	kf.prefix.scope_id = kr6->prefix_scope_id;
 	kf.nexthop.aid = AID_INET6;
 	memcpy(&kf.nexthop.v6, &kr6->nexthop, sizeof(struct in6_addr));
+	kf.nexthop.scope_id = kr6->nexthop_scope_id;
 	strlcpy(kf.label, rtlabel_id2name(kr6->labelid), sizeof(kf.label));
 	kf.flags = kr6->flags;
 	kf.ifindex = kr6->ifindex;
@@ -1619,56 +1647,56 @@ kr6_tofull(struct kroute6 *kr6)
  */
 
 int
-kroute_compare(struct kroute_node *a, struct kroute_node *b)
+kroute_compare(struct kroute *a, struct kroute *b)
 {
-	if (ntohl(a->r.prefix.s_addr) < ntohl(b->r.prefix.s_addr))
+	if (ntohl(a->prefix.s_addr) < ntohl(b->prefix.s_addr))
 		return (-1);
-	if (ntohl(a->r.prefix.s_addr) > ntohl(b->r.prefix.s_addr))
+	if (ntohl(a->prefix.s_addr) > ntohl(b->prefix.s_addr))
 		return (1);
-	if (a->r.prefixlen < b->r.prefixlen)
+	if (a->prefixlen < b->prefixlen)
 		return (-1);
-	if (a->r.prefixlen > b->r.prefixlen)
+	if (a->prefixlen > b->prefixlen)
 		return (1);
 
 	/* if the priority is RTP_ANY finish on the first address hit */
-	if (a->r.priority == RTP_ANY || b->r.priority == RTP_ANY)
+	if (a->priority == RTP_ANY || b->priority == RTP_ANY)
 		return (0);
-	if (a->r.priority < b->r.priority)
+	if (a->priority < b->priority)
 		return (-1);
-	if (a->r.priority > b->r.priority)
+	if (a->priority > b->priority)
 		return (1);
 	return (0);
 }
 
 int
-kroute6_compare(struct kroute6_node *a, struct kroute6_node *b)
+kroute6_compare(struct kroute6 *a, struct kroute6 *b)
 {
 	int i;
 
 	for (i = 0; i < 16; i++) {
-		if (a->r.prefix.s6_addr[i] < b->r.prefix.s6_addr[i])
+		if (a->prefix.s6_addr[i] < b->prefix.s6_addr[i])
 			return (-1);
-		if (a->r.prefix.s6_addr[i] > b->r.prefix.s6_addr[i])
+		if (a->prefix.s6_addr[i] > b->prefix.s6_addr[i])
 			return (1);
 	}
 
-	if (a->r.prefixlen < b->r.prefixlen)
+	if (a->prefixlen < b->prefixlen)
 		return (-1);
-	if (a->r.prefixlen > b->r.prefixlen)
+	if (a->prefixlen > b->prefixlen)
 		return (1);
 
 	/* if the priority is RTP_ANY finish on the first address hit */
-	if (a->r.priority == RTP_ANY || b->r.priority == RTP_ANY)
+	if (a->priority == RTP_ANY || b->priority == RTP_ANY)
 		return (0);
-	if (a->r.priority < b->r.priority)
+	if (a->priority < b->priority)
 		return (-1);
-	if (a->r.priority > b->r.priority)
+	if (a->priority > b->priority)
 		return (1);
 	return (0);
 }
 
 int
-knexthop_compare(struct knexthop_node *a, struct knexthop_node *b)
+knexthop_compare(struct knexthop *a, struct knexthop *b)
 {
 	int	i;
 
@@ -1748,16 +1776,16 @@ kif_compare(struct kif_node *a, struct kif_node *b)
  * tree management functions
  */
 
-struct kroute_node *
+struct kroute *
 kroute_find(struct ktable *kt, const struct bgpd_addr *prefix,
     uint8_t prefixlen, uint8_t prio)
 {
-	struct kroute_node	s;
-	struct kroute_node	*kn, *tmp;
+	struct kroute	 s;
+	struct kroute	*kn, *tmp;
 
-	s.r.prefix = prefix->v4;
-	s.r.prefixlen = prefixlen;
-	s.r.priority = prio;
+	s.prefix = prefix->v4;
+	s.prefixlen = prefixlen;
+	s.priority = prio;
 
 	kn = RB_FIND(kroute_tree, &kt->krt, &s);
 	if (kn && prio == RTP_ANY) {
@@ -1773,8 +1801,8 @@ kroute_find(struct ktable *kt, const struct bgpd_addr *prefix,
 	return (kn);
 }
 
-struct kroute_node *
-kroute_matchgw(struct kroute_node *kr, struct bgpd_addr *gw)
+struct kroute *
+kroute_matchgw(struct kroute *kr, struct bgpd_addr *gw)
 {
 	in_addr_t	nexthop;
 
@@ -1785,7 +1813,7 @@ kroute_matchgw(struct kroute_node *kr, struct bgpd_addr *gw)
 	nexthop = gw->v4.s_addr;
 
 	do {
-		if (kr->r.nexthop.s_addr == nexthop)
+		if (kr->nexthop.s_addr == nexthop)
 			return (kr);
 		kr = kr->next;
 	} while (kr);
@@ -1794,11 +1822,11 @@ kroute_matchgw(struct kroute_node *kr, struct bgpd_addr *gw)
 }
 
 int
-kroute_insert(struct ktable *kt, struct kroute_node *kr)
+kroute_insert(struct ktable *kt, struct kroute *kr)
 {
-	struct kroute_node	*krm;
-	struct knexthop_node	*h;
-	struct in_addr		 ina, inb;
+	struct kroute	*krm;
+	struct knexthop	*h;
+	struct in_addr	 ina, inb;
 
 	if ((krm = RB_INSERT(kroute_tree, &kt->krt, kr)) != NULL) {
 		/* multipath route, add at end of list */
@@ -1809,37 +1837,37 @@ kroute_insert(struct ktable *kt, struct kroute_node *kr)
 	}
 
 	/* XXX this is wrong for nexthop validated via BGP */
-	if (kr->r.flags & F_KERNEL) {
-		inet4applymask(&ina, &kr->r.prefix, kr->r.prefixlen);
+	if (kr->flags & F_KERNEL) {
+		inet4applymask(&ina, &kr->prefix, kr->prefixlen);
 		RB_FOREACH(h, knexthop_tree, KT2KNT(kt))
 			if (h->nexthop.aid == AID_INET) {
 				inet4applymask(&inb, &h->nexthop.v4,
-				    kr->r.prefixlen);
+				    kr->prefixlen);
 				if (memcmp(&ina, &inb, sizeof(ina)) == 0)
 					knexthop_validate(kt, h);
 			}
 
-		if (kr->r.flags & F_CONNECTED)
+		if (kr->flags & F_CONNECTED)
 			if (kif_kr_insert(kr) == -1)
 				return (-1);
 
 		if (krm == NULL)
 			/* redistribute multipath routes only once */
-			kr_redistribute(IMSG_NETWORK_ADD, kt, &kr->r);
+			kr_redistribute(IMSG_NETWORK_ADD, kt, kr);
 	}
 	return (0);
 }
 
 
 int
-kroute_remove(struct ktable *kt, struct kroute_node *kr)
+kroute_remove(struct ktable *kt, struct kroute *kr)
 {
-	struct kroute_node	*krm;
-	struct knexthop_node	*s;
+	struct kroute	*krm;
+	struct knexthop	*s;
 
 	if ((krm = RB_FIND(kroute_tree, &kt->krt, kr)) == NULL) {
 		log_warnx("%s: failed to find %s/%u", __func__,
-		    inet_ntoa(kr->r.prefix), kr->r.prefixlen);
+		    inet_ntoa(kr->prefix), kr->prefixlen);
 		return (-1);
 	}
 
@@ -1847,14 +1875,14 @@ kroute_remove(struct ktable *kt, struct kroute_node *kr)
 		/* head element */
 		if (RB_REMOVE(kroute_tree, &kt->krt, kr) == NULL) {
 			log_warnx("%s: failed for %s/%u", __func__,
-			    inet_ntoa(kr->r.prefix), kr->r.prefixlen);
+			    inet_ntoa(kr->prefix), kr->prefixlen);
 			return (-1);
 		}
 		if (kr->next != NULL) {
 			if (RB_INSERT(kroute_tree, &kt->krt, kr->next) !=
 			    NULL) {
 				log_warnx("%s: failed to add %s/%u", __func__,
-				    inet_ntoa(kr->r.prefix), kr->r.prefixlen);
+				    inet_ntoa(kr->prefix), kr->prefixlen);
 				return (-1);
 			}
 		}
@@ -1863,32 +1891,31 @@ kroute_remove(struct ktable *kt, struct kroute_node *kr)
 		while (krm->next != kr && krm->next != NULL)
 			krm = krm->next;
 		if (krm->next == NULL) {
-			log_warnx("%s: multipath list corrupted "
-			    "for %s/%u", inet_ntoa(kr->r.prefix), __func__,
-			    kr->r.prefixlen);
+			log_warnx("%s: multipath list corrupted for %s/%u",
+			    __func__, inet_ntoa(kr->prefix), kr->prefixlen);
 			return (-1);
 		}
 		krm->next = kr->next;
 	}
 
 	/* check whether a nexthop depends on this kroute */
-	if (kr->r.flags & F_NEXTHOP)
+	if (kr->flags & F_NEXTHOP)
 		RB_FOREACH(s, knexthop_tree, KT2KNT(kt))
 			if (s->kroute == kr)
 				knexthop_validate(kt, s);
 
-	if (kr->r.flags & F_KERNEL && kr == krm && kr->next == NULL)
+	if (kr->flags & F_KERNEL && kr == krm && kr->next == NULL)
 		/* again remove only once */
-		kr_redistribute(IMSG_NETWORK_REMOVE, kt, &kr->r);
+		kr_redistribute(IMSG_NETWORK_REMOVE, kt, kr);
 
-	if (kr->r.flags & F_CONNECTED)
+	if (kr->flags & F_CONNECTED)
 		if (kif_kr_remove(kr) == -1) {
-			rtlabel_unref(kr->r.labelid);
+			rtlabel_unref(kr->labelid);
 			free(kr);
 			return (-1);
 		}
 
-	rtlabel_unref(kr->r.labelid);
+	rtlabel_unref(kr->labelid);
 
 	free(kr);
 	return (0);
@@ -1897,22 +1924,22 @@ kroute_remove(struct ktable *kt, struct kroute_node *kr)
 void
 kroute_clear(struct ktable *kt)
 {
-	struct kroute_node	*kr;
+	struct kroute	*kr;
 
 	while ((kr = RB_MIN(kroute_tree, &kt->krt)) != NULL)
 		kroute_remove(kt, kr);
 }
 
-struct kroute6_node *
+struct kroute6 *
 kroute6_find(struct ktable *kt, const struct bgpd_addr *prefix,
     uint8_t prefixlen, uint8_t prio)
 {
-	struct kroute6_node	s;
-	struct kroute6_node	*kn6, *tmp;
+	struct kroute6	s;
+	struct kroute6	*kn6, *tmp;
 
-	s.r.prefix = prefix->v6;
-	s.r.prefixlen = prefixlen;
-	s.r.priority = prio;
+	s.prefix = prefix->v6;
+	s.prefixlen = prefixlen;
+	s.priority = prio;
 
 	kn6 = RB_FIND(kroute6_tree, &kt->krt6, &s);
 	if (kn6 && prio == RTP_ANY) {
@@ -1928,8 +1955,8 @@ kroute6_find(struct ktable *kt, const struct bgpd_addr *prefix,
 	return (kn6);
 }
 
-struct kroute6_node *
-kroute6_matchgw(struct kroute6_node *kr, struct bgpd_addr *gw)
+struct kroute6 *
+kroute6_matchgw(struct kroute6 *kr, struct bgpd_addr *gw)
 {
 	struct in6_addr	nexthop;
 
@@ -1940,7 +1967,7 @@ kroute6_matchgw(struct kroute6_node *kr, struct bgpd_addr *gw)
 	nexthop = gw->v6;
 
 	do {
-		if (memcmp(&kr->r.nexthop, &nexthop, sizeof(nexthop)) == 0)
+		if (memcmp(&kr->nexthop, &nexthop, sizeof(nexthop)) == 0)
 			return (kr);
 		kr = kr->next;
 	} while (kr);
@@ -1949,11 +1976,11 @@ kroute6_matchgw(struct kroute6_node *kr, struct bgpd_addr *gw)
 }
 
 int
-kroute6_insert(struct ktable *kt, struct kroute6_node *kr)
+kroute6_insert(struct ktable *kt, struct kroute6 *kr)
 {
-	struct kroute6_node	*krm;
-	struct knexthop_node	*h;
-	struct in6_addr		 ina, inb;
+	struct kroute6	*krm;
+	struct knexthop	*h;
+	struct in6_addr	 ina, inb;
 
 	if ((krm = RB_INSERT(kroute6_tree, &kt->krt6, kr)) != NULL) {
 		/* multipath route, add at end of list */
@@ -1964,37 +1991,37 @@ kroute6_insert(struct ktable *kt, struct kroute6_node *kr)
 	}
 
 	/* XXX this is wrong for nexthop validated via BGP */
-	if (kr->r.flags & F_KERNEL) {
-		inet6applymask(&ina, &kr->r.prefix, kr->r.prefixlen);
+	if (kr->flags & F_KERNEL) {
+		inet6applymask(&ina, &kr->prefix, kr->prefixlen);
 		RB_FOREACH(h, knexthop_tree, KT2KNT(kt))
 			if (h->nexthop.aid == AID_INET6) {
 				inet6applymask(&inb, &h->nexthop.v6,
-				    kr->r.prefixlen);
+				    kr->prefixlen);
 				if (memcmp(&ina, &inb, sizeof(ina)) == 0)
 					knexthop_validate(kt, h);
 			}
 
-		if (kr->r.flags & F_CONNECTED)
+		if (kr->flags & F_CONNECTED)
 			if (kif_kr6_insert(kr) == -1)
 				return (-1);
 
 		if (krm == NULL)
 			/* redistribute multipath routes only once */
-			kr_redistribute6(IMSG_NETWORK_ADD, kt, &kr->r);
+			kr_redistribute6(IMSG_NETWORK_ADD, kt, kr);
 	}
 
 	return (0);
 }
 
 int
-kroute6_remove(struct ktable *kt, struct kroute6_node *kr)
+kroute6_remove(struct ktable *kt, struct kroute6 *kr)
 {
-	struct kroute6_node	*krm;
-	struct knexthop_node	*s;
+	struct kroute6	*krm;
+	struct knexthop	*s;
 
 	if ((krm = RB_FIND(kroute6_tree, &kt->krt6, kr)) == NULL) {
 		log_warnx("%s: failed for %s/%u", __func__,
-		    log_in6addr(&kr->r.prefix), kr->r.prefixlen);
+		    log_in6addr(&kr->prefix), kr->prefixlen);
 		return (-1);
 	}
 
@@ -2002,15 +2029,14 @@ kroute6_remove(struct ktable *kt, struct kroute6_node *kr)
 		/* head element */
 		if (RB_REMOVE(kroute6_tree, &kt->krt6, kr) == NULL) {
 			log_warnx("%s: failed for %s/%u", __func__,
-			    log_in6addr(&kr->r.prefix), kr->r.prefixlen);
+			    log_in6addr(&kr->prefix), kr->prefixlen);
 			return (-1);
 		}
 		if (kr->next != NULL) {
 			if (RB_INSERT(kroute6_tree, &kt->krt6, kr->next) !=
 			    NULL) {
 				log_warnx("%s: failed to add %s/%u", __func__,
-				    log_in6addr(&kr->r.prefix),
-				    kr->r.prefixlen);
+				    log_in6addr(&kr->prefix), kr->prefixlen);
 				return (-1);
 			}
 		}
@@ -2019,32 +2045,31 @@ kroute6_remove(struct ktable *kt, struct kroute6_node *kr)
 		while (krm->next != kr && krm->next != NULL)
 			krm = krm->next;
 		if (krm->next == NULL) {
-			log_warnx("%s: multipath list corrupted "
-			    "for %s/%u", __func__, log_in6addr(&kr->r.prefix),
-			    kr->r.prefixlen);
+			log_warnx("%s: multipath list corrupted for %s/%u",
+			    __func__, log_in6addr(&kr->prefix), kr->prefixlen);
 			return (-1);
 		}
 		krm->next = kr->next;
 	}
 
 	/* check whether a nexthop depends on this kroute */
-	if (kr->r.flags & F_NEXTHOP)
+	if (kr->flags & F_NEXTHOP)
 		RB_FOREACH(s, knexthop_tree, KT2KNT(kt))
 			if (s->kroute == kr)
 				knexthop_validate(kt, s);
 
-	if (kr->r.flags & F_KERNEL && kr == krm && kr->next == NULL)
+	if (kr->flags & F_KERNEL && kr == krm && kr->next == NULL)
 		/* again remove only once */
-		kr_redistribute6(IMSG_NETWORK_REMOVE, kt, &kr->r);
+		kr_redistribute6(IMSG_NETWORK_REMOVE, kt, kr);
 
-	if (kr->r.flags & F_CONNECTED)
+	if (kr->flags & F_CONNECTED)
 		if (kif_kr6_remove(kr) == -1) {
-			rtlabel_unref(kr->r.labelid);
+			rtlabel_unref(kr->labelid);
 			free(kr);
 			return (-1);
 		}
 
-	rtlabel_unref(kr->r.labelid);
+	rtlabel_unref(kr->labelid);
 
 	free(kr);
 	return (0);
@@ -2053,16 +2078,16 @@ kroute6_remove(struct ktable *kt, struct kroute6_node *kr)
 void
 kroute6_clear(struct ktable *kt)
 {
-	struct kroute6_node	*kr;
+	struct kroute6	*kr;
 
 	while ((kr = RB_MIN(kroute6_tree, &kt->krt6)) != NULL)
 		kroute6_remove(kt, kr);
 }
 
-struct knexthop_node *
+struct knexthop *
 knexthop_find(struct ktable *kt, struct bgpd_addr *addr)
 {
-	struct knexthop_node	s;
+	struct knexthop	s;
 
 	bzero(&s, sizeof(s));
 	memcpy(&s.nexthop, addr, sizeof(s.nexthop));
@@ -2071,7 +2096,7 @@ knexthop_find(struct ktable *kt, struct bgpd_addr *addr)
 }
 
 int
-knexthop_insert(struct ktable *kt, struct knexthop_node *kn)
+knexthop_insert(struct ktable *kt, struct knexthop *kn)
 {
 	if (RB_INSERT(knexthop_tree, KT2KNT(kt), kn) != NULL) {
 		log_warnx("%s: failed for %s", __func__,
@@ -2086,7 +2111,7 @@ knexthop_insert(struct ktable *kt, struct knexthop_node *kn)
 }
 
 int
-knexthop_remove(struct ktable *kt, struct knexthop_node *kn)
+knexthop_remove(struct ktable *kt, struct knexthop *kn)
 {
 	kroute_detach_nexthop(kt, kn);
 
@@ -2103,7 +2128,7 @@ knexthop_remove(struct ktable *kt, struct knexthop_node *kn)
 void
 knexthop_clear(struct ktable *kt)
 {
-	struct knexthop_node	*kn;
+	struct knexthop	*kn;
 
 	while ((kn = RB_MIN(knexthop_tree, KT2KNT(kt))) != NULL)
 		knexthop_remove(kt, kn);
@@ -2152,14 +2177,14 @@ kif_remove(struct kif_node *kif)
 
 	while ((kkr = LIST_FIRST(&kif->kroute_l)) != NULL) {
 		LIST_REMOVE(kkr, entry);
-		kkr->kr->r.flags &= ~F_NEXTHOP;
+		kkr->kr->flags &= ~F_NEXTHOP;
 		kroute_remove(kt, kkr->kr);
 		free(kkr);
 	}
 
 	while ((kkr6 = LIST_FIRST(&kif->kroute6_l)) != NULL) {
 		LIST_REMOVE(kkr6, entry);
-		kkr6->kr->r.flags &= ~F_NEXTHOP;
+		kkr6->kr->flags &= ~F_NEXTHOP;
 		kroute6_remove(kt, kkr6->kr);
 		free(kkr6);
 	}
@@ -2178,22 +2203,22 @@ kif_clear(void)
 }
 
 int
-kif_kr_insert(struct kroute_node *kr)
+kif_kr_insert(struct kroute *kr)
 {
 	struct kif_node	*kif;
 	struct kif_kr	*kkr;
 
-	if ((kif = kif_find(kr->r.ifindex)) == NULL) {
-		if (kr->r.ifindex)
+	if ((kif = kif_find(kr->ifindex)) == NULL) {
+		if (kr->ifindex)
 			log_warnx("%s: interface with index %u not found",
-			    __func__, kr->r.ifindex);
+			    __func__, kr->ifindex);
 		return (0);
 	}
 
 	if (kif->k.nh_reachable)
-		kr->r.flags &= ~F_DOWN;
+		kr->flags &= ~F_DOWN;
 	else
-		kr->r.flags |= F_DOWN;
+		kr->flags |= F_DOWN;
 
 	if ((kkr = calloc(1, sizeof(*kkr))) == NULL) {
 		log_warn("%s", __func__);
@@ -2208,15 +2233,15 @@ kif_kr_insert(struct kroute_node *kr)
 }
 
 int
-kif_kr_remove(struct kroute_node *kr)
+kif_kr_remove(struct kroute *kr)
 {
 	struct kif_node	*kif;
 	struct kif_kr	*kkr;
 
-	if ((kif = kif_find(kr->r.ifindex)) == NULL) {
-		if (kr->r.ifindex)
+	if ((kif = kif_find(kr->ifindex)) == NULL) {
+		if (kr->ifindex)
 			log_warnx("%s: interface with index %u not found",
-			    __func__, kr->r.ifindex);
+			    __func__, kr->ifindex);
 		return (0);
 	}
 
@@ -2226,7 +2251,7 @@ kif_kr_remove(struct kroute_node *kr)
 
 	if (kkr == NULL) {
 		log_warnx("%s: can't remove connected route from interface "
-		    "with index %u: not found", __func__, kr->r.ifindex);
+		    "with index %u: not found", __func__, kr->ifindex);
 		return (-1);
 	}
 
@@ -2237,22 +2262,22 @@ kif_kr_remove(struct kroute_node *kr)
 }
 
 int
-kif_kr6_insert(struct kroute6_node *kr)
+kif_kr6_insert(struct kroute6 *kr)
 {
 	struct kif_node	*kif;
 	struct kif_kr6	*kkr6;
 
-	if ((kif = kif_find(kr->r.ifindex)) == NULL) {
-		if (kr->r.ifindex)
+	if ((kif = kif_find(kr->ifindex)) == NULL) {
+		if (kr->ifindex)
 			log_warnx("%s: interface with index %u not found",
-			    __func__, kr->r.ifindex);
+			    __func__, kr->ifindex);
 		return (0);
 	}
 
 	if (kif->k.nh_reachable)
-		kr->r.flags &= ~F_DOWN;
+		kr->flags &= ~F_DOWN;
 	else
-		kr->r.flags |= F_DOWN;
+		kr->flags |= F_DOWN;
 
 	if ((kkr6 = calloc(1, sizeof(*kkr6))) == NULL) {
 		log_warn("%s", __func__);
@@ -2267,15 +2292,15 @@ kif_kr6_insert(struct kroute6_node *kr)
 }
 
 int
-kif_kr6_remove(struct kroute6_node *kr)
+kif_kr6_remove(struct kroute6 *kr)
 {
 	struct kif_node	*kif;
 	struct kif_kr6	*kkr6;
 
-	if ((kif = kif_find(kr->r.ifindex)) == NULL) {
-		if (kr->r.ifindex)
+	if ((kif = kif_find(kr->ifindex)) == NULL) {
+		if (kr->ifindex)
 			log_warnx("%s: interface with index %u not found",
-			    __func__, kr->r.ifindex);
+			    __func__, kr->ifindex);
 		return (0);
 	}
 
@@ -2285,7 +2310,7 @@ kif_kr6_remove(struct kroute6_node *kr)
 
 	if (kkr6 == NULL) {
 		log_warnx("%s: can't remove connected route from interface "
-		    "with index %u: not found", __func__, kr->r.ifindex);
+		    "with index %u: not found", __func__, kr->ifindex);
 		return (-1);
 	}
 
@@ -2378,11 +2403,11 @@ kroute6_validate(struct kroute6 *kr)
 }
 
 void
-knexthop_validate(struct ktable *kt, struct knexthop_node *kn)
+knexthop_validate(struct ktable *kt, struct knexthop *kn)
 {
-	void			*oldk;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	void		*oldk;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
 
 	oldk = kn->kroute;
 	kroute_detach_nexthop(kt, kn);
@@ -2396,7 +2421,7 @@ knexthop_validate(struct ktable *kt, struct knexthop_node *kn)
 
 		if (kr) {
 			kn->kroute = kr;
-			kr->r.flags |= F_NEXTHOP;
+			kr->flags |= F_NEXTHOP;
 		}
 
 		/*
@@ -2412,7 +2437,7 @@ knexthop_validate(struct ktable *kt, struct knexthop_node *kn)
 
 		if (kr6) {
 			kn->kroute = kr6;
-			kr6->r.flags |= F_NEXTHOP;
+			kr6->flags |= F_NEXTHOP;
 		}
 
 		if (kr6 != oldk)
@@ -2424,7 +2449,7 @@ knexthop_validate(struct ktable *kt, struct knexthop_node *kn)
 void
 knexthop_track(struct ktable *kt, void *krp)
 {
-	struct knexthop_node	*kn;
+	struct knexthop	*kn;
 
 	RB_FOREACH(kn, knexthop_tree, KT2KNT(kt))
 		if (kn->kroute == krp)
@@ -2432,11 +2457,11 @@ knexthop_track(struct ktable *kt, void *krp)
 }
 
 void
-knexthop_send_update(struct knexthop_node *kn)
+knexthop_send_update(struct knexthop *kn)
 {
 	struct kroute_nexthop	 n;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	struct kroute		*kr;
+	struct kroute6		*kr6;
 
 	bzero(&n, sizeof(n));
 	memcpy(&n.nexthop, &kn->nexthop, sizeof(n.nexthop));
@@ -2450,69 +2475,71 @@ knexthop_send_update(struct knexthop_node *kn)
 	switch (kn->nexthop.aid) {
 	case AID_INET:
 		kr = kn->kroute;
-		n.valid = kroute_validate(&kr->r);
-		n.connected = kr->r.flags & F_CONNECTED;
-		if (kr->r.nexthop.s_addr != 0) {
+		n.valid = kroute_validate(kr);
+		n.connected = kr->flags & F_CONNECTED;
+		if (kr->nexthop.s_addr != 0) {
 			n.gateway.aid = AID_INET;
-			n.gateway.v4.s_addr = kr->r.nexthop.s_addr;
+			n.gateway.v4.s_addr = kr->nexthop.s_addr;
 		}
 		if (n.connected) {
 			n.net.aid = AID_INET;
-			n.net.v4.s_addr = kr->r.prefix.s_addr;
-			n.netlen = kr->r.prefixlen;
+			n.net.v4.s_addr = kr->prefix.s_addr;
+			n.netlen = kr->prefixlen;
 		}
 		break;
 	case AID_INET6:
 		kr6 = kn->kroute;
-		n.valid = kroute6_validate(&kr6->r);
-		n.connected = kr6->r.flags & F_CONNECTED;
-		if (memcmp(&kr6->r.nexthop, &in6addr_any,
+		n.valid = kroute6_validate(kr6);
+		n.connected = kr6->flags & F_CONNECTED;
+		if (memcmp(&kr6->nexthop, &in6addr_any,
 		    sizeof(struct in6_addr)) != 0) {
 			n.gateway.aid = AID_INET6;
-			memcpy(&n.gateway.v6, &kr6->r.nexthop,
+			memcpy(&n.gateway.v6, &kr6->nexthop,
 			    sizeof(struct in6_addr));
+			n.gateway.scope_id = kr6->nexthop_scope_id;
 		}
 		if (n.connected) {
 			n.net.aid = AID_INET6;
-			memcpy(&n.net.v6, &kr6->r.prefix,
+			memcpy(&n.net.v6, &kr6->prefix,
 			    sizeof(struct in6_addr));
-			n.netlen = kr6->r.prefixlen;
+			n.net.scope_id = kr6->prefix_scope_id;
+			n.netlen = kr6->prefixlen;
 		}
 		break;
 	}
 	send_nexthop_update(&n);
 }
 
-struct kroute_node *
+struct kroute *
 kroute_match(struct ktable *kt, struct bgpd_addr *key, int matchall)
 {
 	int			 i;
-	struct kroute_node	*kr;
+	struct kroute		*kr;
 	struct bgpd_addr	 masked;
 
-	/* this will never match the default route */
 	for (i = 32; i >= 0; i--) {
 		applymask(&masked, key, i);
 		if ((kr = kroute_find(kt, &masked, i, RTP_ANY)) != NULL)
-			if (matchall || bgpd_filternexthop(&kr->r, NULL) == 0)
-			    return (kr);
+			if (matchall ||
+			    bgpd_filternexthop(kr_tofull(kr)) == 0)
+				return (kr);
 	}
 
 	return (NULL);
 }
 
-struct kroute6_node *
+struct kroute6 *
 kroute6_match(struct ktable *kt, struct bgpd_addr *key, int matchall)
 {
 	int			 i;
-	struct kroute6_node	*kr6;
+	struct kroute6		*kr6;
 	struct bgpd_addr	 masked;
 
-	/* this will never match the default route */
 	for (i = 128; i >= 0; i--) {
 		applymask(&masked, key, i);
 		if ((kr6 = kroute6_find(kt, &masked, i, RTP_ANY)) != NULL)
-			if (matchall || bgpd_filternexthop(NULL, &kr6->r) == 0)
+			if (matchall ||
+			    bgpd_filternexthop(kr6_tofull(kr6)) == 0)
 				return (kr6);
 	}
 
@@ -2520,11 +2547,11 @@ kroute6_match(struct ktable *kt, struct bgpd_addr *key, int matchall)
 }
 
 void
-kroute_detach_nexthop(struct ktable *kt, struct knexthop_node *kn)
+kroute_detach_nexthop(struct ktable *kt, struct knexthop *kn)
 {
-	struct knexthop_node	*s;
-	struct kroute_node	*k;
-	struct kroute6_node	*k6;
+	struct knexthop	*s;
+	struct kroute	*k;
+	struct kroute6	*k6;
 
 	if (kn->kroute == NULL)
 		return;
@@ -2541,11 +2568,11 @@ kroute_detach_nexthop(struct ktable *kt, struct knexthop_node *kn)
 		switch (kn->nexthop.aid) {
 		case AID_INET:
 			k = kn->kroute;
-			k->r.flags &= ~F_NEXTHOP;
+			k->flags &= ~F_NEXTHOP;
 			break;
 		case AID_INET6:
 			k6 = kn->kroute;
-			k6->r.flags &= ~F_NEXTHOP;
+			k6->flags &= ~F_NEXTHOP;
 			break;
 		}
 	}
@@ -2730,7 +2757,7 @@ if_change(u_short ifindex, int flags, struct if_data *ifd)
 	kif->k.baudrate = ifd->ifi_baudrate;
 	kif->k.depend_state = kif_depend_state(&kif->k);
 
-	send_imsg_session(IMSG_IFINFO, 0, &kif->k, sizeof(kif->k));
+	kr_send_dependon(&kif->k);
 
 	if ((reachable = kif_validate(&kif->k)) == kif->k.nh_reachable)
 		return;		/* nothing changed wrt nexthop validity */
@@ -2741,9 +2768,9 @@ if_change(u_short ifindex, int flags, struct if_data *ifd)
 
 	LIST_FOREACH(kkr, &kif->kroute_l, entry) {
 		if (reachable)
-			kkr->kr->r.flags &= ~F_DOWN;
+			kkr->kr->flags &= ~F_DOWN;
 		else
-			kkr->kr->r.flags |= F_DOWN;
+			kkr->kr->flags |= F_DOWN;
 
 		if (kt == NULL)
 			continue;
@@ -2752,9 +2779,9 @@ if_change(u_short ifindex, int flags, struct if_data *ifd)
 	}
 	LIST_FOREACH(kkr6, &kif->kroute6_l, entry) {
 		if (reachable)
-			kkr6->kr->r.flags &= ~F_DOWN;
+			kkr6->kr->flags &= ~F_DOWN;
 		else
-			kkr6->kr->r.flags |= F_DOWN;
+			kkr6->kr->flags |= F_DOWN;
 
 		if (kt == NULL)
 			continue;
@@ -3010,7 +3037,15 @@ send_rt6msg(int fd, int action, struct ktable *kt, struct kroute6 *kroute)
 	prefix.addr.sin6_family = AF_INET6;
 	memcpy(&prefix.addr.sin6_addr, &kroute->prefix,
 	    sizeof(struct in6_addr));
-	/* XXX scope does not matter or? */
+#ifdef __KAME__
+	/* XXX need to embed the stupid scope for now */
+	if (IN6_IS_ADDR_LINKLOCAL(&kroute->prefix) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&kroute->prefix) ||
+	    IN6_IS_ADDR_MC_NODELOCAL(&kroute->prefix)) {
+		*(u_int16_t *)&prefix.addr.sin6_addr.s6_addr[2] =
+		    htons(kroute->prefix_scope_id);
+	}
+#endif
 	/* adjust header */
 	hdr.rtm_addrs |= RTA_DST;
 	hdr.rtm_msglen += ROUNDUP(sizeof(struct sockaddr_in6));
@@ -3024,6 +3059,15 @@ send_rt6msg(int fd, int action, struct ktable *kt, struct kroute6 *kroute)
 		nexthop.addr.sin6_family = AF_INET6;
 		memcpy(&nexthop.addr.sin6_addr, &kroute->nexthop,
 		    sizeof(struct in6_addr));
+#ifdef __KAME__
+		/* XXX need to embed the stupid scope for now */
+		if (IN6_IS_ADDR_LINKLOCAL(&kroute->nexthop) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(&kroute->nexthop) ||
+		    IN6_IS_ADDR_MC_NODELOCAL(&kroute->nexthop)) {
+			*(u_int16_t *)&nexthop.addr.sin6_addr.s6_addr[2] =
+			    htons(kroute->nexthop_scope_id);
+		}
+#endif
 		/* adjust header */
 		hdr.rtm_flags |= RTF_GATEWAY;
 		hdr.rtm_addrs |= RTA_GATEWAY;
@@ -3115,8 +3159,8 @@ fetchtable(struct ktable *kt)
 	char			*buf = NULL, *next, *lim;
 	struct rt_msghdr	*rtm;
 	struct kroute_full	 kl;
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	struct kroute		*kr;
+	struct kroute6		*kr6;
 
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
@@ -3159,18 +3203,18 @@ fetchtable(struct ktable *kt)
 				log_warn("%s", __func__);
 				return (-1);
 			}
-			kr->r.prefix.s_addr = kl.prefix.v4.s_addr;
-			kr->r.prefixlen = kl.prefixlen;
+			kr->prefix.s_addr = kl.prefix.v4.s_addr;
+			kr->prefixlen = kl.prefixlen;
 			if (kl.nexthop.aid == AID_INET)
-				kr->r.nexthop.s_addr = kl.nexthop.v4.s_addr;
-			kr->r.flags = kl.flags;
-			kr->r.ifindex = kl.ifindex;
-			kr->r.priority = kl.priority;
-			kr->r.labelid = rtlabel_name2id(kl.label);
+				kr->nexthop.s_addr = kl.nexthop.v4.s_addr;
+			kr->flags = kl.flags;
+			kr->ifindex = kl.ifindex;
+			kr->priority = kl.priority;
+			kr->labelid = rtlabel_name2id(kl.label);
 
 			if (kl.priority == kr_state.fib_prio) {
-				send_rtmsg(kr_state.fd, RTM_DELETE, kt, &kr->r);
-				rtlabel_unref(kr->r.labelid);
+				send_rtmsg(kr_state.fd, RTM_DELETE, kt, kr);
+				rtlabel_unref(kr->labelid);
 				free(kr);
 			} else
 				kroute_insert(kt, kr);
@@ -3179,21 +3223,22 @@ fetchtable(struct ktable *kt)
 				log_warn("%s", __func__);
 				return (-1);
 			}
-			kr6->r.prefix = kl.prefix.v6;
-			kr6->r.prefixlen = kl.prefixlen;
-			if (kl.nexthop.aid == AID_INET6)
-				kr6->r.nexthop = kl.nexthop.v6;
-			else
-				kr6->r.nexthop = in6addr_any;
-			kr6->r.flags = kl.flags;
-			kr6->r.ifindex = kl.ifindex;
-			kr6->r.priority = kl.priority;
-			kr6->r.labelid = rtlabel_name2id(kl.label);
+			kr6->prefix = kl.prefix.v6;
+			kr6->prefix_scope_id = kl.prefix.scope_id;
+			kr6->prefixlen = kl.prefixlen;
+			if (kl.nexthop.aid == AID_INET6) {
+				kr6->nexthop = kl.nexthop.v6;
+				kr6->nexthop_scope_id = kl.nexthop.scope_id;
+			} else
+				kr6->nexthop = in6addr_any;
+			kr6->flags = kl.flags;
+			kr6->ifindex = kl.ifindex;
+			kr6->priority = kl.priority;
+			kr6->labelid = rtlabel_name2id(kl.label);
 
 			if (kl.priority == kr_state.fib_prio) {
-				send_rt6msg(kr_state.fd, RTM_DELETE, kt,
-				    &kr6->r);
-				rtlabel_unref(kr6->r.labelid);
+				send_rt6msg(kr_state.fd, RTM_DELETE, kt, kr6);
+				rtlabel_unref(kr6->labelid);
 				free(kr6);
 			} else
 				kroute6_insert(kt, kr6);
@@ -3452,15 +3497,15 @@ dispatch_rtmsg_addr(struct rt_msghdr *rtm, struct kroute_full *kl)
 int
 kr_fib_delete(struct ktable *kt, struct kroute_full *kl, int mpath)
 {
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
 
 	switch (kl->prefix.aid) {
 	case AID_INET:
 		if ((kr = kroute_find(kt, &kl->prefix, kl->prefixlen,
 		    kl->priority)) == NULL)
 			return (0);
-		if (!(kr->r.flags & F_KERNEL))
+		if (!(kr->flags & F_KERNEL))
 			return (0);
 
 		if (mpath) {
@@ -3478,7 +3523,7 @@ kr_fib_delete(struct ktable *kt, struct kroute_full *kl, int mpath)
 		if ((kr6 = kroute6_find(kt, &kl->prefix, kl->prefixlen,
 		    kl->priority)) == NULL)
 			return (0);
-		if (!(kr6->r.flags & F_KERNEL))
+		if (!(kr6->flags & F_KERNEL))
 			return (0);
 
 		if (mpath) {
@@ -3500,18 +3545,18 @@ kr_fib_delete(struct ktable *kt, struct kroute_full *kl, int mpath)
 int
 kr_fib_change(struct ktable *kt, struct kroute_full *kl, int type, int mpath)
 {
-	struct kroute_node	*kr;
-	struct kroute6_node	*kr6;
-	int			 flags, oflags;
-	int			 changed = 0, rtlabel_changed = 0;
-	uint16_t		 new_labelid;
+	struct kroute	*kr;
+	struct kroute6	*kr6;
+	int		 flags, oflags;
+	int		 changed = 0, rtlabel_changed = 0;
+	uint16_t	 new_labelid;
 
 	flags = kl->flags;
 	switch (kl->prefix.aid) {
 	case AID_INET:
 		if ((kr = kroute_find(kt, &kl->prefix, kl->prefixlen,
 		    kl->priority)) != NULL) {
-			if (kr->r.flags & F_KERNEL) {
+			if (kr->flags & F_KERNEL) {
 				/* get the correct route */
 				if (mpath && type == RTM_CHANGE &&
 				    (kr = kroute_matchgw(kr, &kl->nexthop)) ==
@@ -3523,51 +3568,51 @@ kr_fib_change(struct ktable *kt, struct kroute_full *kl, int type, int mpath)
 					goto add4;
 
 				if (kl->nexthop.aid == AID_INET) {
-					if (kr->r.nexthop.s_addr !=
+					if (kr->nexthop.s_addr !=
 					    kl->nexthop.v4.s_addr)
 						changed = 1;
-					kr->r.nexthop.s_addr =
+					kr->nexthop.s_addr =
 					    kl->nexthop.v4.s_addr;
-					kr->r.ifindex = kl->ifindex;
+					kr->ifindex = kl->ifindex;
 				} else {
-					if (kr->r.nexthop.s_addr != 0)
+					if (kr->nexthop.s_addr != 0)
 						changed = 1;
-					kr->r.nexthop.s_addr = 0;
-					kr->r.ifindex = kl->ifindex;
+					kr->nexthop.s_addr = 0;
+					kr->ifindex = kl->ifindex;
 				}
 
-				if (kr->r.flags & F_NEXTHOP)
+				if (kr->flags & F_NEXTHOP)
 					flags |= F_NEXTHOP;
 
 				new_labelid = rtlabel_name2id(kl->label);
-				if (kr->r.labelid != new_labelid) {
-					rtlabel_unref(kr->r.labelid);
-					kr->r.labelid = new_labelid;
+				if (kr->labelid != new_labelid) {
+					rtlabel_unref(kr->labelid);
+					kr->labelid = new_labelid;
 					rtlabel_changed = 1;
 				}
 
-				oflags = kr->r.flags;
+				oflags = kr->flags;
 				if (flags != oflags)
 					changed = 1;
-				kr->r.flags = flags;
+				kr->flags = flags;
 
 				if (rtlabel_changed)
 					kr_redistribute(IMSG_NETWORK_ADD,
-					    kt, &kr->r);
+					    kt, kr);
 
 				if ((oflags & F_CONNECTED) &&
 				    !(flags & F_CONNECTED)) {
 					kif_kr_remove(kr);
 					kr_redistribute(IMSG_NETWORK_ADD,
-					    kt, &kr->r);
+					    kt, kr);
 				}
 				if ((flags & F_CONNECTED) &&
 				    !(oflags & F_CONNECTED)) {
 					kif_kr_insert(kr);
 					kr_redistribute(IMSG_NETWORK_ADD,
-					    kt, &kr->r);
+					    kt, kr);
 				}
-				if (kr->r.flags & F_NEXTHOP && changed)
+				if (kr->flags & F_NEXTHOP && changed)
 					knexthop_track(kt, kr);
 			}
 		} else {
@@ -3576,14 +3621,14 @@ add4:
 				log_warn("%s", __func__);
 				return (-1);
 			}
-			kr->r.prefix.s_addr = kl->prefix.v4.s_addr;
-			kr->r.prefixlen = kl->prefixlen;
+			kr->prefix.s_addr = kl->prefix.v4.s_addr;
+			kr->prefixlen = kl->prefixlen;
 			if (kl->nexthop.aid == AID_INET)
-				kr->r.nexthop.s_addr = kl->nexthop.v4.s_addr;
-			kr->r.flags = flags;
-			kr->r.ifindex = kl->ifindex;
-			kr->r.priority = kl->priority;
-			kr->r.labelid = rtlabel_name2id(kl->label);
+				kr->nexthop.s_addr = kl->nexthop.v4.s_addr;
+			kr->flags = flags;
+			kr->ifindex = kl->ifindex;
+			kr->priority = kl->priority;
+			kr->labelid = rtlabel_name2id(kl->label);
 
 			kroute_insert(kt, kr);
 		}
@@ -3591,7 +3636,7 @@ add4:
 	case AID_INET6:
 		if ((kr6 = kroute6_find(kt, &kl->prefix, kl->prefixlen,
 		    kl->priority)) != NULL) {
-			if (kr6->r.flags & F_KERNEL) {
+			if (kr6->flags & F_KERNEL) {
 				/* get the correct route */
 				if (mpath && type == RTM_CHANGE &&
 				    (kr6 = kroute6_matchgw(kr6, &kl->nexthop))
@@ -3603,54 +3648,54 @@ add4:
 					goto add6;
 
 				if (kl->nexthop.aid == AID_INET6) {
-					if (memcmp(&kr6->r.nexthop,
+					if (memcmp(&kr6->nexthop,
 					    &kl->nexthop.v6,
 					    sizeof(struct in6_addr)))
 						changed = 1;
-					kr6->r.nexthop = kl->nexthop.v6;
-					kr6->r.ifindex = kl->ifindex;
+					kr6->nexthop = kl->nexthop.v6;
+					kr6->ifindex = kl->ifindex;
 				} else {
-					if (memcmp(&kr6->r.nexthop,
+					if (memcmp(&kr6->nexthop,
 					    &in6addr_any,
 					    sizeof(struct in6_addr)))
 						changed = 1;
-					kr6->r.nexthop = in6addr_any;
-					kr6->r.ifindex = kl->ifindex;
+					kr6->nexthop = in6addr_any;
+					kr6->ifindex = kl->ifindex;
 				}
 
-				if (kr6->r.flags & F_NEXTHOP)
+				if (kr6->flags & F_NEXTHOP)
 					flags |= F_NEXTHOP;
 
 				new_labelid = rtlabel_name2id(kl->label);
-				if (kr6->r.labelid != new_labelid) {
-					rtlabel_unref(kr6->r.labelid);
-					kr6->r.labelid = new_labelid;
+				if (kr6->labelid != new_labelid) {
+					rtlabel_unref(kr6->labelid);
+					kr6->labelid = new_labelid;
 					rtlabel_changed = 1;
 				}
 
-				oflags = kr6->r.flags;
+				oflags = kr6->flags;
 				if (flags != oflags)
 					changed = 1;
-				kr6->r.flags = flags;
+				kr6->flags = flags;
 
 				if (rtlabel_changed)
 					kr_redistribute6(IMSG_NETWORK_ADD,
-					    kt, &kr6->r);
+					    kt, kr6);
 
 				if ((oflags & F_CONNECTED) &&
 				    !(flags & F_CONNECTED)) {
 					kif_kr6_remove(kr6);
 					kr_redistribute6(IMSG_NETWORK_ADD,
-					    kt, &kr6->r);
+					    kt, kr6);
 				}
 				if ((flags & F_CONNECTED) &&
 				    !(oflags & F_CONNECTED)) {
 					kif_kr6_insert(kr6);
 					kr_redistribute6(IMSG_NETWORK_ADD,
-					    kt, &kr6->r);
+					    kt, kr6);
 				}
 
-				if (kr6->r.flags & F_NEXTHOP && changed)
+				if (kr6->flags & F_NEXTHOP && changed)
 					knexthop_track(kt, kr6);
 			}
 		} else {
@@ -3659,16 +3704,18 @@ add6:
 				log_warn("%s", __func__);
 				return (-1);
 			}
-			kr6->r.prefix = kl->prefix.v6;
-			kr6->r.prefixlen = kl->prefixlen;
-			if (kl->nexthop.aid == AID_INET6)
-				kr6->r.nexthop = kl->nexthop.v6;
-			else
-				kr6->r.nexthop = in6addr_any;
-			kr6->r.flags = flags;
-			kr6->r.ifindex = kl->ifindex;
-			kr6->r.priority = kl->priority;
-			kr6->r.labelid = rtlabel_name2id(kl->label);
+			kr6->prefix = kl->prefix.v6;
+			kr6->prefix_scope_id = kl->prefix.scope_id;
+			kr6->prefixlen = kl->prefixlen;
+			if (kl->nexthop.aid == AID_INET6) {
+				kr6->nexthop = kl->nexthop.v6;
+				kr6->nexthop_scope_id = kl->nexthop.scope_id;
+			} else
+				kr6->nexthop = in6addr_any;
+			kr6->flags = flags;
+			kr6->ifindex = kl->ifindex;
+			kr6->priority = kl->priority;
+			kr6->labelid = rtlabel_name2id(kl->label);
 
 			kroute6_insert(kt, kr6);
 		}

@@ -24,7 +24,6 @@ D/man8.powerpc64////
 /release.8/1.96/Thu Dec 17 19:39:58 2020//
 D/man8.riscv64////
 /daily.8/1.29/Sat May  1 08:41:50 2021//
-/netstart.8/1.25/Sat May  1 08:41:50 2021//
 /diskless.8/1.71/Wed Sep  1 16:07:38 2021//
 /ssl.8/1.69/Wed Sep  1 16:07:38 2021//
 /boot_config.8/1.33/Tue Sep 14 08:17:30 2021//
@@ -35,3 +34,4 @@ D/man8.riscv64////
 /starttls.8/1.28/Wed Apr 20 14:28:15 2022//
 /rc.d.8/1.38/Tue Jun 21 09:30:23 2022//
 /rc.subr.8/1.45/Tue Jun 21 09:30:23 2022//
+/netstart.8/1.26/Sun Jun 26 07:44:25 2022//

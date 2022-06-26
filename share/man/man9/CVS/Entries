@@ -74,7 +74,6 @@
 /rtrequest.9/1.3/Fri Jul 12 16:57:45 2019//
 /sensor_attach.9/1.13/Mon Sep 14 15:14:55 2015//
 /sigio_init.9/1.4/Wed Jan  8 16:27:40 2020//
-/smr_call.9/1.3/Tue Feb 25 16:53:25 2020//
 /socreate.9/1.10/Mon Jul 30 12:22:14 2018//
 /sosplice.9/1.10/Thu Jul  4 17:42:17 2019//
 /spl.9/1.26/Tue Aug 16 23:49:35 2016//
@@ -122,7 +121,6 @@
 /ppsratecheck.9/1.7/Fri Dec 11 17:58:22 2020//
 /ratecheck.9/1.13/Fri Dec 11 17:58:22 2020//
 /resettodr.9/1.8/Fri Dec 11 17:58:22 2020//
-/task_add.9/1.22/Fri Dec 11 17:58:22 2020//
 /cpumem_get.9/1.11/Thu Dec 17 19:39:58 2020//
 /kstat_kv_init.9/1.2/Thu Dec 17 19:39:58 2020//
 /mq_init.9/1.13/Thu Dec 17 19:39:58 2020//
@@ -150,7 +148,6 @@
 /usb_add_task.9/1.3/Wed Sep  1 16:07:38 2021//
 /vnode.9/1.35/Wed Oct 20 17:29:07 2021//
 /SMR_LIST_INIT.9/1.8/Mon Jan 24 14:35:14 2022//
-/VOP_LOOKUP.9/1.45/Mon Jan 24 14:35:14 2022//
 /bus_space.9/1.32/Fri Feb 11 13:33:47 2022//
 /iic.9/1.10/Fri Feb 11 13:33:47 2022//
 /malloc.9/1.68/Fri Feb 11 13:33:47 2022//
@@ -176,8 +173,11 @@
 /radio.9/1.12/Wed Apr 20 14:28:16 2022//
 /srp_enter.9/1.16/Wed Apr 20 14:28:16 2022//
 /style.9/1.78/Wed Apr 20 14:28:16 2022//
-/timeout.9/1.54/Wed Apr 20 14:28:16 2022//
 /tsleep.9/1.16/Wed Apr 20 14:28:16 2022//
 /usbd_open_pipe.9/1.5/Wed Apr 20 14:28:16 2022//
 /refcnt_init.9/1.3/Wed May 25 14:32:29 2022//
+/VOP_LOOKUP.9/1.46/Sun Jun 26 07:44:25 2022//
+/smr_call.9/1.4/Sun Jun 26 07:44:25 2022//
+/task_add.9/1.23/Sun Jun 26 07:44:25 2022//
+/timeout.9/1.55/Sun Jun 26 07:44:25 2022//
 D

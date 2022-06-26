@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.h,v 1.432 2022/06/19 10:30:09 claudio Exp $ */
+/*	$OpenBSD: bgpd.h,v 1.437 2022/06/23 13:09:03 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -572,6 +572,7 @@ enum imsg_type {
 	IMSG_SESSION_STALE,
 	IMSG_SESSION_FLUSH,
 	IMSG_SESSION_RESTARTED,
+	IMSG_SESSION_DEPENDON,
 	IMSG_PFKEY_RELOAD,
 	IMSG_MRT_OPEN,
 	IMSG_MRT_REOPEN,
@@ -586,7 +587,6 @@ enum imsg_type {
 	IMSG_PFTABLE_REMOVE,
 	IMSG_PFTABLE_COMMIT,
 	IMSG_REFRESH,
-	IMSG_IFINFO,
 	IMSG_DEMOTE,
 	IMSG_XON,
 	IMSG_XOFF
@@ -656,13 +656,13 @@ enum suberr_rrefresh {
 	ERR_RR_INV_LEN = 1
 };
 
-struct kroute_node;
-struct kroute6_node;
-struct knexthop_node;
+struct kroute;
+struct kroute6;
+struct knexthop;
 struct kredist_node;
-RB_HEAD(kroute_tree, kroute_node);
-RB_HEAD(kroute6_tree, kroute6_node);
-RB_HEAD(knexthop_tree, knexthop_node);
+RB_HEAD(kroute_tree, kroute);
+RB_HEAD(kroute6_tree, kroute6);
+RB_HEAD(knexthop_tree, knexthop);
 RB_HEAD(kredist_tree, kredist_node);
 
 struct ktable {
@@ -690,28 +690,6 @@ struct kroute_full {
 	uint8_t			priority;
 };
 
-struct kroute {
-	struct in_addr	prefix;
-	struct in_addr	nexthop;
-	uint32_t	mplslabel;
-	uint16_t	flags;
-	uint16_t	labelid;
-	u_short		ifindex;
-	uint8_t		prefixlen;
-	uint8_t		priority;
-};
-
-struct kroute6 {
-	struct in6_addr	prefix;
-	struct in6_addr	nexthop;
-	uint32_t	mplslabel;
-	uint16_t	flags;
-	uint16_t	labelid;
-	u_short		ifindex;
-	uint8_t		prefixlen;
-	uint8_t		priority;
-};
-
 struct kroute_nexthop {
 	struct bgpd_addr	nexthop;
 	struct bgpd_addr	gateway;
@@ -721,15 +699,8 @@ struct kroute_nexthop {
 	uint8_t			netlen;
 };
 
-struct kif {
+struct session_dependon {
 	char			 ifname[IFNAMSIZ];
-	uint64_t		 baudrate;
-	u_int			 rdomain;
-	int			 flags;
-	u_short			 ifindex;
-	uint8_t			 if_type;
-	uint8_t			 link_state;
-	uint8_t			 nh_reachable;	/* for nexthop verification */
 	uint8_t			 depend_state;	/* for session depend on */
 };
 
@@ -769,10 +740,7 @@ struct ctl_show_interface {
 struct ctl_show_nexthop {
 	struct bgpd_addr		addr;
 	struct ctl_show_interface	iface;
-	union {
-		struct kroute		kr4;
-		struct kroute6		kr6;
-	} kr;
+	struct kroute_full		kr;
 	uint8_t				valid;
 	uint8_t				krvalid;
 };
@@ -1268,7 +1236,7 @@ void		 send_nexthop_update(struct kroute_nexthop *);
 void		 send_imsg_session(int, pid_t, void *, uint16_t);
 int		 send_network(int, struct network_config *,
 		     struct filter_set_head *);
-int		 bgpd_filternexthop(struct kroute *, struct kroute6 *);
+int		 bgpd_filternexthop(struct kroute_full *);
 void		 set_pollfd(struct pollfd *, struct imsgbuf *);
 int		 handle_pollfd(struct pollfd *, struct imsgbuf *);
 

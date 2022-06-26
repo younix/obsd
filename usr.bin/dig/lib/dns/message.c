@@ -14,7 +14,7 @@
  * PERFORMANCE OF THIS SOFTWARE.
  */
 
-/* $Id: message.c,v 1.18 2020/11/01 07:12:14 florian Exp $ */
+/* $Id: message.c,v 1.20 2022/06/25 10:20:29 florian Exp $ */
 
 /*! \file */
 
@@ -58,8 +58,6 @@
 				       isc_buffer_putstr(b, s);}
 #define VALID_PSEUDOSECTION(s)	(((s) >= DNS_PSEUDOSECTION_ANY) \
 				 && ((s) < DNS_PSEUDOSECTION_MAX))
-
-#define OPTOUT(x) (((x)->attributes & DNS_RDATASETATTR_OPTOUT) != 0)
 
 /*%
  * This is the size of each individual scratchpad buffer, and the numbers
@@ -333,8 +331,6 @@ msginit(dns_message_t *m) {
 	m->tcp_continuation = 0;
 	m->verified_sig = 0;
 	m->verify_attempted = 0;
-	m->order = NULL;
-	m->order_arg = NULL;
 	m->query.base = NULL;
 	m->query.length = 0;
 	m->free_query = 0;
@@ -1300,11 +1296,8 @@ getsection(isc_buffer_t *source, dns_message_t *msg, dns_decompress_t *dctx,
 		 * currently treat them the as if they were authoritative and
 		 * minimize them.
 		 */
-		if (ttl != rdataset->ttl) {
-			rdataset->attributes |= DNS_RDATASETATTR_TTLADJUSTED;
-			if (ttl < rdataset->ttl)
-				rdataset->ttl = ttl;
-		}
+		if (ttl < rdataset->ttl)
+			rdataset->ttl = ttl;
 
 		/* Append this rdata to the rdataset. */
 		dns_rdatalist_fromrdataset(rdataset, &rdatalist);
@@ -1657,8 +1650,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid)
 						  name,
 						  msg->cctx,
 						  msg->buffer,
-						  msg->order,
-						  msg->order_arg,
 						  &count);
 
 				total += count;
@@ -1686,8 +1677,6 @@ dns_message_rendersection(dns_message_t *msg, dns_section_t sectionid)
 				if (rdataset->trust != dns_trust_secure &&
 				    (sectionid == DNS_SECTION_ANSWER ||
 				     sectionid == DNS_SECTION_AUTHORITY))
-					msg->flags &= ~DNS_MESSAGEFLAG_AD;
-				if (OPTOUT(rdataset))
 					msg->flags &= ~DNS_MESSAGEFLAG_AD;
 
 				rdataset->attributes |=
