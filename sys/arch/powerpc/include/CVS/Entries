@@ -36,6 +36,6 @@
 /pmap.h/1.60/Thu Sep  2 14:22:31 2021//
 /cpu.h/1.71/Fri Feb 11 13:33:50 2022//
 /db_machdep.h/1.32/Fri Feb 11 13:33:50 2022//
-/trap.h/1.8/Wed May 25 14:32:32 2022//
-/asm.h/1.17/Tue Jun 21 09:30:26 2022//
+/asm.h/1.17/Sun Jun 26 14:22:15 2022//
+/trap.h/1.8/Sun Jun 26 14:22:15 2022//
 D

@@ -14,8 +14,8 @@
 /ntp_dns.c/1.27/Mon Nov 15 19:06:15 2021//
 /constraint.c/1.53/Mon Jan 24 14:35:16 2022//
 /log.h/1.6/Mon Jan 24 14:35:16 2022//
-/client.c/1.117/Wed Apr 20 14:28:27 2022//
-/ntp.c/1.169/Wed Apr 20 14:28:27 2022//
-/ntpd.conf.5/1.48/Wed Apr 20 14:28:27 2022//
-/ntpd.h/1.151/Wed Apr 20 14:28:27 2022//
+/client.c/1.117/Sun Jun 26 14:22:16 2022//
+/ntp.c/1.169/Sun Jun 26 14:22:16 2022//
+/ntpd.conf.5/1.48/Sun Jun 26 14:22:16 2022//
+/ntpd.h/1.151/Sun Jun 26 14:22:16 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_pppx.c,v 1.114 2022/02/22 01:15:02 guenther Exp $ */
+/*	$OpenBSD: if_pppx.c,v 1.117 2022/06/26 22:51:58 mvs Exp $ */
 
 /*
  * Copyright (c) 2010 Claudio Jeker <claudio@openbsd.org>
@@ -817,7 +817,9 @@ pppx_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	struct pppx_if *pxi = (struct pppx_if *)ifp->if_softc;
 	struct pppx_hdr *th;
 	int error = 0;
-	int proto;
+	int pipex_enable_local, proto;
+
+	pipex_enable_local = atomic_load_int(&pipex_enable);
 
 	NET_ASSERT_LOCKED();
 
@@ -831,7 +833,7 @@ pppx_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	if (ifp->if_bpf)
 		bpf_mtap_af(ifp->if_bpf, dst->sa_family, m, BPF_DIRECTION_OUT);
 #endif
-	if (pipex_enable) {
+	if (pipex_enable_local) {
 		switch (dst->sa_family) {
 #ifdef INET6
 		case AF_INET6:
@@ -856,7 +858,7 @@ pppx_if_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	}
 	*mtod(m, int *) = proto;
 
-	if (pipex_enable)
+	if (pipex_enable_local)
 		error = if_enqueue(ifp, m);
 	else {
 		M_PREPEND(m, sizeof(struct pppx_hdr), M_DONTWAIT);
@@ -1021,7 +1023,7 @@ pppacopen(dev_t dev, int flags, int mode, struct proc *p)
 
 	/* virtual pipex_session entry for multicast */
 	session = pool_get(&pipex_session_pool, PR_WAITOK | PR_ZERO);
-	session->is_multicast = 1;
+	session->flags |= PIPEX_SFLAGS_MULTICAST;
 	session->ownersc = sc;
 	sc->sc_multicast_session = session;
 
@@ -1322,9 +1324,7 @@ pppacclose(dev_t dev, int flags, int mode, struct proc *p)
 	splx(s);
 
 	pool_put(&pipex_session_pool, sc->sc_multicast_session);
-	NET_LOCK();
 	pipex_destroy_all_sessions(sc);
-	NET_UNLOCK();
 
 	LIST_REMOVE(sc, sc_entry);
 	free(sc, M_DEVBUF, sizeof(*sc));
@@ -1384,12 +1384,18 @@ pppac_del_session(struct pppac_softc *sc, struct pipex_session_close_req *req)
 {
 	struct pipex_session *session;
 
-	session = pipex_lookup_by_session_id(req->pcr_protocol,
+	mtx_enter(&pipex_list_mtx);
+
+	session = pipex_lookup_by_session_id_locked(req->pcr_protocol,
 	    req->pcr_session_id);
-	if (session == NULL || session->ownersc != sc)
+	if (session == NULL || session->ownersc != sc) {
+		mtx_leave(&pipex_list_mtx);
 		return (EINVAL);
-	pipex_unlink_session(session);
+	}
+	pipex_unlink_session_locked(session);
 	pipex_rele_session(session);
+
+	mtx_leave(&pipex_list_mtx);
 
 	return (0);
 }
@@ -1461,6 +1467,7 @@ pppac_qstart(struct ifqueue *ifq)
 				session = pipex_lookup_by_ip_address(ip.ip_dst);
 				if (session != NULL) {
 					pipex_ip_output(m, session);
+					pipex_rele_session(session);
 					m = NULL;
 				}
 			}

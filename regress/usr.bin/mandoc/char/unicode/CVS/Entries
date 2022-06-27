@@ -26,7 +26,6 @@
 /latin1diff.out_ascii/1.4/Thu Sep  2 14:22:31 2021//
 /latin1diff.out_utf8/1.4/Thu Sep  2 14:22:31 2021//
 /man.out_utf8/1.5/Thu Sep  2 14:22:31 2021//
-/named.out_ascii/1.10/Thu Sep  2 14:22:31 2021//
 /named.out_utf8/1.10/Thu Sep  2 14:22:31 2021//
 /namediff.out_ascii/1.10/Thu Sep  2 14:22:31 2021//
 /namediff.out_utf8/1.9/Thu Sep  2 14:22:31 2021//
@@ -34,6 +33,7 @@
 /nogroff.out_ascii/1.7/Thu Sep  2 14:22:31 2021//
 /nogroff.out_html/1.9/Thu Sep  2 14:22:31 2021//
 /nogroff.out_utf8/1.9/Thu Sep  2 14:22:31 2021//
-/input.out_lint/1.8/Tue Jun 21 09:30:20 2022//
-/invalid.out_lint/1.7/Tue Jun 21 09:30:20 2022//
+/input.out_lint/1.8/Sun Jun 26 14:22:14 2022//
+/invalid.out_lint/1.7/Sun Jun 26 14:22:14 2022//
+/named.out_ascii/1.11/Mon Jun 27 12:59:25 2022//
 D

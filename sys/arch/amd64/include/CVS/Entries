@@ -71,8 +71,8 @@
 /profile.h/1.5/Tue Sep 14 08:17:30 2021//
 /asm.h/1.21/Mon Jan 24 14:35:14 2022//
 /intr.h/1.33/Mon Jan 24 14:35:14 2022//
-/specialreg.h/1.92/Wed May 25 14:32:29 2022//
-/pmap.h/1.80/Tue Jun 21 09:30:23 2022//
-/cpu.h/1.143/Sun Jun 26 07:44:25 2022//
-/vmmvar.h/1.78/Sun Jun 26 07:44:25 2022//
+/cpu.h/1.143/Sun Jun 26 14:22:15 2022//
+/pmap.h/1.80/Sun Jun 26 14:22:15 2022//
+/specialreg.h/1.92/Sun Jun 26 14:22:15 2022//
+/vmmvar.h/1.78/Sun Jun 26 14:22:15 2022//
 D

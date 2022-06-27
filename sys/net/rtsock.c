@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.329 2022/06/16 10:35:45 claudio Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.331 2022/06/27 08:15:38 claudio Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -101,7 +101,8 @@
 const struct sockaddr route_src = { 2, PF_ROUTE, };
 
 struct walkarg {
-	int	w_op, w_arg, w_given, w_needed, w_tmemsize;
+	int	w_op, w_arg, w_tmemsize;
+	size_t	w_given, w_needed;
 	caddr_t	w_where, w_tmem;
 };
 
@@ -1564,25 +1565,31 @@ rtm_msg1(int type, struct rt_addrinfo *rtinfo)
 	switch (type) {
 	case RTM_DELADDR:
 	case RTM_NEWADDR:
-		len = sizeof(struct ifa_msghdr);
+		hlen = sizeof(struct ifa_msghdr);
 		break;
 	case RTM_IFINFO:
-		len = sizeof(struct if_msghdr);
+		hlen = sizeof(struct if_msghdr);
 		break;
 	case RTM_IFANNOUNCE:
-		len = sizeof(struct if_announcemsghdr);
+		hlen = sizeof(struct if_announcemsghdr);
 		break;
 #ifdef BFD
 	case RTM_BFD:
-		len = sizeof(struct bfd_msghdr);
+		hlen = sizeof(struct bfd_msghdr);
 		break;
 #endif
 	case RTM_80211INFO:
-		len = sizeof(struct if_ieee80211_msghdr);
+		hlen = sizeof(struct if_ieee80211_msghdr);
 		break;
 	default:
-		len = sizeof(struct rt_msghdr);
+		hlen = sizeof(struct rt_msghdr);
 		break;
+	}
+	len = hlen;
+	for (i = 0; i < RTAX_MAX; i++) {
+		if (rtinfo == NULL || (sa = rtinfo->rti_info[i]) == NULL)
+			continue;
+		len += ROUNDUP(sa->sa_len);
 	}
 	if (len > MCLBYTES)
 		panic("rtm_msg1");
@@ -1596,16 +1603,17 @@ rtm_msg1(int type, struct rt_addrinfo *rtinfo)
 	}
 	if (m == NULL)
 		return (m);
-	m->m_pkthdr.len = m->m_len = hlen = len;
+	m->m_pkthdr.len = m->m_len = len;
 	m->m_pkthdr.ph_ifidx = 0;
 	rtm = mtod(m, struct rt_msghdr *);
 	bzero(rtm, len);
+	len = hlen;
 	for (i = 0; i < RTAX_MAX; i++) {
 		if (rtinfo == NULL || (sa = rtinfo->rti_info[i]) == NULL)
 			continue;
 		rtinfo->rti_addrs |= (1U << i);
 		dlen = ROUNDUP(sa->sa_len);
-		if (m_copyback(m, len, dlen, sa, M_NOWAIT)) {
+		if (m_copyback(m, len, sa->sa_len, sa, M_NOWAIT)) {
 			m_freem(m);
 			return (NULL);
 		}
@@ -1651,7 +1659,8 @@ again:
 		rtinfo->rti_addrs |= (1U << i);
 		dlen = ROUNDUP(sa->sa_len);
 		if (cp) {
-			bcopy(sa, cp, (size_t)dlen);
+			bcopy(sa, cp, sa->sa_len);
+			bzero(cp + sa->sa_len, dlen - sa->sa_len);
 			cp += dlen;
 		}
 		len += dlen;
@@ -1660,7 +1669,7 @@ again:
 	len = ALIGN(len);
 	if (cp == 0 && w != NULL && !second_time) {
 		w->w_needed += len;
-		if (w->w_needed <= 0 && w->w_where) {
+		if (w->w_needed <= w->w_given && w->w_where) {
 			if (w->w_tmemsize < len) {
 				free(w->w_tmem, M_RTABLE, w->w_tmemsize);
 				w->w_tmem = malloc(len, M_RTABLE,
@@ -1983,7 +1992,7 @@ sysctl_dumpentry(struct rtentry *rt, void *v, unsigned int id)
 #endif
 
 	size = rtm_msg2(RTM_GET, RTM_VERSION, &info, NULL, w);
-	if (w->w_where && w->w_tmem && w->w_needed <= 0) {
+	if (w->w_where && w->w_tmem && w->w_needed <= w->w_given) {
 		struct rt_msghdr *rtm = (struct rt_msghdr *)w->w_tmem;
 
 		rtm->rtm_pid = curproc->p_p->ps_pid;
@@ -2021,7 +2030,7 @@ sysctl_iflist(int af, struct walkarg *w)
 		/* Copy the link-layer address first */
 		info.rti_info[RTAX_IFP] = sdltosa(ifp->if_sadl);
 		len = rtm_msg2(RTM_IFINFO, RTM_VERSION, &info, 0, w);
-		if (w->w_where && w->w_tmem && w->w_needed <= 0) {
+		if (w->w_where && w->w_tmem && w->w_needed <= w->w_given) {
 			struct if_msghdr *ifm;
 
 			ifm = (struct if_msghdr *)w->w_tmem;
@@ -2044,7 +2053,8 @@ sysctl_iflist(int af, struct walkarg *w)
 			info.rti_info[RTAX_NETMASK] = ifa->ifa_netmask;
 			info.rti_info[RTAX_BRD] = ifa->ifa_dstaddr;
 			len = rtm_msg2(RTM_NEWADDR, RTM_VERSION, &info, 0, w);
-			if (w->w_where && w->w_tmem && w->w_needed <= 0) {
+			if (w->w_where && w->w_tmem &&
+			    w->w_needed <= w->w_given) {
 				struct ifa_msghdr *ifam;
 
 				ifam = (struct ifa_msghdr *)w->w_tmem;
@@ -2076,7 +2086,7 @@ sysctl_ifnames(struct walkarg *w)
 		if (w->w_arg && w->w_arg != ifp->if_index)
 			continue;
 		w->w_needed += sizeof(ifn);
-		if (w->w_where && w->w_needed <= 0) {
+		if (w->w_where && w->w_needed <= w->w_given) {
 
 			memset(&ifn, 0, sizeof(ifn));
 			ifn.if_index = ifp->if_index;
@@ -2113,7 +2123,7 @@ sysctl_source(int af, u_int tableid, struct walkarg *w)
 			return (0);
 		}
 		w->w_needed += size;
-		if (w->w_where && w->w_needed <= 0) {
+		if (w->w_where && w->w_needed <= w->w_given) {
 			if ((error = copyout(sa, w->w_where, size)))
 				return (error);
 			w->w_where += size;
@@ -2140,7 +2150,6 @@ sysctl_rtable(int *name, u_int namelen, void *where, size_t *given, void *new,
 	bzero(&w, sizeof(w));
 	w.w_where = where;
 	w.w_given = *given;
-	w.w_needed = 0 - w.w_given;
 	w.w_op = name[1];
 	w.w_arg = name[2];
 
@@ -2211,10 +2220,9 @@ sysctl_rtable(int *name, u_int namelen, void *where, size_t *given, void *new,
 		break;
 	}
 	free(w.w_tmem, M_RTABLE, w.w_tmemsize);
-	w.w_needed += w.w_given;
 	if (where) {
 		*given = w.w_where - (caddr_t)where;
-		if (*given < w.w_needed)
+		if (w.w_needed > w.w_given)
 			return (ENOMEM);
 	} else if (w.w_needed == 0) {
 		*given = 0;
