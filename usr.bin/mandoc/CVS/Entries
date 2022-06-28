@@ -83,7 +83,6 @@
 /man.c/1.136/Mon Jun 27 13:02:01 2022//
 /man_macro.c/1.109/Mon Jun 27 13:02:01 2022//
 /man_term.c/1.190/Mon Jun 27 13:02:01 2022//
-/mandoc.1/1.187/Mon Jun 27 13:02:01 2022//
 /mandoc.c/1.89/Mon Jun 27 13:02:01 2022//
 /mandoc.css/1.36/Mon Jun 27 13:02:01 2022//
 /mandoc.h/1.221/Mon Jun 27 13:02:01 2022//
@@ -99,4 +98,5 @@
 /tbl_html.c/1.35/Mon Jun 27 13:02:01 2022//
 /tbl_term.c/1.65/Mon Jun 27 13:02:01 2022//
 /term.c/1.146/Mon Jun 27 13:02:01 2022//
+/mandoc.1/1.188/Tue Jun 28 08:42:40 2022//
 D
