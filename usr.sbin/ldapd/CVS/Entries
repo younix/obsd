@@ -1,5 +1,4 @@
 /aldap.h/1.2/Sat May 11 17:46:02 2019//
-/auth.c/1.14/Thu Oct 24 12:39:26 2019//
 /btest.c/1.3/Wed Feb 22 14:40:46 2017//
 /btree.3/1.5/Sun Nov  4 08:04:08 2018//
 /btree.c/1.38/Fri May 26 21:23:14 2017//
@@ -35,3 +34,4 @@ D/schema////
 /util.c/1.14/Mon Jan 24 14:35:16 2022//
 /validate.c/1.13/Mon Jan 24 14:35:16 2022//
 /ldapd.c/1.32/Mon Jun 27 13:02:01 2022//
+/auth.c/1.15/Wed Jun 29 12:46:45 2022//

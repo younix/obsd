@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.394 2022/06/07 17:52:00 tb Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.401 2022/06/29 12:03:38 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -379,6 +379,11 @@ typedef struct ssl_cert_st {
 	DH *dhe_params;
 	DH *(*dhe_params_cb)(SSL *ssl, int is_export, int keysize);
 	int dhe_params_auto;
+
+	int (*security_cb)(const SSL *s, const SSL_CTX *ctx, int op, int bits,
+	    int nid, void *other, void *ex_data);
+	int security_level;
+	void *security_ex_data; /* XXX: do we really need to support this? */
 
 	int references; /* >1 only if SSL_copy_session_id is used */
 } SSL_CERT;
@@ -1276,6 +1281,17 @@ int ssl_cert_set0_chain(SSL_CERT *c, STACK_OF(X509) *chain);
 int ssl_cert_set1_chain(SSL_CERT *c, STACK_OF(X509) *chain);
 int ssl_cert_add0_chain_cert(SSL_CERT *c, X509 *cert);
 int ssl_cert_add1_chain_cert(SSL_CERT *c, X509 *cert);
+
+int ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int op,
+    int bits, int nid, void *other, void *ex_data);
+int ssl_security_dummy_cb(const SSL *ssl, const SSL_CTX *ctx, int op,
+    int bits, int nid, void *other, void *ex_data);
+
+int ssl_ctx_security(const SSL_CTX *ctx, int op, int bits, int nid,
+    void *other);
+int ssl_security(const SSL *ssl, int op, int bits, int nid, void *other);
+int ssl_ctx_security_dh(const SSL_CTX *ctx, DH *dh);
+int ssl_security_dh(const SSL *ssl, DH *dh);
 
 int ssl_get_new_session(SSL *s, int session);
 int ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block,

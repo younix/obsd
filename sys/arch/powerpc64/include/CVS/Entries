@@ -11,7 +11,6 @@
 /ieeefp.h/1.1/Mon Jun  1 00:13:37 2020//
 /apmvar.h/1.1/Fri Dec 11 17:58:22 2020//
 /atomic.h/1.2/Fri Dec 11 17:58:22 2020//
-/conf.h/1.4/Fri Dec 11 17:58:22 2020//
 /endian.h/1.2/Fri Dec 11 17:58:22 2020//
 /fenv.h/1.1/Fri Dec 11 17:58:22 2020//
 /frame.h/1.5/Fri Dec 11 17:58:22 2020//
@@ -46,4 +45,5 @@
 /pmap.h/1.18/Wed Oct 20 17:29:10 2021//
 /fpu.h/1.4/Mon Jun 27 13:02:00 2022//
 /trap.h/1.9/Mon Jun 27 13:02:00 2022//
+/conf.h/1.5/Wed Jun 29 12:46:38 2022//
 D

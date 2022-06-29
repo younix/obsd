@@ -5,7 +5,6 @@
 /atomic.h/1.18/Mon Jul 31 11:52:49 2017//
 /bus.h/1.18/Wed Apr 29 15:25:07 2020//
 /cdefs.h/1.4/Thu Mar 28 17:30:45 2013//
-/conf.h/1.11/Sat May 21 21:24:36 2016//
 /cpuconf.h/1.19/Fri Jan  6 00:06:02 2017//
 /disklabel.h/1.15/Wed Sep 30 15:35:30 2015//
 /endian.h/1.11/Tue Oct  2 21:30:44 2018//
@@ -50,4 +49,5 @@
 /pci_machdep.h/1.18/Mon Jan 24 14:35:14 2022//
 /asm.h/1.11/Mon Jun 27 13:02:00 2022//
 /vfp.h/1.4/Mon Jun 27 13:02:00 2022//
+/conf.h/1.12/Wed Jun 29 12:46:36 2022//
 D

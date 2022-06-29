@@ -38,7 +38,6 @@
 /signal.h/1.4/Thu Sep  2 14:22:31 2021//
 /syscall.h/1.3/Thu Sep  2 14:22:31 2021//
 /timetc.h/1.3/Thu Sep  2 14:22:31 2021//
-/conf.h/1.3/Wed Oct 20 17:29:10 2021//
 /sysarch.h/1.1/Tue Sep 14 12:03:49 2021//
 /softintr.h/1.3/Mon Jan 24 14:35:14 2022//
 /asm.h/1.4/Mon Jun 27 13:02:00 2022//
@@ -47,4 +46,5 @@
 /fdt.h/1.4/Mon Jun 27 13:02:00 2022//
 /frame.h/1.3/Mon Jun 27 13:02:00 2022//
 /vmparam.h/1.6/Mon Jun 27 13:02:00 2022//
+/conf.h/1.4/Wed Jun 29 12:46:38 2022//
 D

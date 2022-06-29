@@ -67,12 +67,9 @@
 /kern_ktrace.c/1.106/Mon Jun 27 13:02:00 2022//
 /kern_lock.c/1.72/Mon Jun 27 13:02:00 2022//
 /kern_malloc.c/1.147/Mon Jun 27 13:02:00 2022//
-/kern_pledge.c/1.282/Mon Jun 27 13:02:00 2022//
 /kern_prot.c/1.79/Mon Jun 27 13:02:00 2022//
 /kern_resource.c/1.74/Mon Jun 27 13:02:00 2022//
 /kern_rwlock.c/1.48/Mon Jun 27 13:02:00 2022//
-/kern_sig.c/1.296/Mon Jun 27 13:02:00 2022//
-/kern_synch.c/1.188/Mon Jun 27 13:02:00 2022//
 /kern_sysctl.c/1.402/Mon Jun 27 13:02:00 2022//
 /kern_time.c/1.156/Mon Jun 27 13:02:00 2022//
 /makesyscalls.sh/1.16/Mon Jun 27 13:02:00 2022//
@@ -85,7 +82,6 @@
 /sys_generic.c/1.147/Mon Jun 27 13:02:00 2022//
 /sys_pipe.c/1.140/Mon Jun 27 13:02:00 2022//
 /sys_socket.c/1.51/Mon Jun 27 13:02:00 2022//
-/syscalls.c/1.236/Mon Jun 27 13:02:00 2022//
 /sysv_msg.c/1.38/Mon Jun 27 13:02:00 2022//
 /tty.c/1.174/Mon Jun 27 13:02:00 2022//
 /tty_nmea.c/1.51/Mon Jun 27 13:02:00 2022//
@@ -102,6 +98,10 @@
 /vfs_syscalls.c/1.357/Mon Jun 27 13:02:00 2022//
 /vfs_vnops.c/1.120/Mon Jun 27 13:02:00 2022//
 /vfs_vops.c/1.35/Mon Jun 27 13:02:00 2022//
-/init_sysent.c/1.238/Tue Jun 28 08:42:38 2022//
-/syscalls.master/1.225/Tue Jun 28 08:42:38 2022//
+/init_sysent.c/1.239/Wed Jun 29 12:46:41 2022//
+/kern_pledge.c/1.284/Wed Jun 29 12:46:41 2022//
+/kern_sig.c/1.298/Wed Jun 29 12:46:41 2022//
+/kern_synch.c/1.189/Wed Jun 29 12:46:41 2022//
+/syscalls.c/1.237/Wed Jun 29 12:46:41 2022//
+/syscalls.master/1.226/Wed Jun 29 12:46:41 2022//
 D

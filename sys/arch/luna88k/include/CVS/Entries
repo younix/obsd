@@ -7,7 +7,6 @@
 /board.h/1.15/Fri Nov  3 06:55:08 2017//
 /cdefs.h/1.4/Thu Nov 24 20:46:45 2005//
 /cmmu.h/1.3/Mon Apr 26 14:31:08 2004//
-/conf.h/1.6/Wed May 13 08:10:03 2020//
 /cpu.h/1.10/Sat Mar 24 04:19:43 2018//
 /db_machdep.h/1.3/Mon Apr 26 14:31:08 2004//
 /disklabel.h/1.6/Wed Sep 30 14:57:03 2015//
@@ -49,4 +48,5 @@
 /xpio.h/1.1/Sat Dec 17 05:22:34 2016//
 /timetc.h/1.1/Fri Dec 11 17:58:22 2020//
 /bus.h/1.12/Mon Jun 27 13:02:00 2022//
+/conf.h/1.7/Wed Jun 29 12:46:37 2022//
 D

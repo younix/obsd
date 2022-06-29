@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_srvr.c,v 1.142 2022/06/07 17:14:17 tb Exp $ */
+/* $OpenBSD: ssl_srvr.c,v 1.145 2022/06/29 08:27:51 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1074,6 +1074,7 @@ ssl3_get_client_hello(SSL *s)
 		s->internal->hit = 1;
 		s->session->verify_result = X509_V_OK;
 
+		sk_SSL_CIPHER_free(s->session->ciphers);
 		s->session->ciphers = ciphers;
 		ciphers = NULL;
 
@@ -1098,18 +1099,17 @@ ssl3_get_client_hello(SSL *s)
 	 */
 
 	if (!s->internal->hit) {
-		sk_SSL_CIPHER_free(s->session->ciphers);
-		s->session->ciphers = ciphers;
 		if (ciphers == NULL) {
 			al = SSL_AD_ILLEGAL_PARAMETER;
 			SSLerror(s, SSL_R_NO_CIPHERS_PASSED);
 			goto fatal_err;
 		}
+		sk_SSL_CIPHER_free(s->session->ciphers);
+		s->session->ciphers = ciphers;
 		ciphers = NULL;
-		c = ssl3_choose_cipher(s, s->session->ciphers,
-		SSL_get_ciphers(s));
 
-		if (c == NULL) {
+		if ((c = ssl3_choose_cipher(s, s->session->ciphers,
+		    SSL_get_ciphers(s))) == NULL) {
 			al = SSL_AD_HANDSHAKE_FAILURE;
 			SSLerror(s, SSL_R_NO_SHARED_CIPHER);
 			goto fatal_err;
@@ -1355,6 +1355,12 @@ ssl3_send_server_kex_dhe(SSL *s, CBB *cbb)
 	if (!tls_key_share_public(s->s3->hs.key_share, cbb))
 		goto err;
 
+	if (!tls_key_share_peer_security(s, s->s3->hs.key_share)) {
+		SSLerror(s, SSL_R_DH_KEY_TOO_SMALL);
+		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_HANDSHAKE_FAILURE);
+		return 0;
+	}
+
 	return 1;
 
  err:
@@ -1567,8 +1573,8 @@ ssl3_send_certificate_request(SSL *s)
 			if (!CBB_add_u16_length_prefixed(&cert_request,
 			    &sigalgs))
 				goto err;
-			if (!ssl_sigalgs_build(
-			    s->s3->hs.negotiated_tls_version, &sigalgs))
+			if (!ssl_sigalgs_build(s->s3->hs.negotiated_tls_version,
+			    &sigalgs, SSL_get_security_level(s)))
 				goto err;
 		}
 

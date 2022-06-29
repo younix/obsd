@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.655 2022/06/28 08:01:40 mvs Exp $	*/
+/*	$OpenBSD: if.c,v 1.657 2022/06/29 09:08:07 mvs Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -68,6 +68,7 @@
 #include "pf.h"
 #include "pfsync.h"
 #include "ppp.h"
+#include "pppoe.h"
 #include "if_wg.h"
 
 #include <sys/param.h>
@@ -917,6 +918,10 @@ if_netisr(void *unused)
 #ifdef PIPEX
 		if (n & (1 << NETISR_PIPEX))
 			pipexintr();
+#endif
+#if NPPPOE > 0
+		if (n & (1 << NETISR_PPPOE))
+			pppoeintr();
 #endif
 		t |= n;
 	}
@@ -2054,6 +2059,10 @@ ifioctl(struct socket *so, u_long cmd, caddr_t data, struct proc *p)
 			}
 
 			splx(s);
+		} else if (!ISSET(ifp->if_capabilities, IFCAP_TSO) &&
+		    ISSET(ifr->ifr_flags, IFXF_TSO)) {
+			ifr->ifr_flags &= ~IFXF_TSO;
+			error = ENOTSUP;
 		}
 #endif
 

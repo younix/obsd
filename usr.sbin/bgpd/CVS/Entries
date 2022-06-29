@@ -4,20 +4,17 @@
 /timer.c/1.19/Sat May  1 08:41:52 2021//
 /Makefile/1.37/Wed Sep  1 16:07:40 2021//
 /rtr.c/1.5/Mon Jan 24 14:35:16 2022//
-/bgpd.8/1.73/Mon Jun 27 13:02:01 2022//
 /bgpd.c/1.248/Mon Jun 27 13:02:01 2022//
 /bgpd.h/1.438/Mon Jun 27 14:57:58 2022//
 /config.c/1.102/Mon Jun 27 13:02:01 2022//
 /control.c/1.106/Mon Jun 27 13:02:01 2022//
 /kroute.c/1.270/Mon Jun 27 13:02:01 2022//
-/logmsg.c/1.6/Mon Jun 27 13:02:01 2022//
 /mrt.c/1.107/Mon Jun 27 13:02:01 2022//
 /mrt.h/1.37/Mon Jun 27 13:02:01 2022//
 /name2id.c/1.12/Mon Jun 27 13:02:01 2022//
 /parse.y/1.431/Mon Jun 27 14:57:58 2022//
 /pfkey.c/1.65/Mon Jun 27 13:02:01 2022//
 /pftable.c/1.16/Mon Jun 27 13:02:01 2022//
-/printconf.c/1.154/Mon Jun 27 14:57:58 2022//
 /rde.c/1.547/Mon Jun 27 14:57:58 2022//
 /rde.h/1.254/Mon Jun 27 14:57:58 2022//
 /rde_attr.c/1.126/Mon Jun 27 13:02:01 2022//
@@ -34,6 +31,9 @@
 /session.c/1.430/Mon Jun 27 14:57:58 2022//
 /session.h/1.156/Mon Jun 27 14:57:58 2022//
 /version.h/1.5/Mon Jun 27 13:02:01 2022//
-/bgpd.conf.5/1.222/Tue Jun 28 08:42:41 2022//
 /util.c/1.69/Tue Jun 28 08:42:41 2022//
+/bgpd.8/1.74/Wed Jun 29 12:46:44 2022//
+/bgpd.conf.5/1.223/Wed Jun 29 12:46:44 2022//
+/logmsg.c/1.7/Wed Jun 29 12:46:44 2022//
+/printconf.c/1.155/Wed Jun 29 12:46:44 2022//
 D
