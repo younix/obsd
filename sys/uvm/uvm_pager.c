@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_pager.c,v 1.81 2022/06/28 19:07:40 mpi Exp $	*/
+/*	$OpenBSD: uvm_pager.c,v 1.83 2022/07/11 11:33:17 mpi Exp $	*/
 /*	$NetBSD: uvm_pager.c,v 1.36 2000/11/27 18:26:41 chs Exp $	*/
 
 /*
@@ -258,6 +258,16 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 	vsize_t size;
 	struct vm_page *pp;
 
+#ifdef __HAVE_PMAP_DIRECT
+	/* use direct mappings for single page */
+	if (npages == 1) {
+		KASSERT(pps[0]);
+		KASSERT(pps[0]->pg_flags & PG_BUSY);
+		kva = pmap_map_direct(pps[0]);
+		return kva;
+	}
+#endif
+
 	prot = PROT_READ;
 	if (flags & UVMPAGER_MAPIN_READ)
 		prot |= PROT_WRITE;
@@ -273,14 +283,7 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 		pp = *pps++;
 		KASSERT(pp);
 		KASSERT(pp->pg_flags & PG_BUSY);
-		/* Allow pmap_enter to fail. */
-		if (pmap_enter(pmap_kernel(), cva, VM_PAGE_TO_PHYS(pp),
-		    prot, PMAP_WIRED | PMAP_CANFAIL | prot) != 0) {
-			pmap_remove(pmap_kernel(), kva, cva);
-			pmap_update(pmap_kernel());
-			uvm_pseg_release(kva);
-			return 0;
-		}
+		pmap_kenter_pa(cva, VM_PAGE_TO_PHYS(pp), prot);
 	}
 	pmap_update(pmap_kernel());
 	return kva;
@@ -294,8 +297,15 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 void
 uvm_pagermapout(vaddr_t kva, int npages)
 {
+#ifdef __HAVE_PMAP_DIRECT
+	/* use direct mappings for single page */
+	if (npages == 1) {
+		pmap_unmap_direct(kva);
+		return;
+	}
+#endif
 
-	pmap_remove(pmap_kernel(), kva, kva + ((vsize_t)npages << PAGE_SHIFT));
+	pmap_kremove(kva, (vsize_t)npages << PAGE_SHIFT);
 	pmap_update(pmap_kernel());
 	uvm_pseg_release(kva);
 
@@ -735,50 +745,77 @@ void
 uvm_aio_aiodone_pages(struct vm_page **pgs, int npages, boolean_t write,
     int error)
 {
-	struct vm_page *pg;
 	struct uvm_object *uobj;
+	struct vm_page *pg;
+	struct rwlock *slock;
 	boolean_t swap;
-	int i;
+	int i, swslot;
 
+	slock = NULL;
 	uobj = NULL;
+	pg = pgs[0];
+	swap = (pg->uanon != NULL && pg->uobject == NULL) ||
+		(pg->pg_flags & PQ_AOBJ) != 0;
+
+	KASSERT(swap);
+	KASSERT(write);
+
+	if (error) {
+		if (pg->uobject != NULL) {
+			swslot = uao_find_swslot(pg->uobject,
+			    pg->offset >> PAGE_SHIFT);
+		} else {
+			swslot = pg->uanon->an_swslot;
+		}
+		KASSERT(swslot);
+	}
 
 	for (i = 0; i < npages; i++) {
+		int anon_disposed = 0;
+
 		pg = pgs[i];
-
-		if (i == 0) {
-			swap = (pg->pg_flags & PQ_SWAPBACKED) != 0;
-			if (!swap) {
-				uobj = pg->uobject;
-				rw_enter(uobj->vmobjlock, RW_WRITE);
-			}
-		}
-		KASSERT(swap || pg->uobject == uobj);
+		KASSERT((pg->pg_flags & PG_FAKE) == 0);
 
 		/*
-		 * if this is a read and we got an error, mark the pages
-		 * PG_RELEASED so that uvm_page_unbusy() will free them.
+		 * lock each page's object (or anon) individually since
+		 * each page may need a different lock.
 		 */
-		if (!write && error) {
-			atomic_setbits_int(&pg->pg_flags, PG_RELEASED);
-			continue;
+		if (pg->uobject != NULL) {
+			slock = pg->uobject->vmobjlock;
+		} else {
+			slock = pg->uanon->an_lock;
 		}
-		KASSERT(!write || (pgs[i]->pg_flags & PG_FAKE) == 0);
+		rw_enter(slock, RW_WRITE);
+		anon_disposed = (pg->pg_flags & PG_RELEASED) != 0;
+		KASSERT(!anon_disposed || pg->uobject != NULL ||
+		    pg->uanon->an_ref == 0);
+		uvm_lock_pageq();
 
 		/*
-		 * if this is a read and the page is PG_FAKE,
-		 * or this was a successful write,
-		 * mark the page PG_CLEAN and not PG_FAKE.
+		 * if this was a successful write,
+		 * mark the page PG_CLEAN.
 		 */
-		if ((pgs[i]->pg_flags & PG_FAKE) || (write && error != ENOMEM)) {
-			pmap_clear_reference(pgs[i]);
-			pmap_clear_modify(pgs[i]);
-			atomic_setbits_int(&pgs[i]->pg_flags, PG_CLEAN);
-			atomic_clearbits_int(&pgs[i]->pg_flags, PG_FAKE);
+		if (!error) {
+			pmap_clear_reference(pg);
+			pmap_clear_modify(pg);
+			atomic_setbits_int(&pg->pg_flags, PG_CLEAN);
+		}
+
+		/*
+		 * unlock everything for this page now.
+		 */
+		if (pg->uobject == NULL && anon_disposed) {
+			uvm_unlock_pageq();
+			uvm_anon_release(pg->uanon);
+		} else {
+			uvm_page_unbusy(&pg, 1);
+			uvm_unlock_pageq();
+			rw_exit(slock);
 		}
 	}
-	uvm_page_unbusy(pgs, npages);
-	if (!swap) {
-		rw_exit(uobj->vmobjlock);
+
+	if (error) {
+		uvm_swap_markbad(swslot, npages);
 	}
 }
 

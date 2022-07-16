@@ -1,4 +1,4 @@
-/*	$OpenBSD: ssl_seclevel.c,v 1.8 2022/06/29 11:59:23 tb Exp $ */
+/*	$OpenBSD: ssl_seclevel.c,v 1.22 2022/07/07 17:08:28 tb Exp $ */
 /*
  * Copyright (c) 2020 Theo Buehler <tb@openbsd.org>
  *
@@ -17,11 +17,17 @@
 
 #include <stddef.h>
 
+#include <openssl/asn1.h>
 #include <openssl/dh.h>
+#include <openssl/evp.h>
+#include <openssl/objects.h>
 #include <openssl/ossl_typ.h>
 #include <openssl/ssl.h>
 #include <openssl/tls1.h>
+#include <openssl/x509.h>
+#include <openssl/x509v3.h>
 
+#include "bytestring.h"
 #include "ssl_locl.h"
 
 static int
@@ -185,10 +191,10 @@ ssl_security_secop_default(const SSL_CTX *ctx, const SSL *ssl, int bits)
 }
 
 int
-ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int op, int bits,
+ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int secop, int bits,
     int version, void *cipher, void *ex_data)
 {
-	switch (op) {
+	switch (secop) {
 	case SSL_SECOP_CIPHER_SUPPORTED:
 	case SSL_SECOP_CIPHER_SHARED:
 	case SSL_SECOP_CIPHER_CHECK:
@@ -206,44 +212,241 @@ ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int op, int bits,
 	}
 }
 
-int
-ssl_security_dummy_cb(const SSL *ssl, const SSL_CTX *ctx, int op, int bits,
-    int version, void *cipher, void *ex_data)
+static int
+ssl_ctx_security(const SSL_CTX *ctx, int secop, int bits, int nid, void *other)
 {
-	return 1;
+	return ctx->internal->cert->security_cb(NULL, ctx, secop, bits, nid,
+	    other, ctx->internal->cert->security_ex_data);
 }
 
-int
-ssl_ctx_security(const SSL_CTX *ctx, int op, int bits, int nid, void *other)
+static int
+ssl_security(const SSL *ssl, int secop, int bits, int nid, void *other)
 {
-	return ctx->internal->cert->security_cb(NULL, ctx, op, bits, nid, other,
-	    ctx->internal->cert->security_ex_data);
-}
-
-int
-ssl_security(const SSL *ssl, int op, int bits, int nid, void *other)
-{
-	return ssl->cert->security_cb(ssl, NULL, op, bits, nid, other,
+	return ssl->cert->security_cb(ssl, NULL, secop, bits, nid, other,
 	    ssl->cert->security_ex_data);
+}
+
+int
+ssl_security_sigalg_check(const SSL *ssl, const EVP_PKEY *pkey)
+{
+	int bits;
+
+	bits = EVP_PKEY_security_bits(pkey);
+
+	return ssl_security(ssl, SSL_SECOP_SIGALG_CHECK, bits, 0, NULL);
+}
+
+int
+ssl_security_tickets(const SSL *ssl)
+{
+	return ssl_security(ssl, SSL_SECOP_TICKET, 0, 0, NULL);
+}
+
+int
+ssl_security_version(const SSL *ssl, int version)
+{
+	return ssl_security(ssl, SSL_SECOP_VERSION, 0, version, NULL);
+}
+
+static int
+ssl_security_cipher(const SSL *ssl, SSL_CIPHER *cipher, int secop)
+{
+	return ssl_security(ssl, secop, cipher->strength_bits, 0, cipher);
+}
+
+int
+ssl_security_cipher_check(const SSL *ssl, SSL_CIPHER *cipher)
+{
+	return ssl_security_cipher(ssl, cipher, SSL_SECOP_CIPHER_CHECK);
+}
+
+int
+ssl_security_shared_cipher(const SSL *ssl, SSL_CIPHER *cipher)
+{
+	return ssl_security_cipher(ssl, cipher, SSL_SECOP_CIPHER_SHARED);
+}
+
+int
+ssl_security_supported_cipher(const SSL *ssl, SSL_CIPHER *cipher)
+{
+	return ssl_security_cipher(ssl, cipher, SSL_SECOP_CIPHER_SUPPORTED);
 }
 
 int
 ssl_ctx_security_dh(const SSL_CTX *ctx, DH *dh)
 {
-#if defined(LIBRESSL_HAS_SECURITY_LEVEL)
-	return ssl_ctx_security(ctx, SSL_SECOP_TMP_DH, DH_security_bits(dh), 0,
-	    dh);
-#else
-	return 1;
-#endif
+	int bits;
+
+	bits = DH_security_bits(dh);
+
+	return ssl_ctx_security(ctx, SSL_SECOP_TMP_DH, bits, 0, dh);
 }
 
 int
 ssl_security_dh(const SSL *ssl, DH *dh)
 {
-#if defined(LIBRESSL_HAS_SECURITY_LEVEL)
-	return ssl_security(ssl, SSL_SECOP_TMP_DH, DH_security_bits(dh), 0, dh);
-#else
+	int bits;
+
+	bits = DH_security_bits(dh);
+
+	return ssl_security(ssl, SSL_SECOP_TMP_DH, bits, 0, dh);
+}
+
+static int
+ssl_cert_pubkey_security_bits(const X509 *x509)
+{
+	EVP_PKEY *pkey;
+
+	if ((pkey = X509_get0_pubkey(x509)) == NULL)
+		return -1;
+
+	/*
+	 * XXX: DSA_security_bits() returns -1 on keys without parameters and
+	 * makes the default security callback fail.
+	 */
+
+	return EVP_PKEY_security_bits(pkey);
+}
+
+static int
+ssl_security_cert_key(const SSL_CTX *ctx, const SSL *ssl, X509 *x509, int secop)
+{
+	int security_bits;
+
+	security_bits = ssl_cert_pubkey_security_bits(x509);
+
+	if (ssl != NULL)
+		return ssl_security(ssl, secop, security_bits, 0, x509);
+
+	return ssl_ctx_security(ctx, secop, security_bits, 0, x509);
+}
+
+static int
+ssl_cert_signature_md_nid(X509 *x509)
+{
+	int md_nid, signature_nid;
+
+	if ((signature_nid = X509_get_signature_nid(x509)) == NID_undef)
+		return NID_undef;
+
+	if (!OBJ_find_sigid_algs(signature_nid, &md_nid, NULL))
+		return NID_undef;
+
+	return md_nid;
+}
+
+static int
+ssl_cert_md_nid_security_bits(int md_nid)
+{
+	const EVP_MD *md;
+
+	if (md_nid == NID_undef)
+		return -1;
+
+	if ((md = EVP_get_digestbynid(md_nid)) == NULL)
+		return -1;
+
+	/* Assume 4 bits of collision resistance for each hash octet. */
+	return EVP_MD_size(md) * 4;
+}
+
+static int
+ssl_security_cert_sig(const SSL_CTX *ctx, const SSL *ssl, X509 *x509, int secop)
+{
+	int md_nid, security_bits;
+
+	/* Don't check signature if self signed. */
+	if ((X509_get_extension_flags(x509) & EXFLAG_SS) != 0)
+		return 1;
+
+	md_nid = ssl_cert_signature_md_nid(x509);
+	security_bits = ssl_cert_md_nid_security_bits(md_nid);
+
+	if (ssl != NULL)
+		return ssl_security(ssl, secop, security_bits, md_nid, x509);
+
+	return ssl_ctx_security(ctx, secop, security_bits, md_nid, x509);
+}
+
+int
+ssl_security_cert(const SSL_CTX *ctx, const SSL *ssl, X509 *x509,
+    int is_ee, int *out_error)
+{
+	int key_error, operation;
+
+	*out_error = 0;
+
+	if (is_ee) {
+		operation = SSL_SECOP_EE_KEY;
+		key_error = SSL_R_EE_KEY_TOO_SMALL;
+	} else {
+		operation = SSL_SECOP_CA_KEY;
+		key_error = SSL_R_CA_KEY_TOO_SMALL;
+	}
+
+	if (!ssl_security_cert_key(ctx, ssl, x509, operation)) {
+		*out_error = key_error;
+		return 0;
+	}
+
+	if (!ssl_security_cert_sig(ctx, ssl, x509, SSL_SECOP_CA_MD)) {
+		*out_error = SSL_R_CA_MD_TOO_WEAK;
+		return 0;
+	}
+
 	return 1;
-#endif
+}
+
+/*
+ * Check security of a chain. If |sk| includes the end entity certificate
+ * then |x509| must be NULL.
+ */
+int
+ssl_security_cert_chain(const SSL *ssl, STACK_OF(X509) *sk, X509 *x509,
+    int *out_error)
+{
+	int start_idx = 0;
+	int is_ee;
+	int i;
+
+	if (x509 == NULL) {
+		x509 = sk_X509_value(sk, 0);
+		start_idx = 1;
+	}
+
+	is_ee = 1;
+	if (!ssl_security_cert(NULL, ssl, x509, is_ee, out_error))
+		return 0;
+
+	is_ee = 0;
+	for (i = start_idx; i < sk_X509_num(sk); i++) {
+		x509 = sk_X509_value(sk, i);
+
+		if (!ssl_security_cert(NULL, ssl, x509, is_ee, out_error))
+			return 0;
+	}
+
+	return 1;
+}
+
+int
+ssl_security_supported_group(const SSL *ssl, uint16_t group_id)
+{
+	CBB cbb;
+	int bits, nid;
+	uint8_t group[2];
+
+	if (!tls1_ec_group_id2bits(group_id, &bits))
+		return 0;
+	if (!tls1_ec_group_id2nid(group_id, &nid))
+		return 0;
+
+	if (!CBB_init_fixed(&cbb, group, sizeof(group)))
+		return 0;
+	if (!CBB_add_u16(&cbb, group_id))
+		return 0;
+	if (!CBB_finish(&cbb, NULL, NULL))
+		return 0;
+
+	return ssl_security(ssl, SSL_SECOP_CURVE_SUPPORTED, bits, nid, group);
 }

@@ -20,7 +20,6 @@
 /kcore.h/1.1/Mon Sep 20 06:32:30 2010//
 /limits.h/1.1/Mon Sep 20 06:32:30 2010//
 /loadfile_machdep.h/1.2/Fri Jul 17 20:44:39 2015//
-/lock.h/1.1/Mon Sep 20 06:32:30 2010//
 /memconf.h/1.1/Mon Sep 20 06:32:30 2010//
 /mips_opcode.h/1.1/Mon Sep 20 06:32:30 2010//
 /mplock.h/1.2/Wed Sep  9 15:48:52 2015//

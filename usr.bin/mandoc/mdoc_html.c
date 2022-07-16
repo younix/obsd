@@ -1,4 +1,4 @@
-/* $OpenBSD: mdoc_html.c,v 1.219 2022/06/25 12:44:12 schwarze Exp $ */
+/* $OpenBSD: mdoc_html.c,v 1.225 2022/07/06 16:02:52 schwarze Exp $ */
 /*
  * Copyright (c) 2014-2022 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008-2011, 2014 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -291,16 +291,16 @@ html_mdoc(void *arg, const struct roff_meta *mdoc)
 	if ((h->oflags & HTML_FRAGMENT) == 0) {
 		print_gen_decls(h);
 		print_otag(h, TAG_HTML, "");
-		if (n != NULL && n->type == ROFFT_COMMENT)
-			print_gen_comment(h, n);
 		t = print_otag(h, TAG_HEAD, "");
 		print_mdoc_head(mdoc, h);
 		print_tagq(h, t);
+		if (n != NULL && n->type == ROFFT_COMMENT)
+			print_gen_comment(h, n);
 		print_otag(h, TAG_BODY, "");
 	}
 
 	mdoc_root_pre(mdoc, h);
-	t = print_otag(h, TAG_DIV, "c", "manual-text");
+	t = print_otag(h, TAG_MAIN, "c", "manual-text");
 	print_mdoc_nodelist(mdoc, n, h);
 	print_tagq(h, t);
 	mdoc_root_post(mdoc, h);
@@ -451,16 +451,19 @@ print_mdoc_node(MDOC_ARGS)
 static void
 mdoc_root_post(const struct roff_meta *meta, struct html *h)
 {
-	struct tag	*t, *tt;
+	struct tag	*t;
 
-	t = print_otag(h, TAG_TABLE, "c", "foot");
-	tt = print_otag(h, TAG_TR, "");
+	t = print_otag(h, TAG_DIV, "cr?", "foot", "doc-pagefooter",
+	    "aria-label", "Manual footer line");
 
-	print_otag(h, TAG_TD, "c", "foot-date");
+	print_otag(h, TAG_SPAN, "c", "foot-left");
+	print_stagq(h, t);
+
+	print_otag(h, TAG_SPAN, "c", "foot-date");
 	print_text(h, meta->date);
-	print_stagq(h, tt);
+	print_stagq(h, t);
 
-	print_otag(h, TAG_TD, "c", "foot-os");
+	print_otag(h, TAG_SPAN, "c", "foot-os");
 	print_text(h, meta->os);
 	print_tagq(h, t);
 }
@@ -468,7 +471,7 @@ mdoc_root_post(const struct roff_meta *meta, struct html *h)
 static int
 mdoc_root_pre(const struct roff_meta *meta, struct html *h)
 {
-	struct tag	*t, *tt;
+	struct tag	*t;
 	char		*volume, *title;
 
 	if (NULL == meta->arch)
@@ -483,18 +486,18 @@ mdoc_root_pre(const struct roff_meta *meta, struct html *h)
 		mandoc_asprintf(&title, "%s(%s)",
 		    meta->title, meta->msec);
 
-	t = print_otag(h, TAG_TABLE, "c", "head");
-	tt = print_otag(h, TAG_TR, "");
+	t = print_otag(h, TAG_DIV, "cr?", "head", "doc-pageheader",
+	    "aria-label", "Manual header line");
 
-	print_otag(h, TAG_TD, "c", "head-ltitle");
+	print_otag(h, TAG_SPAN, "c", "head-ltitle");
 	print_text(h, title);
-	print_stagq(h, tt);
+	print_stagq(h, t);
 
-	print_otag(h, TAG_TD, "c", "head-vol");
+	print_otag(h, TAG_SPAN, "c", "head-vol");
 	print_text(h, volume);
-	print_stagq(h, tt);
+	print_stagq(h, t);
 
-	print_otag(h, TAG_TD, "c", "head-rtitle");
+	print_otag(h, TAG_SPAN, "c", "head-rtitle");
 	print_text(h, title);
 	print_tagq(h, t);
 
@@ -536,7 +539,7 @@ mdoc_sh_pre(MDOC_ARGS)
 		if (sc < 2)
 			break;
 		tnav = print_otag(h, TAG_NAV, "r", "doc-toc");
-		t = print_otag(h, TAG_H1, "c", "Sh");
+		t = print_otag(h, TAG_H2, "c", "Sh");
 		print_text(h, "TABLE OF CONTENTS");
 		print_tagq(h, t);
 		t = print_otag(h, TAG_UL, "c", "Bl-compact");
@@ -571,7 +574,7 @@ mdoc_sh_pre(MDOC_ARGS)
 		print_otag(h, TAG_SECTION, "c", "Sh");
 		break;
 	case ROFFT_HEAD:
-		print_otag_id(h, TAG_H1, "Sh", n);
+		print_otag_id(h, TAG_H2, "Sh", n);
 		break;
 	case ROFFT_BODY:
 		if (n->sec == SEC_AUTHORS)
@@ -592,7 +595,7 @@ mdoc_ss_pre(MDOC_ARGS)
 		print_otag(h, TAG_SECTION, "c", "Ss");
 		break;
 	case ROFFT_HEAD:
-		print_otag_id(h, TAG_H2, "Ss", n);
+		print_otag_id(h, TAG_H3, "Ss", n);
 		break;
 	case ROFFT_BODY:
 		break;
@@ -632,7 +635,7 @@ mdoc_nd_pre(MDOC_ARGS)
 		abort();
 	}
 	print_text(h, "\\(em");
-	print_otag(h, TAG_SPAN, "c", "Nd");
+	print_otag(h, TAG_SPAN, "cr", "Nd", "doc-subtitle");
 	return 1;
 }
 

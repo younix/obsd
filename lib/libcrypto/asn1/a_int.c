@@ -1,4 +1,4 @@
-/* $OpenBSD: a_int.c,v 1.42 2022/06/28 19:44:28 jsing Exp $ */
+/* $OpenBSD: a_int.c,v 1.44 2022/07/13 20:07:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -282,14 +282,18 @@ ASN1_INTEGER_get_int64(int64_t *out_val, const ASN1_INTEGER *aint)
 int
 ASN1_INTEGER_set_int64(ASN1_INTEGER *aint, int64_t val)
 {
+	uint64_t uval;
+
 	asn1_aint_clear(aint);
+
+	uval = (uint64_t)val;
 
 	if (val < 0) {
 		aint->type = V_ASN1_NEG_INTEGER;
-		val = -val;
+		uval = -uval;
 	}
 
-	return asn1_aint_set_uint64((uint64_t)val, &aint->data, &aint->length);
+	return asn1_aint_set_uint64(uval, &aint->data, &aint->length);
 }
 
 long
@@ -297,6 +301,8 @@ ASN1_INTEGER_get(const ASN1_INTEGER *aint)
 {
 	int64_t val;
 
+	if (aint == NULL)
+		return 0;
 	if (!ASN1_INTEGER_get_int64(&val, aint))
 		return -1;
 	if (val < LONG_MIN || val > LONG_MAX) {

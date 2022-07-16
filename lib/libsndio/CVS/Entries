@@ -13,7 +13,6 @@
 /aucat.c/1.79/Sun Nov 21 20:15:22 2021//
 /sioctl.c/1.2/Sun Nov 21 20:15:22 2021//
 /sndio.7/1.27/Sun Nov 21 20:15:22 2021//
-/sndio.pc/1.3/Mon Jan 24 14:35:14 2022//
 /Symbols.map/1.3/Mon Jun 27 13:01:59 2022//
 /amsg.h/1.15/Mon Jun 27 13:01:59 2022//
 /shlib_version/1.13/Mon Jun 27 13:01:59 2022//
@@ -23,4 +22,5 @@
 /sio_priv.h/1.10/Mon Jun 27 13:01:59 2022//
 /sio_sun.c/1.29/Mon Jun 27 13:01:59 2022//
 /sioctl_open.3/1.13/Mon Jun 27 13:01:59 2022//
+/sndio.pc/1.4/Sat Jul 16 15:39:16 2022//
 D

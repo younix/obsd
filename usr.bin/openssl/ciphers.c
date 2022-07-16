@@ -1,4 +1,4 @@
-/* $OpenBSD: ciphers.c,v 1.10 2019/07/14 03:30:45 guenther Exp $ */
+/* $OpenBSD: ciphers.c,v 1.13 2022/07/14 08:37:17 tb Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -26,6 +26,7 @@
 
 struct {
 	int usage;
+	int use_supported;
 	int verbose;
 } ciphers_config;
 
@@ -41,8 +42,13 @@ static const struct option ciphers_options[] = {
 		.opt.flag = &ciphers_config.usage,
 	},
 	{
+		.name = "s",
+		.desc = "Only list ciphers that are supported by the TLS method",
+		.type = OPTION_FLAG,
+		.opt.flag = &ciphers_config.use_supported,
+	},
+	{
 		.name = "tls1",
-		.desc = "This option is deprecated since it is the default",
 		.type = OPTION_DISCARD,
 	},
 	{
@@ -65,7 +71,7 @@ static const struct option ciphers_options[] = {
 static void
 ciphers_usage(void)
 {
-	fprintf(stderr, "usage: ciphers [-hVv] [-tls1] [cipherlist]\n");
+	fprintf(stderr, "usage: ciphers [-hsVv] [cipherlist]\n");
 	options_usage(ciphers_options);
 }
 
@@ -74,6 +80,7 @@ ciphers_main(int argc, char **argv)
 {
 	char *cipherlist = NULL;
 	STACK_OF(SSL_CIPHER) *ciphers;
+	STACK_OF(SSL_CIPHER) *supported_ciphers = NULL;
 	const SSL_CIPHER *cipher;
 	SSL_CTX *ssl_ctx = NULL;
 	SSL *ssl = NULL;
@@ -101,7 +108,7 @@ ciphers_main(int argc, char **argv)
 		return (1);
 	}
 
-	if ((ssl_ctx = SSL_CTX_new(TLSv1_client_method())) == NULL)
+	if ((ssl_ctx = SSL_CTX_new(TLS_client_method())) == NULL)
 		goto err;
 
 	if (cipherlist != NULL) {
@@ -112,8 +119,15 @@ ciphers_main(int argc, char **argv)
 	if ((ssl = SSL_new(ssl_ctx)) == NULL)
 		goto err;
 
-	if ((ciphers = SSL_get_ciphers(ssl)) == NULL)
-		goto err;
+	if (ciphers_config.use_supported) {
+		if ((supported_ciphers =
+		    SSL_get1_supported_ciphers(ssl)) == NULL)
+			goto err;
+		ciphers = supported_ciphers;
+	} else {
+		if ((ciphers = SSL_get_ciphers(ssl)) == NULL)
+			goto err;
+	}
 
 	for (i = 0; i < sk_SSL_CIPHER_num(ciphers); i++) {
 		cipher = sk_SSL_CIPHER_value(ciphers, i);
@@ -145,6 +159,7 @@ ciphers_main(int argc, char **argv)
 	rv = 1;
 
  done:
+	sk_SSL_CIPHER_free(supported_ciphers);
 	SSL_CTX_free(ssl_ctx);
 	SSL_free(ssl);
 

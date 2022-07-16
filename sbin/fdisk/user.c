@@ -1,4 +1,4 @@
-/*	$OpenBSD: user.c,v 1.80 2022/04/18 17:32:16 krw Exp $	*/
+/*	$OpenBSD: user.c,v 1.82 2022/07/10 20:34:31 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -34,7 +34,7 @@
 struct cmd {
 	char	*cmd_name;
 	int	 cmd_gpt;
-	int	(*cmd_fcn)(char *, struct mbr *);
+	int	(*cmd_fcn)(const char *, struct mbr *);
 	char	*cmd_help;
 };
 
@@ -160,7 +160,7 @@ USER_print_disk(const int verbosity)
 void
 USER_help(void)
 {
-	char			 help[80];
+	char			 help[HELPBUFSZ];
 	char			*mbrstr;
 	int			 i;
 
@@ -180,7 +180,7 @@ USER_help(void)
 int
 ask_cmd(const int editlevel, char **arg)
 {
-	static char		 lbuf[100];
+	static char		 lbuf[LINEBUFSZ];
 	char			*cmd;
 	unsigned int		 i;
 

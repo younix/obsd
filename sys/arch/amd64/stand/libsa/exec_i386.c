@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_i386.c,v 1.35 2021/10/24 17:49:19 deraadt Exp $	*/
+/*	$OpenBSD: exec_i386.c,v 1.37 2022/07/11 19:45:02 kettenis Exp $	*/
 
 /*
  * Copyright (c) 1997-1998 Michael Shalayeff
@@ -105,10 +105,10 @@ run_loadfile(uint64_t *marks, int howto)
 	if (sa_cleanup != NULL)
 		(*sa_cleanup)();
 
+	memset(&cd, 0, sizeof(cd));
 	cd.consdev = cn_tab->cn_dev;
 	cd.conspeed = com_speed;
 	cd.consaddr = com_addr;
-	cd.consfreq = 0;
 	addbootarg(BOOTARG_CONSDEV, sizeof(cd), &cd);
 
 	if (bootmac != NULL)

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.401 2022/06/29 12:03:38 tb Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.413 2022/07/10 18:40:55 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -381,9 +381,9 @@ typedef struct ssl_cert_st {
 	int dhe_params_auto;
 
 	int (*security_cb)(const SSL *s, const SSL_CTX *ctx, int op, int bits,
-	    int nid, void *other, void *ex_data);
+	    int nid, void *other, void *ex_data); /* Not exposed in API. */
 	int security_level;
-	void *security_ex_data; /* XXX: do we really need to support this? */
+	void *security_ex_data; /* Not exposed in API. */
 
 	int references; /* >1 only if SSL_copy_session_id is used */
 } SSL_CERT;
@@ -932,6 +932,10 @@ typedef struct ssl_internal_st {
 	unsigned char *alpn_client_proto_list;
 	unsigned int alpn_client_proto_list_len;
 
+	/* QUIC transport params we will send */
+	uint8_t *quic_transport_params;
+	size_t quic_transport_params_len;
+
 	/* XXX Callbacks */
 
 	/* true when we are actually in SSL_accept() or SSL_connect() */
@@ -1218,6 +1222,10 @@ typedef struct ssl3_state_st {
 	 */
 	unsigned char *alpn_selected;
 	size_t alpn_selected_len;
+
+	/* Contains the QUIC transport params received from our peer. */
+	uint8_t *peer_quic_transport_params;
+	size_t peer_quic_transport_params_len;
 } SSL3_STATE;
 
 /*
@@ -1277,21 +1285,28 @@ void ssl_msg_callback(SSL *s, int is_write, int content_type,
 SSL_CERT *ssl_cert_new(void);
 SSL_CERT *ssl_cert_dup(SSL_CERT *cert);
 void ssl_cert_free(SSL_CERT *c);
-int ssl_cert_set0_chain(SSL_CERT *c, STACK_OF(X509) *chain);
-int ssl_cert_set1_chain(SSL_CERT *c, STACK_OF(X509) *chain);
-int ssl_cert_add0_chain_cert(SSL_CERT *c, X509 *cert);
-int ssl_cert_add1_chain_cert(SSL_CERT *c, X509 *cert);
+SSL_CERT *ssl_get0_cert(SSL_CTX *ctx, SSL *ssl);
+int ssl_cert_set0_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain);
+int ssl_cert_set1_chain(SSL_CTX *ctx, SSL *ssl, STACK_OF(X509) *chain);
+int ssl_cert_add0_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert);
+int ssl_cert_add1_chain_cert(SSL_CTX *ctx, SSL *ssl, X509 *cert);
 
 int ssl_security_default_cb(const SSL *ssl, const SSL_CTX *ctx, int op,
     int bits, int nid, void *other, void *ex_data);
-int ssl_security_dummy_cb(const SSL *ssl, const SSL_CTX *ctx, int op,
-    int bits, int nid, void *other, void *ex_data);
 
-int ssl_ctx_security(const SSL_CTX *ctx, int op, int bits, int nid,
-    void *other);
-int ssl_security(const SSL *ssl, int op, int bits, int nid, void *other);
+int ssl_security_cipher_check(const SSL *ssl, SSL_CIPHER *cipher);
+int ssl_security_shared_cipher(const SSL *ssl, SSL_CIPHER *cipher);
+int ssl_security_supported_cipher(const SSL *ssl, SSL_CIPHER *cipher);
 int ssl_ctx_security_dh(const SSL_CTX *ctx, DH *dh);
 int ssl_security_dh(const SSL *ssl, DH *dh);
+int ssl_security_sigalg_check(const SSL *ssl, const EVP_PKEY *pkey);
+int ssl_security_tickets(const SSL *ssl);
+int ssl_security_version(const SSL *ssl, int version);
+int ssl_security_cert(const SSL_CTX *ctx, const SSL *ssl, X509 *x509,
+    int is_peer, int *out_error);
+int ssl_security_cert_chain(const SSL *ssl, STACK_OF(X509) *sk,
+    X509 *x509, int *out_error);
+int ssl_security_supported_group(const SSL *ssl, uint16_t group_id);
 
 int ssl_get_new_session(SSL *s, int session);
 int ssl_get_prev_session(SSL *s, CBS *session_id, CBS *ext_block,
@@ -1303,7 +1318,7 @@ int ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *ciphers, CBB *cbb);
 STACK_OF(SSL_CIPHER) *ssl_bytes_to_cipher_list(SSL *s, CBS *cbs);
 STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *meth,
     STACK_OF(SSL_CIPHER) **pref, STACK_OF(SSL_CIPHER) *tls13,
-    const char *rule_str);
+    const char *rule_str, SSL_CERT *cert);
 int ssl_parse_ciphersuites(STACK_OF(SSL_CIPHER) **out_ciphers, const char *str);
 int ssl_merge_cipherlists(STACK_OF(SSL_CIPHER) *cipherlist,
     STACK_OF(SSL_CIPHER) *cipherlist_tls13,
@@ -1500,10 +1515,11 @@ int tls1_set_groups(uint16_t **out_group_ids, size_t *out_group_ids_len,
 int tls1_set_group_list(uint16_t **out_group_ids, size_t *out_group_ids_len,
     const char *groups);
 
-int tls1_ec_curve_id2nid(const uint16_t curve_id);
-uint16_t tls1_ec_nid2curve_id(const int nid);
-int tls1_check_curve(SSL *s, const uint16_t group_id);
-int tls1_get_shared_curve(SSL *s);
+int tls1_ec_group_id2nid(uint16_t group_id, int *out_nid);
+int tls1_ec_group_id2bits(uint16_t group_id, int *out_bits);
+int tls1_ec_nid2group_id(int nid, uint16_t *out_group_id);
+int tls1_check_group(SSL *s, uint16_t group_id);
+int tls1_get_supported_group(SSL *s, int *group_nid);
 
 int ssl_check_clienthello_tlsext_early(SSL *s);
 int ssl_check_clienthello_tlsext_late(SSL *s);

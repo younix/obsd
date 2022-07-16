@@ -1,4 +1,4 @@
-/*	$OpenBSD: netisr.h,v 1.58 2022/06/29 09:08:07 mvs Exp $	*/
+/*	$OpenBSD: netisr.h,v 1.60 2022/07/14 10:52:21 mvs Exp $	*/
 /*	$NetBSD: netisr.h,v 1.12 1995/08/12 23:59:24 mycroft Exp $	*/
 
 /*
@@ -41,15 +41,14 @@
  * interrupt used for scheduling the network code to calls
  * on the lowest level routine of each protocol.
  */
-#define	NETISR_IP	2		/* same as AF_INET */
-#define	NETISR_PFSYNC	5		/* for pfsync "immediate" tx */
-#define	NETISR_ARP	18		/* same as AF_LINK */
-#define	NETISR_IPV6	24		/* same as AF_INET6 */
-#define	NETISR_PIPEX	27		/* for pipex processing */
-#define	NETISR_PPP	28		/* for PPP processing */
-#define	NETISR_BRIDGE	29		/* for bridge processing */
-#define	NETISR_PPPOE	30		/* for pppoe processing */
-#define	NETISR_SWITCH	31		/* for switch dataplane */
+#define NETISR_IP	2		/* same as AF_INET */
+#define NETISR_PFSYNC	5		/* for pfsync "immediate" tx */
+#define NETISR_ARP	18		/* same as AF_LINK */
+#define NETISR_IPV6	24		/* same as AF_INET6 */
+#define NETISR_PIPEX	27		/* for pipex processing */
+#define NETISR_PPP	28		/* for PPP processing */
+#define NETISR_BRIDGE	29		/* for bridge processing */
+#define NETISR_PPPOE	30		/* for pppoe processing */
 
 #ifndef _LOCORE
 #ifdef _KERNEL
@@ -65,7 +64,6 @@ void	ipintr(void);
 void	ip6intr(void);
 void	pppintr(void);
 void	bridgeintr(void);
-void	switchintr(void);
 void	pfsyncintr(void);
 void	pipexintr(void);
 void	pppoeintr(void);

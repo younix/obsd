@@ -1,4 +1,4 @@
-.\" $OpenBSD: tmux.1,v 1.892 2022/06/20 07:59:37 nicm Exp $
+.\" $OpenBSD: tmux.1,v 1.895 2022/07/06 07:51:37 nicm Exp $
 .\"
 .\" Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
 .\"
@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: June 20 2022 $
+.Dd $Mdocdate: July 6 2022 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -2112,9 +2112,11 @@ is not given, "detach-client -t '%%'" is used.
 specifies the initial sort field: one of
 .Ql name ,
 .Ql size ,
-.Ql creation ,
+.Ql creation
+(time),
 or
-.Ql activity .
+.Ql activity
+(time).
 .Fl r
 reverses the sort order.
 .Fl f
@@ -2196,7 +2198,8 @@ specifies the initial sort field: one of
 .Ql index ,
 .Ql name ,
 or
-.Ql time .
+.Ql time
+(activity).
 .Fl r
 reverses the sort order.
 .Fl f
@@ -3656,6 +3659,8 @@ Allows setting the cursor style.
 Supports extended keys.
 .It focus
 Supports focus reporting.
+.It hyperlinks
+Supports OSC 8 hyperlinks.
 .It ignorefkeys
 Ignore function keys from
 .Xr terminfo 5
@@ -5158,6 +5163,7 @@ The following variables are available, where appropriate:
 .It Li "mouse_all_flag" Ta "" Ta "Pane mouse all flag"
 .It Li "mouse_any_flag" Ta "" Ta "Pane mouse any flag"
 .It Li "mouse_button_flag" Ta "" Ta "Pane mouse button flag"
+.It Li "mouse_hyperlink" Ta "" Ta "Hyperlink under mouse, if any"
 .It Li "mouse_line" Ta "" Ta "Line under mouse, if any"
 .It Li "mouse_sgr_flag" Ta "" Ta "Pane mouse SGR flag"
 .It Li "mouse_standard_flag" Ta "" Ta "Pane mouse standard flag"
@@ -6104,7 +6110,8 @@ is not given, "paste-buffer -b '%%'" is used.
 .Pp
 .Fl O
 specifies the initial sort field: one of
-.Ql time ,
+.Ql time
+(creation),
 .Ql name
 or
 .Ql size .
@@ -6122,9 +6129,14 @@ a format for each shortcut key; both are evaluated once for each line.
 starts without the preview.
 This command works only if at least one client is attached.
 .Tg clearhist
-.It Ic clear-history Op Fl t Ar target-pane
+.It Xo Ic clear-history
+.Op Fl H
+.Op Fl t Ar target-pane
+.Xc
 .D1 Pq alias: Ic clearhist
 Remove and free the history for the specified pane.
+.Fl H
+also removes all hyperlinks.
 .Tg deleteb
 .It Ic delete-buffer Op Fl b Ar buffer-name
 .D1 Pq alias: Ic deleteb
@@ -6412,6 +6424,8 @@ Disable and enable focus reporting.
 These are set automatically if the
 .Em XT
 capability is present.
+.It Em \&Hls
+Set or clear a hyperlink annotation.
 .It Em \&Rect
 Tell
 .Nm

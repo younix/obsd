@@ -1,7 +1,8 @@
-/* $OpenBSD: cgi.c,v 1.115 2021/10/24 21:24:16 deraadt Exp $ */
+/* $OpenBSD: cgi.c,v 1.119 2022/07/06 17:19:57 schwarze Exp $ */
 /*
- * Copyright (c) 2014-2019, 2021 Ingo Schwarze <schwarze@usta.de>
+ * Copyright (c) 2014-2019, 2021, 2022 Ingo Schwarze <schwarze@usta.de>
  * Copyright (c) 2011, 2012 Kristaps Dzonsons <kristaps@bsd.lv>
+ * Copyright (c) 2022 Anna Vyalkova <cyber@sysrq.in>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -82,10 +83,10 @@ static	void		 pg_search(const struct req *);
 static	void		 pg_searchres(const struct req *,
 				struct manpage *, size_t);
 static	void		 pg_show(struct req *, const char *);
-static	void		 resp_begin_html(int, const char *, const char *);
+static	int		 resp_begin_html(int, const char *, const char *);
 static	void		 resp_begin_http(int, const char *);
 static	void		 resp_catman(const struct req *, const char *);
-static	void		 resp_copy(const char *);
+static	int		 resp_copy(const char *, const char *);
 static	void		 resp_end_html(void);
 static	void		 resp_format(const struct req *, const char *);
 static	void		 resp_searchform(const struct req *, enum focus);
@@ -348,22 +349,26 @@ resp_begin_http(int code, const char *msg)
 	fflush(stdout);
 }
 
-static void
-resp_copy(const char *filename)
+static int
+resp_copy(const char *element, const char *filename)
 {
 	char	 buf[4096];
 	ssize_t	 sz;
 	int	 fd;
 
-	if ((fd = open(filename, O_RDONLY)) != -1) {
-		fflush(stdout);
-		while ((sz = read(fd, buf, sizeof(buf))) > 0)
-			write(STDOUT_FILENO, buf, sz);
-		close(fd);
-	}
+	if ((fd = open(filename, O_RDONLY)) == -1)
+		return 0;
+
+	if (element != NULL)
+		printf("<%s>\n", element);
+	fflush(stdout);
+	while ((sz = read(fd, buf, sizeof(buf))) > 0)
+		write(STDOUT_FILENO, buf, sz);
+	close(fd);
+	return 1;
 }
 
-static void
+static int
 resp_begin_html(int code, const char *msg, const char *file)
 {
 	const char	*name, *sec, *cp;
@@ -409,14 +414,14 @@ resp_begin_html(int code, const char *msg, const char *file)
 	       "<body>\n",
 	       CUSTOMIZE_TITLE);
 
-	resp_copy(MAN_DIR "/header.html");
+	return resp_copy("header", MAN_DIR "/header.html");
 }
 
 static void
 resp_end_html(void)
 {
-
-	resp_copy(MAN_DIR "/footer.html");
+	if (resp_copy("footer", MAN_DIR "/footer.html"))
+		puts("</footer>");
 
 	puts("</body>\n"
 	     "</html>");
@@ -427,7 +432,7 @@ resp_searchform(const struct req *req, enum focus focus)
 {
 	int		 i;
 
-	printf("<form action=\"/%s\" method=\"get\" "
+	printf("<form role=\"search\" action=\"/%s\" method=\"get\" "
 	       "autocomplete=\"off\" autocapitalize=\"none\">\n"
 	       "  <fieldset>\n"
 	       "    <legend>Manual Page Search Parameters</legend>\n",
@@ -435,13 +440,14 @@ resp_searchform(const struct req *req, enum focus focus)
 
 	/* Write query input box. */
 
-	printf("    <input type=\"search\" name=\"query\" value=\"");
+	printf("    <label>Search query:\n"
+	       "      <input type=\"search\" name=\"query\" value=\"");
 	if (req->q.query != NULL)
 		html_print(req->q.query);
-	printf( "\" size=\"40\"");
+	printf("\" size=\"40\"");
 	if (focus == FOCUS_QUERY)
 		printf(" autofocus");
-	puts(">");
+	puts(">\n    </label>");
 
 	/* Write submission buttons. */
 
@@ -453,7 +459,7 @@ resp_searchform(const struct req *req, enum focus focus)
 
 	/* Write section selector. */
 
-	puts("    <select name=\"sec\">");
+	puts("    <select name=\"sec\" aria-label=\"Manual section\">");
 	for (i = 0; i < sec_MAX; i++) {
 		printf("      <option value=\"%s\"", sec_numbers[i]);
 		if (NULL != req->q.sec &&
@@ -465,7 +471,7 @@ resp_searchform(const struct req *req, enum focus focus)
 
 	/* Write architecture selector. */
 
-	printf(	"    <select name=\"arch\">\n"
+	printf(	"    <select name=\"arch\" aria-label=\"CPU architecture\">\n"
 		"      <option value=\"default\"");
 	if (NULL == req->q.arch)
 		printf(" selected=\"selected\"");
@@ -482,7 +488,8 @@ resp_searchform(const struct req *req, enum focus focus)
 	/* Write manpath selector. */
 
 	if (req->psz > 1) {
-		puts("    <select name=\"manpath\">");
+		puts("    <select name=\"manpath\""
+		     " aria-label=\"Manual path\">");
 		for (i = 0; i < (int)req->psz; i++) {
 			printf("      <option");
 			if (strcmp(req->q.manpath, req->p[i]) == 0)
@@ -550,16 +557,21 @@ validate_filename(const char *file)
 static void
 pg_index(const struct req *req)
 {
-
-	resp_begin_html(200, NULL, NULL);
+	if (resp_begin_html(200, NULL, NULL) == 0)
+		puts("<header>");
 	resp_searchform(req, FOCUS_QUERY);
-	printf("<p>\n"
+	printf("</header>\n"
+	       "<main>\n"
+	       "<p role=\"doc-notice\" aria-label=\"Usage\">\n"
 	       "This web interface is documented in the\n"
-	       "<a class=\"Xr\" href=\"/%s%sman.cgi.8\">man.cgi(8)</a>\n"
+	       "<a class=\"Xr\" href=\"/%s%sman.cgi.8\""
+	       " aria-label=\"man dot CGI, section 8\">man.cgi(8)</a>\n"
 	       "manual, and the\n"
-	       "<a class=\"Xr\" href=\"/%s%sapropos.1\">apropos(1)</a>\n"
+	       "<a class=\"Xr\" href=\"/%s%sapropos.1\""
+	       " aria-label=\"apropos, section 1\">apropos(1)</a>\n"
 	       "manual explains the query syntax.\n"
-	       "</p>\n",
+	       "</p>\n"
+	       "</main>\n",
 	       scriptname, *scriptname == '\0' ? "" : "/",
 	       scriptname, *scriptname == '\0' ? "" : "/");
 	resp_end_html();
@@ -569,33 +581,40 @@ static void
 pg_noresult(const struct req *req, int code, const char *http_msg,
     const char *user_msg)
 {
-	resp_begin_html(code, http_msg, NULL);
+	if (resp_begin_html(code, http_msg, NULL) == 0)
+		puts("<header>");
 	resp_searchform(req, FOCUS_QUERY);
-	puts("<p>");
+	puts("</header>");
+	puts("<main>");
+	puts("<p role=\"doc-notice\" aria-label=\"No result\">");
 	puts(user_msg);
 	puts("</p>");
+	puts("</main>");
 	resp_end_html();
 }
 
 static void
 pg_error_badrequest(const char *msg)
 {
-
-	resp_begin_html(400, "Bad Request", NULL);
-	puts("<h1>Bad Request</h1>\n"
-	     "<p>\n");
+	if (resp_begin_html(400, "Bad Request", NULL))
+		puts("</header>");
+	puts("<main>\n"
+	     "<h1>Bad Request</h1>\n"
+	     "<p role=\"doc-notice\" aria-label=\"Bad Request\">");
 	puts(msg);
 	printf("Try again from the\n"
 	       "<a href=\"/%s\">main page</a>.\n"
-	       "</p>", scriptname);
+	       "</p>\n"
+	       "</main>\n", scriptname);
 	resp_end_html();
 }
 
 static void
 pg_error_internal(void)
 {
-	resp_begin_html(500, "Internal Server Error", NULL);
-	puts("<p>Internal Server Error</p>");
+	if (resp_begin_html(500, "Internal Server Error", NULL))
+		puts("</header>");
+	puts("<main><p role=\"doc-notice\">Internal Server Error</p></main>");
 	resp_end_html();
 }
 
@@ -626,6 +645,7 @@ pg_searchres(const struct req *req, struct manpage *r, size_t sz)
 	size_t		 i, iuse;
 	int		 archprio, archpriouse;
 	int		 prio, priouse;
+	int		 have_header;
 
 	for (i = 0; i < sz; i++) {
 		if (validate_filename(r[i].file))
@@ -692,14 +712,18 @@ pg_searchres(const struct req *req, struct manpage *r, size_t sz)
 			priouse = prio;
 			iuse = i;
 		}
-		resp_begin_html(200, NULL, r[iuse].file);
+		have_header = resp_begin_html(200, NULL, r[iuse].file);
 	} else
-		resp_begin_html(200, NULL, NULL);
+		have_header = resp_begin_html(200, NULL, NULL);
 
+	if (have_header == 0)
+		puts("<header>");
 	resp_searchform(req,
 	    req->q.equal || sz == 1 ? FOCUS_NONE : FOCUS_QUERY);
+	puts("</header>");
 
 	if (sz > 1) {
+		puts("<nav>");
 		puts("<table class=\"results\">");
 		for (i = 0; i < sz; i++) {
 			printf("  <tr>\n"
@@ -718,6 +742,7 @@ pg_searchres(const struct req *req, struct manpage *r, size_t sz)
 			     "  </tr>");
 		}
 		puts("</table>");
+		puts("</nav>");
 	}
 
 	if (req->q.equal || sz == 1) {
@@ -739,7 +764,9 @@ resp_catman(const struct req *req, const char *file)
 	int		 italic, bold;
 
 	if ((f = fopen(file, "r")) == NULL) {
-		puts("<p>You specified an invalid manual file.</p>");
+		puts("<p role=\"doc-notice\">\n"
+		     "  You specified an invalid manual file.\n"
+		     "</p>");
 		return;
 	}
 
@@ -876,7 +903,9 @@ resp_format(const struct req *req, const char *file)
 	int		 usepath;
 
 	if (-1 == (fd = open(file, O_RDONLY))) {
-		puts("<p>You specified an invalid manual file.</p>");
+		puts("<p role=\"doc-notice\">\n"
+		     "  You specified an invalid manual file.\n"
+		     "</p>");
 		return;
 	}
 
@@ -962,8 +991,10 @@ pg_show(struct req *req, const char *fullpath)
 		return;
 	}
 
-	resp_begin_html(200, NULL, file);
+	if (resp_begin_html(200, NULL, file) == 0)
+		puts("<header>");
 	resp_searchform(req, FOCUS_NONE);
+	puts("</header>");
 	resp_show(req, file);
 	resp_end_html();
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: cmd-find.c,v 1.79 2020/05/16 16:20:59 nicm Exp $ */
+/* $OpenBSD: cmd-find.c,v 1.81 2022/07/06 08:32:28 nicm Exp $ */
 
 /*
  * Copyright (c) 2015 Nicholas Marriott <nicholas.marriott@gmail.com>

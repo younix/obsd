@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.648 2022/02/01 20:29:55 deraadt Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.650 2022/07/12 05:45:49 jsg Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -510,8 +510,6 @@ const struct cpu_nocpuid_nameclass i386_nocpuid_cpus[] = {
 		NULL},				/* CPU_486DLC */
 	{ CPUVENDOR_CYRIX, "Cyrix", "6x86",	CPUCLASS_486,
 		cyrix6x86_cpu_setup},		/* CPU_6x86 */
-	{ CPUVENDOR_NEXGEN,"NexGen","586",	CPUCLASS_386,
-		NULL},				/* CPU_NX586 */
 };
 
 const char *classnames[] = {
@@ -1840,12 +1838,9 @@ identifycpu(struct cpu_info *ci)
 		u_int regs[4];
 		cpuid(0x80000000, regs);
 
-		if (regs[0] >= 0x80000005)
-			cpuid(0x80000005, ci->ci_amdcacheinfo);
-
 		if (regs[0] >= 0x80000006) {
-			cpuid(0x80000006, ci->ci_extcacheinfo);
-			cachesize = (ci->ci_extcacheinfo[2] >> 16);
+			cpuid(0x80000006, regs);
+			cachesize = (regs[2] >> 16);
 		}
 	}
 
@@ -1861,7 +1856,6 @@ identifycpu(struct cpu_info *ci)
 	}
 
 	if (vendor == CPUVENDOR_INTEL) {
-		u_int regs[4];
 		/*
 		 * PIII, Core Solo and Core Duo CPUs have known
 		 * errata stating:
@@ -1872,12 +1866,6 @@ identifycpu(struct cpu_info *ci)
 		 */
 		if (ci->ci_family == 6 && ci->ci_model < 15)
 		    ci->ci_feature_flags &= ~CPUID_PAT;
-
-		if (cpuid_level >= 0x1) {
-			cpuid(0x80000000, regs);
-			if (regs[0] >= 0x80000006)
-				cpuid(0x80000006, ci->ci_extcacheinfo);
-		}
 	}
 
 	/* Remove leading, trailing and duplicated spaces from cpu_brandstr */

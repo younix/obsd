@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ts.1,v 1.1 2022/06/29 08:39:49 job Exp $
+.\"	$OpenBSD: ts.1,v 1.8 2022/07/03 16:55:39 job Exp $
 .\"
 .\" Copyright (c) 2022 Job Snijders <job@openbsd.org>
 .\"
@@ -14,25 +14,33 @@
 .\" ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 .\" OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: June 29 2022 $
+.Dd $Mdocdate: July 3 2022 $
 .Dt TS 1
 .Os
 .Sh NAME
-.Nm ts 
+.Nm ts
 .Nd timestamp input
 .Sh SYNOPSIS
 .Nm ts
 .Op Fl i | s
+.Op Fl m
 .Op Ar format
 .Sh DESCRIPTION
-When invoked, the
+The
 .Nm
-utility adds a timestamp to the beginning of each line of input.
+utility prepends a timestamp to each line of standard input and writes
+it to standard output.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
 .It Fl i
 Display time elapsed since the last timestamp.
+.It Fl m
+Display timestamps derived from a strictly linearly increasing clock.
+Without
+.Fl m ,
+timestamps reflect the current date and time, including time jumps if the
+system time is changed.
 .It Fl s
 Display time elapsed since the start of the program.
 .El
@@ -44,20 +52,24 @@ specifications described in the
 .Xr strftime 3
 manual page.
 The default format is
-.Qq %b %d %H:%M:%S ,
+.Qq %b %d %H:%M:%S ;
 or
 .Qq %H:%M:%S
-if an option is used.
+if one of the
+.Fl i
+or
+.Fl s
+options is used.
 .Pp
-The following non-standard conversion specifications append microsecond
-resolution:
-.Cm \&%.S ,
-.Cm \&%.s ,
+Some additional conversion specifications are also supported
+to append microsecond resolution:
+.Cm %.S ,
+.Cm %.s ,
 and
-.Cm \&%.T ;
+.Cm %.T ;
 which are similar to
-.Cm \&%S ,
-.Cm \&%s ,
+.Cm %S ,
+.Cm %s ,
 and
 .Cm \&%T .
 Examples:
@@ -67,7 +79,7 @@ and
 .Qq 4:20:00.00001 .
 .Sh EXAMPLES
 .Bd -literal -offset indent
-$ (echo foo; sleep 2; echo bar) | ts 
+$ (echo foo; sleep 2; echo bar) | ts
 Jun 28 12:13:38 foo
 Jun 28 12:13:40 bar
 
@@ -77,6 +89,8 @@ $ ls | ts -i %.S
 00.000004 ts.1
 00.000004 ts.c
 .Ed
+.Sh SEE ALSO
+.Xr strftime 3
 .Sh HISTORY
 A
 .Nm

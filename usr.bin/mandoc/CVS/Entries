@@ -16,7 +16,6 @@
 /libman.h/1.61/Mon Dec 31 10:03:38 2018//
 /libmdoc.h/1.88/Mon Dec 31 04:55:42 2018//
 /main.h/1.25/Sun Mar  3 13:01:47 2019//
-/man.cgi.8/1.22/Sun May 20 21:48:23 2018//
 /man.conf.5/1.8/Mon Feb 10 14:42:03 2020//
 /man.h/1.59/Thu Aug 23 19:32:03 2018//
 /mandoc_aux.c/1.9/Wed Feb  7 20:04:33 2018//
@@ -50,7 +49,6 @@
 /term_ascii.c/1.52/Thu Dec 17 19:39:59 2020//
 /term_ps.c/1.56/Thu Dec 17 19:39:59 2020//
 /apropos.1/1.45/Sat May  1 08:41:52 2021//
-/man_html.c/1.132/Sat May  1 08:41:52 2021//
 /arch.c/1.14/Wed Sep  1 16:07:40 2021//
 /term_tag.c/1.6/Wed Sep  1 16:07:40 2021//
 /term_tag.h/1.4/Wed Sep  1 16:07:40 2021//
@@ -67,27 +65,21 @@
 /out.c/1.57/Wed Oct 20 17:29:16 2021//
 /term.h/1.76/Wed Oct 20 17:29:16 2021//
 /term_tab.c/1.5/Wed Oct 20 17:29:16 2021//
-/cgi.c/1.115/Mon Nov 15 19:06:15 2021//
 /mandocdb.c/1.218/Mon Nov 15 19:06:15 2021//
 /manpath.c/1.31/Sun Nov 21 20:15:22 2021//
 /mansearch.c/1.66/Mon Jan 24 14:35:16 2022//
 /st.c/1.14/Mon Jan 24 14:35:16 2022//
 /tree.c/1.59/Mon Jan 24 14:35:16 2022//
-/Makefile/1.119/Mon Jun 27 13:02:01 2022//
 /chars.c/1.51/Mon Jun 27 13:02:01 2022//
 /eqn.c/1.48/Mon Jun 27 13:02:01 2022//
 /eqn_parse.h/1.4/Mon Jun 27 13:02:01 2022//
-/html.c/1.147/Mon Jun 27 13:02:01 2022//
-/html.h/1.72/Mon Jun 27 13:02:01 2022//
 /makewhatis.8/1.15/Mon Jun 27 13:02:01 2022//
 /man.c/1.136/Mon Jun 27 13:02:01 2022//
 /man_macro.c/1.109/Mon Jun 27 13:02:01 2022//
 /man_term.c/1.190/Mon Jun 27 13:02:01 2022//
 /mandoc.c/1.89/Mon Jun 27 13:02:01 2022//
-/mandoc.css/1.36/Mon Jun 27 13:02:01 2022//
 /mandoc.h/1.221/Mon Jun 27 13:02:01 2022//
 /mandoc_msg.c/1.18/Mon Jun 27 13:02:01 2022//
-/mdoc_html.c/1.219/Mon Jun 27 13:02:01 2022//
 /mdoc_validate.c/1.306/Mon Jun 27 13:02:01 2022//
 /read.c/1.192/Mon Jun 27 13:02:01 2022//
 /roff.c/1.266/Mon Jun 27 13:02:01 2022//
@@ -99,4 +91,12 @@
 /tbl_term.c/1.65/Mon Jun 27 13:02:01 2022//
 /term.c/1.146/Mon Jun 27 13:02:01 2022//
 /mandoc.1/1.188/Tue Jun 28 08:42:40 2022//
+/Makefile/1.120/Sat Jul 16 15:39:34 2022//
+/cgi.c/1.119/Sat Jul 16 15:39:34 2022//
+/html.c/1.149/Sat Jul 16 15:39:34 2022//
+/html.h/1.74/Sat Jul 16 15:39:34 2022//
+/man.cgi.8/1.23/Sat Jul 16 15:39:34 2022//
+/man_html.c/1.137/Sat Jul 16 15:39:34 2022//
+/mandoc.css/1.39/Sat Jul 16 15:39:34 2022//
+/mdoc_html.c/1.225/Sat Jul 16 15:39:34 2022//
 D

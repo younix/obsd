@@ -1,4 +1,4 @@
-/*	$OpenBSD: ikev2.c,v 1.347 2022/05/28 18:51:16 gerhard Exp $	*/
+/*	$OpenBSD: ikev2.c,v 1.349 2022/07/08 19:51:11 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -315,6 +315,7 @@ ikev2_dispatch_cert(int fd, struct privsep_proc *p, struct imsg *imsg)
 	size_t			 len;
 	struct iked_id		*id = NULL;
 	int			 ignore = 0;
+	int			 i;
 
 	switch (imsg->hdr.type) {
 	case IMSG_CERTREQ:
@@ -415,6 +416,51 @@ ikev2_dispatch_cert(int fd, struct privsep_proc *p, struct imsg *imsg)
 
 		if (ikev2_ike_auth(env, sa) != 0)
 			log_debug("%s: failed to send ike auth", __func__);
+		break;
+	case IMSG_SCERT:
+		if ((sa = ikev2_getimsgdata(env, imsg,
+		    &sh, &type, &ptr, &len)) == NULL) {
+			log_debug("%s: invalid supplemental cert reply",
+			    __func__);
+			break;
+		}
+
+		if (sa->sa_stateflags & IKED_REQ_CERT ||
+		    type == IKEV2_CERT_NONE)
+			ignore = 1;
+
+		log_debug("%s: supplemental cert type %s length %zu, %s",
+		    __func__,
+		    print_map(type, ikev2_cert_map), len,
+		    ignore ? "ignored" : "ok");
+
+		if (ignore)
+			break;
+
+		for (i = 0; i < IKED_SCERT_MAX; i++) {
+			id = &sa->sa_scert[i];
+			if (id->id_type == IKEV2_CERT_NONE)
+				break;
+			id = NULL;
+		}
+
+		if (id == NULL) {
+			log_debug("%s: too many supplemental cert. ignored",
+			    __func__);
+			break;
+		}
+
+		id->id_type = type;
+		id->id_offset = 0;
+		ibuf_release(id->id_buf);
+		id->id_buf = NULL;
+
+		if (len <= 0 || (id->id_buf = ibuf_new(ptr, len)) == NULL) {
+			log_debug("%s: failed to get supplemental cert payload",
+			    __func__);
+			break;
+		}
+
 		break;
 	case IMSG_AUTH:
 		if ((sa = ikev2_getimsgdata(env, imsg,
@@ -1490,6 +1536,7 @@ ikev2_init_ike_auth(struct iked *env, struct iked_sa *sa)
 	uint8_t				 firstpayload;
 	int				 ret = -1;
 	ssize_t				 len;
+	int				 i;
 
 	if (!sa_stateok(sa, IKEV2_STATE_SA_INIT))
 		return (0);
@@ -1543,6 +1590,22 @@ ikev2_init_ike_auth(struct iked *env, struct iked_sa *sa)
 		if (ibuf_cat(e, certid->id_buf) != 0)
 			goto done;
 		len = ibuf_size(certid->id_buf) + sizeof(*cert);
+
+		for (i = 0; i < IKED_SCERT_MAX; i++) {
+			if (sa->sa_scert[i].id_type == IKEV2_CERT_NONE)
+				break;
+			if (ikev2_next_payload(pld, len,
+			    IKEV2_PAYLOAD_CERT) == -1)
+				goto done;
+			if ((pld = ikev2_add_payload(e)) == NULL)
+				goto done;
+			if ((cert = ibuf_advance(e, sizeof(*cert))) == NULL)
+				goto done;
+			cert->cert_type = sa->sa_scert[i].id_type;
+			if (ibuf_cat(e, sa->sa_scert[i].id_buf) != 0)
+				goto done;
+			len = ibuf_size(sa->sa_scert[i].id_buf) + sizeof(*cert);
+		}
 
 		/* CERTREQ payload(s) */
 		if ((len = ikev2_add_certreq(e, &pld,
@@ -3722,6 +3785,7 @@ ikev2_resp_ike_auth(struct iked *env, struct iked_sa *sa)
 	uint8_t				 firstpayload;
 	int				 ret = -1;
 	ssize_t				 len;
+	int				 i;
 
 	if (sa == NULL)
 		return (-1);
@@ -3781,6 +3845,24 @@ ikev2_resp_ike_auth(struct iked *env, struct iked_sa *sa)
 			if (ibuf_cat(e, certid->id_buf) != 0)
 				goto done;
 			len = ibuf_size(certid->id_buf) + sizeof(*cert);
+
+			for (i = 0; i < IKED_SCERT_MAX; i++) {
+				if (sa->sa_scert[i].id_type == IKEV2_CERT_NONE)
+					break;
+				if (ikev2_next_payload(pld, len,
+				    IKEV2_PAYLOAD_CERT) == -1)
+					goto done;
+				if ((pld = ikev2_add_payload(e)) == NULL)
+					goto done;
+				if ((cert = ibuf_advance(e,
+				    sizeof(*cert))) == NULL)
+					goto done;
+				cert->cert_type = sa->sa_scert[i].id_type;
+				if (ibuf_cat(e, sa->sa_scert[i].id_buf) != 0)
+					goto done;
+				len = ibuf_size(sa->sa_scert[i].id_buf)
+				    + sizeof(*cert);
+			}
 		}
 
 		if (ikev2_next_payload(pld, len, IKEV2_PAYLOAD_AUTH) == -1)
@@ -4387,14 +4469,14 @@ ikev2_init_create_child_sa(struct iked *env, struct iked_message *msg)
 	sa->sa_rnonce = msg->msg_nonce;
 	msg->msg_nonce = NULL;
 
-	if (csa && (ni = sa->sa_simult) != NULL) {
+	if (csa && (nr = sa->sa_simult) != NULL) {
 		log_info("%s: resolving simultaneous CHILD SA rekeying",
 		    SPI_SA(sa, __func__));
-		/* set nr to minimum nonce for exchange initiated by peer */
+		/* set ni to minimum nonce for exchange initiated by us */
 		if (ikev2_nonce_cmp(sa->sa_inonce, sa->sa_rnonce) < 0)
-			nr = sa->sa_inonce;
+			ni = sa->sa_inonce;
 		else
-			nr = sa->sa_rnonce;
+			ni = sa->sa_rnonce;
 		/*
 		 * If the exchange initated by us has smaller nonce,
 		 * then we have to delete our SAs.
@@ -4458,6 +4540,7 @@ ikev2_ikesa_enable(struct iked *env, struct iked_sa *sa, struct iked_sa *nsa)
 	struct iked_childsa		*csa, *csatmp, *ipcomp;
 	struct iked_flow		*flow, *flowtmp;
 	struct iked_proposal		*prop, *proptmp;
+	int				i;
 
 	log_debug("%s: IKE SA %p ispi %s rspi %s replaced"
 	    " by SA %p ispi %s rspi %s ",
@@ -4535,11 +4618,15 @@ ikev2_ikesa_enable(struct iked *env, struct iked_sa *sa, struct iked_sa *nsa)
 		nsa->sa_icert = sa->sa_rcert;
 		nsa->sa_rcert = sa->sa_icert;
 	}
+	for (i = 0; i < IKED_SCERT_MAX; i++)
+		nsa->sa_scert[i] = sa->sa_scert[i];
 	/* duplicate the actual buffer */
 	nsa->sa_iid.id_buf = ibuf_dup(nsa->sa_iid.id_buf);
 	nsa->sa_rid.id_buf = ibuf_dup(nsa->sa_rid.id_buf);
 	nsa->sa_icert.id_buf = ibuf_dup(nsa->sa_icert.id_buf);
 	nsa->sa_rcert.id_buf = ibuf_dup(nsa->sa_rcert.id_buf);
+	for (i = 0; i < IKED_SCERT_MAX; i++)
+		nsa->sa_scert[i].id_buf = ibuf_dup(nsa->sa_scert[i].id_buf);
 
 	/* Transfer sa_addrpool address */
 	if (sa->sa_addrpool) {

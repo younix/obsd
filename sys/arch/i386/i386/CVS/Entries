@@ -47,8 +47,6 @@
 /acpi_wakecode.S/1.32/Mon Jan 24 14:35:14 2022//
 /hibernate_machdep.c/1.58/Mon Jan 24 14:35:14 2022//
 /locore.s/1.194/Mon Jan 24 14:35:14 2022//
-/locore0.S/1.5/Mon Jan 24 14:35:14 2022//
-/pmapae.c/1.66/Mon Jan 24 14:35:14 2022//
 /trap.c/1.156/Mon Jan 24 14:35:14 2022//
 /acpi_machdep.c/1.85/Mon Jun 27 13:02:00 2022//
 /amdmsr.c/1.11/Mon Jun 27 13:02:00 2022//
@@ -58,10 +56,12 @@
 /db_interface.c/1.44/Mon Jun 27 13:02:00 2022//
 /esm.c/1.63/Mon Jun 27 13:02:00 2022//
 /ioapic.c/1.43/Mon Jun 27 13:02:00 2022//
-/machdep.c/1.648/Mon Jun 27 13:02:00 2022//
 /mainbus.c/1.60/Mon Jun 27 13:02:00 2022//
 /mpbios.c/1.44/Mon Jun 27 13:02:00 2022//
-/pmap.c/1.218/Mon Jun 27 13:02:00 2022//
 /vm_machdep.c/1.72/Mon Jun 27 13:02:00 2022//
 /conf.c/1.173/Wed Jun 29 12:46:37 2022//
+/locore0.S/1.6/Sat Jul 16 15:39:28 2022//
+/machdep.c/1.650/Sat Jul 16 15:39:28 2022//
+/pmap.c/1.219/Sat Jul 16 15:39:28 2022//
+/pmapae.c/1.67/Sat Jul 16 15:39:28 2022//
 D

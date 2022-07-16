@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.231 2022/06/26 20:05:06 sthen Exp $
+# $OpenBSD: GENERIC,v 1.233 2022/07/14 19:06:29 kettenis Exp $
 #
 # GENERIC machine description file
 #
@@ -25,6 +25,7 @@ maxusers	80
 option		PCIVERBOSE
 option		USER_PCICONF	# user-space PCI configuration
 option		USBVERBOSE
+option		SUSPEND
 
 makeoptions	KERNEL_BASE_PHYS="0x00200000"
 makeoptions	KERNEL_BASE_VIRT="0xffffff8000200000"
@@ -295,6 +296,7 @@ gpio*		at sxipio?
 sxiccmu*	at fdt? early 1	# Clock Control Module/Unit
 sxidog*		at fdt?
 sxipwm*		at fdt?
+sxirintc*	at fdt?
 sxirsb*		at fdt? early 1	# Reduced Serial Bus
 axppmic*	at rsb?
 sxirtc*		at fdt? early 1	# Real Time Clock

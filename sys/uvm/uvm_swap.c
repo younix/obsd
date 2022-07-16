@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_swap.c,v 1.158 2022/06/28 19:39:54 mpi Exp $	*/
+/*	$OpenBSD: uvm_swap.c,v 1.160 2022/07/11 11:29:11 mpi Exp $	*/
 /*	$NetBSD: uvm_swap.c,v 1.40 2000/11/17 11:39:39 mrg Exp $	*/
 
 /*
@@ -1603,8 +1603,7 @@ uvm_swap_get(struct vm_page *page, int swslot, int flags)
 	}
 
 	KERNEL_LOCK();
-	result = uvm_swap_io(&page, swslot, 1, B_READ |
-	    ((flags & PGO_SYNCIO) ? 0 : B_ASYNC));
+	result = uvm_swap_io(&page, swslot, 1, B_READ);
 	KERNEL_UNLOCK();
 
 	if (result == VM_PAGER_OK || result == VM_PAGER_PEND) {
@@ -1725,7 +1724,6 @@ uvm_swap_io(struct vm_page **pps, int startslot, int npages, int flags)
 
 		bouncekva = uvm_pagermapin(tpps, npages, swmapflags);
 		if (bouncekva == 0) {
-			KASSERT(tpps[0] != oompps[0]);
 			pool_put(&bufpool, bp);
 			uvm_pagermapout(kva, npages);
 			uvm_swap_freepages(tpps, npages);

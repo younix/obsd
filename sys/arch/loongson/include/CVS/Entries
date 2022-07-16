@@ -24,7 +24,6 @@
 /kcore.h/1.1.1.1/Fri Jul 31 09:26:25 2009//
 /limits.h/1.1.1.1/Fri Jul 31 09:26:25 2009//
 /loadfile_machdep.h/1.2/Fri Jul 17 20:44:39 2015//
-/lock.h/1.1.1.1/Fri Jul 31 09:26:25 2009//
 /loongson2.h/1.1.1.1/Thu Aug  6 20:51:44 2009//
 /loongson3.h/1.1/Sun Nov  6 10:20:33 2016//
 /memconf.h/1.1.1.1/Fri Jul 31 09:26:25 2009//

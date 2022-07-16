@@ -1,4 +1,4 @@
-/*	$OpenBSD: vldcp.c,v 1.22 2021/10/24 17:05:04 mpi Exp $	*/
+/*	$OpenBSD: vldcp.c,v 1.24 2022/07/10 08:33:00 visa Exp $	*/
 /*
  * Copyright (c) 2009, 2012 Mark Kettenis
  *
@@ -19,7 +19,6 @@
 #include <sys/conf.h>
 #include <sys/device.h>
 #include <sys/malloc.h>
-#include <sys/poll.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
 
@@ -578,49 +577,6 @@ vldcpioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	return (0);
 }
 
-int
-vldcppoll(dev_t dev, int events, struct proc *p)
-{
-	struct vldcp_softc *sc;
-	struct ldc_conn *lc;
-	uint64_t head, tail, state;
-	int revents = 0;
-	int s, err;
-
-	sc = vldcp_lookup(dev);
-	if (sc == NULL)
-		return (POLLERR);
-	lc = &sc->sc_lc;
-
-	s = spltty();
-	if (events & (POLLIN | POLLRDNORM)) {
-		err = hv_ldc_rx_get_state(lc->lc_id, &head, &tail, &state);
-
-		if (err == 0 && state == LDC_CHANNEL_UP && head != tail)
-			revents |= events & (POLLIN | POLLRDNORM);
-	}
-	if (events & (POLLOUT | POLLWRNORM)) {
-		err = hv_ldc_tx_get_state(lc->lc_id, &head, &tail, &state);
-
-		if (err == 0 && state == LDC_CHANNEL_UP && head != tail)
-			revents |= events & (POLLOUT | POLLWRNORM);
-	}
-	if (revents == 0) {
-		if (events & (POLLIN | POLLRDNORM)) {
-			cbus_intr_setenabled(sc->sc_bustag, sc->sc_rx_ino,
-			    INTR_ENABLED);
-			selrecord(p, &sc->sc_rsel);
-		}
-		if (events & (POLLOUT | POLLWRNORM)) {
-			cbus_intr_setenabled(sc->sc_bustag, sc->sc_tx_ino,
-			    INTR_ENABLED);
-			selrecord(p, &sc->sc_wsel);
-		}
-	}
-	splx(s);
-	return revents;
-}
-
 void
 filt_vldcprdetach(struct knote *kn)
 {
@@ -727,6 +683,7 @@ vldcpkqfilter(dev_t dev, struct knote *kn)
 		break;
 
 	default:
+		device_unref(&sc->sc_dv);
 		return (EINVAL);
 	}
 
@@ -736,5 +693,6 @@ vldcpkqfilter(dev_t dev, struct knote *kn)
 	klist_insert_locked(klist, kn);
 	splx(s);
 
+	device_unref(&sc->sc_dv);
 	return (0);
 }

@@ -15,13 +15,11 @@
 /intc.h/1.4/Fri Dec 11 17:58:22 2020//
 /omap4.c/1.7/Wed Sep  1 16:07:38 2021//
 /omap_machdep.c/1.13/Wed Sep  1 16:07:38 2021//
-/amdisplay.c/1.16/Mon Nov 15 19:06:15 2021//
 /edma.c/1.8/Mon Nov 15 19:06:15 2021//
 /if_cpsw.c/1.52/Mon Nov 15 19:06:15 2021//
 /nxphdmi.c/1.8/Mon Nov 15 19:06:15 2021//
 /omap.c/1.24/Mon Nov 15 19:06:15 2021//
 /omapid.c/1.5/Mon Nov 15 19:06:15 2021//
-/omdisplay.c/1.9/Mon Nov 15 19:06:15 2021//
 /omdog.c/1.10/Mon Nov 15 19:06:15 2021//
 /omehci.c/1.9/Mon Nov 15 19:06:15 2021//
 /omgpio.c/1.14/Mon Nov 15 19:06:15 2021//
@@ -38,4 +36,6 @@
 /omcm.c/1.3/Mon Jun 27 13:02:00 2022//
 /omrng.c/1.3/Mon Jun 27 13:02:00 2022//
 /omsysc.c/1.3/Mon Jun 27 13:02:00 2022//
+/amdisplay.c/1.17/Sat Jul 16 15:39:28 2022//
+/omdisplay.c/1.10/Sat Jul 16 15:39:28 2022//
 D

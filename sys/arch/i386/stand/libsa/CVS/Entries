@@ -1,7 +1,6 @@
 /apmprobe.c/1.19/Fri Jun 10 18:36:06 2016//
 /bioscons.c/1.36/Fri May 27 05:37:51 2016//
 /biosprobe.c/1.5/Sat Mar 29 18:09:29 2014//
-/cpuprobe.c/1.2/Sat Mar 29 18:09:29 2014//
 /debug.c/1.16/Mon Dec  6 22:51:46 2010//
 /debug.h/1.7/Tue Feb 10 00:41:44 2004//
 /debug_i386.S/1.12/Tue Mar  9 19:12:12 2004//
@@ -12,7 +11,6 @@
 /gateA20.c/1.11/Fri Sep  8 05:36:52 2017//
 /gidt.S/1.37/Sat Nov  9 17:58:48 2019//
 /gidt.h/1.1/Fri Mar 19 13:48:18 2004//
-/machdep.c/1.39/Wed Jul 11 18:08:05 2018//
 /memprobe.c/1.57/Fri Jun 10 18:36:06 2016//
 /pciprobe.c/1.10/Sat Mar 29 18:09:29 2014//
 /ps2probe.c/1.2/Sat Mar 29 18:09:29 2014//
@@ -34,6 +32,8 @@
 /pxe_net.h/1.4/Sat May  1 08:41:51 2021//
 /softraid_i386.c/1.4/Sat May  1 08:41:51 2021//
 /softraid_i386.h/1.4/Sat May  1 08:41:51 2021//
-/exec_i386.c/1.51/Mon Nov 15 19:06:15 2021//
 /cmd_i386.c/1.37/Mon Jun 27 13:02:00 2022//
+/cpuprobe.c/1.3/Sat Jul 16 15:39:28 2022//
+/exec_i386.c/1.52/Sat Jul 16 15:39:28 2022//
+/machdep.c/1.40/Sat Jul 16 15:39:28 2022//
 D

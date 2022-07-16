@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.230 2022/06/29 08:37:18 tb Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.235 2022/07/02 16:31:04 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1575,6 +1575,9 @@ ssl3_free(SSL *s)
 
 	free(s->s3->alpn_selected);
 
+	freezero(s->s3->peer_quic_transport_params,
+	    s->s3->peer_quic_transport_params_len);
+
 	freezero(s->s3, sizeof(*s->s3));
 
 	s->s3 = NULL;
@@ -1618,6 +1621,11 @@ ssl3_clear(SSL *s)
 	free(s->s3->alpn_selected);
 	s->s3->alpn_selected = NULL;
 	s->s3->alpn_selected_len = 0;
+
+	freezero(s->s3->peer_quic_transport_params,
+	    s->s3->peer_quic_transport_params_len);
+	s->s3->peer_quic_transport_params = NULL;
+	s->s3->peer_quic_transport_params_len = 0;
 
 	memset(s->s3, 0, sizeof(*s->s3));
 
@@ -1859,25 +1867,25 @@ _SSL_set_tlsext_status_ocsp_resp(SSL *s, unsigned char *resp, int resp_len)
 int
 SSL_set0_chain(SSL *ssl, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set0_chain(ssl->cert, chain);
+	return ssl_cert_set0_chain(NULL, ssl, chain);
 }
 
 int
 SSL_set1_chain(SSL *ssl, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set1_chain(ssl->cert, chain);
+	return ssl_cert_set1_chain(NULL, ssl, chain);
 }
 
 int
 SSL_add0_chain_cert(SSL *ssl, X509 *x509)
 {
-	return ssl_cert_add0_chain_cert(ssl->cert, x509);
+	return ssl_cert_add0_chain_cert(NULL, ssl, x509);
 }
 
 int
 SSL_add1_chain_cert(SSL *ssl, X509 *x509)
 {
-	return ssl_cert_add1_chain_cert(ssl->cert, x509);
+	return ssl_cert_add1_chain_cert(NULL, ssl, x509);
 }
 
 int
@@ -1894,7 +1902,7 @@ SSL_get0_chain_certs(const SSL *ssl, STACK_OF(X509) **out_chain)
 int
 SSL_clear_chain_certs(SSL *ssl)
 {
-	return ssl_cert_set0_chain(ssl->cert, NULL);
+	return ssl_cert_set0_chain(NULL, ssl, NULL);
 }
 
 int
@@ -2247,25 +2255,25 @@ _SSL_CTX_set_tlsext_status_arg(SSL_CTX *ctx, void *arg)
 int
 SSL_CTX_set0_chain(SSL_CTX *ctx, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set0_chain(ctx->internal->cert, chain);
+	return ssl_cert_set0_chain(ctx, NULL, chain);
 }
 
 int
 SSL_CTX_set1_chain(SSL_CTX *ctx, STACK_OF(X509) *chain)
 {
-	return ssl_cert_set1_chain(ctx->internal->cert, chain);
+	return ssl_cert_set1_chain(ctx, NULL, chain);
 }
 
 int
 SSL_CTX_add0_chain_cert(SSL_CTX *ctx, X509 *x509)
 {
-	return ssl_cert_add0_chain_cert(ctx->internal->cert, x509);
+	return ssl_cert_add0_chain_cert(ctx, NULL, x509);
 }
 
 int
 SSL_CTX_add1_chain_cert(SSL_CTX *ctx, X509 *x509)
 {
-	return ssl_cert_add1_chain_cert(ctx->internal->cert, x509);
+	return ssl_cert_add1_chain_cert(ctx, NULL, x509);
 }
 
 int
@@ -2282,7 +2290,7 @@ SSL_CTX_get0_chain_certs(const SSL_CTX *ctx, STACK_OF(X509) **out_chain)
 int
 SSL_CTX_clear_chain_certs(SSL_CTX *ctx)
 {
-	return ssl_cert_set0_chain(ctx->internal->cert, NULL);
+	return ssl_cert_set0_chain(ctx, NULL, NULL);
 }
 
 static int
@@ -2486,13 +2494,13 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 	STACK_OF(SSL_CIPHER) *prio, *allow;
 	SSL_CIPHER *c, *ret = NULL;
 	int can_use_ecc;
-	int i, ii, ok;
+	int i, ii, nid, ok;
 	SSL_CERT *cert;
 
 	/* Let's see which ciphers we can support */
 	cert = s->cert;
 
-	can_use_ecc = (tls1_get_shared_curve(s) != NID_undef);
+	can_use_ecc = tls1_get_supported_group(s, &nid);
 
 	/*
 	 * Do not set the compare functions, because this may lead to a
@@ -2527,8 +2535,7 @@ ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
 		    !(c->algorithm_ssl & SSL_TLSV1_3))
 			continue;
 
-		if (!ssl_security(s, SSL_SECOP_CIPHER_SHARED, c->strength_bits,
-		    0, c))
+		if (!ssl_security_shared_cipher(s, c))
 			continue;
 
 		ssl_set_cert_masks(cert, c);

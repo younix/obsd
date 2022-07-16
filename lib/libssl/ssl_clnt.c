@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_clnt.c,v 1.148 2022/06/29 08:34:04 tb Exp $ */
+/* $OpenBSD: ssl_clnt.c,v 1.151 2022/07/03 14:52:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -217,6 +217,13 @@ ssl3_connect(SSL *s)
 			    &s->s3->hs.our_min_tls_version,
 			    &s->s3->hs.our_max_tls_version)) {
 				SSLerror(s, SSL_R_NO_PROTOCOLS_AVAILABLE);
+				ret = -1;
+				goto end;
+			}
+
+			if (!ssl_security_version(s,
+			    s->s3->hs.our_min_tls_version)) {
+				SSLerror(s, SSL_R_VERSION_TOO_LOW);
 				ret = -1;
 				goto end;
 			}
@@ -1079,10 +1086,10 @@ ssl3_get_server_hello(SSL *s)
 int
 ssl3_get_server_certificate(SSL *s)
 {
-	CBS cbs, cert_list;
-	X509 *x = NULL;
-	const unsigned char *q;
-	STACK_OF(X509) *sk = NULL;
+	CBS cbs, cert_list, cert_data;
+	STACK_OF(X509) *certs = NULL;
+	X509 *cert = NULL;
+	const uint8_t *p;
 	EVP_PKEY *pkey;
 	int cert_type;
 	int al, ret;
@@ -1104,7 +1111,7 @@ ssl3_get_server_certificate(SSL *s)
 		goto fatal_err;
 	}
 
-	if ((sk = sk_X509_new_null()) == NULL) {
+	if ((certs = sk_X509_new_null()) == NULL) {
 		SSLerror(s, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -1113,47 +1120,37 @@ ssl3_get_server_certificate(SSL *s)
 		goto decode_err;
 
 	CBS_init(&cbs, s->internal->init_msg, s->internal->init_num);
-	if (CBS_len(&cbs) < 3)
+
+	if (!CBS_get_u24_length_prefixed(&cbs, &cert_list))
+		goto decode_err;
+	if (CBS_len(&cbs) != 0)
 		goto decode_err;
 
-	if (!CBS_get_u24_length_prefixed(&cbs, &cert_list) ||
-	    CBS_len(&cbs) != 0) {
-		al = SSL_AD_DECODE_ERROR;
-		SSLerror(s, SSL_R_LENGTH_MISMATCH);
-		goto fatal_err;
-	}
-
 	while (CBS_len(&cert_list) > 0) {
-		CBS cert;
-
-		if (CBS_len(&cert_list) < 3)
+		if (!CBS_get_u24_length_prefixed(&cert_list, &cert_data))
 			goto decode_err;
-		if (!CBS_get_u24_length_prefixed(&cert_list, &cert)) {
-			al = SSL_AD_DECODE_ERROR;
-			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
-			goto fatal_err;
-		}
-
-		q = CBS_data(&cert);
-		x = d2i_X509(NULL, &q, CBS_len(&cert));
-		if (x == NULL) {
+		p = CBS_data(&cert_data);
+		if ((cert = d2i_X509(NULL, &p, CBS_len(&cert_data))) == NULL) {
 			al = SSL_AD_BAD_CERTIFICATE;
 			SSLerror(s, ERR_R_ASN1_LIB);
 			goto fatal_err;
 		}
-		if (q != CBS_data(&cert) + CBS_len(&cert)) {
-			al = SSL_AD_DECODE_ERROR;
-			SSLerror(s, SSL_R_CERT_LENGTH_MISMATCH);
-			goto fatal_err;
-		}
-		if (!sk_X509_push(sk, x)) {
+		if (p != CBS_data(&cert_data) + CBS_len(&cert_data))
+			goto decode_err;
+		if (!sk_X509_push(certs, cert)) {
 			SSLerror(s, ERR_R_MALLOC_FAILURE);
 			goto err;
 		}
-		x = NULL;
+		cert = NULL;
 	}
 
-	if (ssl_verify_cert_chain(s, sk) <= 0 &&
+	/* A server must always provide a non-empty certificate list. */
+	if (sk_X509_num(certs) < 1) {
+		SSLerror(s, SSL_R_PEER_DID_NOT_RETURN_A_CERTIFICATE);
+		goto decode_err;
+	}
+
+	if (ssl_verify_cert_chain(s, certs) <= 0 &&
 	    s->verify_mode != SSL_VERIFY_NONE) {
 		al = ssl_verify_alarm_type(s->verify_result);
 		SSLerror(s, SSL_R_CERTIFICATE_VERIFY_FAILED);
@@ -1165,34 +1162,32 @@ ssl3_get_server_certificate(SSL *s)
 	 * Inconsistency alert: cert_chain does include the peer's
 	 * certificate, which we don't include in s3_srvr.c
 	 */
-	x = sk_X509_value(sk, 0);
+	cert = sk_X509_value(certs, 0);
+	X509_up_ref(cert);
 
-	if ((pkey = X509_get0_pubkey(x)) == NULL ||
+	if ((pkey = X509_get0_pubkey(cert)) == NULL ||
 	    EVP_PKEY_missing_parameters(pkey)) {
-		x = NULL;
 		al = SSL3_AL_FATAL;
 		SSLerror(s, SSL_R_UNABLE_TO_FIND_PUBLIC_KEY_PARAMETERS);
 		goto fatal_err;
 	}
 	if ((cert_type = ssl_cert_type(pkey)) < 0) {
-		x = NULL;
 		al = SSL3_AL_FATAL;
 		SSLerror(s, SSL_R_UNKNOWN_CERTIFICATE_TYPE);
 		goto fatal_err;
 	}
 
-	X509_up_ref(x);
 	X509_free(s->session->peer_cert);
-	s->session->peer_cert = x;
+	X509_up_ref(cert);
+	s->session->peer_cert = cert;
 	s->session->peer_cert_type = cert_type;
 
 	s->session->verify_result = s->verify_result;
 
 	sk_X509_pop_free(s->session->cert_chain, X509_free);
-	s->session->cert_chain = sk;
-	sk = NULL;
+	s->session->cert_chain = certs;
+	certs = NULL;
 
-	x = NULL;
 	ret = 1;
 
 	if (0) {
@@ -1204,8 +1199,8 @@ ssl3_get_server_certificate(SSL *s)
 		ssl3_send_alert(s, SSL3_AL_FATAL, al);
 	}
  err:
-	X509_free(x);
-	sk_X509_pop_free(sk, X509_free);
+	sk_X509_pop_free(certs, X509_free);
+	X509_free(cert);
 
 	return (ret);
 }
@@ -1264,13 +1259,13 @@ static int
 ssl3_get_server_kex_ecdhe(SSL *s, CBS *cbs)
 {
 	uint8_t curve_type;
-	uint16_t curve_id;
+	uint16_t group_id;
 	int decode_error;
 	CBS public;
 
 	if (!CBS_get_u8(cbs, &curve_type))
 		goto decode_err;
-	if (!CBS_get_u16(cbs, &curve_id))
+	if (!CBS_get_u16(cbs, &group_id))
 		goto decode_err;
 
 	/* Only named curves are supported. */
@@ -1284,17 +1279,17 @@ ssl3_get_server_kex_ecdhe(SSL *s, CBS *cbs)
 		goto decode_err;
 
 	/*
-	 * Check that the curve is one of our preferences - if it is not,
-	 * the server has sent us an invalid curve.
+	 * Check that the group is one of our preferences - if it is not,
+	 * the server has sent us an invalid group.
 	 */
-	if (!tls1_check_curve(s, curve_id)) {
+	if (!tls1_check_group(s, group_id)) {
 		SSLerror(s, SSL_R_WRONG_CURVE);
 		ssl3_send_alert(s, SSL3_AL_FATAL, SSL_AD_ILLEGAL_PARAMETER);
 		goto err;
 	}
 
 	tls_key_share_free(s->s3->hs.key_share);
-	if ((s->s3->hs.key_share = tls_key_share_new(curve_id)) == NULL)
+	if ((s->s3->hs.key_share = tls_key_share_new(group_id)) == NULL)
 		goto err;
 
 	if (!tls_key_share_peer_public(s->s3->hs.key_share, &public,

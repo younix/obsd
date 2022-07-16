@@ -1,4 +1,4 @@
-/*	$OpenBSD: systm.h,v 1.155 2021/12/09 00:26:10 guenther Exp $	*/
+/*	$OpenBSD: systm.h,v 1.157 2022/07/12 17:12:31 jca Exp $	*/
 /*	$NetBSD: systm.h,v 1.50 1996/06/09 04:55:09 briggs Exp $	*/
 
 /*-
@@ -91,7 +91,6 @@ extern int ncpusfound;		/* number of CPUs found */
 extern int nblkdev;		/* number of entries in bdevsw */
 extern int nchrdev;		/* number of entries in cdevsw */
 
-extern int selwait;		/* select timeout address */
 extern int maxmem;		/* max memory per process */
 extern int physmem;		/* physical memory */
 
@@ -151,8 +150,6 @@ int	enoioctl(void);
 int	enxio(void);
 int	eopnotsupp(void *);
 
-int	seltrue(dev_t dev, int which, struct proc *);
-int	selfalse(dev_t dev, int which, struct proc *);
 void	*hashinit(int, int, int, u_long *);
 void	 hashfree(void *, int, int);
 int	sys_nosys(struct proc *, void *, register_t *);
@@ -404,6 +401,7 @@ extern int (*mountroot)(void);
 #if defined(DDB)
 /* debugger entry points */
 void	db_enter(void);	/* in DDB only */
+int	db_rint(int);
 #endif
 
 #ifdef BOOT_CONFIG

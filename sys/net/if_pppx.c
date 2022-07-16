@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_pppx.c,v 1.117 2022/06/26 22:51:58 mvs Exp $ */
+/*	$OpenBSD: if_pppx.c,v 1.119 2022/07/15 22:56:13 mvs Exp $ */
 
 /*
  * Copyright (c) 2010 Claudio Jeker <claudio@openbsd.org>
@@ -56,7 +56,6 @@
 #include <sys/socket.h>
 #include <sys/ioctl.h>
 #include <sys/vnode.h>
-#include <sys/poll.h>
 #include <sys/selinfo.h>
 
 #include <net/if.h>
@@ -448,27 +447,6 @@ pppxioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 }
 
 int
-pppxpoll(dev_t dev, int events, struct proc *p)
-{
-	struct pppx_dev *pxd = pppx_dev2pxd(dev);
-	int revents = 0;
-
-	if (events & (POLLIN | POLLRDNORM)) {
-		if (!mq_empty(&pxd->pxd_svcq))
-			revents |= events & (POLLIN | POLLRDNORM);
-	}
-	if (events & (POLLOUT | POLLWRNORM))
-		revents |= events & (POLLOUT | POLLWRNORM);
-
-	if (revents == 0) {
-		if (events & (POLLIN | POLLRDNORM))
-			selrecord(p, &pxd->pxd_rsel);
-	}
-
-	return (revents);
-}
-
-int
 pppxkqfilter(dev_t dev, struct knote *kn)
 {
 	struct pppx_dev *pxd = pppx_dev2pxd(dev);
@@ -659,8 +637,6 @@ pppx_add_session(struct pppx_dev *pxd, struct pipex_session_req *req)
 	ifp->if_softc = pxi;
 	/* ifp->if_rdomain = req->pr_rdomain; */
 	if_counters_alloc(ifp);
-	/* XXXSMP: be sure pppx_if_qstart() called with NET_LOCK held */
-	ifq_set_maxlen(&ifp->if_snd, 1);
 
 	/* XXXSMP breaks atomicity */
 	NET_UNLOCK();
@@ -801,7 +777,6 @@ pppx_if_qstart(struct ifqueue *ifq)
 	struct mbuf *m;
 	int proto;
 
-	NET_ASSERT_LOCKED();
 	while ((m = ifq_dequeue(ifq)) != NULL) {
 		proto = *mtod(m, int *);
 		m_adj(m, sizeof(proto));
@@ -1044,8 +1019,6 @@ pppacopen(dev_t dev, int flags, int mode, struct proc *p)
 	ifp->if_output = pppac_output;
 	ifp->if_qstart = pppac_qstart;
 	ifp->if_ioctl = pppac_ioctl;
-	/* XXXSMP: be sure pppac_qstart() called with NET_LOCK held */
-	ifq_set_maxlen(&ifp->if_snd, 1);
 
 	if_counters_alloc(ifp);
 	if_attach(ifp);
@@ -1210,27 +1183,6 @@ pppacioctl(dev_t dev, u_long cmd, caddr_t data, int flags, struct proc *p)
 	NET_UNLOCK();
 
 	return (error);
-}
-
-int
-pppacpoll(dev_t dev, int events, struct proc *p)
-{
-	struct pppac_softc *sc = pppac_lookup(dev);
-	int revents = 0;
-
-	if (events & (POLLIN | POLLRDNORM)) {
-		if (!mq_empty(&sc->sc_mq))
-			revents |= events & (POLLIN | POLLRDNORM);
-	}
-	if (events & (POLLOUT | POLLWRNORM))
-		revents |= events & (POLLOUT | POLLWRNORM);
-
-	if (revents == 0) {
-		if (events & (POLLIN | POLLRDNORM))
-			selrecord(p, &sc->sc_rsel);
-	}
-
-	return (revents);
 }
 
 int
@@ -1441,7 +1393,6 @@ pppac_qstart(struct ifqueue *ifq)
 	struct ip ip;
 	int rv;
 
-	NET_ASSERT_LOCKED();
 	while ((m = ifq_dequeue(ifq)) != NULL) {
 #if NBPFILTER > 0
 		if (ifp->if_bpf) {
