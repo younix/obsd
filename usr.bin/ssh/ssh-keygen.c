@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.454 2022/06/03 03:17:42 dtucker Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.457 2022/07/20 03:33:22 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -574,10 +574,13 @@ do_convert_private_ssh2(struct sshbuf *b)
 		error_f("remaining bytes in key blob %d", rlen);
 
 	/* try the key */
-	if (sshkey_sign(key, &sig, &slen, data, sizeof(data),
-	    NULL, NULL, NULL, 0) != 0 ||
-	    sshkey_verify(key, sig, slen, data, sizeof(data),
-	    NULL, 0, NULL) != 0) {
+	if ((r = sshkey_sign(key, &sig, &slen, data, sizeof(data),
+	    NULL, NULL, NULL, 0)) != 0)
+		error_fr(r, "signing with converted key failed");
+	else if ((r = sshkey_verify(key, sig, slen, data, sizeof(data),
+	    NULL, 0, NULL)) != 0)
+		error_fr(r, "verification with converted key failed");
+	if (r != 0) {
 		sshkey_free(key);
 		free(sig);
 		return NULL;
@@ -3003,37 +3006,43 @@ do_moduli_screen(const char *out_file, char **opts, size_t nopts)
 #endif /* WITH_OPENSSL */
 }
 
+/* Read and confirm a passphrase */
 static char *
-private_key_passphrase(void)
+read_check_passphrase(const char *prompt1, const char *prompt2,
+    const char *retry_prompt)
 {
 	char *passphrase1, *passphrase2;
 
-	/* Ask for a passphrase (twice). */
-	if (identity_passphrase)
-		passphrase1 = xstrdup(identity_passphrase);
-	else if (identity_new_passphrase)
-		passphrase1 = xstrdup(identity_new_passphrase);
-	else {
-passphrase_again:
-		passphrase1 =
-			read_passphrase("Enter passphrase (empty for no "
-			    "passphrase): ", RP_ALLOW_STDIN);
-		passphrase2 = read_passphrase("Enter same passphrase again: ",
-		    RP_ALLOW_STDIN);
-		if (strcmp(passphrase1, passphrase2) != 0) {
-			/*
-			 * The passphrases do not match.  Clear them and
-			 * retry.
-			 */
-			freezero(passphrase1, strlen(passphrase1));
+	for (;;) {
+		passphrase1 = read_passphrase(prompt1, RP_ALLOW_STDIN);
+		passphrase2 = read_passphrase(prompt2, RP_ALLOW_STDIN);
+		if (strcmp(passphrase1, passphrase2) == 0) {
 			freezero(passphrase2, strlen(passphrase2));
-			printf("Passphrases do not match.  Try again.\n");
-			goto passphrase_again;
+			return passphrase1;
 		}
-		/* Clear the other copy of the passphrase. */
+		/* The passphrases do not match. Clear them and retry. */
+		freezero(passphrase1, strlen(passphrase1));
 		freezero(passphrase2, strlen(passphrase2));
+		fputs(retry_prompt, stdout);
+		fputc('\n', stdout);
+		fflush(stdout);
 	}
-	return passphrase1;
+	/* NOTREACHED */
+	return NULL;
+}
+
+static char *
+private_key_passphrase(void)
+{
+	if (identity_passphrase)
+		return xstrdup(identity_passphrase);
+	if (identity_new_passphrase)
+		return xstrdup(identity_new_passphrase);
+
+	return read_check_passphrase(
+	    "Enter passphrase (empty for no passphrase): ",
+	    "Enter same passphrase again: ",
+	    "Passphrases do not match.  Try again.");
 }
 
 static char *
@@ -3182,6 +3191,23 @@ save_attestation(struct sshbuf *attest, const char *path)
 	if (!quiet)
 		printf("Your FIDO attestation certificate has been saved in "
 		    "%s\n", path);
+}
+
+static int
+confirm_sk_overwrite(const char *application, const char *user)
+{
+	char yesno[3];
+
+	printf("A resident key scoped to '%s' with user id '%s' already "
+	    "exists.\n", application == NULL ? "ssh:" : application,
+	    user == NULL ? "null" : user);
+	printf("Overwrite key in token (y/n)? ");
+	fflush(stdout);
+	if (fgets(yesno, sizeof(yesno), stdin) == NULL)
+		return 0;
+	if (yesno[0] != 'y' && yesno[0] != 'Y')
+		return 0;
+	return 1;
 }
 
 static void
@@ -3747,10 +3773,6 @@ main(int argc, char **argv)
 				    "FIDO authenticator enrollment", opts[i]);
 			}
 		}
-		if (!quiet) {
-			printf("You may need to touch your authenticator "
-			    "to authorize key generation.\n");
-		}
 		if ((attest = sshbuf_new()) == NULL)
 			fatal("sshbuf_new failed");
 		if ((sk_flags &
@@ -3760,7 +3782,14 @@ main(int argc, char **argv)
 		} else {
 			passphrase = NULL;
 		}
-		for (i = 0 ; ; i++) {
+		r = 0;
+		for (i = 0 ;;) {
+			if (!quiet) {
+				printf("You may need to touch your "
+				    "authenticator%s to authorize key "
+				    "generation.\n",
+				    r == 0 ? "" : " again");
+			}
 			fflush(stdout);
 			r = sshsk_enroll(type, sk_provider, sk_device,
 			    sk_application == NULL ? "ssh:" : sk_application,
@@ -3768,6 +3797,13 @@ main(int argc, char **argv)
 			    &private, attest);
 			if (r == 0)
 				break;
+			if (r == SSH_ERR_KEY_BAD_PERMISSIONS &&
+			    (sk_flags & SSH_SK_RESIDENT_KEY) != 0 &&
+			    (sk_flags & SSH_SK_FORCE_OPERATION) == 0 &&
+			    confirm_sk_overwrite(sk_application, sk_user)) {
+				sk_flags |= SSH_SK_FORCE_OPERATION;
+				continue;
+			}
 			if (r != SSH_ERR_KEY_WRONG_PASSPHRASE)
 				fatal_r(r, "Key enrollment failed");
 			else if (passphrase != NULL) {
@@ -3775,15 +3811,10 @@ main(int argc, char **argv)
 				freezero(passphrase, strlen(passphrase));
 				passphrase = NULL;
 			}
-			if (i >= 3)
+			if (++i >= 3)
 				fatal("Too many incorrect PINs");
 			passphrase = read_passphrase("Enter PIN for "
 			    "authenticator: ", RP_ALLOW_STDIN);
-			if (!quiet) {
-				printf("You may need to touch your "
-				    "authenticator (again) to authorize "
-				    "key generation.\n");
-			}
 		}
 		if (passphrase != NULL) {
 			freezero(passphrase, strlen(passphrase));

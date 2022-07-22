@@ -1,7 +1,6 @@
 /Makefile.inc/1.9/Wed Mar 30 06:38:41 2016//
 /creat.3/1.8/Fri Sep  6 19:25:08 2019//
 /creat.c/1.6/Mon Aug  8 08:05:33 2005//
-/getdtablesize.3/1.13/Fri Jan 12 04:36:44 2018//
 /getdtablesize.c/1.4/Mon Aug  8 08:05:33 2005//
 /gethostid.3/1.16/Sun Mar  3 18:15:24 2019//
 /killpg.3/1.14/Sun May  7 21:19:29 2017//
@@ -15,4 +14,5 @@
 /sethostid.c/1.10/Sat May  1 08:41:50 2021//
 /getwd.c/1.13/Mon Jan 24 14:35:13 2022//
 /sigvec.3/1.36/Mon Jun 27 13:01:59 2022//
+/getdtablesize.3/1.14/Fri Jul 22 12:01:44 2022//
 D

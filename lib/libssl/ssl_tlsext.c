@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_tlsext.c,v 1.119 2022/07/02 16:31:04 tb Exp $ */
+/* $OpenBSD: ssl_tlsext.c,v 1.125 2022/07/20 15:16:06 tb Exp $ */
 /*
  * Copyright (c) 2016, 2017, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2017 Doug Hogan <doug@openbsd.org>
@@ -63,29 +63,41 @@ tlsext_alpn_client_build(SSL *s, uint16_t msg_type, CBB *cbb)
 }
 
 int
+tlsext_alpn_check_format(CBS *cbs)
+{
+	CBS proto_name_list;
+
+	if (CBS_len(cbs) == 0)
+		return 0;
+
+	CBS_dup(cbs, &proto_name_list);
+	while (CBS_len(&proto_name_list) > 0) {
+		CBS proto_name;
+
+		if (!CBS_get_u8_length_prefixed(&proto_name_list, &proto_name))
+			return 0;
+		if (CBS_len(&proto_name) == 0)
+			return 0;
+	}
+
+	return 1;
+}
+
+int
 tlsext_alpn_server_parse(SSL *s, uint16_t msg_types, CBS *cbs, int *alert)
 {
-	CBS proto_name_list, alpn;
+	CBS alpn;
 	const unsigned char *selected;
 	unsigned char selected_len;
 	int r;
 
 	if (!CBS_get_u16_length_prefixed(cbs, &alpn))
 		goto err;
-	if (CBS_len(&alpn) < 2)
-		goto err;
 	if (CBS_len(cbs) != 0)
 		goto err;
 
-	CBS_dup(&alpn, &proto_name_list);
-	while (CBS_len(&proto_name_list) > 0) {
-		CBS proto_name;
-
-		if (!CBS_get_u8_length_prefixed(&proto_name_list, &proto_name))
-			goto err;
-		if (CBS_len(&proto_name) == 0)
-			goto err;
-	}
+	if (!tlsext_alpn_check_format(&alpn))
+		goto err;
 
 	if (s->ctx->internal->alpn_select_cb == NULL)
 		return 1;
@@ -101,14 +113,15 @@ tlsext_alpn_server_parse(SSL *s, uint16_t msg_types, CBS *cbs, int *alert)
 	    s->ctx->internal->alpn_select_cb_arg);
 
 	if (r == SSL_TLSEXT_ERR_OK) {
-		free(s->s3->alpn_selected);
-		if ((s->s3->alpn_selected = malloc(selected_len)) == NULL) {
-			s->s3->alpn_selected_len = 0;
+		CBS cbs;
+
+		CBS_init(&cbs, selected, selected_len);
+
+		if (!CBS_stow(&cbs, &s->s3->alpn_selected,
+		    &s->s3->alpn_selected_len)) {
 			*alert = SSL_AD_INTERNAL_ERROR;
 			return 0;
 		}
-		memcpy(s->s3->alpn_selected, selected, selected_len);
-		s->s3->alpn_selected_len = selected_len;
 
 		return 1;
 	}
@@ -177,8 +190,7 @@ tlsext_alpn_client_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 	if (CBS_len(&proto) == 0)
 		goto err;
 
-	if (!CBS_stow(&proto, &(s->s3->alpn_selected),
-	    &(s->s3->alpn_selected_len)))
+	if (!CBS_stow(&proto, &s->s3->alpn_selected, &s->s3->alpn_selected_len))
 		goto err;
 
 	return 1;
@@ -233,7 +245,9 @@ tlsext_supportedgroups_server_parse(SSL *s, uint16_t msg_type, CBS *cbs,
     int *alert)
 {
 	CBS grouplist;
+	uint16_t *groups;
 	size_t groups_len;
+	int i;
 
 	if (!CBS_get_u16_length_prefixed(cbs, &grouplist))
 		goto err;
@@ -245,61 +259,45 @@ tlsext_supportedgroups_server_parse(SSL *s, uint16_t msg_type, CBS *cbs,
 		goto err;
 	groups_len /= 2;
 
-	if (!s->internal->hit) {
-		uint16_t *groups;
-		int i;
+	if (s->internal->hit)
+		return 1;
 
-		if (s->s3->hs.tls13.hrr) {
-			if (s->session->tlsext_supportedgroups == NULL) {
-				*alert = SSL_AD_HANDSHAKE_FAILURE;
-				return 0;
-			}
-			/*
-			 * In the case of TLSv1.3 the client cannot change
-			 * the supported groups.
-			 */
-			if (groups_len != s->session->tlsext_supportedgroups_length) {
-				*alert = SSL_AD_ILLEGAL_PARAMETER;
-				return 0;
-			}
-			for (i = 0; i < groups_len; i++) {
-				uint16_t group;
-
-				if (!CBS_get_u16(&grouplist, &group))
-					goto err;
-				if (s->session->tlsext_supportedgroups[i] != group) {
-					*alert = SSL_AD_ILLEGAL_PARAMETER;
-					return 0;
-				}
-			}
-
-			return 1;
-		}
-
-		if (s->session->tlsext_supportedgroups != NULL)
-			goto err;
-
-		if ((groups = reallocarray(NULL, groups_len,
-		    sizeof(uint16_t))) == NULL) {
-			*alert = SSL_AD_INTERNAL_ERROR;
+	if (s->s3->hs.tls13.hrr) {
+		if (s->session->tlsext_supportedgroups == NULL) {
+			*alert = SSL_AD_HANDSHAKE_FAILURE;
 			return 0;
 		}
 
-		for (i = 0; i < groups_len; i++) {
-			if (!CBS_get_u16(&grouplist, &groups[i])) {
-				free(groups);
-				goto err;
-			}
-		}
+		/*
+		 * The ClientHello extension hashing ensures that the client
+		 * did not change its list of supported groups.
+		 */
 
-		if (CBS_len(&grouplist) != 0) {
+		return 1;
+	}
+
+	if (s->session->tlsext_supportedgroups != NULL)
+		goto err;
+
+	if ((groups = reallocarray(NULL, groups_len, sizeof(uint16_t))) == NULL) {
+		*alert = SSL_AD_INTERNAL_ERROR;
+		return 0;
+	}
+
+	for (i = 0; i < groups_len; i++) {
+		if (!CBS_get_u16(&grouplist, &groups[i])) {
 			free(groups);
 			goto err;
 		}
-
-		s->session->tlsext_supportedgroups = groups;
-		s->session->tlsext_supportedgroups_length = groups_len;
 	}
+
+	if (CBS_len(&grouplist) != 0) {
+		free(groups);
+		goto err;
+	}
+
+	s->session->tlsext_supportedgroups = groups;
+	s->session->tlsext_supportedgroups_length = groups_len;
 
 	return 1;
 
@@ -1950,30 +1948,21 @@ tlsext_psk_server_parse(SSL *s, uint16_t msg_type, CBS *cbs, int *alert)
 }
 
 /*
- * QUIC transport parameters extension.
+ * QUIC transport parameters extension - RFC 9001 section 8.2.
  */
 
 int
 tlsext_quic_transport_parameters_client_needs(SSL *s, uint16_t msg_type)
 {
-	return (s->internal->quic_transport_params_len > 0 &&
-	    s->s3->hs.our_max_tls_version >= TLS1_3_VERSION);
+	return SSL_is_quic(s) && s->internal->quic_transport_params_len > 0;
 }
 
 int
 tlsext_quic_transport_parameters_client_build(SSL *s, uint16_t msg_type,
     CBB *cbb)
 {
-	CBB contents;
-
-	if (!CBB_add_u16_length_prefixed(cbb, &contents))
-		return 0;
-
-	if (!CBB_add_bytes(&contents, s->internal->quic_transport_params,
+	if (!CBB_add_bytes(cbb, s->internal->quic_transport_params,
 	    s->internal->quic_transport_params_len))
-		return 0;
-
-	if (!CBB_flush(cbb))
 		return 0;
 
 	return 1;
@@ -1983,19 +1972,15 @@ int
 tlsext_quic_transport_parameters_client_parse(SSL *s, uint16_t msg_type,
     CBS *cbs, int *alert)
 {
-	CBS transport_data;
-
-	/* QUIC requires TLS 1.3. */
-	if (ssl_effective_tls_version(s) < TLS1_3_VERSION) {
+	if (!SSL_is_quic(s)) {
 		*alert = SSL_AD_UNSUPPORTED_EXTENSION;
 		return 0;
 	}
 
-	if (!CBS_get_u16_length_prefixed(cbs, &transport_data))
-		return 0;
-
-	if (!CBS_stow(&transport_data, &s->s3->peer_quic_transport_params,
+	if (!CBS_stow(cbs, &s->s3->peer_quic_transport_params,
 	    &s->s3->peer_quic_transport_params_len))
+		return 0;
+	if (!CBS_skip(cbs, s->s3->peer_quic_transport_params_len))
 		return 0;
 
 	return 1;
@@ -2004,23 +1989,15 @@ tlsext_quic_transport_parameters_client_parse(SSL *s, uint16_t msg_type,
 int
 tlsext_quic_transport_parameters_server_needs(SSL *s, uint16_t msg_type)
 {
-	return s->internal->quic_transport_params_len > 0;
+	return SSL_is_quic(s) && s->internal->quic_transport_params_len > 0;
 }
 
 int
 tlsext_quic_transport_parameters_server_build(SSL *s, uint16_t msg_type,
     CBB *cbb)
 {
-	CBB contents;
-
-	if (!CBB_add_u16_length_prefixed(cbb, &contents))
-		return 0;
-
-	if (!CBB_add_bytes(&contents, s->internal->quic_transport_params,
+	if (!CBB_add_bytes(cbb, s->internal->quic_transport_params,
 	    s->internal->quic_transport_params_len))
-		return 0;
-
-	if (!CBB_flush(cbb))
 		return 0;
 
 	return 1;
@@ -2030,26 +2007,15 @@ int
 tlsext_quic_transport_parameters_server_parse(SSL *s, uint16_t msg_type,
     CBS *cbs, int *alert)
 {
-	CBS transport_data;
-
-	/*
-	 * Ignore this extension if we don't have configured quic transport data
-	 * or if we are not TLS 1.3.
-	 */
-	if (s->internal->quic_transport_params_len == 0 ||
-	    ssl_effective_tls_version(s) < TLS1_3_VERSION) {
-		if (!CBS_skip(cbs, CBS_len(cbs))) {
-			*alert = SSL_AD_INTERNAL_ERROR;
-			return 0;
-		}
-		return 1;
+	if (!SSL_is_quic(s)) {
+		*alert = SSL_AD_UNSUPPORTED_EXTENSION;
+		return 0;
 	}
 
-	if (!CBS_get_u16_length_prefixed(cbs, &transport_data))
-		return 0;
-
-	if (!CBS_stow(&transport_data, &s->s3->peer_quic_transport_params,
+	if (!CBS_stow(cbs, &s->s3->peer_quic_transport_params,
 	    &s->s3->peer_quic_transport_params_len))
+		return 0;
+	if (!CBS_skip(cbs, s->s3->peer_quic_transport_params_len))
 		return 0;
 
 	return 1;
@@ -2245,7 +2211,7 @@ static const struct tls_extension tls_extensions[] = {
 #endif /* OPENSSL_NO_SRTP */
 	{
 		.type = TLSEXT_TYPE_quic_transport_parameters,
-		.messages = SSL_TLSEXT_MSG_CH | SSL_TLSEXT_MSG_SH,
+		.messages = SSL_TLSEXT_MSG_CH | SSL_TLSEXT_MSG_EE,
 		.client = {
 			.needs = tlsext_quic_transport_parameters_client_needs,
 			.build = tlsext_quic_transport_parameters_client_build,

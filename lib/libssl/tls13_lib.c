@@ -1,4 +1,4 @@
-/*	$OpenBSD: tls13_lib.c,v 1.63 2022/02/05 14:54:10 jsing Exp $ */
+/*	$OpenBSD: tls13_lib.c,v 1.67 2022/07/20 06:32:24 jsing Exp $ */
 /*
  * Copyright (c) 2018, 2019 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2019 Bob Beck <beck@openbsd.org>
@@ -215,31 +215,41 @@ tls13_legacy_ocsp_status_recv_cb(void *arg)
 }
 
 static int
-tls13_phh_update_local_traffic_secret(struct tls13_ctx *ctx)
+tls13_phh_update_read_traffic_secret(struct tls13_ctx *ctx)
 {
 	struct tls13_secrets *secrets = ctx->hs->tls13.secrets;
+	struct tls13_secret *secret;
 
-	if (ctx->mode == TLS13_HS_CLIENT)
-		return (tls13_update_client_traffic_secret(secrets) &&
-		    tls13_record_layer_set_write_traffic_key(ctx->rl,
-			&secrets->client_application_traffic));
-	return (tls13_update_server_traffic_secret(secrets) &&
-	    tls13_record_layer_set_read_traffic_key(ctx->rl,
-	    &secrets->server_application_traffic));
+	if (ctx->mode == TLS13_HS_CLIENT) {
+		secret = &secrets->server_application_traffic;
+		if (!tls13_update_server_traffic_secret(secrets))
+			return 0;
+	} else {
+		secret = &secrets->client_application_traffic;
+		if (!tls13_update_client_traffic_secret(secrets))
+			return 0;
+	}
+
+	return tls13_record_layer_set_read_traffic_key(ctx->rl, secret);
 }
 
 static int
-tls13_phh_update_peer_traffic_secret(struct tls13_ctx *ctx)
+tls13_phh_update_write_traffic_secret(struct tls13_ctx *ctx)
 {
 	struct tls13_secrets *secrets = ctx->hs->tls13.secrets;
+	struct tls13_secret *secret;
 
-	if (ctx->mode == TLS13_HS_CLIENT)
-		return (tls13_update_server_traffic_secret(secrets) &&
-		    tls13_record_layer_set_read_traffic_key(ctx->rl,
-		    &secrets->server_application_traffic));
-	return (tls13_update_client_traffic_secret(secrets) &&
-	    tls13_record_layer_set_write_traffic_key(ctx->rl,
-	    &secrets->client_application_traffic));
+	if (ctx->mode == TLS13_HS_CLIENT) {
+		secret = &secrets->client_application_traffic;
+		if (!tls13_update_client_traffic_secret(secrets))
+			return 0;
+	} else {
+		secret = &secrets->server_application_traffic;
+		if (!tls13_update_server_traffic_secret(secrets))
+			return 0;
+	}
+
+	return tls13_record_layer_set_write_traffic_key(ctx->rl, secret);
 }
 
 /*
@@ -285,13 +295,13 @@ tls13_key_update_recv(struct tls13_ctx *ctx, CBS *cbs)
 		goto err;
 	}
 
-	if (!tls13_phh_update_peer_traffic_secret(ctx))
+	if (!tls13_phh_update_read_traffic_secret(ctx))
 		goto err;
 
 	if (key_update_request == 0)
 		return TLS13_IO_SUCCESS;
 
-	/* key_update_request == 1 */
+	/* Our peer requested that we update our write traffic keys. */
 	if ((hs_msg = tls13_handshake_msg_new()) == NULL)
 		goto err;
 	if (!tls13_handshake_msg_start(hs_msg, &cbb_hs, TLS13_MT_KEY_UPDATE))
@@ -322,17 +332,17 @@ tls13_phh_done_cb(void *cb_arg)
 	struct tls13_ctx *ctx = cb_arg;
 
 	if (ctx->key_update_request) {
-		tls13_phh_update_local_traffic_secret(ctx);
+		tls13_phh_update_write_traffic_secret(ctx);
 		ctx->key_update_request = 0;
 	}
 }
 
 static ssize_t
-tls13_phh_received_cb(void *cb_arg, CBS *cbs)
+tls13_phh_received_cb(void *cb_arg)
 {
 	ssize_t ret = TLS13_IO_FAILURE;
 	struct tls13_ctx *ctx = cb_arg;
-	CBS phh_cbs;
+	CBS cbs;
 
 	if (!tls13_phh_limit_check(ctx))
 		return tls13_send_alert(ctx->rl, TLS13_ALERT_UNEXPECTED_MESSAGE);
@@ -341,19 +351,16 @@ tls13_phh_received_cb(void *cb_arg, CBS *cbs)
 	    ((ctx->hs_msg = tls13_handshake_msg_new()) == NULL))
 		return TLS13_IO_FAILURE;
 
-	if (!tls13_handshake_msg_set_buffer(ctx->hs_msg, cbs))
-		return TLS13_IO_FAILURE;
-
-	if ((ret = tls13_handshake_msg_recv(ctx->hs_msg, ctx->rl))
-	    != TLS13_IO_SUCCESS)
+	if ((ret = tls13_handshake_msg_recv(ctx->hs_msg, ctx->rl)) !=
+	    TLS13_IO_SUCCESS)
 		return ret;
 
-	if (!tls13_handshake_msg_content(ctx->hs_msg, &phh_cbs))
+	if (!tls13_handshake_msg_content(ctx->hs_msg, &cbs))
 		return TLS13_IO_FAILURE;
 
 	switch(tls13_handshake_msg_type(ctx->hs_msg)) {
 	case TLS13_MT_KEY_UPDATE:
-		ret = tls13_key_update_recv(ctx, &phh_cbs);
+		ret = tls13_key_update_recv(ctx, &cbs);
 		break;
 	case TLS13_MT_NEW_SESSION_TICKET:
 		/* XXX do nothing for now and ignore this */
@@ -382,14 +389,16 @@ static const struct tls13_record_layer_callbacks rl_callbacks = {
 };
 
 struct tls13_ctx *
-tls13_ctx_new(int mode)
+tls13_ctx_new(int mode, SSL *ssl)
 {
 	struct tls13_ctx *ctx = NULL;
 
 	if ((ctx = calloc(sizeof(struct tls13_ctx), 1)) == NULL)
 		goto err;
 
+	ctx->hs = &ssl->s3->hs;
 	ctx->mode = mode;
+	ctx->ssl = ssl;
 
 	if ((ctx->rl = tls13_record_layer_new(&rl_callbacks, ctx)) == NULL)
 		goto err;
@@ -399,7 +408,10 @@ tls13_ctx_new(int mode)
 	ctx->info_cb = tls13_legacy_info_cb;
 	ctx->ocsp_status_recv_cb = tls13_legacy_ocsp_status_recv_cb;
 
-	ctx->middlebox_compat = 1;
+	if (!SSL_is_quic(ssl))
+		ctx->middlebox_compat = 1;
+
+	ssl->internal->tls13 = ctx;
 
 	return ctx;
 

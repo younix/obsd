@@ -7,11 +7,6 @@
 /gcc.octeon/1.16/Wed Sep  1 16:07:30 2021//
 /md.powerpc64/1.7/Wed Sep  1 16:07:30 2021//
 /md.riscv64/1.5/Wed Oct 20 17:27:55 2021//
-/gcc.alpha/1.18/Mon Jun 27 13:01:57 2022//
-/gcc.hppa/1.18/Mon Jun 27 13:01:57 2022//
-/gcc.landisk/1.18/Mon Jun 27 13:01:57 2022//
-/gcc.luna88k/1.18/Mon Jun 27 13:01:57 2022//
-/gcc.sparc64/1.18/Mon Jun 27 13:01:57 2022//
 /clang.amd64/1.43/Sat Jul 16 15:38:33 2022//
 /clang.arm64/1.36/Sat Jul 16 15:38:33 2022//
 /clang.armv7/1.36/Sat Jul 16 15:38:33 2022//
@@ -33,5 +28,10 @@
 /md.macppc/1.131/Sat Jul 16 15:38:33 2022//
 /md.octeon/1.35/Sat Jul 16 15:38:33 2022//
 /md.sparc64/1.121/Sat Jul 16 15:38:33 2022//
-/mi/1.1601/Sat Jul 16 15:38:33 2022//
+/gcc.alpha/1.19/Fri Jul 22 12:01:08 2022//
+/gcc.hppa/1.19/Fri Jul 22 12:01:08 2022//
+/gcc.landisk/1.19/Fri Jul 22 12:01:08 2022//
+/gcc.luna88k/1.19/Fri Jul 22 12:01:08 2022//
+/gcc.sparc64/1.19/Fri Jul 22 12:01:08 2022//
+/mi/1.1602/Fri Jul 22 12:01:08 2022//
 D

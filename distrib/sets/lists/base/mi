@@ -317,6 +317,9 @@
 ./etc/signify/openbsd-72-fw.pub
 ./etc/signify/openbsd-72-pkg.pub
 ./etc/signify/openbsd-72-syspatch.pub
+./etc/signify/openbsd-73-base.pub
+./etc/signify/openbsd-73-fw.pub
+./etc/signify/openbsd-73-pkg.pub
 ./etc/skel
 ./etc/skel/.ssh
 ./etc/ssh
@@ -768,7 +771,7 @@
 ./usr/lib/libtls.so.25.1
 ./usr/lib/libusbhid.so.7.1
 ./usr/lib/libutil.so.16.0
-./usr/lib/libz.so.6.1
+./usr/lib/libz.so.7.0
 ./usr/lib/locate
 ./usr/lib/locate/src.db
 ./usr/lib/pkgconfig

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.295 2022/07/02 16:31:04 tb Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.299 2022/07/20 14:13:13 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -162,6 +162,7 @@
 #include "dtls_locl.h"
 #include "ssl_locl.h"
 #include "ssl_sigalgs.h"
+#include "ssl_tlsext.h"
 
 const char *SSL_version_str = OPENSSL_VERSION_TEXT;
 
@@ -239,6 +240,7 @@ SSL *
 SSL_new(SSL_CTX *ctx)
 {
 	SSL *s;
+	CBS cbs;
 
 	if (ctx == NULL) {
 		SSLerrorx(SSL_R_NULL_SSL_CTX);
@@ -328,17 +330,11 @@ SSL_new(SSL_CTX *ctx)
 		    ctx->internal->tlsext_supportedgroups_length;
 	}
 
-	if (s->ctx->internal->alpn_client_proto_list != NULL) {
-		s->internal->alpn_client_proto_list =
-		    malloc(s->ctx->internal->alpn_client_proto_list_len);
-		if (s->internal->alpn_client_proto_list == NULL)
-			goto err;
-		memcpy(s->internal->alpn_client_proto_list,
-		    s->ctx->internal->alpn_client_proto_list,
-		    s->ctx->internal->alpn_client_proto_list_len);
-		s->internal->alpn_client_proto_list_len =
-		    s->ctx->internal->alpn_client_proto_list_len;
-	}
+	CBS_init(&cbs, ctx->internal->alpn_client_proto_list,
+	    ctx->internal->alpn_client_proto_list_len);
+	if (!CBS_stow(&cbs, &s->internal->alpn_client_proto_list,
+	    &s->internal->alpn_client_proto_list_len))
+		goto err;
 
 	s->verify_result = X509_V_OK;
 
@@ -1763,27 +1759,28 @@ int
 SSL_CTX_set_alpn_protos(SSL_CTX *ctx, const unsigned char *protos,
     unsigned int protos_len)
 {
+	CBS cbs;
 	int failed = 1;
 
-	if (protos == NULL || protos_len == 0)
+	if (protos == NULL)
+		protos_len = 0;
+
+	CBS_init(&cbs, protos, protos_len);
+
+	if (protos_len > 0) {
+		if (!tlsext_alpn_check_format(&cbs))
+			goto err;
+	}
+
+	if (!CBS_stow(&cbs, &ctx->internal->alpn_client_proto_list,
+	    &ctx->internal->alpn_client_proto_list_len))
 		goto err;
-
-	free(ctx->internal->alpn_client_proto_list);
-	ctx->internal->alpn_client_proto_list = NULL;
-	ctx->internal->alpn_client_proto_list_len = 0;
-
-	if ((ctx->internal->alpn_client_proto_list = malloc(protos_len))
-	    == NULL)
-		goto err;
-	ctx->internal->alpn_client_proto_list_len = protos_len;
-
-	memcpy(ctx->internal->alpn_client_proto_list, protos, protos_len);
 
 	failed = 0;
 
  err:
 	/* NOTE: Return values are the reverse of what you expect. */
-	return (failed);
+	return failed;
 }
 
 /*
@@ -1795,27 +1792,28 @@ int
 SSL_set_alpn_protos(SSL *ssl, const unsigned char *protos,
     unsigned int protos_len)
 {
+	CBS cbs;
 	int failed = 1;
 
-	if (protos == NULL || protos_len == 0)
+	if (protos == NULL)
+		protos_len = 0;
+
+	CBS_init(&cbs, protos, protos_len);
+
+	if (protos_len > 0) {
+		if (!tlsext_alpn_check_format(&cbs))
+			goto err;
+	}
+
+	if (!CBS_stow(&cbs, &ssl->internal->alpn_client_proto_list,
+	    &ssl->internal->alpn_client_proto_list_len))
 		goto err;
-
-	free(ssl->internal->alpn_client_proto_list);
-	ssl->internal->alpn_client_proto_list = NULL;
-	ssl->internal->alpn_client_proto_list_len = 0;
-
-	if ((ssl->internal->alpn_client_proto_list = malloc(protos_len))
-	    == NULL)
-		goto err;
-	ssl->internal->alpn_client_proto_list_len = protos_len;
-
-	memcpy(ssl->internal->alpn_client_proto_list, protos, protos_len);
 
 	failed = 0;
 
  err:
 	/* NOTE: Return values are the reverse of what you expect. */
-	return (failed);
+	return failed;
 }
 
 /*
@@ -3313,6 +3311,12 @@ OBJ_bsearch_ssl_cipher_id(SSL_CIPHER *key, SSL_CIPHER const *base, int num)
 {
 	return (SSL_CIPHER *)OBJ_bsearch_(key, base, num, sizeof(SSL_CIPHER),
 	    ssl_cipher_id_cmp_BSEARCH_CMP_FN);
+}
+
+int
+SSL_is_quic(const SSL *ssl)
+{
+	return ssl->quic_method != NULL;
 }
 
 int

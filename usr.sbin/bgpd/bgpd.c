@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.c,v 1.248 2022/06/23 13:09:03 claudio Exp $ */
+/*	$OpenBSD: bgpd.c,v 1.250 2022/07/22 11:17:48 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -599,7 +599,9 @@ send_config(struct bgpd_config *conf)
 
 	reconfpending = 3;	/* one per child */
 
-	expand_networks(conf);
+	expand_networks(conf, &conf->networks);
+	SIMPLEQ_FOREACH(vpn, &conf->l3vpns, entry)
+		expand_networks(conf, &vpn->net_l);
 
 	cflags = conf->flags;
 
@@ -1117,7 +1119,7 @@ int
 bgpd_filternexthop(struct kroute_full *kf)
 {
 	/* kernel routes are never filtered */
-	if (kf->flags & F_KERNEL && kf->prefixlen != 0)
+	if (kf->priority != RTP_MINE && kf->prefixlen != 0)
 		return (0);
 
 	if (cflags & BGPD_FLAG_NEXTHOP_BGP) {

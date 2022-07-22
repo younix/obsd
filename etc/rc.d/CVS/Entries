@@ -53,7 +53,6 @@
 /watchdogd/1.2/Thu Jan 11 19:52:12 2018//
 /wsmoused/1.2/Thu Jan 11 19:52:12 2018//
 /xenodm/1.2/Thu Jan 11 19:52:12 2018//
-/ypbind/1.9/Thu Jan 11 21:09:26 2018//
 /ypldap/1.4/Thu Jan 11 19:52:12 2018//
 /yppasswdd/1.6/Thu Jan 11 21:09:26 2018//
 /ypserv/1.6/Thu Jan 11 21:09:26 2018//
@@ -72,4 +71,5 @@
 /unbound/1.7/Mon Jun 27 13:01:57 2022//
 /vmd/1.11/Mon Jun 27 13:01:57 2022//
 /bgplgd/1.1/Tue Jun 28 18:46:01 2022//
+/ypbind/1.10/Fri Jul 22 12:01:09 2022//
 D

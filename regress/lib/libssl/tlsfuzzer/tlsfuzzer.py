@@ -1,4 +1,4 @@
-#   $OpenBSD: tlsfuzzer.py,v 1.45 2022/05/14 17:58:11 tb Exp $
+#   $OpenBSD: tlsfuzzer.py,v 1.47 2022/07/18 09:15:08 tb Exp $
 #
 # Copyright (c) 2020 Theo Buehler <tb@openbsd.org>
 #
@@ -175,7 +175,8 @@ tls13_tests = TestGroup("TLSv1.3 tests", [
     Test("test-tls13-legacy-version.py"),
     Test("test-tls13-nociphers.py"),
     Test("test-tls13-record-padding.py"),
-    Test("test-tls13-shuffled-extentions.py"),
+    # Exclude QUIC transport parameters
+    Test("test-tls13-shuffled-extentions.py", [ "--exc", "57" ]),
     Test("test-tls13-zero-content-type.py"),
 
     # The skipped tests fail due to a bug in BIO_gets() which masks the retry
@@ -207,9 +208,10 @@ tls13_slow_tests = TestGroup("slow TLSv1.3 tests", [
     ]),
     # We don't accept an empty ECPF extension since it must advertise the
     # uncompressed point format. Exclude this extension type from the test.
+    # Also exclude QUIC transport parameters.
     Test(
         "test-tls13-large-number-of-extensions.py",
-        tls13_args = ["--exc", "11"],
+        tls13_args = ["--exc", "11", "--exc", "57"],
     ),
 ])
 
@@ -413,7 +415,8 @@ tls12_slow_tests = TestGroup("slow TLSv1.2 tests", [
     Test("test-dhe-no-shared-secret-padding.py", tls12_exclude_legacy_protocols),
     Test("test-ecdhe-padded-shared-secret.py", tls12_exclude_legacy_protocols),
     Test("test-ecdhe-rsa-key-share-random.py", tls12_exclude_legacy_protocols),
-    Test("test-large-hello.py"),
+    # Start at extension number 58 to avoid QUIC transport parameters (57)
+    Test("test-large-hello.py", [ "-m", "58" ]),
 ])
 
 tls12_failing_tests = TestGroup("failing TLSv1.2 tests", [
