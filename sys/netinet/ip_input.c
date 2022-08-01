@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.372 2022/06/29 09:01:48 mvs Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.375 2022/07/28 22:05:39 bluhm Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -142,6 +142,11 @@ int	ip_local(struct mbuf **, int *, int, int);
 int	ip_dooptions(struct mbuf *, struct ifnet *);
 int	in_ouraddr(struct mbuf *, struct ifnet *, struct rtentry **);
 
+int		ip_fragcheck(struct mbuf **, int *);
+struct mbuf *	ip_reass(struct ipqent *, struct ipq *);
+void		ip_freef(struct ipq *);
+void		ip_flush(void);
+
 static void ip_send_dispatch(void *);
 static void ip_sendraw_dispatch(void *);
 static struct task ipsend_task = TASK_INITIALIZER(ip_send_dispatch, &ipsend_mq);
@@ -234,6 +239,10 @@ ip_init(void)
 int
 ip_ours(struct mbuf **mp, int *offp, int nxt, int af)
 {
+	nxt = ip_fragcheck(mp, offp);
+	if (nxt == IPPROTO_DONE)
+		return IPPROTO_DONE;
+
 	/* We are already in a IPv4/IPv6 local deliver loop. */
 	if (af != AF_UNSPEC)
 		return ip_local(mp, offp, nxt, af);
@@ -550,31 +559,65 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 int
 ip_local(struct mbuf **mp, int *offp, int nxt, int af)
 {
-	struct mbuf *m = *mp;
-	struct ip *ip = mtod(m, struct ip *);
+	struct ip *ip;
+
+	ip = mtod(*mp, struct ip *);
+	*offp = ip->ip_hl << 2;
+	nxt = ip->ip_p;
+
+	/* Check whether we are already in a IPv4/IPv6 local deliver loop. */
+	if (af == AF_UNSPEC)
+		nxt = ip_deliver(mp, offp, nxt, AF_INET);
+	return nxt;
+}
+
+int
+ip_fragcheck(struct mbuf **mp, int *offp)
+{
+	struct ip *ip;
 	struct ipq *fp;
 	struct ipqent *ipqe;
 	int mff, hlen;
 
-	NET_ASSERT_WLOCKED();
-
+	ip = mtod(*mp, struct ip *);
 	hlen = ip->ip_hl << 2;
 
 	/*
-	 * If offset or IP_MF are set, must reassemble.
+	 * If offset or more fragments are set, must reassemble.
 	 * Otherwise, nothing need be done.
 	 * (We could look in the reassembly queue to see
 	 * if the packet was previously fragmented,
 	 * but it's not worth the time; just let them time out.)
 	 */
-	if (ip->ip_off &~ htons(IP_DF | IP_RF)) {
-		if (m->m_flags & M_EXT) {		/* XXX */
-			if ((m = *mp = m_pullup(m, hlen)) == NULL) {
+	if (ISSET(ip->ip_off, htons(IP_OFFMASK | IP_MF))) {
+		if ((*mp)->m_flags & M_EXT) {		/* XXX */
+			if ((*mp = m_pullup(*mp, hlen)) == NULL) {
 				ipstat_inc(ips_toosmall);
 				return IPPROTO_DONE;
 			}
-			ip = mtod(m, struct ip *);
+			ip = mtod(*mp, struct ip *);
 		}
+
+		/*
+		 * Adjust ip_len to not reflect header,
+		 * set ipqe_mff if more fragments are expected,
+		 * convert offset of this to bytes.
+		 */
+		ip->ip_len = htons(ntohs(ip->ip_len) - hlen);
+		mff = ISSET(ip->ip_off, htons(IP_MF));
+		if (mff) {
+			/*
+			 * Make sure that fragments have a data length
+			 * that's a non-zero multiple of 8 bytes.
+			 */
+			if (ntohs(ip->ip_len) == 0 ||
+			    (ntohs(ip->ip_len) & 0x7) != 0) {
+				ipstat_inc(ips_badfrags);
+				m_freemp(mp);
+				return IPPROTO_DONE;
+			}
+		}
+		ip->ip_off = htons(ntohs(ip->ip_off) << 3);
 
 		mtx_enter(&ipq_mutex);
 
@@ -589,26 +632,6 @@ ip_local(struct mbuf **mp, int *offp, int nxt, int af)
 			    ip->ip_p == fp->ipq_p)
 				break;
 		}
-
-		/*
-		 * Adjust ip_len to not reflect header,
-		 * set ipqe_mff if more fragments are expected,
-		 * convert offset of this to bytes.
-		 */
-		ip->ip_len = htons(ntohs(ip->ip_len) - hlen);
-		mff = (ip->ip_off & htons(IP_MF)) != 0;
-		if (mff) {
-			/*
-			 * Make sure that fragments have a data length
-			 * that's a non-zero multiple of 8 bytes.
-			 */
-			if (ntohs(ip->ip_len) == 0 ||
-			    (ntohs(ip->ip_len) & 0x7) != 0) {
-				ipstat_inc(ips_badfrags);
-				goto bad;
-			}
-		}
-		ip->ip_off = htons(ntohs(ip->ip_off) << 3);
 
 		/*
 		 * If datagram marked as having more fragments
@@ -630,28 +653,26 @@ ip_local(struct mbuf **mp, int *offp, int nxt, int af)
 			}
 			ip_frags++;
 			ipqe->ipqe_mff = mff;
-			ipqe->ipqe_m = m;
+			ipqe->ipqe_m = *mp;
 			ipqe->ipqe_ip = ip;
-			m = *mp = ip_reass(ipqe, fp);
-			if (m == NULL)
+			*mp = ip_reass(ipqe, fp);
+			if (*mp == NULL)
 				goto bad;
 			ipstat_inc(ips_reassembled);
-			ip = mtod(m, struct ip *);
+			ip = mtod(*mp, struct ip *);
 			hlen = ip->ip_hl << 2;
 			ip->ip_len = htons(ntohs(ip->ip_len) + hlen);
-		} else
-			if (fp)
+		} else {
+			if (fp != NULL)
 				ip_freef(fp);
+		}
 
 		mtx_leave(&ipq_mutex);
 	}
 
 	*offp = hlen;
-	nxt = ip->ip_p;
-	/* Check whether we are already in a IPv4/IPv6 local deliver loop. */
-	if (af == AF_UNSPEC)
-		nxt = ip_deliver(mp, offp, nxt, AF_INET);
-	return nxt;
+	return ip->ip_p;
+
  bad:
 	mtx_leave(&ipq_mutex);
 	m_freemp(mp);
@@ -673,6 +694,8 @@ ip_deliver(struct mbuf **mp, int *offp, int nxt, int af)
 #ifdef INET6
 	int nest = 0;
 #endif /* INET6 */
+
+	NET_ASSERT_WLOCKED();
 
 	/* pf might have modified stuff, might have to chksum */
 	switch (af) {

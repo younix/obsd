@@ -27,7 +27,6 @@
 /exit.3/1.16/Sun Nov 30 21:21:59 2014//
 /exit.c/1.14/Sat Aug 12 22:59:52 2017//
 /gcvt.c/1.14/Fri Jan 25 00:19:25 2019//
-/getenv.3/1.21/Fri Jul 11 09:24:03 2014//
 /getenv.c/1.12/Sun Mar 13 18:34:21 2016//
 /getsubopt.c/1.4/Mon Aug  8 08:05:36 2005//
 /hcreate.3/1.8/Tue Jan 30 11:37:58 2018//
@@ -95,14 +94,15 @@
 /getsubopt.3/1.15/Tue Sep 14 08:17:17 2021//
 /realpath.3/1.26/Wed Oct 20 17:28:43 2021//
 /atoll.c/1.4/Mon Nov 15 19:06:15 2021//
-/getopt.3/1.47/Mon Nov 15 19:06:15 2021//
 /bsearch.c/1.9/Mon Jan 24 14:35:13 2022//
 /getopt_long.3/1.24/Mon Jan 24 14:35:13 2022//
 /lsearch.c/1.7/Mon Jan 24 14:35:13 2022//
 /atexit.3/1.13/Mon Jun 27 13:01:59 2022//
-/malloc.3/1.129/Mon Jun 27 13:01:59 2022//
-/rand.3/1.21/Mon Jun 27 13:01:59 2022//
-/system.c/1.13/Mon Jun 27 13:01:59 2022//
-/tsearch.3/1.22/Mon Jun 27 13:01:59 2022//
-/malloc.c/1.274/Sat Jul 16 15:39:13 2022//
+/getenv.3/1.22/Mon Aug  1 07:15:36 2022//
+/getopt.3/1.48/Mon Aug  1 07:15:36 2022//
+/malloc.3/1.129/Tue Jul 26 13:42:32 2022//
+/malloc.c/1.274/Tue Jul 26 13:42:32 2022//
+/rand.3/1.21/Tue Jul 26 13:42:32 2022//
+/system.c/1.13/Tue Jul 26 13:42:32 2022//
+/tsearch.3/1.22/Tue Jul 26 13:42:32 2022//
 D

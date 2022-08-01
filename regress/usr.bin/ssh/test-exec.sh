@@ -1,9 +1,9 @@
-#	$OpenBSD: test-exec.sh,v 1.90 2022/07/04 09:10:31 dtucker Exp $
+#	$OpenBSD: test-exec.sh,v 1.92 2022/07/25 07:12:45 dtucker Exp $
 #	Placed in the Public Domain.
 
 #SUDO=sudo
 
-if [ ! -x "$TEST_SSH_ELAPSED_TIMES" ]; then
+if [ ! -z "$TEST_SSH_ELAPSED_TIMES" ]; then
 	STARTTIME=`date '+%s'`
 fi
 

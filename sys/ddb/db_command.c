@@ -1,4 +1,4 @@
-/*	$OpenBSD: db_command.c,v 1.94 2022/04/14 19:47:12 naddy Exp $	*/
+/*	$OpenBSD: db_command.c,v 1.96 2022/07/29 17:47:11 semarie Exp $	*/
 /*	$NetBSD: db_command.c,v 1.20 1996/03/30 22:30:05 christos Exp $	*/
 
 /*
@@ -102,6 +102,7 @@ void	db_tdb_print_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_vnode_print_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_nfsreq_print_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_nfsnode_print_cmd(db_expr_t, int, db_expr_t, char *);
+void	db_swap_print_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_help_cmd(db_expr_t, int, db_expr_t, char *);
 void	db_fncall(db_expr_t, int, db_expr_t, char *);
 void	db_boot_sync_cmd(db_expr_t, int, db_expr_t, char *);
@@ -418,6 +419,31 @@ db_show_all_tdbs(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
 }
 #endif
 
+void
+db_show_all_routes(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	u_int rtableid = 0;
+
+	if (have_addr)
+		rtableid = addr;
+	if (count == -1)
+		count = 1;
+
+	while (count--) {
+		if (modif[0] != 'I')
+			db_show_rtable(AF_INET, rtableid);
+		if (modif[0] != 'i')
+			db_show_rtable(AF_INET6, rtableid);
+		rtableid++;
+	}
+}
+
+void
+db_show_route(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
+{
+	db_show_rtentry((void *)addr, NULL, -1);
+}
+
 /*ARGSUSED*/
 void
 db_object_print_cmd(db_expr_t addr, int have_addr, db_expr_t count, char *modif)
@@ -482,6 +508,13 @@ db_nfsnode_print_cmd(db_expr_t addr, int have_addr, db_expr_t count,
 }
 #endif
 
+/*ARGSUSED*/
+void
+db_swap_print_cmd(db_expr_t addr, int have_addr, db_expr_t count,
+    char *modif)
+{
+	swap_print_all(db_printf);
+}
 
 /*ARGSUSED*/
 void
@@ -568,6 +601,7 @@ const struct db_command db_show_all_cmds[] = {
 	{ "mounts",	db_show_all_mounts,	0, NULL },
 	{ "vnodes",	db_show_all_vnodes,	0, NULL },
 	{ "bufs",	db_show_all_bufs,	0, NULL },
+	{ "routes",	db_show_all_routes,	0, NULL },
 #ifdef NFSCLIENT
 	{ "nfsreqs",	db_show_all_nfsreqs,	0, NULL },
 	{ "nfsnodes",	db_show_all_nfsnodes,	0, NULL },
@@ -604,8 +638,10 @@ const struct db_command db_show_cmds[] = {
 	{ "pool",	db_pool_print_cmd,	0,	NULL },
 	{ "proc",	db_proc_print_cmd,	0,	NULL },
 	{ "registers",	db_show_regs,		0,	NULL },
+	{ "route",	db_show_route,		0,	NULL },
 	{ "socket",	db_socket_print_cmd,	0,	NULL },
 	{ "struct",	db_ctf_show_struct,	CS_OWN,	NULL },
+	{ "swap",	db_swap_print_cmd,	0,	NULL },
 #ifdef IPSEC
 	{ "tdb",	db_tdb_print_cmd,	0,	NULL },
 #endif

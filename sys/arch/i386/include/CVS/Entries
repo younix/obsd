@@ -68,9 +68,9 @@
 /intr.h/1.49/Mon Jan 24 14:35:14 2022//
 /param.h/1.51/Mon Jun 27 13:02:00 2022//
 /pcb.h/1.25/Mon Jun 27 13:02:00 2022//
-/pmap.h/1.90/Mon Jun 27 13:02:00 2022//
 /specialreg.h/1.79/Mon Jun 27 13:02:00 2022//
-/conf.h/1.20/Wed Jun 29 12:46:37 2022//
-/cpu.h/1.176/Sat Jul 16 15:39:28 2022//
-/cputypes.h/1.11/Sat Jul 16 15:39:28 2022//
+/conf.h/1.20/Tue Jul 26 13:42:34 2022//
+/cpu.h/1.176/Tue Jul 26 13:42:34 2022//
+/cputypes.h/1.12/Mon Aug  1 07:15:51 2022//
+/pmap.h/1.90/Tue Jul 26 13:42:34 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: efi.c,v 1.12 2022/01/01 18:52:37 kettenis Exp $	*/
+/*	$OpenBSD: efi.c,v 1.14 2022/07/30 17:56:54 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2017 Mark Kettenis <kettenis@openbsd.org>
@@ -34,6 +34,12 @@
 
 #include <dev/clock_subr.h>
 
+/*
+ * We need a large address space to allow identity mapping of physical
+ * memory on some machines.
+ */
+#define EFI_SPACE_BITS	48
+
 extern todr_chip_handle_t todr_handle;
 
 extern uint32_t mmap_size;
@@ -65,6 +71,7 @@ struct cfdriver efi_cd = {
 	NULL, "efi", DV_DULL
 };
 
+void	efi_map_runtime(struct efi_softc *);
 void	efi_enter(struct efi_softc *);
 void	efi_leave(struct efi_softc *);
 int	efi_gettime(struct todr_chip_handle *, struct timeval *);
@@ -86,8 +93,6 @@ efi_attach(struct device *parent, struct device *self, void *aux)
 	uint64_t system_table;
 	bus_space_handle_t ioh;
 	EFI_SYSTEM_TABLE *st;
-	EFI_RUNTIME_SERVICES *rs;
-	EFI_MEMORY_DESCRIPTOR *desc;
 	EFI_TIME time;
 	EFI_STATUS status;
 	uint16_t major, minor;
@@ -100,13 +105,13 @@ efi_attach(struct device *parent, struct device *self, void *aux)
 	KASSERT(system_table);
 
 	if (bus_space_map(faa->fa_iot, system_table, sizeof(EFI_SYSTEM_TABLE),
-	    BUS_SPACE_MAP_LINEAR | BUS_SPACE_MAP_PREFETCHABLE, &ioh)) {
+	    BUS_SPACE_MAP_LINEAR | BUS_SPACE_MAP_CACHEABLE, &ioh)) {
 		printf(": can't map system table\n");
 		return;
 	}
 
 	st = bus_space_vaddr(faa->fa_iot, ioh);
-	rs = st->RuntimeServices;
+	sc->sc_rs = st->RuntimeServices;
 
 	major = st->Hdr.Revision >> 16;
 	minor = st->Hdr.Revision & 0xffff;
@@ -115,66 +120,11 @@ efi_attach(struct device *parent, struct device *self, void *aux)
 		printf(".%d", minor % 10);
 	printf("\n");
 
-	/*
-	 * We don't really want some random executable non-OpenBSD
-	 * code lying around in kernel space.  So create a separate
-	 * pmap and only activate it when we call runtime services.
-	 */
-	sc->sc_pm = pmap_create();
-	sc->sc_pm->pm_privileged = 1;
-
-	desc = mmap;
-	for (i = 0; i < mmap_size / mmap_desc_size; i++) {
-		if (desc->Attribute & EFI_MEMORY_RUNTIME) {
-			vaddr_t va = desc->VirtualStart;
-			paddr_t pa = desc->PhysicalStart;
-			int npages = desc->NumberOfPages;
-			vm_prot_t prot = PROT_READ | PROT_WRITE;
-
-#ifdef EFI_DEBUG
-			printf("type 0x%x pa 0x%llx va 0x%llx pages 0x%llx attr 0x%llx\n",
-			    desc->Type, desc->PhysicalStart,
-			    desc->VirtualStart, desc->NumberOfPages,
-			    desc->Attribute);
-#endif
-
-			/*
-			 * Normal memory is expected to be "write
-			 * back" cacheable.  Everything else is mapped
-			 * as device memory.
-			 */
-			if ((desc->Attribute & EFI_MEMORY_WB) == 0)
-				pa |= PMAP_DEVICE;
-
-			/*
-			 * Only make pages marked as runtime service code
-			 * executable.  This violates the standard but it
-			 * seems we can get away with it.
-			 */
-			if (desc->Type == EfiRuntimeServicesCode)
-				prot |= PROT_EXEC;
-
-			if (desc->Attribute & EFI_MEMORY_RP)
-				prot &= ~PROT_READ;
-			if (desc->Attribute & EFI_MEMORY_XP)
-				prot &= ~PROT_EXEC;
-			if (desc->Attribute & EFI_MEMORY_RO)
-				prot &= ~PROT_WRITE;
-
-			while (npages--) {
-				pmap_enter(sc->sc_pm, va, pa, prot,
-				   prot | PMAP_WIRED);
-				va += PAGE_SIZE;
-				pa += PAGE_SIZE;
-			}
-		}
-		desc = NextMemoryDescriptor(desc, mmap_desc_size);
-	}
+	efi_map_runtime(sc);
 
 	/*
-	 * The FirmwareVendor and ConfigurationTable fields have been
-	 * converted from a physical pointer to a virtual pointer, so
-	 * we have to activate our pmap to access them.
+	 * Activate our pmap such that we can access the
+	 * FirmwareVendor and ConfigurationTable fields.
 	 */
 	efi_enter(sc);
 	if (st->FirmwareVendor) {
@@ -206,16 +156,12 @@ efi_attach(struct device *parent, struct device *self, void *aux)
 		config_found(self, &fa, NULL);
 	}
 	
-	if (rs == NULL)
-		return;
-
 	efi_enter(sc);
-	status = rs->GetTime(&time, NULL);
+	status = sc->sc_rs->GetTime(&time, NULL);
 	efi_leave(sc);
 	if (status != EFI_SUCCESS)
 		return;
 
-	sc->sc_rs = rs;
 	sc->sc_todr.cookie = sc;
 	sc->sc_todr.todr_gettime = efi_gettime;
 	sc->sc_todr.todr_settime = efi_settime;
@@ -223,13 +169,90 @@ efi_attach(struct device *parent, struct device *self, void *aux)
 }
 
 void
+efi_map_runtime(struct efi_softc *sc)
+{
+	EFI_MEMORY_DESCRIPTOR *desc;
+	int i;
+
+	/*
+	 * We don't really want some random executable non-OpenBSD
+	 * code lying around in kernel space.  So create a separate
+	 * pmap and only activate it when we call runtime services.
+	 */
+	sc->sc_pm = pmap_create();
+	sc->sc_pm->pm_privileged = 1;
+	sc->sc_pm->have_4_level_pt = 1;
+
+	desc = mmap;
+	for (i = 0; i < mmap_size / mmap_desc_size; i++) {
+		if (desc->Attribute & EFI_MEMORY_RUNTIME) {
+			vaddr_t va = desc->VirtualStart;
+			paddr_t pa = desc->PhysicalStart;
+			int npages = desc->NumberOfPages;
+			vm_prot_t prot = PROT_READ | PROT_WRITE;
+
+#ifdef EFI_DEBUG
+			printf("type 0x%x pa 0x%llx va 0x%llx pages 0x%llx attr 0x%llx\n",
+			    desc->Type, desc->PhysicalStart,
+			    desc->VirtualStart, desc->NumberOfPages,
+			    desc->Attribute);
+#endif
+
+			/*
+			 * If the virtual address is still zero, use
+			 * an identity mapping.
+			 */
+			if (va == 0)
+				va = pa;
+
+			/*
+			 * Normal memory is expected to be "write
+			 * back" cacheable.  Everything else is mapped
+			 * as device memory.
+			 */
+			if ((desc->Attribute & EFI_MEMORY_WB) == 0)
+				pa |= PMAP_DEVICE;
+
+			/*
+			 * Only make pages marked as runtime service code
+			 * executable.  This violates the standard but it
+			 * seems we can get away with it.
+			 */
+			if (desc->Type == EfiRuntimeServicesCode)
+				prot |= PROT_EXEC;
+
+			if (desc->Attribute & EFI_MEMORY_RP)
+				prot &= ~PROT_READ;
+			if (desc->Attribute & EFI_MEMORY_XP)
+				prot &= ~PROT_EXEC;
+			if (desc->Attribute & EFI_MEMORY_RO)
+				prot &= ~PROT_WRITE;
+
+			while (npages--) {
+				pmap_enter(sc->sc_pm, va, pa, prot,
+				   prot | PMAP_WIRED);
+				va += PAGE_SIZE;
+				pa += PAGE_SIZE;
+			}
+		}
+
+		desc = NextMemoryDescriptor(desc, mmap_desc_size);
+	}
+}
+
+void
 efi_enter(struct efi_softc *sc)
 {
 	struct pmap *pm = sc->sc_pm;
+	uint64_t tcr;
 
 	sc->sc_psw = intr_disable();
 	WRITE_SPECIALREG(ttbr0_el1, pmap_kernel()->pm_pt0pa);
 	__asm volatile("isb");
+	tcr = READ_SPECIALREG(tcr_el1);
+	tcr &= ~TCR_T0SZ(0x3f);
+	tcr |= TCR_T0SZ(64 - EFI_SPACE_BITS);
+	WRITE_SPECIALREG(tcr_el1, tcr);
 	cpu_setttb(pm->pm_asid, pm->pm_pt0pa);
 
 	fpu_kernel_enter();
@@ -239,11 +262,16 @@ void
 efi_leave(struct efi_softc *sc)
 {
 	struct pmap *pm = curcpu()->ci_curpm;
+	uint64_t tcr;
 
 	fpu_kernel_exit();
 
 	WRITE_SPECIALREG(ttbr0_el1, pmap_kernel()->pm_pt0pa);
 	__asm volatile("isb");
+	tcr = READ_SPECIALREG(tcr_el1);
+	tcr &= ~TCR_T0SZ(0x3f);
+	tcr |= TCR_T0SZ(64 - USER_SPACE_BITS);
+	WRITE_SPECIALREG(tcr_el1, tcr);
 	cpu_setttb(pm->pm_asid, pm->pm_pt0pa);
 	intr_restore(sc->sc_psw);
 }

@@ -85,7 +85,6 @@
 /setbuf.3/1.16/Tue Nov 25 19:08:14 2014//
 /setbuf.c/1.6/Mon Aug 31 02:53:57 2015//
 /setbuffer.c/1.7/Wed Sep 21 04:38:56 2016//
-/setvbuf.3/1.4/Wed Nov 26 18:16:32 2014//
 /setvbuf.c/1.14/Wed Sep 21 04:38:56 2016//
 /snprintf.c/1.19/Mon Aug 31 02:53:57 2015//
 /sprintf.c/1.19/Tue Nov 28 06:55:49 2017//
@@ -131,9 +130,10 @@
 /findfp.c/1.20/Mon Jan 24 14:35:13 2022//
 /funopen.3/1.19/Mon Jan 24 14:35:13 2022//
 /funopen.c/1.10/Mon Jan 24 14:35:13 2022//
-/fseek.c/1.14/Mon Jun 27 13:01:59 2022//
-/mktemp.3/1.55/Mon Jun 27 13:01:59 2022//
-/rewind.c/1.7/Mon Jun 27 13:01:59 2022//
-/scanf.3/1.26/Mon Jun 27 13:01:59 2022//
-/wprintf.3/1.10/Mon Jun 27 13:01:59 2022//
+/fseek.c/1.14/Tue Jul 26 13:42:32 2022//
+/mktemp.3/1.55/Tue Jul 26 13:42:32 2022//
+/rewind.c/1.7/Tue Jul 26 13:42:32 2022//
+/scanf.3/1.26/Tue Jul 26 13:42:32 2022//
+/setvbuf.3/1.5/Mon Aug  1 07:15:36 2022//
+/wprintf.3/1.10/Tue Jul 26 13:42:32 2022//
 D

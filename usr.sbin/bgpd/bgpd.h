@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.h,v 1.443 2022/07/22 11:17:48 claudio Exp $ */
+/*	$OpenBSD: bgpd.h,v 1.448 2022/07/28 13:11:48 deraadt Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -54,8 +54,6 @@
 #define	MAX_RTSOCK_BUF			(2 * 1024 * 1024)
 #define	MAX_COMM_MATCH			3
 
-#define	RTP_MINE			0xff	/* internal route priority */
-
 #define	BGPD_OPT_VERBOSE		0x0001
 #define	BGPD_OPT_VERBOSE2		0x0002
 #define	BGPD_OPT_NOACTION		0x0004
@@ -78,14 +76,13 @@
 #define	F_BGPD			0x0001
 #define	F_BGPD_INSERTED		0x0002
 #define	F_CONNECTED		0x0004
-#define	F_NEXTHOP		0x0008
-#define	F_DOWN			0x0010
-#define	F_STATIC		0x0020
-#define	F_REJECT		0x0080
-#define	F_BLACKHOLE		0x0100
+#define	F_STATIC		0x0008
+#define	F_NEXTHOP		0x0010
+#define	F_REJECT		0x0020
+#define	F_BLACKHOLE		0x0040
+#define	F_MPLS			0x0080
 #define	F_LONGER		0x0200
 #define	F_SHORTER		0x0400
-#define	F_MPLS			0x0800
 #define	F_CTL_DETAIL		0x1000	/* only set on requests */
 #define	F_CTL_ADJ_IN		0x2000	/* only set on requests */
 #define	F_CTL_ADJ_OUT		0x4000	/* only set on requests */
@@ -521,7 +518,7 @@ struct ctl_show_rtr {
 	uint32_t		expire;
 	int			session_id;
 	in_addr_t		remote_port;
-	enum rtr_error 		last_sent_error;
+	enum rtr_error		last_sent_error;
 	enum rtr_error		last_recv_error;
 	char			last_sent_msg[REASON_LEN];
 	char			last_recv_msg[REASON_LEN];
@@ -1265,8 +1262,8 @@ struct mrt_config {
 void		 send_nexthop_update(struct kroute_nexthop *);
 void		 send_imsg_session(int, pid_t, void *, uint16_t);
 int		 send_network(int, struct network_config *,
-		     struct filter_set_head *);
-int		 bgpd_filternexthop(struct kroute_full *);
+		    struct filter_set_head *);
+int		 bgpd_oknexthop(struct kroute_full *);
 void		 set_pollfd(struct pollfd *, struct imsgbuf *);
 int		 handle_pollfd(struct pollfd *, struct imsgbuf *);
 
@@ -1350,7 +1347,7 @@ void		 pftable_unref(uint16_t);
 uint16_t	 pftable_ref(uint16_t);
 
 /* parse.y */
-int		 	cmdline_symset(char *);
+int			cmdline_symset(char *);
 struct prefixset	*find_prefixset(char *, struct prefixset_head *);
 struct bgpd_config	*parse_config(char *, struct peer_head *,
 			    struct rtr_config_head *);
@@ -1423,13 +1420,13 @@ int		 aspath_verify(void *, uint16_t, int, int);
 #define		 AS_ERR_SOFT	-4
 u_char		*aspath_inflate(void *, uint16_t, uint16_t *);
 int		 nlri_get_prefix(u_char *, uint16_t, struct bgpd_addr *,
-		     uint8_t *);
+		    uint8_t *);
 int		 nlri_get_prefix6(u_char *, uint16_t, struct bgpd_addr *,
-		     uint8_t *);
+		    uint8_t *);
 int		 nlri_get_vpn4(u_char *, uint16_t, struct bgpd_addr *,
-		     uint8_t *, int);
+		    uint8_t *, int);
 int		 nlri_get_vpn6(u_char *, uint16_t, struct bgpd_addr *,
-		     uint8_t *, int);
+		    uint8_t *, int);
 int		 prefix_compare(const struct bgpd_addr *,
 		    const struct bgpd_addr *, int);
 void		 inet4applymask(struct in_addr *, const struct in_addr *, int);

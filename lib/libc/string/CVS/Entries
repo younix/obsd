@@ -30,16 +30,13 @@
 /strcasecmp.c/1.7/Mon Aug 31 02:53:57 2015//
 /strcasecmp_l.c/1.1/Tue Sep  5 03:16:13 2017//
 /strcasestr.c/1.4/Mon Aug 31 02:53:57 2015//
-/strcat.3/1.18/Thu May 26 21:30:13 2016//
 /strcat.c/1.10/Tue Nov 28 06:55:49 2017//
 /strchr.3/1.13/Mon Oct  1 06:37:37 2018//
 /strchr.c/1.4/Mon Oct  1 06:37:37 2018//
-/strcmp.3/1.14/Wed Jul 17 05:42:11 2013//
 /strcmp.c/1.9/Mon Aug 31 02:53:57 2015//
 /strcoll.3/1.11/Fri Jan 18 07:43:36 2019//
 /strcoll.c/1.6/Mon Aug 31 02:53:57 2015//
 /strcoll_l.c/1.1/Tue Sep  5 03:16:13 2017//
-/strcpy.3/1.21/Sat Apr 19 11:30:40 2014//
 /strcpy.c/1.10/Tue Nov 28 06:55:49 2017//
 /strcspn.3/1.11/Wed Jun  5 03:39:23 2013//
 /strcspn.c/1.6/Mon Aug 31 02:53:57 2015//
@@ -52,7 +49,6 @@
 /strlcat.c/1.19/Fri Jan 25 00:19:25 2019//
 /strlcpy.3/1.27/Fri Jan 25 00:19:25 2019//
 /strlcpy.c/1.16/Fri Jan 25 00:19:25 2019//
-/strlen.3/1.13/Tue Dec  9 14:41:00 2014//
 /strlen.c/1.9/Mon Aug 31 02:53:57 2015//
 /strmode.3/1.17/Wed Jul  5 11:44:35 2017//
 /strmode.c/1.8/Mon Aug 31 02:53:57 2015//
@@ -131,4 +127,8 @@
 /wmemmove.c/1.4/Sat Sep 12 16:23:14 2015//
 /wmemset.3/1.4/Wed Jun  5 03:39:23 2013//
 /wmemset.c/1.4/Sat Sep 12 16:23:14 2015//
+/strcat.3/1.19/Mon Aug  1 07:15:36 2022//
+/strcmp.3/1.15/Mon Aug  1 07:15:36 2022//
+/strcpy.3/1.22/Mon Aug  1 07:15:36 2022//
+/strlen.3/1.14/Mon Aug  1 07:15:36 2022//
 D

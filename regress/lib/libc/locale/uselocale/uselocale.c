@@ -1,6 +1,6 @@
-/* $OpenBSD: uselocale.c,v 1.6 2022/04/03 16:52:50 anton Exp $ */
+/* $OpenBSD: uselocale.c,v 1.8 2022/07/25 21:29:16 guenther Exp $ */
 /*
- * Copyright (c) 2017 Ingo Schwarze <schwarze@openbsd.org>
+ * Copyright (c) 2017, 2022 Ingo Schwarze <schwarze@openbsd.org>
  *
  * Permission to use, copy, modify, and distribute this software for any
  * purpose with or without fee is hereby granted, provided that the above
@@ -38,7 +38,6 @@
 
 /* Options for TESTFUNC(). */
 #define	TOPT_ERR	 (1 << 0)
-#define	TOPT_STR	 (1 << 1)
 
 /*
  * Generate one test function for a specific interface.
@@ -62,19 +61,28 @@ _test_##Fn(int line, int ee, Ft er, FUNCPARA)				\
 	Ft ar;								\
 	errno = 0;							\
 	ar = Fn(FUNCARGS);						\
-	if (Op & TOPT_STR) {						\
-		if (er == (Ft)NULL)					\
-			er = (Ft)"NULL";				\
-		if (ar == (Ft)NULL)					\
-			ar = (Ft)"NULL";				\
-	}								\
-	if (Op & TOPT_STR ? strcmp((const char *)er, (const char *)ar)	\
-	    : ar != er)							\
+	if (ar != er)							\
 		errx(1, "[%d] %s(" Af ")=" Rf " [exp: " Rf "]",		\
 		    line, #Fn, FUNCARGS, ar, er);			\
 	if (Op & TOPT_ERR && errno != ee)				\
 		errx(1, "[%d] %s(" Af ") errno=%d [exp: %d]",		\
 		    line, #Fn, FUNCARGS, errno, ee);			\
+}
+
+#define	STRTESTFUNC(Fn, Af)						\
+static void								\
+_test_##Fn(int line, int ee, const char *er, FUNCPARA)			\
+{									\
+	const char *ar;							\
+	errno = 0;							\
+	ar = Fn(FUNCARGS);						\
+	if (er == NULL)							\
+		er = "NULL";						\
+	if (ar == NULL)							\
+		ar = "NULL";						\
+	if (strcmp((const char *)er, (const char *)ar) != 0)		\
+		errx(1, "[%d] %s(" Af ")=%s [exp: %s]",			\
+		    line, #Fn, FUNCARGS, ar, er);			\
 }
 
 /*
@@ -91,15 +99,15 @@ TESTFUNC(uselocale, locale_t, "%p", "%p", TOPT_ERR)
 
 #define	FUNCPARA	int category, char *locname
 #define	FUNCARGS	category, locname
-TESTFUNC(setlocale, const char *, "%d, %s", "%s", TOPT_STR)
+STRTESTFUNC(setlocale, "%d, %s")
 
 #define	FUNCPARA	nl_item item
 #define	FUNCARGS	item
-TESTFUNC(nl_langinfo, const char *, "%ld", "%s", TOPT_STR)
+STRTESTFUNC(nl_langinfo, "%ld")
 
 #define	FUNCPARA	nl_item item, locale_t locale
 #define	FUNCARGS	item, locale
-TESTFUNC(nl_langinfo_l, const char *, "%ld, %p", "%s", TOPT_STR)
+STRTESTFUNC(nl_langinfo_l, "%ld, %p")
 
 #define	FUNCPARA	int c
 #define	FUNCARGS	c
@@ -307,8 +315,6 @@ child_func(void *arg)
 	wctyc = wctype_l("upper", _LOCALE_C);
 	if (wctyc == NULL)
 		errx(1, "wctype_l(upper, C) == NULL");
-	if (wctyg == wctyc)
-		errx(1, "wctype global == C");
 	TEST_R(iswctype, 1, 0x00D0, wctyg);  /* Eth */
 	TEST_R(iswctype_l, 1, 0x00D0, wctyu, _LOCALE_UTF8);
 	TEST_R(iswctype_l, 0, 0x00D0, wctyc, _LOCALE_C);
@@ -329,8 +335,6 @@ child_func(void *arg)
 	wctrc = wctrans_l("tolower", _LOCALE_C);
 	if (wctrc == NULL)
 		errx(1, "wctrans(tolower, C) == NULL");
-	if (wctrg == wctrc)
-		errx(1, "wctrans global == C");
 	TEST_R(towctrans, 0x00FE, 0x00DE, wctrg);  /* Thorn */
 	TEST_R(towctrans_l, 0x00FE, 0x00DE, wctru, _LOCALE_UTF8);
 	TEST_R(towctrans_l, 0x00DE, 0x00DE, wctrc, _LOCALE_C);

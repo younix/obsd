@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_nist.c,v 1.20 2022/05/07 07:47:24 jsing Exp $ */
+/* $OpenBSD: bn_nist.c,v 1.22 2022/07/31 14:38:38 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project
  */
@@ -287,45 +287,84 @@ static const BN_ULONG _nist_p_521_sqr[] = {
 #endif
 
 static const BIGNUM _bignum_nist_p_192 = {
-	(BN_ULONG *)_nist_p_192[0],
-	BN_NIST_192_TOP,
-	BN_NIST_192_TOP,
-	0,
-	BN_FLG_STATIC_DATA
+	.d = (BN_ULONG *)_nist_p_192[0],
+	.top = BN_NIST_192_TOP,
+	.dmax = BN_NIST_192_TOP,
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
+};
+
+static const BIGNUM _bignum_nist_p_192_sqr = {
+	.d = (BN_ULONG *)_nist_p_192_sqr,
+	.top = sizeof(_nist_p_192_sqr) / sizeof(_nist_p_192_sqr[0]),
+	.dmax = sizeof(_nist_p_192_sqr) / sizeof(_nist_p_192_sqr[0]),
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
 };
 
 static const BIGNUM _bignum_nist_p_224 = {
-	(BN_ULONG *)_nist_p_224[0],
-	BN_NIST_224_TOP,
-	BN_NIST_224_TOP,
-	0,
-	BN_FLG_STATIC_DATA
+	.d = (BN_ULONG *)_nist_p_224[0],
+	.top = BN_NIST_224_TOP,
+	.dmax = BN_NIST_224_TOP,
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
+};
+
+static const BIGNUM _bignum_nist_p_224_sqr = {
+	.d = (BN_ULONG *)_nist_p_224_sqr,
+	.top = sizeof(_nist_p_224_sqr) / sizeof(_nist_p_224_sqr[0]),
+	.dmax = sizeof(_nist_p_224_sqr) / sizeof(_nist_p_224_sqr[0]),
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
 };
 
 static const BIGNUM _bignum_nist_p_256 = {
-	(BN_ULONG *)_nist_p_256[0],
-	BN_NIST_256_TOP,
-	BN_NIST_256_TOP,
-	0,
-	BN_FLG_STATIC_DATA
+	.d = (BN_ULONG *)_nist_p_256[0],
+	.top = BN_NIST_256_TOP,
+	.dmax = BN_NIST_256_TOP,
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
+};
+
+static const BIGNUM _bignum_nist_p_256_sqr = {
+	.d = (BN_ULONG *)_nist_p_256_sqr,
+	.top = sizeof(_nist_p_256_sqr) / sizeof(_nist_p_256_sqr[0]),
+	.dmax = sizeof(_nist_p_256_sqr) / sizeof(_nist_p_256_sqr[0]),
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
 };
 
 static const BIGNUM _bignum_nist_p_384 = {
-	(BN_ULONG *)_nist_p_384[0],
-	BN_NIST_384_TOP,
-	BN_NIST_384_TOP,
-	0,
-	BN_FLG_STATIC_DATA
+	.d = (BN_ULONG *)_nist_p_384[0],
+	.top = BN_NIST_384_TOP,
+	.dmax = BN_NIST_384_TOP,
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
+};
+
+static const BIGNUM _bignum_nist_p_384_sqr = {
+	.d = (BN_ULONG *)_nist_p_384_sqr,
+	.top = sizeof(_nist_p_384_sqr) / sizeof(_nist_p_384_sqr[0]),
+	.dmax = sizeof(_nist_p_384_sqr) / sizeof(_nist_p_384_sqr[0]),
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
 };
 
 static const BIGNUM _bignum_nist_p_521 = {
-	(BN_ULONG *)_nist_p_521,
-	BN_NIST_521_TOP,
-	BN_NIST_521_TOP,
-	0,
-	BN_FLG_STATIC_DATA
+	.d = (BN_ULONG *)_nist_p_521,
+	.top = BN_NIST_521_TOP,
+	.dmax = BN_NIST_521_TOP,
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
 };
 
+static const BIGNUM _bignum_nist_p_521_sqr = {
+	.d = (BN_ULONG *)_nist_p_521_sqr,
+	.top = sizeof(_nist_p_521_sqr) / sizeof(_nist_p_521_sqr[0]),
+	.dmax = sizeof(_nist_p_521_sqr) / sizeof(_nist_p_521_sqr[0]),
+	.neg = 0,
+	.flags = BN_FLG_STATIC_DATA,
+};
 
 const BIGNUM *
 BN_get0_nist_prime_192(void)
@@ -425,19 +464,13 @@ static void nist_cp_bn(BN_ULONG *dst, const BN_ULONG *src, int top)
 int
 BN_nist_mod_192(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 {
-	int top = a->top, i;
-	int carry;
-	BN_ULONG *r_d, *a_d = a->d;
 	BN_ULONG bnbuf[BN_NIST_192_TOP] = { 0 };
-	BN_ULONG c_d[BN_NIST_192_TOP], *res;
+	BN_ULONG c_d[BN_NIST_192_TOP] = { 0 };
+	BN_ULONG *a_d = a->d;
+	BN_ULONG *r_d, *res;
 	uintptr_t mask;
-	static const BIGNUM _bignum_nist_p_192_sqr = {
-		(BN_ULONG *)_nist_p_192_sqr,
-		sizeof(_nist_p_192_sqr) / sizeof(_nist_p_192_sqr[0]),
-		sizeof(_nist_p_192_sqr) / sizeof(_nist_p_192_sqr[0]),
-		0,
-		BN_FLG_STATIC_DATA
-	};
+	int top = a->top;
+	int carry, i;
 
 	field = &_bignum_nist_p_192; /* just to make sure */
 
@@ -579,20 +612,14 @@ typedef BN_ULONG (*bn_addsub_f)(BN_ULONG *, const BN_ULONG *,
 int
 BN_nist_mod_224(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 {
-	int top = a->top, i;
-	int carry;
-	BN_ULONG *r_d, *a_d = a->d;
 	BN_ULONG bnbuf[BN_NIST_224_TOP] = { 0 };
-	BN_ULONG c_d[BN_NIST_224_TOP], *res;
-	uintptr_t mask;
+	BN_ULONG c_d[BN_NIST_224_TOP] = { 0 };
+	BN_ULONG *a_d = a->d;
+	BN_ULONG *r_d, *res;
 	bn_addsub_f addsubf;
-	static const BIGNUM _bignum_nist_p_224_sqr = {
-		(BN_ULONG *)_nist_p_224_sqr,
-		sizeof(_nist_p_224_sqr) / sizeof(_nist_p_224_sqr[0]),
-		sizeof(_nist_p_224_sqr) / sizeof(_nist_p_224_sqr[0]),
-		0,
-		BN_FLG_STATIC_DATA
-	};
+	uintptr_t mask;
+	int top = a->top;
+	int carry, i;
 
 	field = &_bignum_nist_p_224; /* just to make sure */
 
@@ -769,20 +796,14 @@ BN_nist_mod_224(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 int
 BN_nist_mod_256(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 {
-	int i, top = a->top;
-	int carry = 0;
-	BN_ULONG *a_d = a->d, *r_d;
 	BN_ULONG bnbuf[BN_NIST_256_TOP] = { 0 };
-	BN_ULONG c_d[BN_NIST_256_TOP] = {0}, *res;
-	uintptr_t mask;
+	BN_ULONG c_d[BN_NIST_256_TOP] = { 0 };
+	BN_ULONG *a_d = a->d;
+	BN_ULONG *r_d, *res;
 	bn_addsub_f addsubf;
-	static const BIGNUM _bignum_nist_p_256_sqr = {
-		(BN_ULONG *)_nist_p_256_sqr,
-		sizeof(_nist_p_256_sqr) / sizeof(_nist_p_256_sqr[0]),
-		sizeof(_nist_p_256_sqr) / sizeof(_nist_p_256_sqr[0]),
-		0,
-		BN_FLG_STATIC_DATA
-	};
+	uintptr_t mask;
+	int top = a->top;
+	int carry, i;
 
 	field = &_bignum_nist_p_256; /* just to make sure */
 
@@ -1007,20 +1028,14 @@ BN_nist_mod_256(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 int
 BN_nist_mod_384(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 {
-	int i, top = a->top;
-	int carry = 0;
-	BN_ULONG *r_d, *a_d = a->d;
 	BN_ULONG bnbuf[BN_NIST_384_TOP] = { 0 };
-	BN_ULONG c_d[BN_NIST_384_TOP], *res;
-	uintptr_t mask;
+	BN_ULONG c_d[BN_NIST_384_TOP] = { 0 };
+	BN_ULONG *a_d = a->d;
+	BN_ULONG *r_d, *res;
 	bn_addsub_f addsubf;
-	static const BIGNUM _bignum_nist_p_384_sqr = {
-		(BN_ULONG *)_nist_p_384_sqr,
-		sizeof(_nist_p_384_sqr) / sizeof(_nist_p_384_sqr[0]),
-		sizeof(_nist_p_384_sqr) / sizeof(_nist_p_384_sqr[0]),
-		0,
-		BN_FLG_STATIC_DATA
-	};
+	uintptr_t mask;
+	int top = a->top;
+	int carry, i;
 
 	field = &_bignum_nist_p_384; /* just to make sure */
 
@@ -1266,16 +1281,13 @@ BN_nist_mod_384(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 int
 BN_nist_mod_521(BIGNUM *r, const BIGNUM *a, const BIGNUM *field, BN_CTX *ctx)
 {
-	int top = a->top, i;
-	BN_ULONG *r_d, *a_d = a->d, t_d[BN_NIST_521_TOP], val, tmp, *res;
+	BN_ULONG t_d[BN_NIST_521_TOP] = { 0 };
+	BN_ULONG *a_d = a->d;
+	BN_ULONG *r_d, *res;
+	BN_ULONG tmp, val;
 	uintptr_t mask;
-	static const BIGNUM _bignum_nist_p_521_sqr = {
-		(BN_ULONG *)_nist_p_521_sqr,
-		sizeof(_nist_p_521_sqr) / sizeof(_nist_p_521_sqr[0]),
-		sizeof(_nist_p_521_sqr) / sizeof(_nist_p_521_sqr[0]),
-		0,
-		BN_FLG_STATIC_DATA
-	};
+	int top = a->top;
+	int i;
 
 	field = &_bignum_nist_p_521; /* just to make sure */
 

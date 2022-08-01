@@ -7,6 +7,6 @@
 /memset.S/1.6/Wed Nov 29 05:13:57 2017//
 /strcmp.S/1.5/Sat Aug  6 19:16:09 2016//
 /strncmp.S/1.6/Sat Aug  6 19:16:09 2016//
-/bcopy.S/1.7/Mon Jun 27 13:01:59 2022//
-/bzero.S/1.7/Mon Jun 27 13:01:59 2022//
+/bcopy.S/1.7/Tue Jul 26 13:42:32 2022//
+/bzero.S/1.7/Tue Jul 26 13:42:32 2022//
 D

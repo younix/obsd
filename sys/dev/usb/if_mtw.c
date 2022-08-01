@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_mtw.c,v 1.5 2022/04/21 21:03:03 stsp Exp $	*/
+/*	$OpenBSD: if_mtw.c,v 1.7 2022/07/28 00:56:02 kevlo Exp $	*/
 /*
  * Copyright (c) 2008-2010 Damien Bergamini <damien.bergamini@free.fr>
  * Copyright (c) 2013-2014 Kevin Lo
@@ -654,8 +654,6 @@ mtw_ucode_write(struct mtw_softc *sc, const uint8_t *fw, uint32_t len,
 		if ((error = usbd_transfer(xfer)) != 0)
 			break;
 
-		mtw_read_cfg(sc, MTW_MCU_DMA_LEN, &tmp);
-
 		mtw_read(sc, MTW_MCU_FW_IDX, &tmp);
 		mtw_write(sc, MTW_MCU_FW_IDX, tmp++);
 
@@ -719,7 +717,6 @@ mtw_load_microcode(struct mtw_softc *sc)
 		if ((error = mtw_ucode_write(sc, fw->data, ilen, 0x90000)) != 0)
 			goto fail;
 
-		mtw_read_cfg(sc, 0x0208, &tmp);
 		mtw_usb_dma_write(sc, 0x00e41814);
 		free(ucode, M_DEVBUF, size);
 	}
@@ -2092,7 +2089,7 @@ mtw_rx_frame(struct mtw_softc *sc, uint8_t *buf, int dmalen,
 		tap->wr_dbm_antsignal = mtw_rssi2dbm(sc, rssi, ant);
 		tap->wr_rate = 2;	/* in case it can't be found below */
 		phy = letoh16(rxwi->phy);
-		switch (phy & MTW_PHY_MODE) {
+		switch (phy >> MT7601_PHY_SHIFT) {
 		case MTW_PHY_CCK:
 			switch ((phy & MTW_PHY_MCS) & ~MTW_PHY_SHPRE) {
 			case 0:	tap->wr_rate =   2; break;
@@ -2302,12 +2299,12 @@ mtw_tx(struct mtw_softc *sc, struct mbuf *m, struct ieee80211_node *ni)
 	txwi->txop = MTW_TX_TXOP_BACKOFF;
 
 	if (rt2860_rates[ridx].phy == IEEE80211_T_DS) {
-		txwi->phy = htole16(MTW_PHY_CCK);
+		txwi->phy = htole16(MTW_PHY_CCK << MT7601_PHY_SHIFT);
 		if (ridx != MTW_RIDX_CCK1 &&
 		    (ic->ic_flags & IEEE80211_F_SHPREAMBLE))
 			mcs |= MTW_PHY_SHPRE;
 	} else if (rt2860_rates[ridx].phy == IEEE80211_T_OFDM)
-		txwi->phy = htole16(MTW_PHY_OFDM);
+		txwi->phy = htole16(MTW_PHY_OFDM << MT7601_PHY_SHIFT);
 	txwi->phy |= htole16(mcs);
 
 	if (!IEEE80211_IS_MULTICAST(wh->i_addr1) &&

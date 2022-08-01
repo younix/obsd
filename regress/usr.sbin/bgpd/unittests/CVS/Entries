@@ -17,9 +17,9 @@
 /rde_trie_test.6.in/1.1/Sun Aug 29 08:01:51 2021//
 /rde_trie_test.6.out/1.1/Sun Aug 29 08:01:51 2021//
 /Makefile/1.9/Tue Sep 14 08:17:28 2021//
-/rde_community_test.c/1.5/Mon Jun 27 13:01:59 2022//
-/rde_community_test.h/1.2/Mon Jun 27 13:01:59 2022//
 /rde_sets_test.c/1.8/Mon Jun 27 13:01:59 2022//
 /rde_trie_test.c/1.13/Mon Jun 27 13:01:59 2022//
-/rde_decide_test.c/1.11/Fri Jul 22 12:01:56 2022//
+/rde_community_test.c/1.5/Tue Jul 26 13:42:33 2022//
+/rde_community_test.h/1.2/Tue Jul 26 13:42:33 2022//
+/rde_decide_test.c/1.12/Mon Aug  1 07:15:48 2022//
 D

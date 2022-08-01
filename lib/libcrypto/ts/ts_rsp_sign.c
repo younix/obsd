@@ -1,4 +1,4 @@
-/* $OpenBSD: ts_rsp_sign.c,v 1.27 2022/07/16 16:42:58 kn Exp $ */
+/* $OpenBSD: ts_rsp_sign.c,v 1.29 2022/07/24 20:02:04 tb Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -66,6 +66,7 @@
 #include <openssl/ts.h>
 
 #include "evp_locl.h"
+#include "ts_local.h"
 #include "x509_lcl.h"
 
 /* Private function declarations. */
@@ -140,6 +141,13 @@ def_extension_cb(struct TS_resp_ctx *ctx, X509_EXTENSION *ext, void *data)
 	    "Unsupported extension.");
 	TS_RESP_CTX_add_failure_info(ctx, TS_INFO_UNACCEPTED_EXTENSION);
 	return 0;
+}
+
+void
+TS_RESP_CTX_set_time_cb(TS_RESP_CTX *ctx, TS_time_cb cb, void *data)
+{
+	ctx->time_cb = cb;
+	ctx->time_cb_data = data;
 }
 
 /* TS_RESP_CTX management functions. */

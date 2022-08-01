@@ -1,4 +1,4 @@
-/*	$OpenBSD: rune.c,v 1.8 2019/06/28 13:32:41 deraadt Exp $ */
+/*	$OpenBSD: rune.c,v 1.10 2022/07/27 20:00:11 guenther Exp $ */
 /*	$NetBSD: rune.c,v 1.26 2004/05/09 11:26:33 kleink Exp $	*/
 
 /*-
@@ -80,7 +80,6 @@ do {					\
 
 static int readrange(_RuneLocale *, _RuneRange *, uint32_t, void *, FILE *);
 static void _freeentry(_RuneRange *);
-static void _wctype_init(_RuneLocale *rl);
 
 static int
 readrange(_RuneLocale *rl, _RuneRange *rr, uint32_t nranges, void *lastp,
@@ -205,13 +204,6 @@ _freeentry(_RuneRange *rr)
 	}
 }
 
-void
-_wctype_init(_RuneLocale *rl)
-{
-	memcpy(&rl->rl_wctype, &_DefaultRuneLocale.rl_wctype,
-	       sizeof(rl->rl_wctype));
-}
-
 
 _RuneLocale *
 _Read_RuneMagi(FILE *fp)
@@ -270,11 +262,6 @@ _Read_RuneMagi(FILE *fp)
 	rl = (_RuneLocale *)hostdata;
 	rl->rl_variable = rl + 1;
 
-	memcpy(rl->rl_magic, frl.frl_magic, sizeof(rl->rl_magic));
-	memcpy(rl->rl_encoding, frl.frl_encoding, sizeof(rl->rl_encoding));
-
-	/* XXX assumes rune_t = uint32_t */
-	rl->rl_invalid_rune = ntohl((uint32_t)frl.frl_invalid_rune);
 	rl->rl_variable_len = ntohl((uint32_t)frl.frl_variable_len);
 
 	for (x = 0; x < _CACHED_RUNES; ++x) {
@@ -303,13 +290,11 @@ _Read_RuneMagi(FILE *fp)
 		goto rune_err;
 	if (find_codeset(rl))
 		goto rune_err;
-	_wctype_init(rl);
 
 	/*
-	 * error if we have junk at the tail, 
-	 * or if we can't allocate memory.
+	 * error if we have junk at the tail
 	 */
-	if (ftello(fp) != sb.st_size || __make_ctype_tabs(rl) == -1)
+	if (ftello(fp) != sb.st_size)
 		goto rune_err;
 
 	return(rl);

@@ -8,9 +8,9 @@
 /onewiredevs_data.h/1.6/Sat Feb 23 23:21:19 2008//
 /onewirereg.h/1.2/Tue Jun  2 18:19:47 2009//
 /onewirevar.h/1.7/Mon Jul 19 23:44:09 2010//
-/onewire.c/1.19/Mon Jun 27 13:02:00 2022//
-/owctr.c/1.9/Mon Jun 27 13:02:00 2022//
-/owid.c/1.12/Mon Jun 27 13:02:00 2022//
-/owsbm.c/1.11/Mon Jun 27 13:02:00 2022//
-/owtemp.c/1.18/Mon Jun 27 13:02:00 2022//
+/onewire.c/1.19/Tue Jul 26 13:42:35 2022//
+/owctr.c/1.9/Tue Jul 26 13:42:35 2022//
+/owid.c/1.12/Tue Jul 26 13:42:35 2022//
+/owsbm.c/1.11/Tue Jul 26 13:42:35 2022//
+/owtemp.c/1.18/Tue Jul 26 13:42:35 2022//
 D

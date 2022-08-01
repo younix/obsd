@@ -1,4 +1,4 @@
-/*	$OpenBSD: dhcpleased.c,v 1.24 2022/03/21 04:35:41 dlg Exp $	*/
+/*	$OpenBSD: dhcpleased.c,v 1.26 2022/07/23 09:33:18 florian Exp $	*/
 
 /*
  * Copyright (c) 2017, 2021 Florian Obser <florian@openbsd.org>
@@ -30,6 +30,7 @@
 
 #include <net/if.h>
 #include <net/route.h>
+#include <net/if_dl.h>
 #include <netinet/in.h>
 #include <netinet/if_ether.h>
 #include <netinet/in_var.h>
@@ -913,8 +914,22 @@ deconfigure_interface(struct imsg_configure_interface *imsg)
 
 	memset(&ifaliasreq, 0, sizeof(ifaliasreq));
 
+#if 0
+	/*
+	 * When two default routes have the same gateway the kernel always
+	 * deletes the first which might be the wrong one. When we then
+	 * deconfigure the IP address from the interface the kernel deletes
+	 * all routes pointing out that interface and we end up with no
+	 * default.
+	 * This can happen with a wired & wireless interface on the same
+	 * layer 2 network and the user issues ifconfig $WIFI inet -autoconf.
+	 * Work around this issue by not deleting the default route and let
+	 * the kernel handle it when we remove the IP address a few lines
+	 * down.
+	 */
 	if (imsg->routes_len > 0)
 		configure_routes(RTM_DELETE, imsg);
+#endif
 
 	if (if_indextoname(imsg->if_index, ifaliasreq.ifra_name) == NULL) {
 		log_warnx("%s: cannot find interface %d", __func__,
@@ -1014,8 +1029,9 @@ configure_route(uint8_t rtm_type, uint32_t if_index, int rdomain, struct
     struct sockaddr_in *ifa, int rtm_flags)
 {
 	struct rt_msghdr		 rtm;
+	struct sockaddr_dl		 ifp;
 	struct sockaddr_rtlabel		 rl;
-	struct iovec			 iov[12];
+	struct iovec			 iov[14];
 	long				 pad = 0;
 	int				 iovcnt = 0, padlen;
 
@@ -1028,7 +1044,8 @@ configure_route(uint8_t rtm_type, uint32_t if_index, int rdomain, struct
 	rtm.rtm_tableid = rdomain;
 	rtm.rtm_seq = ++rtm_seq;
 	rtm.rtm_priority = RTP_NONE;
-	rtm.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_LABEL;
+	rtm.rtm_addrs = RTA_DST | RTA_GATEWAY | RTA_NETMASK | RTA_IFP |
+	    RTA_LABEL;
 	rtm.rtm_flags = RTF_UP | RTF_STATIC | RTF_MPATH | rtm_flags;
 
 	if (ifa)
@@ -1061,6 +1078,20 @@ configure_route(uint8_t rtm_type, uint32_t if_index, int rdomain, struct
 	iov[iovcnt++].iov_len = mask->sin_len;
 	rtm.rtm_msglen += mask->sin_len;
 	padlen = ROUNDUP(mask->sin_len) - mask->sin_len;
+	if (padlen > 0) {
+		iov[iovcnt].iov_base = &pad;
+		iov[iovcnt++].iov_len = padlen;
+		rtm.rtm_msglen += padlen;
+	}
+
+	memset(&ifp, 0, sizeof(ifp));
+	ifp.sdl_len = sizeof(struct sockaddr_dl);
+	ifp.sdl_family = AF_LINK;
+	ifp.sdl_index = if_index;
+	iov[iovcnt].iov_base = &ifp;
+	iov[iovcnt++].iov_len = sizeof(ifp);
+	rtm.rtm_msglen += sizeof(ifp);
+	padlen = ROUNDUP(sizeof(ifp)) - sizeof(ifp);
 	if (padlen > 0) {
 		iov[iovcnt].iov_base = &pad;
 		iov[iovcnt++].iov_len = padlen;
