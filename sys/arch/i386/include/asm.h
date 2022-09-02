@@ -1,4 +1,4 @@
-/*	$OpenBSD: asm.h,v 1.16 2018/04/11 15:44:08 bluhm Exp $	*/
+/*	$OpenBSD: asm.h,v 1.18 2022/08/30 16:26:29 miod Exp $	*/
 /*	$NetBSD: asm.h,v 1.7 1994/10/27 04:15:56 cgd Exp $	*/
 
 /*-
@@ -82,19 +82,15 @@
 	.weak alias; \
 	alias = sym
 
-/*
- * WARN_REFERENCES: create a warning if the specified symbol is referenced
- */
-#define WARN_REFERENCES(_sym,_msg)	\
-	.section .gnu.warning. ## _sym ; .ascii _msg ; .text
-
 /* let kernels and others override entrypoint alignment */
 #ifndef _ALIGN_TEXT
 # define _ALIGN_TEXT .align 2, 0x90
 #endif
 
-#define _ENTRY(x) \
-	.text; _ALIGN_TEXT; .globl x; .type x,@function; x:
+/* NB == No Binding: use .globl or .weak as necessary */
+#define _ENTRY_NB(x) \
+	.text; _ALIGN_TEXT; .type x,@function; x:
+#define _ENTRY(x)	.globl x; _ENTRY_NB(x)
 
 #ifdef _KERNEL
 #define KUTEXT	.section .kutext, "ax"
@@ -118,6 +114,7 @@
 #endif
 
 #define	ENTRY(y)	_ENTRY(_C_LABEL(y)); _PROF_PROLOGUE
+#define	ENTRY_NB(y)	_ENTRY_NB(y); _PROF_PROLOGUE
 #define	NENTRY(y)	_ENTRY(_C_LABEL(y))
 #define	ASENTRY(y)	_ENTRY(_ASM_LABEL(y)); _PROF_PROLOGUE
 #define	NASENTRY(y)	_ENTRY(_ASM_LABEL(y))

@@ -9,7 +9,6 @@
 /isa_machdep.c/1.4/Sat Feb 24 11:42:31 2018//
 /locore0.S/1.1/Thu Jun  8 11:44:00 2017//
 /loongson2_machdep.c/1.17/Fri Dec 20 13:34:41 2019//
-/loongson3_intr.c/1.7/Sat Feb 24 11:42:31 2018//
 /loongson3_machdep.c/1.1/Sat Aug 15 22:31:38 2015//
 /pciide_machdep.c/1.2/Sat May  8 21:59:56 2010//
 /pmon.c/1.8/Sun May 21 14:22:36 2017//
@@ -18,6 +17,7 @@
 /yeeloong_machdep.c/1.28/Wed Sep 26 14:58:16 2018//
 /locore.S/1.9/Wed Sep  1 16:07:38 2021//
 /generic3a_machdep.c/1.11/Thu Sep  2 14:22:31 2021//
-/machdep.c/1.99/Thu Sep  2 14:22:31 2021//
 /conf.c/1.31/Sun Nov 21 20:15:22 2021//
+/loongson3_intr.c/1.8/Fri Sep  2 14:00:19 2022//
+/machdep.c/1.100/Fri Sep  2 14:00:19 2022//
 D

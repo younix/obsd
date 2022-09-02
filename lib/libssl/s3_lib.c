@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.235 2022/07/02 16:31:04 tb Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.238 2022/08/21 19:39:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1559,13 +1559,17 @@ ssl3_free(SSL *s)
 	tls1_cleanup_key_block(s);
 	ssl3_release_read_buffer(s);
 	ssl3_release_write_buffer(s);
-	freezero(s->s3->hs.sigalgs, s->s3->hs.sigalgs_len);
 
+	freezero(s->s3->hs.sigalgs, s->s3->hs.sigalgs_len);
+	sk_X509_pop_free(s->s3->hs.peer_certs, X509_free);
+	sk_X509_pop_free(s->s3->hs.peer_certs_no_leaf, X509_free);
 	tls_key_share_free(s->s3->hs.key_share);
 
 	tls13_secrets_destroy(s->s3->hs.tls13.secrets);
 	freezero(s->s3->hs.tls13.cookie, s->s3->hs.tls13.cookie_len);
 	tls13_clienthello_hash_clear(&s->s3->hs.tls13);
+
+	tls_buffer_free(s->s3->hs.tls13.quic_read_buffer);
 
 	sk_X509_NAME_pop_free(s->s3->hs.tls12.ca_names, X509_NAME_free);
 	sk_X509_pop_free(s->internal->verified_chain, X509_free);
@@ -1586,8 +1590,8 @@ ssl3_free(SSL *s)
 void
 ssl3_clear(SSL *s)
 {
-	unsigned char	*rp, *wp;
-	size_t		 rlen, wlen;
+	unsigned char *rp, *wp;
+	size_t rlen, wlen;
 
 	tls1_cleanup_key_block(s);
 	sk_X509_NAME_pop_free(s->s3->hs.tls12.ca_names, X509_NAME_free);
@@ -1598,6 +1602,11 @@ ssl3_clear(SSL *s)
 	s->s3->hs.sigalgs = NULL;
 	s->s3->hs.sigalgs_len = 0;
 
+	sk_X509_pop_free(s->s3->hs.peer_certs, X509_free);
+	s->s3->hs.peer_certs = NULL;
+	sk_X509_pop_free(s->s3->hs.peer_certs_no_leaf, X509_free);
+	s->s3->hs.peer_certs_no_leaf = NULL;
+
 	tls_key_share_free(s->s3->hs.key_share);
 	s->s3->hs.key_share = NULL;
 
@@ -1607,6 +1616,11 @@ ssl3_clear(SSL *s)
 	s->s3->hs.tls13.cookie = NULL;
 	s->s3->hs.tls13.cookie_len = 0;
 	tls13_clienthello_hash_clear(&s->s3->hs.tls13);
+
+	tls_buffer_free(s->s3->hs.tls13.quic_read_buffer);
+	s->s3->hs.tls13.quic_read_buffer = NULL;
+	s->s3->hs.tls13.quic_read_level = ssl_encryption_initial;
+	s->s3->hs.tls13.quic_write_level = ssl_encryption_initial;
 
 	s->s3->hs.extensions_seen = 0;
 
@@ -1646,6 +1660,39 @@ ssl3_clear(SSL *s)
 	s->version = TLS1_VERSION;
 
 	s->s3->hs.state = SSL_ST_BEFORE|((s->server) ? SSL_ST_ACCEPT : SSL_ST_CONNECT);
+}
+
+long
+_SSL_get_shared_group(SSL *s, long n)
+{
+	size_t count;
+	int nid;
+
+	/* OpenSSL document that they return -1 for clients. They return 0. */
+	if (!s->server)
+		return 0;
+
+	if (n == -1) {
+		if (!tls1_count_shared_groups(s, &count))
+			return 0;
+
+		if (count > LONG_MAX)
+			count = LONG_MAX;
+
+		return count;
+	}
+
+	/* Undocumented special case added for Suite B profile support. */
+	if (n == -2)
+		n = 0;
+
+	if (n < 0)
+		return 0;
+
+	if (!tls1_get_shared_group_by_index(s, n, &nid))
+		return NID_undef;
+
+	return nid;
 }
 
 long
@@ -2067,6 +2114,9 @@ ssl3_ctrl(SSL *s, int cmd, long larg, void *parg)
 
 	case SSL_CTRL_SET_GROUPS_LIST:
 		return SSL_set1_groups_list(s, parg);
+
+	case SSL_CTRL_GET_SHARED_GROUP:
+		return _SSL_get_shared_group(s, larg);
 
 	/* XXX - rename to SSL_CTRL_GET_PEER_TMP_KEY and remove server check. */
 	case SSL_CTRL_GET_SERVER_TMP_KEY:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.h,v 1.448 2022/07/28 13:11:48 deraadt Exp $ */
+/*	$OpenBSD: bgpd.h,v 1.452 2022/08/31 15:51:44 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -547,7 +547,6 @@ enum imsg_type {
 	IMSG_CTL_SHOW_RIB_ATTR,
 	IMSG_CTL_SHOW_NETWORK,
 	IMSG_CTL_SHOW_RIB_MEM,
-	IMSG_CTL_SHOW_RIB_HASH,
 	IMSG_CTL_SHOW_TERSE,
 	IMSG_CTL_SHOW_TIMER,
 	IMSG_CTL_LOG_VERBOSE,
@@ -592,6 +591,7 @@ enum imsg_type {
 	IMSG_SESSION_UP,
 	IMSG_SESSION_DOWN,
 	IMSG_SESSION_STALE,
+	IMSG_SESSION_NOGRACE,
 	IMSG_SESSION_FLUSH,
 	IMSG_SESSION_RESTARTED,
 	IMSG_SESSION_DEPENDON,
@@ -717,9 +717,9 @@ struct kroute_nexthop {
 	struct bgpd_addr	nexthop;
 	struct bgpd_addr	gateway;
 	struct bgpd_addr	net;
+	uint8_t			netlen;
 	uint8_t			valid;
 	uint8_t			connected;
-	uint8_t			netlen;
 };
 
 struct session_dependon {
@@ -1192,7 +1192,6 @@ struct rde_memstats {
 	long long	nexthop_cnt;
 	long long	aspath_cnt;
 	long long	aspath_size;
-	long long	aspath_refs;
 	long long	comm_cnt;
 	long long	comm_nmemb;
 	long long	comm_size;
@@ -1206,15 +1205,6 @@ struct rde_memstats {
 	long long	aset_nmemb;
 	long long	pset_cnt;
 	long long	pset_size;
-};
-
-struct rde_hashstats {
-	char		name[16];
-	long long	num;
-	long long	min;
-	long long	max;
-	long long	sum;
-	long long	sumq;
 };
 
 #define	MRT_FILE_LEN	512

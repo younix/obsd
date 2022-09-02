@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_mutl.c,v 1.30 2022/07/25 05:06:06 tb Exp $ */
+/* $OpenBSD: p12_mutl.c,v 1.32 2022/08/20 09:16:18 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -70,7 +70,41 @@
 
 #include "evp_locl.h"
 #include "hmac_local.h"
+#include "pkcs12_local.h"
 #include "x509_lcl.h"
+
+int
+PKCS12_mac_present(const PKCS12 *p12)
+{
+	return p12->mac != NULL;
+}
+
+void
+PKCS12_get0_mac(const ASN1_OCTET_STRING **pmac, const X509_ALGOR **pmacalg,
+    const ASN1_OCTET_STRING **psalt, const ASN1_INTEGER **piter,
+    const PKCS12 *p12)
+{
+	if (p12->mac == NULL) {
+		if (pmac != NULL)
+			*pmac = NULL;
+		if (pmacalg != NULL)
+			*pmacalg = NULL;
+		if (psalt != NULL)
+			*psalt = NULL;
+		if (piter != NULL)
+			*piter = NULL;
+		return;
+	}
+
+	if (pmac != NULL)
+		*pmac = p12->mac->dinfo->digest;
+	if (pmacalg != NULL)
+		*pmacalg = p12->mac->dinfo->algor;
+	if (psalt != NULL)
+		*psalt = p12->mac->salt;
+	if (piter != NULL)
+		*piter = p12->mac->iter;
+}
 
 /* Generate a MAC */
 int

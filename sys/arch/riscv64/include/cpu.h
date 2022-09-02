@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.12 2022/06/10 21:34:15 jca Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.14 2022/08/29 02:01:18 jsg Exp $	*/
 
 /*
  * Copyright (c) 2019 Mike Larkin <mlarkin@openbsd.org>
@@ -92,7 +92,7 @@ struct cpu_info {
 	uint64_t		ci_lasttb;
 	uint64_t		ci_nexttimerevent;
 	uint64_t		ci_nextstatevent;
-	int			ci_statspending;
+	volatile int		ci_timer_deferred;
 
 	uint32_t		ci_cpl;
 	uint32_t		ci_ipending;
@@ -137,7 +137,7 @@ static inline struct cpu_info *
 curcpu(void)
 {
 	struct cpu_info *__ci = NULL;
-	__asm __volatile("mv %0, tp" : "=&r"(__ci));
+	__asm volatile("mv %0, tp" : "=&r"(__ci));
 	return (__ci);
 }
 
@@ -238,7 +238,7 @@ void	savectx		(struct pcb *pcb);
 static inline void
 intr_enable(void)
 {
-	__asm __volatile("csrsi sstatus, %0" :: "i" (SSTATUS_SIE));
+	__asm volatile("csrsi sstatus, %0" :: "i" (SSTATUS_SIE));
 }
 
 static inline u_long
@@ -246,7 +246,7 @@ intr_disable(void)
 {
 	uint64_t ret;
 
-	__asm __volatile(
+	__asm volatile(
 	    "csrrci %0, sstatus, %1"
 	    : "=&r" (ret) : "i" (SSTATUS_SIE)
 	);
@@ -257,7 +257,7 @@ intr_disable(void)
 static inline void
 intr_restore(u_long s)
 {
-	__asm __volatile("csrs sstatus, %0" :: "r" (s));
+	__asm volatile("csrs sstatus, %0" :: "r" (s));
 }
 
 void	delay (unsigned);

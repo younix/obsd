@@ -320,6 +320,7 @@
 ./etc/signify/openbsd-73-base.pub
 ./etc/signify/openbsd-73-fw.pub
 ./etc/signify/openbsd-73-pkg.pub
+./etc/signify/openbsd-73-syspatch.pub
 ./etc/skel
 ./etc/skel/.ssh
 ./etc/ssh
@@ -743,7 +744,7 @@
 ./usr/lib/libevent.so.4.1
 ./usr/lib/libexecinfo.so.3.0
 ./usr/lib/libexpat.so.14.0
-./usr/lib/libfido2.so.5.0
+./usr/lib/libfido2.so.6.0
 ./usr/lib/libform.so.6.0
 ./usr/lib/libformw.so.6.0
 ./usr/lib/libfuse.so.2.0
@@ -2494,6 +2495,8 @@
 ./usr/libexec/rpc.rwalld
 ./usr/libexec/security
 ./usr/libexec/sftp-server
+./usr/libexec/snmpd
+./usr/libexec/snmpd/snmpd_metrics
 ./usr/libexec/spamd
 ./usr/libexec/spamd-setup
 ./usr/libexec/spamlogd
@@ -6232,6 +6235,7 @@
 ./usr/share/zoneinfo/Europe/Kaliningrad
 ./usr/share/zoneinfo/Europe/Kiev
 ./usr/share/zoneinfo/Europe/Kirov
+./usr/share/zoneinfo/Europe/Kyiv
 ./usr/share/zoneinfo/Europe/Lisbon
 ./usr/share/zoneinfo/Europe/Ljubljana
 ./usr/share/zoneinfo/Europe/London
@@ -6387,6 +6391,7 @@
 ./usr/share/zoneinfo/zone1970.tab
 ./var
 ./var/account
+./var/agentx
 ./var/audit
 ./var/authpf
 ./var/backups

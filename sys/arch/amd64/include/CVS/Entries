@@ -59,18 +59,18 @@
 /pci_machdep.h/1.30/Sat May  1 08:41:51 2021//
 /setjmp.h/1.2/Sat May  1 08:41:51 2021//
 /trap.h/1.4/Sat May  1 08:41:51 2021//
-/atomic.h/1.21/Wed Sep  1 16:07:38 2021//
-/cpuvar.h/1.11/Wed Sep  1 16:07:38 2021//
 /smbiosvar.h/1.13/Wed Sep  1 16:07:38 2021//
 /db_machdep.h/1.19/Thu Sep  2 14:22:31 2021//
 /intrdefs.h/1.22/Thu Sep  2 14:22:31 2021//
 /profile.h/1.5/Tue Sep 14 08:17:30 2021//
-/asm.h/1.21/Mon Jan 24 14:35:14 2022//
 /intr.h/1.33/Mon Jan 24 14:35:14 2022//
 /biosvar.h/1.28/Tue Jul 26 13:42:34 2022//
 /conf.h/1.9/Tue Jul 26 13:42:34 2022//
-/cpu.h/1.145/Tue Jul 26 13:42:34 2022//
-/pmap.h/1.80/Tue Jul 26 13:42:34 2022//
-/specialreg.h/1.92/Tue Jul 26 13:42:34 2022//
-/vmmvar.h/1.79/Tue Jul 26 13:42:34 2022//
+/asm.h/1.22/Fri Sep  2 14:00:18 2022//
+/atomic.h/1.22/Fri Sep  2 14:00:18 2022//
+/cpu.h/1.150/Fri Sep  2 14:00:18 2022//
+/cpuvar.h/1.12/Fri Sep  2 14:00:18 2022//
+/pmap.h/1.81/Fri Sep  2 14:00:18 2022//
+/specialreg.h/1.94/Fri Sep  2 14:00:18 2022//
+/vmmvar.h/1.81/Fri Sep  2 14:00:18 2022//
 D

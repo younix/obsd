@@ -1,4 +1,4 @@
-/*	$OpenBSD: output_json.c,v 1.20 2022/07/28 10:40:25 claudio Exp $ */
+/*	$OpenBSD: output_json.c,v 1.23 2022/08/31 15:00:53 claudio Exp $ */
 
 /*
  * Copyright (c) 2020 Claudio Jeker <claudio@openbsd.org>
@@ -188,6 +188,11 @@ json_neighbor_stats(struct peer *p)
 	json_do_uint("updates", p->stats.prefix_rcvd_update);
 	json_do_uint("withdraws", p->stats.prefix_rcvd_withdraw);
 	json_do_uint("eor", p->stats.prefix_rcvd_eor);
+	json_do_end();
+
+	json_do_object("pending");
+	json_do_uint("updates", p->stats.pending_update);
+	json_do_uint("withdraws", p->stats.pending_withdraw);
 	json_do_end();
 
 	json_do_end();
@@ -931,7 +936,7 @@ json_rib_mem(struct rde_memstats *stats)
 	    stats->path_cnt * sizeof(struct rde_aspath),
 	    stats->path_refs);
 	json_rib_mem_element("aspath", stats->aspath_cnt,
-	    stats->aspath_size, stats->aspath_refs);
+	    stats->aspath_size, UINT64_MAX);
 	json_rib_mem_element("community_entries", stats->comm_cnt,
 	    stats->comm_cnt * sizeof(struct rde_community), UINT64_MAX);
 	json_rib_mem_element("community", stats->comm_nmemb,
@@ -957,28 +962,6 @@ json_rib_mem(struct rde_memstats *stats)
 	    UINT64_MAX);
 	json_rib_mem_element("total", UINT64_MAX, 
 	    stats->aset_size + stats->pset_size, UINT64_MAX);
-	json_do_end();
-}
-
-static void
-json_rib_hash(struct rde_hashstats *hash)
-{
-	double avg, dev;
-
-	json_do_array("hashtables");
-
-	avg = (double)hash->sum / (double)hash->num;
-	dev = sqrt(fmax(0, hash->sumq / hash->num - avg * avg));
-
-	json_do_object("hashtable");
-
-	json_do_printf("name", "%s", hash->name);
-	json_do_uint("size", hash->num);
-	json_do_uint("entries", hash->sum);
-	json_do_uint("min", hash->min);
-	json_do_uint("max", hash->max);
-	json_do_double("avg", avg);
-	json_do_double("std_dev", dev);
 	json_do_end();
 }
 
@@ -1071,7 +1054,6 @@ const struct output json_output = {
 	.attr = json_attr,
 	.rib = json_rib,
 	.rib_mem = json_rib_mem,
-	.rib_hash = json_rib_hash,
 	.set = json_rib_set,
 	.rtr = json_rtr,
 	.result = json_result,

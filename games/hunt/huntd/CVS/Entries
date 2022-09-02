@@ -1,6 +1,5 @@
 /Makefile/1.5/Sun Mar 23 02:42:47 2014//
 /answer.c/1.22/Sat Jan 21 08:22:57 2017//
-/conf.c/1.13/Sat Jan 21 08:22:57 2017//
 /conf.h/1.5/Tue Jun 17 00:36:40 2003//
 /draw.c/1.11/Sat Jan 21 08:22:57 2017//
 /driver.c/1.30/Fri Feb 14 19:17:33 2020//
@@ -13,4 +12,5 @@
 /server.h/1.12/Sat Jan 21 08:22:57 2017//
 /shots.c/1.14/Sat Jan 21 08:22:57 2017//
 /terminal.c/1.14/Sat Jan 21 08:22:57 2017//
+/conf.c/1.14/Fri Sep  2 13:59:26 2022//
 D

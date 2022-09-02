@@ -1,4 +1,4 @@
-/*	$OpenBSD: mbr.S,v 1.25 2022/06/27 16:10:09 deraadt Exp $	*/
+/*	$OpenBSD: mbr.S,v 1.27 2022/09/02 07:46:03 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Michael Shalayeff and Tobias Weingartner
@@ -112,7 +112,7 @@ start:
 	 *
 	 * Accordingly, this code will fail on very early 8086/88s, but
 	 * nick@ will just have to live with it.  Others will note that
-	 * we require an 80386 (or compatible) or above processor, anyway.
+	 * we require at least a Pentium compatible processor anyway.
 	 */
 	/* cli */
 	movw	%ax, %ss
@@ -513,15 +513,7 @@ endofcode:
 /* partition table */
 /* flag, head, sec, cyl, type, ehead, esect, ecyl, start, len */
 	. = DOSPARTOFF	/* starting address of partition table */
-pt:
-	.byte	0x0,0,0,0,0,0,0,0
-	.long	0,0
-	.byte	0x0,0,0,0,0,0,0,0
-	.long	0,0
-	.byte	0x0,0,0,0,0,0,0,0
-	.long	0,0
-	.byte	0x0,0,0,0,0,0,0,0
-	.long	0,0
+pt:	.fill	0x40,1,0
 /* the last 2 bytes in the sector 0 contain the signature */
 	. = 0x1fe
 signature:

@@ -1,4 +1,4 @@
-/* $OpenBSD: input.c,v 1.206 2022/06/30 09:55:53 nicm Exp $ */
+/* $OpenBSD: input.c,v 1.208 2022/08/31 08:07:05 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1899,7 +1899,7 @@ input_csi_dispatch_winops(struct input_ctx *ictx)
 			}
 			break;
 		case 18:
-			input_reply(ictx, "\033[8;%u;%ut", x, y);
+			input_reply(ictx, "\033[8;%u;%ut", y, x);
 			break;
 		default:
 			log_debug("%s: unknown '%c'", __func__, ictx->ch);
@@ -2242,22 +2242,27 @@ static int
 input_dcs_dispatch(struct input_ctx *ictx)
 {
 	struct window_pane	*wp = ictx->wp;
+	struct options		*oo = wp->options;
 	struct screen_write_ctx	*sctx = &ictx->ctx;
 	u_char			*buf = ictx->input_buf;
 	size_t			 len = ictx->input_len;
 	const char		 prefix[] = "tmux;";
 	const u_int		 prefixlen = (sizeof prefix) - 1;
+	long long		 allow_passthrough = 0;
 
 	if (wp == NULL)
 		return (0);
 	if (ictx->flags & INPUT_DISCARD)
 		return (0);
-	if (!options_get_number(ictx->wp->options, "allow-passthrough"))
+	allow_passthrough = options_get_number(oo, "allow-passthrough");
+	if (!allow_passthrough)
 		return (0);
 	log_debug("%s: \"%s\"", __func__, buf);
 
-	if (len >= prefixlen && strncmp(buf, prefix, prefixlen) == 0)
-		screen_write_rawstring(sctx, buf + prefixlen, len - prefixlen);
+	if (len >= prefixlen && strncmp(buf, prefix, prefixlen) == 0) {
+		screen_write_rawstring(sctx, buf + prefixlen, len - prefixlen,
+		    allow_passthrough == 2);
+	}
 
 	return (0);
 }

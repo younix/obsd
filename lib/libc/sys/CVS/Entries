@@ -2,12 +2,10 @@
 /__thrsigdivert.2/1.5/Sun Aug 21 13:31:21 2016//
 /__thrsleep.2/1.7/Tue Apr 24 16:28:42 2018//
 /accept.2/1.29/Sun May 26 09:47:28 2019//
-/access.2/1.25/Mon Jan 19 15:54:11 2015//
 /adjtime.2/1.25/Tue Mar 26 16:02:54 2019//
 /brk.2/1.24/Sun Sep  8 22:50:59 2019//
 /canceled.c/1.2/Tue Sep  5 02:40:54 2017//
 /chdir.2/1.14/Thu Sep 10 17:55:21 2015//
-/chflags.2/1.28/Mon Mar 25 21:17:01 2019//
 /chmod.2/1.28/Thu Sep 10 17:55:21 2015//
 /closefrom.2/1.10/Fri May 31 18:36:58 2019//
 /connect.2/1.34/Thu Jun 20 14:19:25 2019//
@@ -16,7 +14,6 @@
 /flock.2/1.21/Tue Jun 25 19:28:31 2019//
 /fork.2/1.18/Thu Sep 10 17:55:21 2015//
 /fsync.2/1.15/Thu Apr 18 23:51:13 2019//
-/getdents.2/1.3/Tue Dec 16 00:06:49 2014//
 /getdtablecount.2/1.5/Sun May 31 23:54:25 2015//
 /getgid.2/1.19/Thu Sep 10 17:55:21 2015//
 /getgroups.2/1.15/Mon Jul  8 18:48:30 2019//
@@ -80,7 +77,6 @@
 /socketpair.2/1.21/Sun Apr  8 18:46:43 2018//
 /stack_protector.c/1.24/Wed Nov 29 05:13:57 2017//
 /sysarch.2/1.11/Thu Sep 10 17:55:21 2015//
-/syscall.2/1.13/Mon May 30 06:48:21 2016//
 /thrkill.2/1.2/Sat Mar 19 21:56:12 2016//
 /timer_create.c/1.7/Sat Sep 12 13:13:34 2015//
 /timer_delete.c/1.6/Sat Sep 12 13:13:34 2015//
@@ -137,7 +133,6 @@
 /revoke.2/1.16/Thu Sep  2 14:22:30 2021//
 /unlink.2/1.28/Thu Sep  2 14:22:30 2021//
 /unveil.2/1.22/Tue Sep 14 08:17:17 2021//
-/wait.2/1.31/Thu Sep  2 14:22:30 2021//
 /mount.2/1.50/Tue Oct 26 15:40:54 2021//
 /semget.2/1.20/Mon Nov 15 19:06:15 2021//
 /semop.2/1.20/Mon Nov 15 19:06:15 2021//
@@ -184,8 +179,13 @@
 /socket.2/1.44/Tue Jul 26 13:42:32 2022//
 /statfs.2/1.29/Mon Aug  1 07:15:36 2022//
 /sync.2/1.17/Tue Jul 26 13:42:32 2022//
-/sysctl.2/1.48/Tue Jul 26 13:42:32 2022//
 /truncate.2/1.21/Tue Jul 26 13:42:32 2022//
 /write.2/1.44/Tue Jul 26 13:42:32 2022//
 /ypconnect.2/1.3/Tue Jul 26 13:42:32 2022//
+/access.2/1.26/Fri Sep  2 14:00:04 2022//
+/chflags.2/1.29/Fri Sep  2 14:00:04 2022//
+/getdents.2/1.4/Fri Sep  2 14:00:04 2022//
+/syscall.2/1.14/Fri Sep  2 14:00:04 2022//
+/sysctl.2/1.49/Fri Sep  2 14:00:04 2022//
+/wait.2/1.32/Fri Sep  2 14:00:04 2022//
 D

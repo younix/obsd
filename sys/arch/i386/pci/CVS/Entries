@@ -1,5 +1,4 @@
 /agp_machdep.c/1.20/Sun Nov 16 12:30:57 2014//
-/ali1543.c/1.4/Sun Sep 14 14:17:23 2014//
 /amd756.c/1.5/Thu Jun 26 05:42:11 2008//
 /amd756reg.h/1.1/Tue Nov  7 18:21:22 2000//
 /elan520reg.h/1.4/Thu Jun 26 05:42:11 2008//
@@ -40,4 +39,5 @@
 /pchb.c/1.93/Mon Jun 27 13:02:00 2022//
 /pcib.c/1.25/Mon Jun 27 13:02:00 2022//
 /pcibios.c/1.49/Mon Jun 27 13:02:00 2022//
+/ali1543.c/1.5/Fri Sep  2 14:00:19 2022//
 D

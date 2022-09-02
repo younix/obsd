@@ -1,4 +1,4 @@
-/*	$OpenBSD: sys_generic.c,v 1.148 2022/07/05 15:06:16 visa Exp $	*/
+/*	$OpenBSD: sys_generic.c,v 1.150 2022/08/16 13:32:16 visa Exp $	*/
 /*	$NetBSD: sys_generic.c,v 1.24 1996/03/29 00:25:32 cgd Exp $	*/
 
 /*
@@ -50,8 +50,6 @@
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
 #include <sys/uio.h>
-#include <sys/kernel.h>
-#include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/malloc.h>
 #include <sys/poll.h>
@@ -59,13 +57,10 @@
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
-#include <sys/sched.h>
 #include <sys/pledge.h>
 
 #include <sys/mount.h>
 #include <sys/syscallargs.h>
-
-#include <uvm/uvm_extern.h>
 
 /*
  * Debug values:
@@ -691,10 +686,7 @@ dopselect(struct proc *p, int nd, fd_set *in, fd_set *ou, fd_set *ex,
 		/* Maximum number of events per iteration */
 		count = MIN(nitems(kev), nevents);
 		ready = kqueue_scan(&scan, count, kev, timeout, p, &error);
-#ifdef KTRACE
-		if (KTRPOINT(p, KTR_STRUCT))
-			ktrevent(p, kev, ready);
-#endif
+
 		/* Convert back events that are ready. */
 		for (i = 0; i < ready && error == 0; i++)
 			error = pselcollect(p, &kev[i], pobits, &ncollected);
@@ -762,10 +754,6 @@ pselregister(struct proc *p, fd_set *pibits[3], fd_set *pobits[3], int nfd,
 				EV_SET(&kev, fd, evf[msk],
 				    EV_ADD|EV_ENABLE|__EV_SELECT,
 				    evff[msk], 0, (void *)(p->p_kq_serial));
-#ifdef KTRACE
-				if (KTRPOINT(p, KTR_STRUCT))
-					ktrevent(p, &kev, 1);
-#endif
 				error = kqueue_register(p->p_kq, &kev, 0, p);
 				switch (error) {
 				case 0:
@@ -1001,10 +989,7 @@ doppoll(struct proc *p, struct pollfd *fds, u_int nfds,
 		/* Maximum number of events per iteration */
 		count = MIN(nitems(kev), nevents);
 		ready = kqueue_scan(&scan, count, kev, timeout, p, &error);
-#ifdef KTRACE
-		if (KTRPOINT(p, KTR_STRUCT))
-			ktrevent(p, kev, ready);
-#endif
+
 		/* Convert back events that are ready. */
 		for (i = 0; i < ready; i++)
 			ncollected += ppollcollect(p, &kev[i], pl, nfds);
@@ -1057,10 +1042,6 @@ ppollregister_evts(struct proc *p, struct kevent *kevp, int nkev,
 
 	KASSERT(pl->revents == 0);
 
-#ifdef KTRACE
-	if (KTRPOINT(p, KTR_STRUCT))
-		ktrevent(p, kevp, nkev);
-#endif
 	for (i = 0; i < nkev; i++, kevp++) {
 again:
 		error = kqueue_register(p->p_kq, kevp, pollid, p);

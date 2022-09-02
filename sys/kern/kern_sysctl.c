@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_sysctl.c,v 1.404 2022/07/26 14:53:45 deraadt Exp $	*/
+/*	$OpenBSD: kern_sysctl.c,v 1.406 2022/08/16 13:29:52 visa Exp $	*/
 /*	$NetBSD: kern_sysctl.c,v 1.17 1996/05/20 17:49:05 mrg Exp $	*/
 
 /*-
@@ -53,7 +53,6 @@
 #include <sys/vnode.h>
 #include <sys/unistd.h>
 #include <sys/buf.h>
-#include <sys/ioctl.h>
 #include <sys/tty.h>
 #include <sys/disklabel.h>
 #include <sys/disk.h>
@@ -298,7 +297,6 @@ const struct sysctl_bounded_args kern_vars[] = {
 	{KERN_NFILES, &numfiles, SYSCTL_INT_READONLY},
 	{KERN_TTYCOUNT, &tty_count, SYSCTL_INT_READONLY},
 	{KERN_ARGMAX, &arg_max, SYSCTL_INT_READONLY},
-	{KERN_NSELCOLL, &int_zero, SYSCTL_INT_READONLY},
 	{KERN_POSIX1, &posix_version, SYSCTL_INT_READONLY},
 	{KERN_NGROUPS, &ngroups_max, SYSCTL_INT_READONLY},
 	{KERN_JOB_CONTROL, &int_one, SYSCTL_INT_READONLY},

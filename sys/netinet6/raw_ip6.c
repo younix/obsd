@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip6.c,v 1.147 2022/03/23 00:16:07 bluhm Exp $	*/
+/*	$OpenBSD: raw_ip6.c,v 1.166 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
 
 /*
@@ -105,6 +105,19 @@ struct	inpcbtable rawin6pcbtable;
 
 struct cpumem *rip6counters;
 
+const struct pr_usrreqs rip6_usrreqs = {
+	.pru_usrreq	= rip6_usrreq,
+	.pru_attach	= rip6_attach,
+	.pru_detach	= rip6_detach,
+	.pru_bind	= rip6_bind,
+	.pru_connect	= rip6_connect,
+	.pru_disconnect	= rip6_disconnect,
+	.pru_shutdown	= rip6_shutdown,
+	.pru_send	= rip6_send,
+	.pru_abort	= rip6_abort,
+	.pru_control	= in6_control,
+};
+
 /*
  * Initialize raw connection block queue.
  */
@@ -164,8 +177,8 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 		}
 	}
 #endif
-	NET_ASSERT_WLOCKED();
 	SIMPLEQ_INIT(&inpcblist);
+	rw_enter_write(&rawin6pcbtable.inpt_notify);
 	mtx_enter(&rawin6pcbtable.inpt_mtx);
 	TAILQ_FOREACH(in6p, &rawin6pcbtable.inpt_queue, inp_queue) {
 		if (in6p->inp_socket->so_state & SS_CANTRCVMORE)
@@ -216,6 +229,8 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 		struct counters_ref ref;
 		uint64_t *counters;
 
+		rw_exit_write(&rawin6pcbtable.inpt_notify);
+
 		if (proto != IPPROTO_ICMPV6) {
 			rip6stat_inc(rip6s_nosock);
 			if (m->m_flags & M_MCAST)
@@ -232,6 +247,8 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 		counters = counters_enter(&ref, ip6counters);
 		counters[ip6s_delivered]--;
 		counters_leave(&ref, ip6counters);
+
+		return IPPROTO_DONE;
 	}
 
 	while ((in6p = SIMPLEQ_FIRST(&inpcblist)) != NULL) {
@@ -259,6 +276,8 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 		}
 		in_pcbunref(in6p);
 	}
+	rw_exit_write(&rawin6pcbtable.inpt_notify);
+
 	return IPPROTO_DONE;
 }
 
@@ -313,12 +332,12 @@ rip6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 		 * XXX chase extension headers, or pass final nxt value
 		 * from icmp6_notify_error()
 		 */
-		in6p = in6_pcbhashlookup(&rawin6pcbtable, &sa6->sin6_addr, 0,
+		in6p = in6_pcblookup(&rawin6pcbtable, &sa6->sin6_addr, 0,
 		    &sa6_src->sin6_addr, 0, rdomain);
 
 		if (in6p && in6p->inp_ipv6.ip6_nxt &&
 		    in6p->inp_ipv6.ip6_nxt == nxt)
-			valid++;
+			valid = 1;
 
 		/*
 		 * Depending on the value of "valid" and routing table
@@ -328,6 +347,7 @@ rip6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 		 * - ignore the MTU change notification.
 		 */
 		icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+		in_pcbunref(in6p);
 
 		/*
 		 * regardless of if we called icmp6_mtudisc_update(),
@@ -561,10 +581,6 @@ rip6_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 	struct inpcb *in6p;
 	int error = 0;
 
-	if (req == PRU_CONTROL)
-		return (in6_control(so, (u_long)m, (caddr_t)nam,
-		    (struct ifnet *)control));
-
 	soassertlocked(so);
 
 	in6p = sotoinpcb(so);
@@ -574,127 +590,6 @@ rip6_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 	}
 
 	switch (req) {
-	case PRU_DISCONNECT:
-		if ((so->so_state & SS_ISCONNECTED) == 0) {
-			error = ENOTCONN;
-			break;
-		}
-		in6p->inp_faddr6 = in6addr_any;
-		so->so_state &= ~SS_ISCONNECTED;	/* XXX */
-		break;
-
-	case PRU_ABORT:
-		soisdisconnected(so);
-		if (in6p == NULL)
-			panic("%s", __func__);
-#ifdef MROUTING
-		if (so == ip6_mrouter[in6p->inp_rtableid])
-			ip6_mrouter_done(so);
-#endif
-		free(in6p->inp_icmp6filt, M_PCB, sizeof(struct icmp6_filter));
-		in6p->inp_icmp6filt = NULL;
-
-		in_pcbdetach(in6p);
-		break;
-
-	case PRU_BIND:
-	    {
-		struct sockaddr_in6 *addr;
-
-		if ((error = in6_nam2sin6(nam, &addr)))
-			break;
-		/*
-		 * Make sure to not enter in_pcblookup_local(), local ports
-		 * are non-sensical for raw sockets.
-		 */
-		addr->sin6_port = 0;
-
-		if ((error = in6_pcbaddrisavail(in6p, addr, 0, p)))
-			break;
-
-		in6p->inp_laddr6 = addr->sin6_addr;
-		break;
-	    }
-
-	case PRU_CONNECT:
-	{
-		struct sockaddr_in6 *addr;
-		struct in6_addr *in6a = NULL;
-
-		if ((error = in6_nam2sin6(nam, &addr)))
-			break;
-		/* Source address selection. XXX: need pcblookup? */
-		error = in6_pcbselsrc(&in6a, addr, in6p, in6p->inp_outputopts6);
-		if (error)
-			break;
-		in6p->inp_laddr6 = *in6a;
-		in6p->inp_faddr6 = addr->sin6_addr;
-		soisconnected(so);
-		break;
-	}
-
-	case PRU_CONNECT2:
-		error = EOPNOTSUPP;
-		break;
-
-	/*
-	 * Mark the connection as being incapable of further input.
-	 */
-	case PRU_SHUTDOWN:
-		socantsendmore(so);
-		break;
-	/*
-	 * Ship a packet out. The appropriate raw output
-	 * routine handles any messaging necessary.
-	 */
-	case PRU_SEND:
-	{
-		struct sockaddr_in6 dst;
-
-		/* always copy sockaddr to avoid overwrites */
-		memset(&dst, 0, sizeof(dst));
-		dst.sin6_family = AF_INET6;
-		dst.sin6_len = sizeof(dst);
-		if (so->so_state & SS_ISCONNECTED) {
-			if (nam) {
-				error = EISCONN;
-				break;
-			}
-			dst.sin6_addr = in6p->inp_faddr6;
-		} else {
-			struct sockaddr_in6 *addr6;
-
-			if (nam == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			if ((error = in6_nam2sin6(nam, &addr6)))
-				break;
-			dst.sin6_addr = addr6->sin6_addr;
-			dst.sin6_scope_id = addr6->sin6_scope_id;
-		}
-		error = rip6_output(m, so, sin6tosa(&dst), control);
-		control = NULL;
-		m = NULL;
-		break;
-	}
-
-	case PRU_SENSE:
-		/*
-		 * stat: don't bother with a blocksize
-		 */
-		break;
-	/*
-	 * Not supported.
-	 */
-	case PRU_LISTEN:
-	case PRU_ACCEPT:
-	case PRU_SENDOOB:
-	case PRU_RCVD:
-	case PRU_RCVOOB:
-		error = EOPNOTSUPP;
-		break;
-
 	case PRU_SOCKADDR:
 		in6_setsockaddr(in6p, nam);
 		break;
@@ -756,6 +651,149 @@ rip6_detach(struct socket *so)
 
 	if (in6p == NULL)
 		panic("%s", __func__);
+#ifdef MROUTING
+	if (so == ip6_mrouter[in6p->inp_rtableid])
+		ip6_mrouter_done(so);
+#endif
+	free(in6p->inp_icmp6filt, M_PCB, sizeof(struct icmp6_filter));
+	in6p->inp_icmp6filt = NULL;
+
+	in_pcbdetach(in6p);
+
+	return (0);
+}
+
+int
+rip6_bind(struct socket *so, struct mbuf *nam, struct proc *p)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+	struct sockaddr_in6 *addr;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = in6_nam2sin6(nam, &addr)))
+		return (error);
+
+	/*
+	 * Make sure to not enter in_pcblookup_local(), local ports
+	 * are non-sensical for raw sockets.
+	 */
+	addr->sin6_port = 0;
+
+	if ((error = in6_pcbaddrisavail(in6p, addr, 0, p)))
+		return (error);
+
+	in6p->inp_laddr6 = addr->sin6_addr;
+	return (0);
+}
+
+int
+rip6_connect(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+	struct sockaddr_in6 *addr;
+	struct in6_addr *in6a = NULL;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = in6_nam2sin6(nam, &addr)))
+		return (error);
+
+	/* Source address selection. XXX: need pcblookup? */
+	error = in6_pcbselsrc(&in6a, addr, in6p, in6p->inp_outputopts6);
+	if (error)
+		return (error);
+
+	in6p->inp_laddr6 = *in6a;
+	in6p->inp_faddr6 = addr->sin6_addr;
+	soisconnected(so);
+	return (0);
+}
+
+int
+rip6_disconnect(struct socket *so)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+
+	soassertlocked(so);
+
+	if ((so->so_state & SS_ISCONNECTED) == 0)
+		return (ENOTCONN);
+
+	in6p->inp_faddr6 = in6addr_any;
+	so->so_state &= ~SS_ISCONNECTED;	/* XXX */
+	return (0);
+}
+
+int
+rip6_shutdown(struct socket *so)
+{
+	/*
+	 * Mark the connection as being incapable of further input.
+	 */
+	soassertlocked(so);
+	socantsendmore(so);
+	return (0);
+}
+
+int
+rip6_send(struct socket *so, struct mbuf *m, struct mbuf *nam,
+	struct mbuf *control)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+	struct sockaddr_in6 dst;
+	int error;
+
+	soassertlocked(so);
+
+	/*
+	 * Ship a packet out. The appropriate raw output
+	 * routine handles any messaging necessary.
+	 */
+
+	/* always copy sockaddr to avoid overwrites */
+	memset(&dst, 0, sizeof(dst));
+	dst.sin6_family = AF_INET6;
+	dst.sin6_len = sizeof(dst);
+	if (so->so_state & SS_ISCONNECTED) {
+		if (nam) {
+			error = EISCONN;
+			goto out;
+		}
+		dst.sin6_addr = in6p->inp_faddr6;
+	} else {
+		struct sockaddr_in6 *addr6;
+
+		if (nam == NULL) {
+			error = ENOTCONN;
+			goto out;
+		}
+		if ((error = in6_nam2sin6(nam, &addr6)))
+			goto out;
+		dst.sin6_addr = addr6->sin6_addr;
+		dst.sin6_scope_id = addr6->sin6_scope_id;
+	}
+	error = rip6_output(m, so, sin6tosa(&dst), control);
+	control = NULL;
+	m = NULL;
+
+out:
+	m_freem(control);
+	m_freem(m);
+
+	return (error);
+}
+
+int
+rip6_abort(struct socket *so)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+
+	soassertlocked(so);
+
+	soisdisconnected(so);
 #ifdef MROUTING
 	if (so == ip6_mrouter[in6p->inp_rtableid])
 		ip6_mrouter_done(so);

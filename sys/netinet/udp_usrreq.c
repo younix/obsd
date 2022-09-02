@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.279 2022/06/26 15:50:21 mvs Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.299 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -121,6 +121,34 @@ int	udpcksum = 1;
 u_int	udp_sendspace = 9216;		/* really max datagram size */
 u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
 					/* 40 1K datagrams */
+
+const struct pr_usrreqs udp_usrreqs = {
+	.pru_usrreq	= udp_usrreq,
+	.pru_attach	= udp_attach,
+	.pru_detach	= udp_detach,
+	.pru_bind	= udp_bind,
+	.pru_connect	= udp_connect,
+	.pru_disconnect	= udp_disconnect,
+	.pru_shutdown	= udp_shutdown,
+	.pru_send	= udp_send,
+	.pru_abort	= udp_abort,
+	.pru_control	= in_control,
+};
+
+#ifdef INET6
+const struct pr_usrreqs udp6_usrreqs = {
+	.pru_usrreq	= udp_usrreq,
+	.pru_attach	= udp_attach,
+	.pru_detach	= udp_detach,
+	.pru_bind	= udp_bind,
+	.pru_connect	= udp_connect,
+	.pru_disconnect	= udp_disconnect,
+	.pru_shutdown	= udp_shutdown,
+	.pru_send	= udp_send,
+	.pru_abort	= udp_abort,
+	.pru_control	= in6_control,
+};
+#endif
 
 const struct sysctl_bounded_args udpctl_vars[] = {
 	{ UDPCTL_CHECKSUM, &udpcksum, 0, 1 },
@@ -364,8 +392,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 		 * Locate pcb(s) for datagram.
 		 * (Algorithm copied from raw_intr().)
 		 */
-		NET_ASSERT_WLOCKED();
 		SIMPLEQ_INIT(&inpcblist);
+		rw_enter_write(&udbtable.inpt_notify);
 		mtx_enter(&udbtable.inpt_mtx);
 		TAILQ_FOREACH(inp, &udbtable.inpt_queue, inp_queue) {
 			if (inp->inp_socket->so_state & SS_CANTRCVMORE)
@@ -438,6 +466,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 		mtx_leave(&udbtable.inpt_mtx);
 
 		if (SIMPLEQ_EMPTY(&inpcblist)) {
+			rw_exit_write(&udbtable.inpt_notify);
+
 			/*
 			 * No matching pcb found; discard datagram.
 			 * (No need to send an ICMP Port Unreachable
@@ -461,6 +491,8 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			}
 			in_pcbunref(inp);
 		}
+		rw_exit_write(&udbtable.inpt_notify);
+
 		return IPPROTO_DONE;
 	}
 	/*
@@ -472,12 +504,12 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 	if (inp == NULL) {
 #ifdef INET6
 		if (ip6)
-			inp = in6_pcbhashlookup(&udbtable, &ip6->ip6_src,
+			inp = in6_pcblookup(&udbtable, &ip6->ip6_src,
 			    uh->uh_sport, &ip6->ip6_dst, uh->uh_dport,
 			    m->m_pkthdr.ph_rtableid);
 		else
 #endif /* INET6 */
-		inp = in_pcbhashlookup(&udbtable, ip->ip_src, uh->uh_sport,
+		inp = in_pcblookup(&udbtable, ip->ip_src, uh->uh_sport,
 		    ip->ip_dst, uh->uh_dport, m->m_pkthdr.ph_rtableid);
 	}
 	if (inp == NULL) {
@@ -570,17 +602,20 @@ udp_input(struct mbuf **mp, int *offp, int proto, int af)
 			m = *mp = pipex_l2tp_input(m, off, session,
 			    ipsecflowinfo);
 			pipex_rele_session(session);
-
-			if (m == NULL)
+			if (m == NULL) {
+				in_pcbunref(inp);
 				return IPPROTO_DONE;
+			}
 		}
 	}
 #endif
 
 	udp_sbappend(inp, m, ip, ip6, iphlen, uh, &srcsa.sa, ipsecflowinfo);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 bad:
 	m_freem(m);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 }
 
@@ -638,12 +673,17 @@ udp_sbappend(struct inpcb *inp, struct mbuf *m, struct ip *ip,
 	}
 #endif
 	m_adj(m, hlen);
+
+	mtx_enter(&inp->inp_mtx);
 	if (sbappendaddr(so, &so->so_rcv, srcaddr, m, opts) == 0) {
+		mtx_leave(&inp->inp_mtx);
 		udpstat_inc(udps_fullsock);
 		m_freem(m);
 		m_freem(opts);
 		return;
 	}
+	mtx_leave(&inp->inp_mtx);
+
 	sorwakeup(so);
 }
 
@@ -674,6 +714,7 @@ udp6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 		u_int16_t uh_sport;
 		u_int16_t uh_dport;
 	} *uhp;
+	struct inpcb *inp;
 	void (*notify)(struct inpcb *, int) = udp_notify;
 
 	if (sa == NULL)
@@ -759,17 +800,14 @@ udp6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 		}
 
 		if (cmd == PRC_MSGSIZE) {
-			int valid = 0;
-
 			/*
 			 * Check to see if we have a valid UDP socket
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcbhashlookup(&udbtable, &sa6.sin6_addr,
+			inp = in6_pcblookup(&udbtable, &sa6.sin6_addr,
 			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport,
-			    rdomain))
-				valid = 1;
+			    rdomain);
 #if 0
 			/*
 			 * As the use of sendto(2) is fairly popular,
@@ -778,10 +816,11 @@ udp6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_listen(&udbtable,
-			    &sa6_src.sin6_addr, uh.uh_sport, NULL,
-			    rdomain))
-				valid = 1;
+			if (inp == NULL) {
+				inp = in6_pcblookup_listen(&udbtable,
+				    &sa6_src.sin6_addr, uh.uh_sport, NULL,
+				    rdomain))
+			}
 #endif
 
 			/*
@@ -791,7 +830,9 @@ udp6_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *d)
 			 *   corresponding routing entry, or
 			 * - ignore the MTU change notification.
 			 */
-			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
+			icmp6_mtudisc_update((struct ip6ctlparam *)d,
+			    inp != NULL);
+			in_pcbunref(inp);
 
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),
@@ -850,11 +891,12 @@ udp_ctlinput(int cmd, struct sockaddr *sa, u_int rdomain, void *v)
 			return;
 		}
 #endif
-		inp = in_pcbhashlookup(&udbtable,
+		inp = in_pcblookup(&udbtable,
 		    ip->ip_dst, uhp->uh_dport, ip->ip_src, uhp->uh_sport,
 		    rdomain);
 		if (inp && inp->inp_socket != NULL)
 			notify(inp, errno);
+		in_pcbunref(inp);
 	} else
 		in_pcbnotifyall(&udbtable, sa, rdomain, errno, notify);
 }
@@ -1038,17 +1080,6 @@ udp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
 	struct inpcb *inp;
 	int error = 0;
 
-	if (req == PRU_CONTROL) {
-#ifdef INET6
-		if (sotopf(so) == PF_INET6)
-			return (in6_control(so, (u_long)m, (caddr_t)addr,
-			    (struct ifnet *)control));
-		else
-#endif /* INET6 */
-			return (in_control(so, (u_long)m, (caddr_t)addr,
-			    (struct ifnet *)control));
-	}
-
 	soassertlocked(so);
 
 	inp = sotoinpcb(so);
@@ -1062,120 +1093,6 @@ udp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
 	 * the udp pcb queue and/or pcb addresses.
 	 */
 	switch (req) {
-
-	case PRU_BIND:
-		error = in_pcbbind(inp, addr, p);
-		break;
-
-	case PRU_LISTEN:
-		error = EOPNOTSUPP;
-		break;
-
-	case PRU_CONNECT:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6) {
-			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
-				error = EISCONN;
-				break;
-			}
-			error = in6_pcbconnect(inp, addr);
-		} else
-#endif /* INET6 */
-		{
-			if (inp->inp_faddr.s_addr != INADDR_ANY) {
-				error = EISCONN;
-				break;
-			}
-			error = in_pcbconnect(inp, addr);
-		}
-
-		if (error == 0)
-			soisconnected(so);
-		break;
-
-	case PRU_CONNECT2:
-		error = EOPNOTSUPP;
-		break;
-
-	case PRU_ACCEPT:
-		error = EOPNOTSUPP;
-		break;
-
-	case PRU_DISCONNECT:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6) {
-			if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6)) {
-				error = ENOTCONN;
-				break;
-			}
-		} else
-#endif /* INET6 */
-		{
-			if (inp->inp_faddr.s_addr == INADDR_ANY) {
-				error = ENOTCONN;
-				break;
-			}
-		}
-
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			inp->inp_laddr6 = in6addr_any;
-		else
-#endif /* INET6 */
-			inp->inp_laddr.s_addr = INADDR_ANY;
-		in_pcbdisconnect(inp);
-
-		so->so_state &= ~SS_ISCONNECTED;		/* XXX */
-		break;
-
-	case PRU_SHUTDOWN:
-		socantsendmore(so);
-		break;
-
-	case PRU_SEND:
-#ifdef PIPEX
-		if (inp->inp_pipex) {
-			struct pipex_session *session;
-
-			if (addr != NULL)
-				session =
-				    pipex_l2tp_userland_lookup_session(m,
-					mtod(addr, struct sockaddr *));
-			else
-#ifdef INET6
-			if (inp->inp_flags & INP_IPV6)
-				session =
-				    pipex_l2tp_userland_lookup_session_ipv6(
-					m, inp->inp_faddr6);
-			else
-#endif
-				session =
-				    pipex_l2tp_userland_lookup_session_ipv4(
-					m, inp->inp_faddr);
-			if (session != NULL) {
-				m = pipex_l2tp_userland_output(m, session);
-				pipex_rele_session(session);
-
-				if (m == NULL) {
-					error = ENOMEM;
-					goto release;
-				}
-			}
-		}
-#endif
-
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			error = udp6_output(inp, m, addr, control);
-		else
-#endif
-			error = udp_output(inp, m, addr, control);
-		return (error);
-
-	case PRU_ABORT:
-		soisdisconnected(so);
-		in_pcbdetach(inp);
-		break;
 
 	case PRU_SOCKADDR:
 #ifdef INET6
@@ -1195,23 +1112,10 @@ udp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
 			in_setpeeraddr(inp, addr);
 		break;
 
-	case PRU_SENSE:
-		/*
-		 * stat: don't bother with a blocksize.
-		 */
-		/*
-		 * Perhaps Path MTU might be returned for a connected
-		 * UDP socket in this case.
-		 */
-		break;
-
-	case PRU_SENDOOB:
 	case PRU_FASTTIMO:
 	case PRU_SLOWTIMO:
 	case PRU_PROTORCV:
 	case PRU_PROTOSEND:
-	case PRU_RCVD:
-	case PRU_RCVOOB:
 		error =  EOPNOTSUPP;
 		break;
 
@@ -1261,6 +1165,145 @@ udp_detach(struct socket *so)
 		return (EINVAL);
 
 	in_pcbdetach(inp);
+	return (0);
+}
+
+int
+udp_bind(struct socket *so, struct mbuf *addr, struct proc *p)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	soassertlocked(so);
+	return in_pcbbind(inp, addr, p);
+}
+
+int
+udp_connect(struct socket *so, struct mbuf *addr)
+{
+	struct inpcb *inp = sotoinpcb(so);
+	int error;
+
+	soassertlocked(so);
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6) {
+		if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+			return (EISCONN);
+		error = in6_pcbconnect(inp, addr);
+	} else
+#endif /* INET6 */
+	{
+		if (inp->inp_faddr.s_addr != INADDR_ANY)
+			return (EISCONN);
+		error = in_pcbconnect(inp, addr);
+	}
+
+	if (error)
+		return (error);
+
+	soisconnected(so);
+	return (0);
+}
+
+int
+udp_disconnect(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	soassertlocked(so);
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6))
+			return (ENOTCONN);
+	} else
+#endif /* INET6 */
+	{
+		if (inp->inp_faddr.s_addr == INADDR_ANY)
+			return (ENOTCONN);
+	}
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
+		inp->inp_laddr6 = in6addr_any;
+	else
+#endif /* INET6 */
+		inp->inp_laddr.s_addr = INADDR_ANY;
+
+	in_pcbdisconnect(inp);
+	so->so_state &= ~SS_ISCONNECTED;		/* XXX */
+
+	return (0);
+}
+
+int
+udp_shutdown(struct socket *so)
+{
+	soassertlocked(so);
+	socantsendmore(so);
+	return (0);
+}
+
+int
+udp_send(struct socket *so, struct mbuf *m, struct mbuf *addr,
+    struct mbuf *control)
+{
+	struct inpcb *inp = sotoinpcb(so);
+	int error;
+
+	soassertlocked(so);
+
+#ifdef PIPEX
+	if (inp->inp_pipex) {
+		struct pipex_session *session;
+
+		if (addr != NULL)
+			session =
+			    pipex_l2tp_userland_lookup_session(m,
+				mtod(addr, struct sockaddr *));
+		else
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			session =
+			    pipex_l2tp_userland_lookup_session_ipv6(
+				m, inp->inp_faddr6);
+		else
+#endif
+			session =
+			    pipex_l2tp_userland_lookup_session_ipv4(
+				m, inp->inp_faddr);
+		if (session != NULL) {
+			m = pipex_l2tp_userland_output(m, session);
+			pipex_rele_session(session);
+
+			if (m == NULL) {
+				m_freem(control);
+				return (ENOMEM);
+			}
+		}
+	}
+#endif
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
+		error = udp6_output(inp, m, addr, control);
+	else
+#endif
+		error = udp_output(inp, m, addr, control);
+
+	return (error);
+}
+
+int
+udp_abort(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	soassertlocked(so);
+
+	soisdisconnected(so);
+	in_pcbdetach(inp);
+
 	return (0);
 }
 

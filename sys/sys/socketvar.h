@@ -1,4 +1,4 @@
-/*	$OpenBSD: socketvar.h,v 1.106 2022/07/15 17:20:24 deraadt Exp $	*/
+/*	$OpenBSD: socketvar.h,v 1.109 2022/09/01 05:31:49 jsg Exp $	*/
 /*	$NetBSD: socketvar.h,v 1.18 1996/02/09 18:25:38 christos Exp $	*/
 
 /*-
@@ -31,6 +31,9 @@
  *
  *	@(#)socketvar.h	8.1 (Berkeley) 6/2/93
  */
+
+#ifndef _SYS_SOCKETVAR_H_
+#define _SYS_SOCKETVAR_H_
 
 #include <sys/selinfo.h>			/* for struct selinfo */
 #include <sys/queue.h>
@@ -308,9 +311,8 @@ int	sbcheckreserve(u_long, u_long);
 int	sbchecklowmem(void);
 int	sbreserve(struct socket *, struct sockbuf *, u_long);
 int	sbwait(struct socket *, struct sockbuf *);
-int	sb_lock(struct sockbuf *);
 void	soinit(void);
-int	soabort(struct socket *);
+void	soabort(struct socket *);
 int	soaccept(struct socket *, struct mbuf *);
 int	sobind(struct socket *, struct mbuf *, struct proc *);
 void	socantrcvmore(struct socket *);
@@ -370,3 +372,5 @@ void	sbcheck(struct socket *, struct sockbuf *);
 #endif /* SOCKBUF_DEBUG */
 
 #endif /* _KERNEL */
+
+#endif /* _SYS_SOCKETVAR_H_ */

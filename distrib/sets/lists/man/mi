@@ -1235,13 +1235,17 @@
 ./usr/share/man/man4/arm64
 ./usr/share/man/man4/arm64/agtimer.4
 ./usr/share/man/man4/arm64/ampintc.4
+./usr/share/man/man4/arm64/aplaudio.4
 ./usr/share/man/man4/arm64/aplcpu.4
 ./usr/share/man/man4/arm64/apldart.4
+./usr/share/man/man4/arm64/apldma.4
 ./usr/share/man/man4/arm64/apldog.4
 ./usr/share/man/man4/arm64/aplhidev.4
 ./usr/share/man/man4/arm64/apliic.4
 ./usr/share/man/man4/arm64/aplintc.4
 ./usr/share/man/man4/arm64/aplmbox.4
+./usr/share/man/man4/arm64/aplmca.4
+./usr/share/man/man4/arm64/aplnco.4
 ./usr/share/man/man4/arm64/aplns.4
 ./usr/share/man/man4/arm64/aplpcie.4
 ./usr/share/man/man4/arm64/aplpinctrl.4
@@ -1986,6 +1990,7 @@
 ./usr/share/man/man4/sypwr.4
 ./usr/share/man/man4/syscon.4
 ./usr/share/man/man4/tap.4
+./usr/share/man/man4/tascodec.4
 ./usr/share/man/man4/tcic.4
 ./usr/share/man/man4/tcp.4
 ./usr/share/man/man4/tcpci.4
@@ -2595,6 +2600,7 @@
 ./usr/share/man/man8/smtpd.8
 ./usr/share/man/man8/sndiod.8
 ./usr/share/man/man8/snmpd.8
+./usr/share/man/man8/snmpd_metrics.8
 ./usr/share/man/man8/spamd-setup.8
 ./usr/share/man/man8/spamd.8
 ./usr/share/man/man8/spamdb.8

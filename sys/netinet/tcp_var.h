@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_var.h,v 1.139 2022/02/25 23:51:03 guenther Exp $	*/
+/*	$OpenBSD: tcp_var.h,v 1.154 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$NetBSD: tcp_var.h,v 1.17 1996/02/13 23:44:24 christos Exp $	*/
 
 /*
@@ -161,6 +161,9 @@ struct tcpcb {
  * "Variance" is actually smoothed difference.
  */
 	uint32_t t_rcvtime;		/* time last segment received */
+	uint32_t t_rcvacktime;		/* time last ack received */
+	uint32_t t_sndtime;		/* time last segment sent */
+	uint32_t t_sndacktime;		/* time last ack sent */
 	uint32_t t_rtttime;		/* time we started measuring rtt */
 	tcp_seq	t_rtseq;		/* sequence number being timed */
 	short	t_srtt;			/* smoothed round-trip time */
@@ -182,7 +185,7 @@ struct tcpcb {
 	u_char	requested_s_scale;
 	u_int32_t ts_recent;		/* timestamp echo data */
 	u_int32_t ts_modulate;		/* modulation on timestamp */
-	u_int32_t ts_recent_age;		/* when last updated */
+	u_int32_t ts_recent_age;	/* when last updated */
 	tcp_seq	last_ack_sent;
 
 /* pointer for syn cache entries*/
@@ -197,6 +200,11 @@ struct tcpcb {
 	u_short	t_pmtud_ip_hl;		/* IP header length from ICMP payload */
 
 	int pf;
+
+/* maintain a few stats per connection: */
+	u_int	t_rcvoopack;		/* out-of-order packets received */
+	u_int	t_sndrexmitpack;	/* retransmit packets sent */
+	u_int	t_sndzerowin;		/* zero-window updates sent */
 };
 
 #define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
@@ -505,6 +513,7 @@ struct tcp_ident_mapping {
 #ifdef _KERNEL
 
 #include <sys/percpu.h>
+#include <sys/stat.h>
 
 enum tcpstat_counters {
 	tcps_connattempt,
@@ -629,6 +638,12 @@ tcpstat_pkt(enum tcpstat_counters pcounter, enum tcpstat_counters bcounter,
 	counters_pkt(tcpcounters, pcounter, bcounter, v);
 }
 
+extern	const struct pr_usrreqs tcp_usrreqs;
+
+#ifdef INET6
+extern	const struct pr_usrreqs tcp6_usrreqs;
+#endif
+
 extern	struct pool tcpcb_pool;
 extern	struct inpcbtable tcbtable;	/* head of queue of active tcpcb's */
 extern	u_int32_t tcp_now;		/* for RFC 1323 timestamps */
@@ -663,7 +678,7 @@ void	 tcp6_ctlinput(int, struct sockaddr *, u_int, void *);
 void	 tcp_ctlinput(int, struct sockaddr *, u_int, void *);
 int	 tcp_ctloutput(int, struct socket *, int, int, struct mbuf *);
 struct tcpcb *
-	 tcp_disconnect(struct tcpcb *);
+	 tcp_dodisconnect(struct tcpcb *);
 struct tcpcb *
 	 tcp_drop(struct tcpcb *, int);
 int	 tcp_dooptions(struct tcpcb *, u_char *, int, struct tcphdr *,
@@ -705,6 +720,20 @@ int	 tcp_usrreq(struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 int	 tcp_attach(struct socket *, int);
 int	 tcp_detach(struct socket *);
+int	 tcp_bind(struct socket *, struct mbuf *, struct proc *);
+int	 tcp_listen(struct socket *);
+int	 tcp_connect(struct socket *, struct mbuf *);
+int	 tcp_accept(struct socket *, struct mbuf *);
+int	 tcp_disconnect(struct socket *);
+int	 tcp_shutdown(struct socket *);
+int	 tcp_rcvd(struct socket *);
+int	 tcp_send(struct socket *, struct mbuf *, struct mbuf *,
+	     struct mbuf *);
+int	 tcp_abort(struct socket *);
+int	 tcp_sense(struct socket *, struct stat *);
+int	 tcp_rcvoob(struct socket *, struct mbuf *, int);
+int	 tcp_sendoob(struct socket *, struct mbuf *, struct mbuf *,
+	     struct mbuf *);
 void	 tcp_xmit_timer(struct tcpcb *, int);
 void	 tcpdropoldhalfopen(struct tcpcb *, u_int16_t);
 void	 tcp_sack_option(struct tcpcb *,struct tcphdr *,u_char *,int);

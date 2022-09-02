@@ -1,4 +1,4 @@
-/*	$OpenBSD: lapic.c,v 1.48 2021/06/11 05:33:16 jsg Exp $	*/
+/*	$OpenBSD: lapic.c,v 1.50 2022/08/25 17:38:16 cheloha Exp $	*/
 /* $NetBSD: lapic.c,v 1.1.2.8 2000/02/23 06:10:50 sommerfeld Exp $ */
 
 /*-
@@ -85,8 +85,7 @@ lapic_map(paddr_t lapic_base)
 	tpr = lapic_tpr;
 
 	/*
-	 * Map local apic.  If we have a local apic, it's safe to assume
-	 * we're on a 486 or better and can use invlpg and non-cacheable PTEs
+	 * Map local apic.
 	 *
 	 * Whap the PTE "by hand" rather than calling pmap_kenter_pa because
 	 * the latter will attempt to invoke TLB shootdown code just as we
@@ -396,7 +395,7 @@ lapic_calibrate_timer(struct cpu_info *ci)
 		 * Now that the timer's calibrated, use the apic timer routines
 		 * for all our timing needs..
 		 */
-		delay_func = lapic_delay;
+		delay_init(lapic_delay, 3000);
 		initclock_func = lapic_initclocks;
 	}
 }

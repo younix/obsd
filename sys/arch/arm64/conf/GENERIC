@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.233 2022/07/14 19:06:29 kettenis Exp $
+# $OpenBSD: GENERIC,v 1.236 2022/08/31 16:10:59 kettenis Exp $
 #
 # GENERIC machine description file
 #
@@ -141,19 +141,29 @@ gpiokeys*	at fdt?
 gpioleds*	at fdt?
 
 # Apple
+aplaudio*	at fdt?
+audio*		at aplaudio?
 aplcpu*		at fdt?
 apldart*	at fdt? early 1
+apldc*		at fdt?
+apldchidev*	at fdt?
+apldckbd*	at apldchidev?
+wskbd*		at apldckbd? mux 1
+apldma*		at fdt?
 apldog*		at fdt? early 1
 apliic*		at fdt?
 iic*		at apliic?
 aplintc*	at fdt? early 1
 aplmbox*	at fdt?
+aplmca*		at fdt?
+aplnco*		at fdt?
 aplns*		at fdt?			# Apple NVME Storage controllers
 nvme*		at aplns?
 aplpcie*	at fdt?
 pci*		at aplpcie?
 aplpinctrl*	at fdt? early 1
 aplpmgr*	at fdt? early 1
+aplrtk*		at fdt?
 aplsart*	at fdt?
 aplsmc*		at fdt?
 aplspi*		at fdt?
@@ -289,6 +299,11 @@ rkvop*		at fdt?
 rkdwusb*	at fdt?
 dwmmc*		at fdt?
 sdmmc*		at dwmmc?
+
+# Qualcomm SoCs
+qcgpio*		at acpi?
+qciic*		at acpi?
+iic*		at qciic?
 
 # Sunxi SoCs
 sxipio*		at fdt? early 1	# GPIO pins for leds & PHYs
@@ -496,6 +511,13 @@ dsxrtc*		at iic?			# DS3231 RTC
 escodec*	at iic?			# ES8316 audio codec
 fanpwr*		at iic?			# FAN53555 regulator
 fusbtc*		at iic?			# USB Type-C controller
+ihidev*		at iic?			# HID-over-I2C
+ikbd*		at ihidev?		# HID-over-I2C keyboard
+wskbd*		at ikbd? mux 1
+ims*		at ihidev?		# HID-over-I2C mouse/trackpad
+wsmouse*	at ims? mux 0
+imt*		at ihidev?		# HID-over-I2C multitouch trackpad
+wsmouse*	at imt? mux 0
 ipmi*		at iic?			# IPMI (SIIF)
 islrtc*		at iic?			# ISL1208 RTC
 maxrtc*		at iic?			# DS1307 RTC
@@ -508,6 +530,7 @@ pcxrtc*		at iic?			# PCF8563 RTC
 pcyrtc*		at iic?			# PCF85063A/TP RTC
 rkpmic*		at iic?			# RK808 PMIC
 sypwr*		at iic?			# SY8106A regulator
+tascodec*	at iic?			# TAS2770 audio codec
 tcpci*		at iic?			# USB Type-C controller
 
 # GPIO "pin bus" drivers

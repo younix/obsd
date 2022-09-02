@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.196 2021/10/06 15:46:03 claudio Exp $ */
+/* $OpenBSD: machdep.c,v 1.198 2022/08/10 10:41:35 miod Exp $ */
 /* $NetBSD: machdep.c,v 1.210 2000/06/01 17:12:38 thorpej Exp $ */
 
 /*-
@@ -180,9 +180,6 @@ u_int8_t	dec_3000_scsiid[2], dec_3000_scsifast[2];
 struct platform platform;
 
 /* for cpu_sysctl() */
-int	alpha_unaligned_print = 1;	/* warn about unaligned accesses */
-int	alpha_unaligned_fix = 1;	/* fix up unaligned accesses */
-int	alpha_unaligned_sigbus = 1;	/* SIGBUS on fixed-up accesses */
 #ifndef NO_IEEE
 int	alpha_fp_sync_complete = 0;	/* fp fixup if sync even without /s */
 #endif
@@ -801,7 +798,7 @@ cpu_startup()
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	printf(version);
+	printf("%s", version);
 	identifycpu();
 	printf("real mem = %lu (%luMB)\n", ptoa((psize_t)totalphysmem),
 	    ptoa((psize_t)totalphysmem) / 1024 / 1024);
@@ -1555,18 +1552,6 @@ cpu_sysctl(int *name, u_int namelen, void *oldp, size_t *oldlenp, void *newp,
 			sizeof consdev));
 
 #ifndef SMALL_KERNEL
-	case CPU_UNALIGNED_PRINT:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &alpha_unaligned_print));
-
-	case CPU_UNALIGNED_FIX:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &alpha_unaligned_fix));
-
-	case CPU_UNALIGNED_SIGBUS:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &alpha_unaligned_sigbus));
-
 	case CPU_BOOTED_KERNEL:
 		return (sysctl_rdstring(oldp, oldlenp, newp,
 		    bootinfo.booted_kernel));

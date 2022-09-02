@@ -67,7 +67,6 @@
 /fdc.c/1.24/Tue Jul 26 13:42:35 2022//
 /fins.c/1.6/Tue Jul 26 13:42:35 2022//
 /gscsio.c/1.14/Tue Jul 26 13:42:35 2022//
-/gus.c/1.50/Tue Jul 26 13:42:35 2022//
 /gus_isa.c/1.9/Tue Jul 26 13:42:35 2022//
 /gus_isapnp.c/1.10/Tue Jul 26 13:42:35 2022//
 /gusvar.h/1.11/Tue Jul 26 13:42:35 2022//
@@ -119,4 +118,5 @@
 /wdc_isa.c/1.17/Tue Jul 26 13:42:35 2022//
 /wdc_isapnp.c/1.13/Tue Jul 26 13:42:35 2022//
 /wds.c/1.59/Tue Jul 26 13:42:35 2022//
+/gus.c/1.51/Fri Sep  2 14:00:21 2022//
 D

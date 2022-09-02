@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_attr.c,v 1.15 2022/05/09 19:19:33 jsing Exp $ */
+/* $OpenBSD: p12_attr.c,v 1.17 2022/08/20 09:16:18 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -60,6 +60,7 @@
 
 #include <openssl/pkcs12.h>
 
+#include "pkcs12_local.h"
 #include "x509_lcl.h"
 
 /* Add a local keyid to a safebag */
@@ -138,12 +139,18 @@ PKCS12_get_attr_gen(const STACK_OF(X509_ATTRIBUTE) *attrs, int attr_nid)
 char *
 PKCS12_get_friendlyname(PKCS12_SAFEBAG *bag)
 {
-	ASN1_TYPE *atype;
+	const ASN1_TYPE *atype;
 
-	if (!(atype = PKCS12_get_attr(bag, NID_friendlyName)))
+	if (!(atype = PKCS12_SAFEBAG_get0_attr(bag, NID_friendlyName)))
 		return NULL;
 	if (atype->type != V_ASN1_BMPSTRING)
 		return NULL;
 	return OPENSSL_uni2asc(atype->value.bmpstring->data,
 	    atype->value.bmpstring->length);
+}
+
+const STACK_OF(X509_ATTRIBUTE) *
+PKCS12_SAFEBAG_get0_attrs(const PKCS12_SAFEBAG *bag)
+{
+	return bag->attrib;
 }

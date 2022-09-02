@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpe.c,v 1.82 2022/01/19 11:00:56 martijn Exp $	*/
+/*	$OpenBSD: snmpe.c,v 1.84 2022/09/01 14:34:17 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>
@@ -33,6 +33,7 @@
 #include <errno.h>
 #include <event.h>
 #include <fcntl.h>
+#include <locale.h>
 #include <string.h>
 #include <unistd.h>
 #include <pwd.h>
@@ -43,6 +44,7 @@
 #include "mib.h"
 
 void	 snmpe_init(struct privsep *, struct privsep_proc *, void *);
+int	 snmpe_dispatch_parent(int, struct privsep_proc *, struct imsg *);
 int	 snmpe_parse(struct snmp_message *);
 void	 snmpe_tryparse(int, struct snmp_message *);
 int	 snmpe_parsevarbinds(struct snmp_message *);
@@ -61,7 +63,7 @@ static const struct timeval	snmpe_tcp_timeout = { 10, 0 }; /* 10s */
 struct snmp_messages snmp_messages = RB_INITIALIZER(&snmp_messages);
 
 static struct privsep_proc procs[] = {
-	{ "parent",	PROC_PARENT }
+	{ "parent",	PROC_PARENT, snmpe_dispatch_parent }
 };
 
 void
@@ -74,12 +76,17 @@ snmpe(struct privsep *ps, struct privsep_proc *p)
 	struct oid	*oid;
 #endif
 
+	if ((setlocale(LC_CTYPE, "en_US.UTF-8")) == NULL)
+		fatal("setlocale(LC_CTYPE, \"en_US.UTF-8\")");
+
 #ifdef DEBUG
 	for (oid = NULL; (oid = smi_foreach(oid, 0)) != NULL;) {
 		smi_oid2string(&oid->o_id, buf, sizeof(buf), 0);
 		log_debug("oid %s", buf);
 	}
 #endif
+
+	appl();
 
 	/* bind SNMP UDP/TCP sockets */
 	TAILQ_FOREACH(h, &env->sc_addresses, entry)
@@ -96,8 +103,11 @@ snmpe_init(struct privsep *ps, struct privsep_proc *p, void *arg)
 	struct snmpd		*env = ps->ps_env;
 	struct address		*h;
 
+/* Remove after 7.2 */
+#if 0
 	kr_init();
 	timer_init();
+#endif
 	usm_generate_keys();
 	appl_init();
 
@@ -118,8 +128,8 @@ snmpe_init(struct privsep *ps, struct privsep_proc *p, void *arg)
 	/* no filesystem visibility */
 	if (unveil("/", "") == -1)
 		fatal("unveil /");
-	if (unveil(NULL, NULL) == -1)
-		fatal("unveil");
+	if (pledge("stdio recvfd inet unix", NULL) == -1)
+		fatal("pledge");
 
 	log_info("snmpe %s: ready",
 	    tohexstr(env->sc_engineid, env->sc_engineid_len));
@@ -137,8 +147,23 @@ snmpe_shutdown(void)
 			event_del(&h->evt);
 		close(h->fd);
 	}
+/* Remove after 7.2 */
+#if 0
 	kr_shutdown();
+#endif
 	appl_shutdown();
+}
+
+int
+snmpe_dispatch_parent(int fd, struct privsep_proc *p, struct imsg *imsg)
+{
+	switch (imsg->hdr.type) {
+	case IMSG_AX_FD:
+		appl_agentx_backend(imsg->fd);
+		return 0;
+	default:
+		return -1;
+	}
 }
 
 int

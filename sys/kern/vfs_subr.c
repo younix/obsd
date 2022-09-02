@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_subr.c,v 1.315 2022/03/27 16:19:39 semarie Exp $	*/
+/*	$OpenBSD: vfs_subr.c,v 1.317 2022/08/14 01:58:28 jsg Exp $	*/
 /*	$NetBSD: vfs_subr.c,v 1.53 1996/04/22 01:39:13 christos Exp $	*/
 
 /*
@@ -46,9 +46,7 @@
 #include <sys/proc.h>
 #include <sys/sysctl.h>
 #include <sys/mount.h>
-#include <sys/time.h>
 #include <sys/fcntl.h>
-#include <sys/kernel.h>
 #include <sys/conf.h>
 #include <sys/vnode.h>
 #include <sys/lock.h>
@@ -662,16 +660,16 @@ vget(struct vnode *vp, int flags)
 	}
 	mtx_leave(&vnode_mtx);
 
+	s = splbio();
 	onfreelist = vp->v_bioflag & VBIOONFREELIST;
 	if (vp->v_usecount == 0 && onfreelist) {
-		s = splbio();
 		if (vp->v_holdcnt > 0)
 			TAILQ_REMOVE(&vnode_hold_list, vp, v_freelist);
 		else
 			TAILQ_REMOVE(&vnode_free_list, vp, v_freelist);
 		vp->v_bioflag &= ~VBIOONFREELIST;
-		splx(s);
 	}
+	splx(s);
 
 	vp->v_usecount++;
 	if (flags & LK_TYPE_MASK) {
@@ -749,6 +747,7 @@ void
 vput(struct vnode *vp)
 {
 	struct proc *p = curproc;
+	int s;
 
 #ifdef DIAGNOSTIC
 	if (vp == NULL)
@@ -777,8 +776,10 @@ vput(struct vnode *vp)
 
 	VOP_INACTIVE(vp, p);
 
+	s = splbio();
 	if (vp->v_usecount == 0 && !(vp->v_bioflag & VBIOONFREELIST))
 		vputonfreelist(vp);
+	splx(s);
 }
 
 /*
@@ -790,6 +791,7 @@ int
 vrele(struct vnode *vp)
 {
 	struct proc *p = curproc;
+	int s;
 
 #ifdef DIAGNOSTIC
 	if (vp == NULL)
@@ -822,8 +824,10 @@ vrele(struct vnode *vp)
 
 	VOP_INACTIVE(vp, p);
 
+	s = splbio();
 	if (vp->v_usecount == 0 && !(vp->v_bioflag & VBIOONFREELIST))
 		vputonfreelist(vp);
+	splx(s);
 	return (1);
 }
 
@@ -831,6 +835,10 @@ vrele(struct vnode *vp)
 void
 vhold(struct vnode *vp)
 {
+	int s;
+
+	s = splbio();
+
 	/*
 	 * If it is on the freelist and the hold count is currently
 	 * zero, move it to the hold list.
@@ -841,12 +849,18 @@ vhold(struct vnode *vp)
 		TAILQ_INSERT_TAIL(&vnode_hold_list, vp, v_freelist);
 	}
 	vp->v_holdcnt++;
+
+	splx(s);
 }
 
 /* Lose interest in a vnode. */
 void
 vdrop(struct vnode *vp)
 {
+	int s;
+
+	s = splbio();
+
 #ifdef DIAGNOSTIC
 	if (vp->v_holdcnt == 0)
 		panic("vdrop: zero holdcnt");
@@ -863,6 +877,8 @@ vdrop(struct vnode *vp)
 		TAILQ_REMOVE(&vnode_hold_list, vp, v_freelist);
 		TAILQ_INSERT_TAIL(&vnode_free_list, vp, v_freelist);
 	}
+
+	splx(s);
 }
 
 /*
@@ -909,6 +925,7 @@ vflush_vnode(struct vnode *vp, void *arg)
 {
 	struct vflush_args *va = arg;
 	struct proc *p = curproc;
+	int empty, s;
 
 	if (vp == va->skipvp) {
 		return (0);
@@ -958,8 +975,11 @@ vflush_vnode(struct vnode *vp, void *arg)
 	 * XXX Might be nice to check per-fs "inode" flags, but
 	 * generally the filesystem is sync'd already, right?
 	 */
-	if ((va->flags & IGNORECLEAN) &&
-	    LIST_EMPTY(&vp->v_dirtyblkhd))
+	s = splbio();
+	empty = (va->flags & IGNORECLEAN) && LIST_EMPTY(&vp->v_dirtyblkhd);
+	splx(s);
+
+	if (empty)
 		return (0);
 
 #ifdef DEBUG_SYSCTL
@@ -992,6 +1012,7 @@ void
 vclean(struct vnode *vp, int flags, struct proc *p)
 {
 	int active, do_wakeup = 0;
+	int s;
 
 	/*
 	 * Check to see if the vnode is in use.
@@ -1066,9 +1087,11 @@ vclean(struct vnode *vp, int flags, struct proc *p)
 	if (active) {
 		vp->v_usecount--;
 		if (vp->v_usecount == 0) {
+			s = splbio();
 			if (vp->v_holdcnt > 0)
 				panic("vclean: not clean");
 			vputonfreelist(vp);
+			splx(s);
 		}
 	}
 	cache_purge(vp);
@@ -1125,6 +1148,7 @@ vgonel(struct vnode *vp, struct proc *p)
 {
 	struct vnode *vq;
 	struct vnode *vx;
+	int s;
 
 	KASSERT(vp->v_uvcount == 0);
 
@@ -1192,12 +1216,9 @@ vgonel(struct vnode *vp, struct proc *p)
 	 * Move onto the free list, unless we were called from
 	 * getnewvnode and we're not on any free list
 	 */
+	s = splbio();
 	if (vp->v_usecount == 0 &&
 	    (vp->v_bioflag & VBIOONFREELIST)) {
-		int s;
-
-		s = splbio();
-
 		if (vp->v_holdcnt > 0)
 			panic("vgonel: not clean");
 
@@ -1205,8 +1226,8 @@ vgonel(struct vnode *vp, struct proc *p)
 			TAILQ_REMOVE(&vnode_free_list, vp, v_freelist);
 			TAILQ_INSERT_HEAD(&vnode_free_list, vp, v_freelist);
 		}
-		splx(s);
 	}
+	splx(s);
 }
 
 /*

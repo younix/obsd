@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.26 2021/11/11 10:03:54 claudio Exp $
+#	$OpenBSD: Makefile,v 1.31 2022/09/01 00:43:14 kn Exp $
 
 SUBDIR += acme-client
 SUBDIR += arp
@@ -16,8 +16,15 @@ SUBDIR += rpki-client
 SUBDIR += snmpd
 SUBDIR += syslogd
 
-.if ${MACHINE} == "amd64" || ${MACHINE} == "i386"
+.if ${MACHINE} == "amd64"
 SUBDIR += vmd
+.endif
+
+.if ${MACHINE} == "amd64" || \
+    ${MACHINE} == "i386" || \
+    ${MACHINE} == "macppc" || \
+    ${MACHINE} == "sparc64"
+SUBDIR += installboot
 .endif
 
 .if defined(REGRESS_FULL) || make(clean) || make(cleandir) || make(obj)

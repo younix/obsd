@@ -1,12 +1,36 @@
-/*	$NetBSD: getsecs.c,v 1.2 2006/09/11 13:48:57 nonaka Exp $	*/
+/*	$OpenBSD: getsecs.c,v 1.7 2022/09/02 10:15:35 miod Exp $	*/
+/*	$NetBSD: getsecs.c,v 1.4 2022/08/24 14:22:35 nonaka Exp $	*/
+
+/*-
+ * Copyright (c) 2005 NONAKA Kimihiro
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
 
 #include <sys/param.h>
+#include <sys/param.h>
 
-#include <netinet/in.h>
-
-#include <lib/libsa/stand.h>
-#include <lib/libsa/net.h>
-#include <lib/libsa/netif.h>
+#include <libsa.h>
 
 #include <sh/devreg.h>
 #include <arch/sh/dev/scireg.h>
@@ -23,7 +47,6 @@
  */
 
 uint8_t rtc_read(uint32_t addr);
-void rtc_write(uint32_t addr, uint8_t data);
 
 static void
 rtc_init(void)
@@ -135,35 +158,6 @@ rtc_read(uint32_t addr)
 	rtc_ce(0);
 
 	return data & 0xf;
-}
-
-void
-rtc_write(uint32_t addr, uint8_t data)
-{
-
-	rtc_init();
-	rtc_ce(1);
-
-	rtc_dir(1);
-	rtc_do(1);		/* Don't care */
-	rtc_do(0);		/* R/#W = 0(WRITE) */
-	rtc_do(1);		/* AD = 1 */
-	rtc_do(0);		/* DT = 0 */
-	rtc_do(addr & 0x8);	/* A3 */
-	rtc_do(addr & 0x4);	/* A2 */
-	rtc_do(addr & 0x2);	/* A1 */
-	rtc_do(addr & 0x1);	/* A0 */
-
-	rtc_do(1);		/* Don't care */
-	rtc_do(0);		/* R/#W = 0(WRITE) */
-	rtc_do(0);		/* AD = 0 */
-	rtc_do(1);		/* DT = 1 */
-	rtc_do(data & 0x8);	/* D3 */
-	rtc_do(data & 0x4);	/* D2 */
-	rtc_do(data & 0x2);	/* D1 */
-	rtc_do(data & 0x1);	/* D0 */
-
-	rtc_ce(0);
 }
 
 time_t

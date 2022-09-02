@@ -1,4 +1,4 @@
-/*	$OpenBSD: bn_bpsw.c,v 1.5 2022/07/29 08:37:33 tb Exp $ */
+/*	$OpenBSD: bn_bpsw.c,v 1.7 2022/08/31 21:34:14 tb Exp $ */
 /*
  * Copyright (c) 2022 Martin Grenouilloux <martin.grenouilloux@lse.epita.fr>
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
@@ -303,6 +303,7 @@ bn_strong_lucas_selfridge(int *is_prime, const BIGNUM *n, BN_CTX *ctx)
 /*
  * Miller-Rabin primality test for base 2.
  */
+
 static int
 bn_miller_rabin_base_2(int *is_prime, const BIGNUM *n, BN_CTX *ctx)
 {
@@ -358,7 +359,7 @@ bn_miller_rabin_base_2(int *is_prime, const BIGNUM *n, BN_CTX *ctx)
 
 	/*
 	 * If 2^{2^i k} == -1 (mod n) for some 1 <= i < s, then n is a
-	 * 2-pseudoprime
+	 * 2-pseudoprime.
 	 */
 
 	for (i = 1; i < s; i++) {

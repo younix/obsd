@@ -1,4 +1,4 @@
-/*	$OpenBSD: vnconfig.c,v 1.7 2021/10/25 19:54:29 kn Exp $	*/
+/*	$OpenBSD: vnconfig.c,v 1.11 2022/09/01 01:52:08 kn Exp $	*/
 /*
  * Copyright (c) 1993 University of Utah.
  * Copyright (c) 1990, 1993
@@ -78,11 +78,8 @@ main(int argc, char **argv)
 
 	action = VND_CONFIG;
 
-	while ((ch = getopt(argc, argv, "ckK:lo:S:t:uv")) != -1) {
+	while ((ch = getopt(argc, argv, "kK:lo:S:t:uv")) != -1) {
 		switch (ch) {
-		case 'c':
-			/* backwards compat: delete in 2020 */
-			break;
 		case 'k':
 			opt_k = 1;
 			break;
@@ -237,7 +234,7 @@ getinfo(const char *vname, int *availp)
 		print_all = 1;
 	}
 
-	vd = opendev((char *)vname, O_RDONLY, OPENDEV_PART, NULL);
+	vd = opendev(vname, O_RDONLY, OPENDEV_PART, NULL);
 	if (vd == -1)
 		err(1, "open: %s", vname);
 
@@ -292,7 +289,6 @@ config(char *file, char *dev, struct disklabel *dp, char *key, size_t keylen)
 	if (dev == NULL) {
 		if (getinfo(NULL, &unit) == -1)
 			err(1, "no devices available");
-		printf("vnd%d\n", unit);
 		asprintf(&dev, "vnd%d", unit);
 	}
 
@@ -315,9 +311,12 @@ config(char *file, char *dev, struct disklabel *dp, char *key, size_t keylen)
 	rv = ioctl(fd, VNDIOCSET, &vndio);
 	if (rv)
 		warn("VNDIOCSET");
-	else if (verbose)
-		fprintf(stderr, "%s: %llu bytes on %s\n", dev, vndio.vnd_size,
-		    file);
+	else {
+		printf("%s\n", dev);
+		if (verbose)
+			fprintf(stderr, "%s: %llu bytes on %s\n", dev,
+			    vndio.vnd_size, file);
+	}
 
 	close(fd);
 	fflush(stdout);
@@ -359,11 +358,9 @@ __dead void
 usage(void)
 {
 	fprintf(stderr,
-	    "usage: vnconfig [-kv] [-K rounds] [-S saltfile] "
-	    "[-t disktype] [vnd_dev] image\n");
-	fprintf(stderr,
-	    "       vnconfig -l [vnd_dev]\n");
-	fprintf(stderr,
+	    "usage: vnconfig [-v] [-k | -K rounds [-S saltfile]] "
+	    "[-t disktype] [vnd_dev] image\n"
+	    "       vnconfig -l [vnd_dev]\n"
 	    "       vnconfig -u [-v] vnd_dev\n");
 	exit(1);
 }

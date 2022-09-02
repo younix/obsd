@@ -4,7 +4,6 @@
 /asctime.c/1.24/Wed Jul  3 03:24:04 2019//
 /ctime.3/1.46/Thu Apr 30 18:36:12 2020//
 /difftime.c/1.12/Tue Feb 10 01:24:28 2015//
-/localtime.c/1.61/Fri Jun 28 13:32:42 2019//
 /private.h/1.39/Sun May 12 12:49:52 2019//
 /strftime.3/1.38/Thu May 16 13:35:17 2019//
 /strftime_l.c/1.1/Tue Sep  5 03:16:14 2017//
@@ -17,4 +16,5 @@
 /wcsftime.c/1.7/Sun May 12 12:49:52 2019//
 /strftime.c/1.33/Fri Dec 11 17:58:18 2020//
 /wcsftime.3/1.4/Tue Jul 26 13:42:32 2022//
+/localtime.c/1.62/Fri Sep  2 14:00:04 2022//
 D

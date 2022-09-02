@@ -1,4 +1,4 @@
-/*	$OpenBSD: application.h,v 1.2 2022/06/30 11:28:36 martijn Exp $	*/
+/*	$OpenBSD: application.h,v 1.5 2022/09/01 14:34:17 martijn Exp $	*/
 
 /*
  * Copyright (c) 2021 Martijn van Duren <martijn@openbsd.org>
@@ -109,6 +109,7 @@ struct appl_backend {
 	char *ab_name;
 	void *ab_cookie;
 	uint8_t ab_retries;
+	int ab_range; /* Supports searchrange */
 	struct appl_backend_functions *ab_fn;
 	/*
 	 * Only store downstream requests: they reference upstream and when
@@ -117,6 +118,7 @@ struct appl_backend {
 	RB_HEAD(appl_requests, appl_request_downstream) ab_requests;
 };
 
+void appl(void);
 void appl_init(void);
 void appl_shutdown(void);
 enum appl_error appl_register(const char *, uint32_t, uint8_t, struct ber_oid *,
@@ -133,6 +135,12 @@ struct ber_element *appl_exception(enum appl_exception);
 /* application_legacy.c */
 void	 appl_legacy_init(void);
 void	 appl_legacy_shutdown(void);
+
+/* application_agentx.c */
+void	 appl_agentx(void);
+void	 appl_agentx_init(void);
+void	 appl_agentx_shutdown(void);
+void	 appl_agentx_backend(int);
 
 /* application_blocklist.c */
 void	 appl_blocklist_init(void);

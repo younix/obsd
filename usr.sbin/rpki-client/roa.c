@@ -1,4 +1,4 @@
-/*	$OpenBSD: roa.c,v 1.47 2022/06/10 10:36:43 tb Exp $ */
+/*	$OpenBSD: roa.c,v 1.51 2022/08/30 18:56:49 job Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -140,7 +140,7 @@ roa_parse_econtent(const unsigned char *d, size_t dsz, struct parse *p)
 		}
 
 		if (p->res->ipsz + addrsz >= MAX_IP_SIZE) {
-			warnx("%s: too many IPAddress entries: limit %d",
+			warnx("%s: too many ROAIPAddress entries: limit %d",
 			    p->fn, MAX_IP_SIZE);
 			goto out;
 		}
@@ -204,8 +204,9 @@ roa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	struct parse	 p;
 	size_t		 cmsz;
 	unsigned char	*cms;
-	int		 rc = 0;
 	const ASN1_TIME	*at;
+	struct cert	*cert = NULL;
+	int		 rc = 0;
 
 	memset(&p, 0, sizeof(struct parse));
 	p.fn = fn;
@@ -242,6 +243,20 @@ roa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	if (!roa_parse_econtent(cms, cmsz, &p))
 		goto out;
 
+	if ((cert = cert_parse_ee_cert(fn, *x509)) == NULL)
+		goto out;
+
+	if (cert->asz > 0) {
+		warnx("%s: superfluous AS Resources extension present", fn);
+		goto out;
+	}
+
+	/*
+	 * If the ROA isn't valid, we accept it anyway and depend upon
+	 * the code around roa_read() to check the "valid" field itself.
+	 */
+	p.res->valid = valid_roa(fn, cert, p.res);
+
 	rc = 1;
 out:
 	if (rc == 0) {
@@ -250,6 +265,7 @@ out:
 		X509_free(*x509);
 		*x509 = NULL;
 	}
+	cert_free(cert);
 	free(cms);
 	return p.res;
 }
@@ -383,6 +399,8 @@ vrpcmp(struct vrp *a, struct vrp *b)
 		rv = memcmp(&a->addr.addr, &b->addr.addr, 16);
 		if (rv)
 			return rv;
+		break;
+	default:
 		break;
 	}
 	/* a smaller prefixlen is considered bigger, e.g. /8 vs /10 */

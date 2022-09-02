@@ -1,4 +1,4 @@
-/*	$OpenBSD: ucc.c,v 1.33 2022/03/29 16:04:36 anton Exp $	*/
+/*	$OpenBSD: ucc.c,v 1.35 2022/08/11 09:22:38 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>

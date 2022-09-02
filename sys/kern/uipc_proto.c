@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_proto.c,v 1.22 2022/02/25 23:51:03 guenther Exp $	*/
+/*	$OpenBSD: uipc_proto.c,v 1.24 2022/08/15 09:11:38 mvs Exp $	*/
 /*	$NetBSD: uipc_proto.c,v 1.8 1996/02/13 21:10:47 christos Exp $	*/
 
 /*-
@@ -36,9 +36,7 @@
 #include <sys/socket.h>
 #include <sys/protosw.h>
 #include <sys/domain.h>
-#include <sys/mbuf.h>
 #include <sys/unpcb.h>
-#include <sys/socketvar.h>
 
 /*
  * Definitions of protocols supported in the UNIX domain.
@@ -50,27 +48,21 @@ const struct protosw unixsw[] = {
   .pr_domain	= &unixdomain,
   .pr_protocol	= PF_UNIX,
   .pr_flags	= PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS,
-  .pr_usrreq	= uipc_usrreq,
-  .pr_attach	= uipc_attach,
-  .pr_detach	= uipc_detach,
+  .pr_usrreqs	= &uipc_usrreqs,
 },
 {
   .pr_type	= SOCK_SEQPACKET,
   .pr_domain	= &unixdomain,
   .pr_protocol	= PF_UNIX,
   .pr_flags	= PR_ATOMIC|PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS,
-  .pr_usrreq	= uipc_usrreq,
-  .pr_attach	= uipc_attach,
-  .pr_detach	= uipc_detach,
+  .pr_usrreqs	= &uipc_usrreqs,
 },
 {
   .pr_type	= SOCK_DGRAM,
   .pr_domain	= &unixdomain,
   .pr_protocol	= PF_UNIX,
   .pr_flags	= PR_ATOMIC|PR_ADDR|PR_RIGHTS,
-  .pr_usrreq	= uipc_usrreq,
-  .pr_attach	= uipc_attach,
-  .pr_detach	= uipc_detach,
+  .pr_usrreqs	= &uipc_usrreqs,
 }
 };
 

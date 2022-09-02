@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.44 2022/06/28 15:46:07 bluhm Exp $
+#	$OpenBSD: Makefile,v 1.48 2022/09/02 13:45:18 tb Exp $
 
 SUBDIR += aead
 SUBDIR += aeswrap
@@ -32,8 +32,7 @@ SUBDIR += hmac
 SUBDIR += idea
 SUBDIR += ige
 SUBDIR += init
-SUBDIR += md4
-SUBDIR += md5
+SUBDIR += md
 SUBDIR += objects
 SUBDIR += pbkdf2
 SUBDIR += pem
@@ -44,10 +43,8 @@ SUBDIR += rc2
 SUBDIR += rc4
 SUBDIR += rmd
 SUBDIR += rsa
-SUBDIR += sha1
+SUBDIR += sha
 SUBDIR += sha2
-SUBDIR += sha256
-SUBDIR += sha512
 SUBDIR += sm3
 SUBDIR += sm4
 SUBDIR += symbols

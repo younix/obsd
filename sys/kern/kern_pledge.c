@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_pledge.c,v 1.290 2022/07/18 18:02:27 jca Exp $	*/
+/*	$OpenBSD: kern_pledge.c,v 1.294 2022/08/14 01:58:27 jsg Exp $	*/
 
 /*
  * Copyright (c) 2015 Nicholas Marriott <nicm@openbsd.org>
@@ -23,12 +23,9 @@
 #include <sys/mutex.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
-#include <sys/filedesc.h>
 #include <sys/namei.h>
-#include <sys/pool.h>
 #include <sys/socketvar.h>
 #include <sys/vnode.h>
-#include <sys/mbuf.h>
 #include <sys/mman.h>
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
@@ -174,6 +171,18 @@ const uint64_t pledge_syscalls[SYS_MAXSYSCALL] = {
 	[SYS_ftruncate] = PLEDGE_STDIO,
 	[SYS_lseek] = PLEDGE_STDIO,
 	[SYS_fpathconf] = PLEDGE_STDIO,
+
+#if 1
+	[SYS_pad_mquery] = PLEDGE_STDIO,
+	[SYS_pad_mmap] = PLEDGE_STDIO,
+	[SYS_pad_pread] = PLEDGE_STDIO,
+	[SYS_pad_preadv] = PLEDGE_STDIO,
+	[SYS_pad_pwrite] = PLEDGE_STDIO,
+	[SYS_pad_pwritev] = PLEDGE_STDIO,
+	[SYS_pad_ftruncate] = PLEDGE_STDIO,
+	[SYS_pad_lseek] = PLEDGE_STDIO,
+	[SYS_pad_truncate] = PLEDGE_WPATH,
+#endif
 
 	/*
 	 * Address selection required a network pledge ("inet",
@@ -644,16 +653,6 @@ pledge_namei(struct proc *p, struct nameidata *ni, char *origpath)
 			ni->ni_cnd.cn_flags |= BYPASSUNVEIL;
 			return (0);
 		}
-		/*
-		 * XXX delete before 7.2.
-		 * Old static binaries may try this file in getpwent and friends
-		 */
-		if ((ni->ni_pledge == PLEDGE_RPATH) &&
-		    (pledge & PLEDGE_GETPW) &&
-		    strcmp(path, "/var/run/ypbind.lock") == 0) {
-			ni->ni_cnd.cn_flags |= BYPASSUNVEIL;
-			return (0);
-		}
 		break;
 	case SYS_open:
 		/* daemon(3) or other such functions */
@@ -709,17 +708,6 @@ pledge_namei(struct proc *p, struct nameidata *ni, char *origpath)
 				ni->ni_cnd.cn_flags |= BYPASSUNVEIL;
 				return (0);
 			}
-		}
-
-		/*
-		 * XXX delete before 7.2.
-		 * Old static binaries may try this file in getpwent and friends
-		 */
-		if ((ni->ni_pledge == PLEDGE_RPATH) &&
-		    (pledge & PLEDGE_GETPW) &&
-		    strcmp(path, "/var/run/ypbind.lock") == 0) {
-			ni->ni_cnd.cn_flags |= BYPASSUNVEIL;
-			return (0);
 		}
 
 		/* tzset() needs these. */
@@ -1379,7 +1367,7 @@ pledge_sockopt(struct proc *p, int set, int level, int optname)
 		switch (optname) {
 		case SO_RCVBUF:
 		case SO_ERROR:
-			return 0;
+			return (0);
 		}
 		break;
 	}
@@ -1401,7 +1389,7 @@ pledge_sockopt(struct proc *p, int set, int level, int optname)
 	case SOL_SOCKET:
 		switch (optname) {
 		case SO_TIMESTAMP:
-			return 0;
+			return (0);
 		}
 		break;
 	}
@@ -1439,6 +1427,7 @@ pledge_sockopt(struct proc *p, int set, int level, int optname)
 		case TCP_SACK_ENABLE:
 		case TCP_MAXSEG:
 		case TCP_NOPUSH:
+		case TCP_INFO:
 			return (0);
 		}
 		break;

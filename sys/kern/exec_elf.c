@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.166 2022/05/12 16:29:58 claudio Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.168 2022/08/29 16:53:46 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -68,7 +68,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/pool.h>
@@ -76,14 +75,11 @@
 #include <sys/namei.h>
 #include <sys/vnode.h>
 #include <sys/core.h>
-#include <sys/syslog.h>
 #include <sys/exec.h>
 #include <sys/exec_elf.h>
 #include <sys/fcntl.h>
 #include <sys/ptrace.h>
-#include <sys/syscall.h>
 #include <sys/signalvar.h>
-#include <sys/stat.h>
 #include <sys/pledge.h>
 
 #include <sys/mman.h>
@@ -742,6 +738,7 @@ exec_elf_fixup(struct proc *p, struct exec_package *epp)
 
 	if (interp &&
 	    (error = elf_load_file(p, interp, epp, ap)) != 0) {
+		uprintf("execve: cannot load %s\n", interp);
 		free(ap, M_TEMP, sizeof *ap);
 		pool_put(&namei_pool, interp);
 		kill_vmcmds(&epp->ep_vmcmds);

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.660 2022/07/29 08:23:40 visa Exp $	*/
+/*	$OpenBSD: if.c,v 1.664 2022/09/02 13:12:31 mvs Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -869,22 +869,16 @@ if_input_process(struct ifnet *ifp, struct mbuf_list *ml)
 		enqueue_randomness(ml_len(ml) ^ (uintptr_t)MBUF_LIST_FIRST(ml));
 
 	/*
-	 * We grab the NET_LOCK() before processing any packet to
-	 * ensure there's no contention on the routing table lock.
-	 *
-	 * Without it we could race with a userland thread to insert
-	 * a L2 entry in ip{6,}_output().  Such race would result in
-	 * one of the threads sleeping *inside* the IP output path.
-	 *
-	 * Since we have a NET_LOCK() we also use it to serialize access
-	 * to PF globals, pipex globals, unicast and multicast addresses
-	 * lists and the socket layer.
+	 * We grab the shared netlock for packet processing in the softnet
+	 * threads.  Packets can regrab the exclusive lock via queues.
+	 * ioctl, sysctl, and socket syscall may use shared lock if access is
+	 * read only or MP safe.  Usually they hold the exclusive net lock.
 	 */
 
-	NET_RLOCK_IN_SOFTNET();
+	NET_LOCK_SHARED();
 	while ((m = ml_dequeue(ml)) != NULL)
 		(*ifp->if_input)(ifp, m);
-	NET_RUNLOCK_IN_SOFTNET();
+	NET_UNLOCK_SHARED();
 }
 
 void
@@ -2305,6 +2299,15 @@ forceup:
 		error = ((*ifp->if_ioctl)(ifp, cmd, data));
 		break;
 
+	case SIOCSIFMEDIA:
+		if ((error = suser(p)) != 0)
+			break;
+		/* FALLTHROUGH */
+	case SIOCGIFMEDIA:
+		/* net lock is not needed */
+		error = ((*ifp->if_ioctl)(ifp, cmd, data));
+		break;
+
 	case SIOCSETKALIVE:
 	case SIOCDIFPHYADDR:
 	case SIOCSLIFPHYADDR:
@@ -2314,7 +2317,6 @@ forceup:
 	case SIOCSLIFPHYECN:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-	case SIOCSIFMEDIA:
 	case SIOCSVNETID:
 	case SIOCDVNETID:
 	case SIOCSVNETFLOWID:
@@ -2358,9 +2360,7 @@ forceup:
 			break;
 		/* FALLTHROUGH */
 	default:
-		error = ((*so->so_proto->pr_usrreq)(so, PRU_CONTROL,
-			(struct mbuf *) cmd, (struct mbuf *) data,
-			(struct mbuf *) ifp, p));
+		error = pru_control(so, cmd, data, ifp);
 		if (error != EOPNOTSUPP)
 			break;
 		switch (cmd) {
@@ -2415,27 +2415,27 @@ ifioctl_get(u_long cmd, caddr_t data)
 
 	switch(cmd) {
 	case SIOCGIFCONF:
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		error = ifconf(data);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (error);
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
 		return (error);
 	case SIOCGIFGMEMB:
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		error = if_getgroupmembers(data);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (error);
 	case SIOCGIFGATTR:
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		error = if_getgroupattribs(data);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (error);
 	case SIOCGIFGLIST:
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		error = if_getgrouplist(data);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (error);
 	}
 
@@ -2443,7 +2443,7 @@ ifioctl_get(u_long cmd, caddr_t data)
 	if (ifp == NULL)
 		return (ENXIO);
 
-	NET_RLOCK_IN_IOCTL();
+	NET_LOCK_SHARED();
 
 	switch(cmd) {
 	case SIOCGIFFLAGS:
@@ -2511,7 +2511,7 @@ ifioctl_get(u_long cmd, caddr_t data)
 		panic("invalid ioctl %lu", cmd);
 	}
 
-	NET_RUNLOCK_IN_IOCTL();
+	NET_UNLOCK_SHARED();
 
 	if_put(ifp);
 

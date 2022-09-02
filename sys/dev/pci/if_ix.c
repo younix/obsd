@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ix.c,v 1.186 2022/06/27 15:11:23 jan Exp $	*/
+/*	$OpenBSD: if_ix.c,v 1.188 2022/08/30 19:52:58 benno Exp $	*/
 
 /******************************************************************************
 
@@ -148,7 +148,7 @@ void	ixgbe_enable_intr(struct ix_softc *);
 void	ixgbe_disable_intr(struct ix_softc *);
 int	ixgbe_txeof(struct tx_ring *);
 int	ixgbe_rxeof(struct rx_ring *);
-void	ixgbe_rx_checksum(uint32_t, struct mbuf *, uint32_t);
+void	ixgbe_rx_checksum(uint32_t, struct mbuf *);
 void	ixgbe_iff(struct ix_softc *);
 void	ixgbe_map_queue_statistics(struct ix_softc *);
 void	ixgbe_update_link_status(struct ix_softc *);
@@ -1575,6 +1575,9 @@ ixgbe_update_link_status(struct ix_softc *sc)
 {
 	struct ifnet	*ifp = &sc->arpcom.ac_if;
 	int		link_state = LINK_STATE_DOWN;
+
+	splassert(IPL_NET);
+	KERNEL_ASSERT_LOCKED();
 
 	ixgbe_check_link(&sc->hw, &sc->link_speed, &sc->link_up, 0);
 
@@ -3103,7 +3106,7 @@ ixgbe_rxeof(struct rx_ring *rxr)
 	struct mbuf    		*mp, *sendmp;
 	uint8_t		    	 eop = 0;
 	uint16_t		 len, vtag;
-	uint32_t		 staterr = 0, ptype;
+	uint32_t		 staterr = 0;
 	struct ixgbe_rx_buf	*rxbuf, *nxbuf;
 	union ixgbe_adv_rx_desc	*rxdesc;
 	size_t			 dsize = sizeof(union ixgbe_adv_rx_desc);
@@ -3140,8 +3143,6 @@ ixgbe_rxeof(struct rx_ring *rxr)
 
 		mp = rxbuf->buf;
 		len = letoh16(rxdesc->wb.upper.length);
-		ptype = letoh32(rxdesc->wb.lower.lo_dword.data) &
-		    IXGBE_RXDADV_PKTTYPE_MASK;
 		vtag = letoh16(rxdesc->wb.upper.vlan);
 		eop = ((staterr & IXGBE_RXD_STAT_EOP) != 0);
 		hash = lemtoh32(&rxdesc->wb.lower.hi_dword.rss);
@@ -3213,7 +3214,7 @@ ixgbe_rxeof(struct rx_ring *rxr)
 			sendmp = NULL;
 			mp->m_next = nxbuf->buf;
 		} else { /* Sending this frame? */
-			ixgbe_rx_checksum(staterr, sendmp, ptype);
+			ixgbe_rx_checksum(staterr, sendmp);
 
 			if (hashtype != IXGBE_RXDADV_RSSTYPE_NONE) {
 				sendmp->m_pkthdr.ph_flowid = hash;
@@ -3251,7 +3252,7 @@ next_desc:
  *
  *********************************************************************/
 void
-ixgbe_rx_checksum(uint32_t staterr, struct mbuf * mp, uint32_t ptype)
+ixgbe_rx_checksum(uint32_t staterr, struct mbuf * mp)
 {
 	uint16_t status = (uint16_t) staterr;
 	uint8_t  errors = (uint8_t) (staterr >> 24);

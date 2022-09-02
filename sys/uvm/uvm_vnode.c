@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_vnode.c,v 1.125 2022/07/07 13:52:20 mpi Exp $	*/
+/*	$OpenBSD: uvm_vnode.c,v 1.127 2022/08/31 09:07:35 gnezdo Exp $	*/
 /*	$NetBSD: uvm_vnode.c,v 1.36 2000/11/24 20:34:01 chs Exp $	*/
 
 /*
@@ -161,9 +161,9 @@ uvn_attach(struct vnode *vp, vm_prot_t accessprot)
 	 * we can bump the reference count, check to see if we need to
 	 * add it to the writeable list, and then return.
 	 */
+	rw_enter(uvn->u_obj.vmobjlock, RW_WRITE);
 	if (uvn->u_flags & UVM_VNODE_VALID) {	/* already active? */
 
-		rw_enter(uvn->u_obj.vmobjlock, RW_WRITE);
 		/* regain vref if we were persisting */
 		if (uvn->u_obj.uo_refs == 0) {
 			vref(vp);
@@ -181,6 +181,7 @@ uvn_attach(struct vnode *vp, vm_prot_t accessprot)
 
 		return (&uvn->u_obj);
 	}
+	rw_exit(uvn->u_obj.vmobjlock);
 
 	/*
 	 * need to call VOP_GETATTR() to get the attributes, but that could
@@ -684,11 +685,10 @@ uvn_flush(struct uvm_object *uobj, voff_t start, voff_t stop, int flags)
 				}
 			} else if (flags & PGO_FREE) {
 				if (pp->pg_flags & PG_BUSY) {
-					atomic_setbits_int(&pp->pg_flags,
-					    PG_WANTED);
 					uvm_unlock_pageq();
-					rwsleep_nsec(pp, uobj->vmobjlock, PVM,
-					    "uvn_flsh", INFSLP);
+					uvm_pagewait(pp, uobj->vmobjlock,
+					    "uvn_flsh");
+					rw_enter(uobj->vmobjlock, RW_WRITE);
 					uvm_lock_pageq();
 					curoff -= PAGE_SIZE;
 					continue;
@@ -1054,9 +1054,8 @@ uvn_get(struct uvm_object *uobj, voff_t offset, struct vm_page **pps,
 
 			/* page is there, see if we need to wait on it */
 			if ((ptmp->pg_flags & PG_BUSY) != 0) {
-				atomic_setbits_int(&ptmp->pg_flags, PG_WANTED);
-				rwsleep_nsec(ptmp, uobj->vmobjlock, PVM,
-				    "uvn_get", INFSLP);
+				uvm_pagewait(ptmp, uobj->vmobjlock, "uvn_get");
+				rw_enter(uobj->vmobjlock, RW_WRITE);
 				continue;	/* goto top of pps while loop */
 			}
 

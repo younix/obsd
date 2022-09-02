@@ -1,4 +1,4 @@
-.\" $OpenBSD: tmux.1,v 1.895 2022/07/06 07:51:37 nicm Exp $
+.\" $OpenBSD: tmux.1,v 1.900 2022/08/23 08:14:19 nicm Exp $
 .\"
 .\" Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
 .\"
@@ -14,7 +14,7 @@
 .\" IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
 .\" OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 .\"
-.Dd $Mdocdate: July 6 2022 $
+.Dd $Mdocdate: August 23 2022 $
 .Dt TMUX 1
 .Os
 .Sh NAME
@@ -214,8 +214,6 @@ that is set does not contain
 .Qq UTF-8
 or
 .Qq UTF8 .
-This is equivalent to
-.Fl T Ar UTF-8 .
 .It Fl T Ar features
 Set terminal features for the client.
 This is a comma-separated list of features.
@@ -1810,6 +1808,7 @@ The following commands are supported in copy mode:
 .It Li "search-forward <for>" Ta "/" Ta ""
 .It Li "search-forward-incremental <for>" Ta "" Ta "C-s"
 .It Li "search-forward-text <for>" Ta "" Ta ""
+.It Li "scroll-middle" Ta "z" Ta ""
 .It Li "search-reverse" Ta "N" Ta "N"
 .It Li "select-line" Ta "V" Ta ""
 .It Li "select-word" Ta "" Ta ""
@@ -4463,11 +4462,17 @@ Available pane options are:
 .Pp
 .Bl -tag -width Ds -compact
 .It Xo Ic allow-passthrough
-.Op Ic on | off
+.Op Ic on | off | all
 .Xc
 Allow programs in the pane to bypass
 .Nm
 using a terminal escape sequence (\eePtmux;...\ee\e\e).
+If set to
+.Ic on ,
+passthrough sequences will be allowed only if the pane is visible.
+If set to
+.Ic all ,
+they will be allowed even if the pane is invisible.
 .Pp
 .It Xo Ic allow-rename
 .Op Ic on | off
@@ -6426,6 +6431,10 @@ These are set automatically if the
 capability is present.
 .It Em \&Hls
 Set or clear a hyperlink annotation.
+.It Em \&Nobr
+Tell
+.Nm
+that the terminal does not use bright colors for bold display.
 .It Em \&Rect
 Tell
 .Nm
@@ -6588,6 +6597,10 @@ escapes non-printable characters and backslash as octal \\xxx.
 The pane with ID
 .Ar pane-id
 has changed mode.
+.It Ic %paste-buffer-changed Ar name
+Paste buffer
+.Ar name
+has been changed.
 .It Ic %pause Ar pane-id
 The pane has been paused (if the
 .Ar pause-after

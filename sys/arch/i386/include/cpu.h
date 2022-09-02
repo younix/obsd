@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.176 2022/07/12 05:45:49 jsg Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.179 2022/08/29 02:58:13 jsg Exp $	*/
 /*	$NetBSD: cpu.h,v 1.35 1996/05/05 19:29:26 christos Exp $	*/
 
 /*-
@@ -217,7 +217,7 @@ extern struct cpu_info *cpu_info_list;
 
 static struct cpu_info *curcpu(void);
 
-__inline static struct cpu_info *
+static __inline struct cpu_info *
 curcpu(void)
 {
 	struct cpu_info *ci;
@@ -302,6 +302,7 @@ void signotify(struct proc *);
  * We need a machine-independent name for this.
  */
 extern void (*delay_func)(int);
+void delay_init(void(*)(int), int);
 struct timeval;
 
 #define	DELAY(x)		(*delay_func)(x)
@@ -316,14 +317,6 @@ void	calibrate_cyclecounter(void);
  * pull in #defines for kinds of processors
  */
 #include <machine/cputypes.h>
-
-struct cpu_nocpuid_nameclass {
-	int cpu_vendor;
-	const char *cpu_vendorname;
-	const char *cpu_name;
-	int cpu_class;
-	void (*cpu_setup)(struct cpu_info *);
-};
 
 struct cpu_cpuid_nameclass {
 	const char *cpu_id;
@@ -342,7 +335,6 @@ struct cpu_cpuid_feature {
 };
 
 /* locore.s */
-extern int cpu;
 extern int cpu_id;
 extern char cpu_vendor[]; /* note: NOT nul-terminated */
 extern char cpu_brandstr[];
@@ -372,7 +364,6 @@ extern void cpu_tsx_disable(struct cpu_info *);
 extern int cpu_apmhalt;
 extern int cpu_class;
 extern char cpu_model[];
-extern const struct cpu_nocpuid_nameclass i386_nocpuid_cpus[];
 extern const struct cpu_cpuid_nameclass i386_cpuid_cpus[];
 extern void (*cpu_idle_enter_fcn)(void);
 extern void (*cpu_idle_cycle_fcn)(void);

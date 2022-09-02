@@ -1,4 +1,4 @@
-/*	$OpenBSD: efidev.c,v 1.38 2021/06/10 18:05:20 krw Exp $	*/
+/*	$OpenBSD: efidev.c,v 1.40 2022/09/01 13:45:26 krw Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -485,9 +485,6 @@ efi_getdisklabel_cd9660(efi_diskinfo_t ed, struct disklabel *label)
 	strncpy(label->d_packname, "fictitious", sizeof(label->d_packname));
 	DL_SETDSIZE(label, 100);
 
-	label->d_bbsize = 2048;
-	label->d_sbsize = 2048;
-
 	/* 'a' partition covering the "whole" disk */
 	DL_SETPOFFSET(&label->d_partitions[0], 0);
 	DL_SETPSIZE(&label->d_partitions[0], 100);
@@ -580,9 +577,11 @@ efiopen(struct open_file *f, ...)
 			return EADAPT;
 		}
 
-		if (bv->sbv_level == 'C' && bv->sbv_keys == NULL)
+		if ((bv->sbv_level == 'C' || bv->sbv_level == 0x1C) &&
+		    bv->sbv_keys == NULL) {
 			if (sr_crypto_unlock_volume(bv) != 0)
 				return EPERM;
+		}
 
 		if (bv->sbv_diskinfo == NULL) {
 			dip = alloc(sizeof(struct diskinfo));

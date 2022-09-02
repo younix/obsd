@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.417 2022/07/24 14:28:16 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.424 2022/08/21 19:39:44 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -518,8 +518,6 @@ struct ssl_session_st {
 	 * not_resumable_session_cb to disable session caching and tickets. */
 	int not_resumable;
 
-	STACK_OF(X509) *cert_chain; /* as received from peer */
-
 	size_t tlsext_ecpointformatlist_length;
 	uint8_t *tlsext_ecpointformatlist; /* peer's list */
 	size_t tlsext_supportedgroups_length;
@@ -582,7 +580,8 @@ typedef struct ssl_handshake_tls13_st {
 	unsigned char *clienthello_hash;
 	unsigned int clienthello_hash_len;
 
-	/* QUIC read/write encryption levels. */
+	/* QUIC read buffer and read/write encryption levels. */
+	struct tls_buffer *quic_read_buffer;
 	enum ssl_encryption_level_t quic_read_level;
 	enum ssl_encryption_level_t quic_write_level;
 } SSL_HANDSHAKE_TLS13;
@@ -644,6 +643,10 @@ typedef struct ssl_handshake_st {
 	size_t finished_len;
 	uint8_t peer_finished[EVP_MAX_MD_SIZE];
 	size_t peer_finished_len;
+
+	/* List of certificates received from our peer. */
+	STACK_OF(X509) *peer_certs;
+	STACK_OF(X509) *peer_certs_no_leaf;
 
 	SSL_HANDSHAKE_TLS12 tls12;
 	SSL_HANDSHAKE_TLS13 tls13;
@@ -880,6 +883,7 @@ typedef struct ssl_ctx_internal_st {
 
 struct ssl_ctx_st {
 	const SSL_METHOD *method;
+	const SSL_QUIC_METHOD *quic_method;
 
 	STACK_OF(SSL_CIPHER) *cipher_list;
 
@@ -1071,7 +1075,7 @@ struct ssl_st {
 	int version;
 
 	const SSL_METHOD *method;
-	const void *quic_method; /* XXX */
+	const SSL_QUIC_METHOD *quic_method;
 
 	/* There are 2 BIO's even though they are normally both the
 	 * same.  This is so data can be read and written to different
@@ -1311,6 +1315,7 @@ int ssl_security_cert(const SSL_CTX *ctx, const SSL *ssl, X509 *x509,
     int is_peer, int *out_error);
 int ssl_security_cert_chain(const SSL *ssl, STACK_OF(X509) *sk,
     X509 *x509, int *out_error);
+int ssl_security_shared_group(const SSL *ssl, uint16_t group_id);
 int ssl_security_supported_group(const SSL *ssl, uint16_t group_id);
 
 int ssl_get_new_session(SSL *s, int session);
@@ -1510,10 +1515,10 @@ int tls12_derive_master_secret(SSL *s, uint8_t *premaster_secret,
 int ssl_using_ecc_cipher(SSL *s);
 int ssl_check_srvr_ecc_cert_and_alg(SSL *s, X509 *x);
 
-void tls1_get_formatlist(SSL *s, int client_formats, const uint8_t **pformats,
-    size_t *pformatslen);
-void tls1_get_group_list(SSL *s, int client_groups, const uint16_t **pgroups,
-    size_t *pgroupslen);
+void tls1_get_formatlist(const SSL *s, int client_formats,
+    const uint8_t **pformats, size_t *pformatslen);
+void tls1_get_group_list(const SSL *s, int client_groups,
+    const uint16_t **pgroups, size_t *pgroupslen);
 
 int tls1_set_groups(uint16_t **out_group_ids, size_t *out_group_ids_len,
     const int *groups, size_t ngroups);
@@ -1524,7 +1529,9 @@ int tls1_ec_group_id2nid(uint16_t group_id, int *out_nid);
 int tls1_ec_group_id2bits(uint16_t group_id, int *out_bits);
 int tls1_ec_nid2group_id(int nid, uint16_t *out_group_id);
 int tls1_check_group(SSL *s, uint16_t group_id);
-int tls1_get_supported_group(SSL *s, int *group_nid);
+int tls1_count_shared_groups(const SSL *ssl, size_t *out_count);
+int tls1_get_shared_group_by_index(const SSL *ssl, size_t index, int *out_nid);
+int tls1_get_supported_group(const SSL *s, int *out_nid);
 
 int ssl_check_clienthello_tlsext_early(SSL *s);
 int ssl_check_clienthello_tlsext_late(SSL *s);
@@ -1565,6 +1572,8 @@ int srtp_find_profile_by_num(unsigned int profile_num,
     const SRTP_PROTECTION_PROFILE **pptr);
 
 #endif /* OPENSSL_NO_SRTP */
+
+int tls_process_peer_certs(SSL *s, STACK_OF(X509) *peer_certs);
 
 __END_HIDDEN_DECLS
 

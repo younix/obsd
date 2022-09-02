@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.651 2022/07/27 01:44:25 daniel Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.656 2022/08/25 17:25:25 cheloha Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -493,27 +493,8 @@ i386_init_pcb_tss(struct cpu_info *ci)
  */
 char	cpu_model[120];
 
-/*
- * Note: these are just the ones that may not have a cpuid instruction.
- * We deal with the rest in a different way.
- */
-const struct cpu_nocpuid_nameclass i386_nocpuid_cpus[] = {
-	{ CPUVENDOR_INTEL, "Intel", "386SX",	CPUCLASS_386,
-		NULL},				/* CPU_386SX */
-	{ CPUVENDOR_INTEL, "Intel", "386DX",	CPUCLASS_386,
-		NULL},				/* CPU_386   */
-	{ CPUVENDOR_INTEL, "Intel", "486SX",	CPUCLASS_486,
-		NULL},				/* CPU_486SX */
-	{ CPUVENDOR_INTEL, "Intel", "486DX",	CPUCLASS_486,
-		NULL},				/* CPU_486   */
-	{ CPUVENDOR_CYRIX, "Cyrix", "486DLC",	CPUCLASS_486,
-		NULL},				/* CPU_486DLC */
-	{ CPUVENDOR_CYRIX, "Cyrix", "6x86",	CPUCLASS_486,
-		cyrix6x86_cpu_setup},		/* CPU_6x86 */
-};
-
 const char *classnames[] = {
-	"386",
+	"",
 	"486",
 	"586",
 	"686"
@@ -1673,7 +1654,7 @@ void
 identifycpu(struct cpu_info *ci)
 {
 	const char *name, *modifier, *vendorname, *token;
-	int class = CPUCLASS_386, vendor, i, max;
+	int class = CPUCLASS_486, vendor, i, max;
 	int family, model, step, modif, cachesize;
 	const struct cpu_cpuid_nameclass *cpup = NULL;
 	char *brandstr_from, *brandstr_to;
@@ -1682,18 +1663,13 @@ identifycpu(struct cpu_info *ci)
 	extern uint32_t cpu_meltdown;
 
 	if (cpuid_level == -1) {
-#ifdef DIAGNOSTIC
-		if (cpu < 0 || cpu >=
-		    (sizeof i386_nocpuid_cpus/sizeof(struct cpu_nocpuid_nameclass)))
-			panic("unknown cpu type %d", cpu);
-#endif
-		name = i386_nocpuid_cpus[cpu].cpu_name;
-		vendor = i386_nocpuid_cpus[cpu].cpu_vendor;
-		vendorname = i386_nocpuid_cpus[cpu].cpu_vendorname;
+		name = "486DX";
+		vendor = CPUVENDOR_INTEL;
+		vendorname = "Intel";
 		model = -1;
 		step = -1;
-		class = i386_nocpuid_cpus[cpu].cpu_class;
-		ci->cpu_setup = i386_nocpuid_cpus[cpu].cpu_setup;
+		class = CPUCLASS_486;
+		ci->cpu_setup = NULL;
 		modifier = "";
 		token = "";
 	} else {
@@ -2078,19 +2054,10 @@ identifycpu(struct cpu_info *ci)
 
 	cpu_class = class;
 
-	if (cpu_class == CPUCLASS_386) {
-		printf("WARNING: 386 (possibly unknown?) cpu class, assuming 486\n");
-		cpu_class = CPUCLASS_486;
-	}
-
 	ci->cpu_class = class;
 
-	if (cpu == CPU_486DLC)
-		printf("WARNING: CYRIX 486DLC CACHE UNCHANGED.\n");
-
 	/*
-	 * Enable ring 0 write protection (486 or above, but 386
-	 * no longer supported).
+	 * Enable ring 0 write protection.
 	 */
 	lcr0(rcr0() | CR0_WP);
 
@@ -4006,4 +3973,14 @@ cpu_rnd_messybits(void)
 
 	nanotime(&ts);
 	return (ts.tv_nsec ^ (ts.tv_sec << 20));
+}
+
+void
+delay_init(void(*fn)(int), int fn_quality)
+{
+	static int cur_quality = 0;
+	if (fn_quality > cur_quality) {
+		delay_func = fn;
+		cur_quality = fn_quality;
+	}
 }

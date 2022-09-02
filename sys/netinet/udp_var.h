@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_var.h,v 1.37 2022/02/25 23:51:03 guenther Exp $	*/
+/*	$OpenBSD: udp_var.h,v 1.45 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$NetBSD: udp_var.h,v 1.12 1996/02/13 23:44:41 christos Exp $	*/
 
 /*
@@ -126,6 +126,12 @@ udpstat_inc(enum udpstat_counters c)
 extern struct	inpcbtable udbtable;
 extern struct	udpstat udpstat;
 
+extern const struct pr_usrreqs udp_usrreqs;
+
+#ifdef INET6
+extern const struct pr_usrreqs udp6_usrreqs;
+#endif
+
 #ifdef INET6
 void	udp6_ctlinput(int, struct sockaddr *, u_int, void *);
 #endif /* INET6 */
@@ -141,5 +147,12 @@ int	 udp_usrreq(struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 int	 udp_attach(struct socket *, int);
 int	 udp_detach(struct socket *);
+int	 udp_bind(struct socket *, struct mbuf *, struct proc *);
+int	 udp_connect(struct socket *, struct mbuf *);
+int	 udp_disconnect(struct socket *);
+int	 udp_shutdown(struct socket *);
+int	 udp_send(struct socket *, struct mbuf *, struct mbuf *,
+	     struct mbuf *);
+int	 udp_abort(struct socket *);
 #endif /* _KERNEL */
 #endif /* _NETINET_UDP_VAR_H_ */

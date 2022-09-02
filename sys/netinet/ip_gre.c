@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip_gre.c,v 1.74 2022/06/26 15:50:21 mvs Exp $ */
+/*      $OpenBSD: ip_gre.c,v 1.82 2022/09/02 13:12:32 mvs Exp $ */
 /*	$NetBSD: ip_gre.c,v 1.9 1999/10/25 19:18:11 drochner Exp $ */
 
 /*
@@ -49,25 +49,48 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#include <net/if_var.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip_gre.h>
 #include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>
+#include <netinet/in_var.h>
 
 #ifdef PIPEX
 #include <net/pipex.h>
 #endif
 
+const struct pr_usrreqs gre_usrreqs = {
+	.pru_usrreq	= gre_usrreq,
+	.pru_attach	= rip_attach,
+	.pru_detach	= rip_detach,
+	.pru_bind	= rip_bind,
+	.pru_connect	= rip_connect,
+	.pru_disconnect	= rip_disconnect,
+	.pru_shutdown	= rip_shutdown,
+	.pru_send	= gre_send,
+	.pru_abort	= rip_abort,
+	.pru_control	= in_control,
+};
+
 int
 gre_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
     struct mbuf *control, struct proc *p)
 {
+	return rip_usrreq(so, req, m, nam, control, p);
+}
+
+int
+gre_send(struct socket *so, struct mbuf *m, struct mbuf *nam,
+    struct mbuf *control)
+{
 #ifdef  PIPEX 
 	struct inpcb *inp = sotoinpcb(so);
 
-	if (inp != NULL && inp->inp_pipex && req == PRU_SEND) {
+	if (inp->inp_pipex) {
 		struct sockaddr_in *sin4;
 		struct in_addr *ina_dst;
 
@@ -92,10 +115,13 @@ gre_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 			}
 		}
 
-		if (m == NULL)
+		if (m == NULL) {
+			m_freem(control);
 			return (ENOMEM);
+		}
 	}
 #endif
-	return rip_usrreq(so, req, m, nam, control, p);
+	return rip_send(so, m, nam, control);
 }
+
 #endif /* if NGRE > 0 */

@@ -3,7 +3,6 @@
 /changelist.5/1.9/Thu Jul 13 19:16:33 2017//
 /defaultdomain.5/1.5/Thu Jul 13 19:16:33 2017//
 /dir.5/1.20/Sat Sep  7 10:28:27 2019//
-/disktab.5/1.19/Thu Sep 20 16:16:52 2018//
 /ethers.5/1.20/Fri Aug 30 19:34:04 2019//
 /files.conf.5/1.23/Wed Mar  2 15:04:20 2016//
 /forward.5/1.11/Mon Dec 28 23:30:59 2015//
@@ -19,7 +18,6 @@
 /netgroup.5/1.17/Sat Jan 25 17:08:34 2020//
 /passwd.5/1.41/Sun Nov  2 05:33:04 2014//
 /pf.os.5/1.8/Thu May 31 19:19:58 2007//
-/printcap.5/1.28/Mon Feb 10 13:18:20 2020//
 /protocols.5/1.12/Sun Mar  3 17:04:17 2019//
 /ranlib.5/1.2/Thu Sep 10 17:55:21 2015//
 /remote.5/1.28/Mon Feb 10 13:18:20 2020//
@@ -55,4 +53,6 @@
 /port-modules.5/1.260/Tue Jul 26 13:42:34 2022//
 /python-module.5/1.4/Tue Jul 26 13:42:34 2022//
 /ruby-module.5/1.36/Tue Jul 26 13:42:34 2022//
+/disktab.5/1.21/Fri Sep  2 14:00:17 2022//
+/printcap.5/1.29/Fri Sep  2 14:00:17 2022//
 D

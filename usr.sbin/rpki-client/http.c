@@ -1,4 +1,4 @@
-/*	$OpenBSD: http.c,v 1.62 2022/05/24 09:22:45 claudio Exp $ */
+/*	$OpenBSD: http.c,v 1.65 2022/08/30 14:33:26 tb Exp $ */
 /*
  * Copyright (c) 2020 Nils Fisher <nils_fisher@hotmail.com>
  * Copyright (c) 2020 Claudio Jeker <claudio@openbsd.org>
@@ -70,7 +70,6 @@
 #define HTTP_USER_AGENT		"OpenBSD rpki-client"
 #define HTTP_BUF_SIZE		(32 * 1024)
 #define HTTP_IDLE_TIMEOUT	10
-#define HTTP_IO_TIMEOUT		(3 * 60)
 #define MAX_CONTENTLEN		(2 * 1024 * 1024 * 1024LL)
 #define NPFDS			(MAX_HTTP_REQUESTS + 1)
 
@@ -354,7 +353,7 @@ recode_credentials(const char *userinfo)
 static void
 proxy_parse_uri(char *uri)
 {
-	char *host, *port = NULL, *cred, *cookie = NULL;
+	char *fullhost, *host, *port = NULL, *cred, *cookie = NULL;
 
 	if (uri == NULL)
 		return;
@@ -363,10 +362,10 @@ proxy_parse_uri(char *uri)
 		errx(1, "%s: http_proxy not using http schema", http_info(uri));
 
 	host = uri + 7;
-	if ((host = strndup(host, strcspn(host, "/"))) == NULL)
+	if ((fullhost = strndup(host, strcspn(host, "/"))) == NULL)
 		err(1, NULL);
 
-	cred = host;
+	cred = fullhost;
 	host = strchr(cred, '@');
 	if (host != NULL)
 		*host++ = '\0';
@@ -406,9 +405,12 @@ proxy_parse_uri(char *uri)
 		if ((cookie = strdup("")) == NULL)
 			err(1, NULL);
 
-	proxy.proxyhost = host;
+	if ((proxy.proxyhost = strdup(host)) == NULL)
+		err(1, NULL);
 	proxy.proxyport = port;
 	proxy.proxyauth = cookie;
+
+	free(fullhost);
 }
 
 /*
@@ -754,6 +756,19 @@ http_failed(struct http_connection *conn)
 	}
 
 	return DONE;
+}
+
+/*
+ * Called in case of connect timeout, try an alternate connection.
+ */
+static enum res
+http_connect_failed(struct http_connection *conn)
+{
+	assert(conn->state == STATE_CONNECT);
+	close(conn->fd);
+	conn->fd = -1;
+
+	return http_connect(conn);
 }
 
 /*
@@ -1813,8 +1828,12 @@ proc_http(char *bind_addr, int fd)
 			if (i >= NPFDS)
 				errx(1, "too many connections");
 
-			if (conn->io_time == 0)
-				conn->io_time = now + HTTP_IO_TIMEOUT;
+			if (conn->io_time == 0) {
+				if (conn->state == STATE_CONNECT)
+					conn->io_time = now + MAX_CONN_TIMEOUT;
+				else
+					conn->io_time = now + MAX_IO_TIMEOUT;
+			}
 
 			if (conn->io_time <= now)
 				timeout = 0;
@@ -1902,9 +1921,15 @@ proc_http(char *bind_addr, int fd)
 			if (conn->pfd != NULL && conn->pfd->revents != 0)
 				http_do(conn, http_handle);
 			else if (conn->io_time <= now) {
-				warnx("%s: timeout, connection closed",
-				    http_info(conn->host));
-				http_do(conn, http_failed);
+				if (conn->state == STATE_CONNECT) {
+					warnx("%s: connect timeout",
+					    http_info(conn->host));
+					http_do(conn, http_connect_failed);
+				} else {
+					warnx("%s: timeout, connection closed",
+					    http_info(conn->host));
+					http_do(conn, http_failed);
+				}
 			}
 
 			if (conn->state == STATE_FREE)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.65 2022/07/13 09:28:18 kettenis Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.68 2022/08/24 22:01:16 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -95,6 +95,8 @@
 #define CPU_PART_FIRESTORM_PRO	0x025
 #define CPU_PART_ICESTORM_MAX	0x028
 #define CPU_PART_FIRESTORM_MAX	0x029
+#define CPU_PART_BLIZZARD	0x032
+#define CPU_PART_AVALANCHE	0x033
 
 #define CPU_IMPL(midr)  (((midr) >> 24) & 0xff)
 #define CPU_PART(midr)  (((midr) >> 4) & 0xfff)
@@ -161,6 +163,8 @@ struct cpu_cores cpu_cores_apple[] = {
 	{ CPU_PART_FIRESTORM_PRO, "Firestorm Pro" },
 	{ CPU_PART_ICESTORM_MAX, "Icestorm Max" },
 	{ CPU_PART_FIRESTORM_MAX, "Firestorm Max" },
+	{ CPU_PART_BLIZZARD, "Blizzard" },
+	{ CPU_PART_AVALANCHE, "Avalanche" },
 	{ 0, NULL },
 };
 
@@ -583,6 +587,11 @@ cpu_identify(struct cpu_info *ci)
 	}
 	if (ID_AA64PFR0_CSV2(id) >= ID_AA64PFR0_CSV2_SCXT)
 		printf("+SCTX");
+
+	if (ID_AA64PFR0_DIT(id) >= ID_AA64PFR0_DIT_IMPL) {
+		printf("%sDIT", sep);
+		sep = ",";
+	}
 
 #ifdef CPU_DEBUG
 	id = READ_SPECIALREG(id_aa64afr0_el1);
@@ -1012,7 +1021,9 @@ cpu_resume_secondary(struct cpu_info *ci)
 	ci->ci_idepth = 0;
 	ci->ci_flags &= ~CPUF_PRESENT;
 
+#ifdef DIAGNOSTIC
 	ci->ci_mutex_level = 0;
+#endif
 	ci->ci_ttbr1 = 0;
 
 	p = ci->ci_schedstate.spc_idleproc;

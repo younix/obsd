@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.129 2022/05/15 09:12:20 dlg Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.132 2022/08/30 11:53:04 bluhm Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -66,6 +66,7 @@
 
 #include <sys/queue.h>
 #include <sys/mutex.h>
+#include <sys/rwlock.h>
 #include <sys/refcnt.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -79,6 +80,8 @@
  *	I	immutable after creation
  *	N	net lock
  *	t	inpt_mtx		pcb table mutex
+ *	y	inpt_notify		pcb table rwlock for notify
+ *	p	inpcb_mtx		pcb mutex
  */
 
 struct pf_state_key;
@@ -102,7 +105,7 @@ struct inpcb {
 	LIST_ENTRY(inpcb) inp_hash;		/* [t] local and foreign hash */
 	LIST_ENTRY(inpcb) inp_lhash;		/* [t] local port hash */
 	TAILQ_ENTRY(inpcb) inp_queue;		/* [t] inet PCB queue */
-	SIMPLEQ_ENTRY(inpcb) inp_notify;	/* [N] notify or udp append */
+	SIMPLEQ_ENTRY(inpcb) inp_notify;	/* [y] notify or udp append */
 	struct	  inpcbtable *inp_table;	/* [I] inet queue/hash table */
 	union	  inpaddru inp_faddru;		/* Foreign address. */
 	union	  inpaddru inp_laddru;		/* Local address. */
@@ -121,6 +124,7 @@ struct inpcb {
 #define	inp_route	inp_ru.ru_route
 #define	inp_route6	inp_ru.ru_route6
 	struct    refcnt inp_refcnt;	/* refcount PCB, delay memory free */
+	struct	  mutex inp_mtx;	/* protect PCB and socket members */
 	int	  inp_flags;		/* generic IP/datagram flags */
 	union {				/* Header prototype. */
 		struct ip hu_ip;
@@ -164,6 +168,7 @@ LIST_HEAD(inpcbhead, inpcb);
 
 struct inpcbtable {
 	struct mutex inpt_mtx;			/* protect queue and hash */
+	struct rwlock inpt_notify;		/* protect inp_notify list */
 	TAILQ_HEAD(inpthead, inpcb) inpt_queue;	/* [t] inet PCB queue */
 	struct	inpcbhead *inpt_hashtbl;	/* [t] local and foreign hash */
 	struct	inpcbhead *inpt_lhashtbl;	/* [t] local port hash */
@@ -283,17 +288,17 @@ struct inpcb *
 void	 in_pcbunref(struct inpcb *);
 void	 in_pcbdisconnect(struct inpcb *);
 struct inpcb *
-	 in_pcbhashlookup(struct inpcbtable *, struct in_addr,
+	 in_pcblookup(struct inpcbtable *, struct in_addr,
 			       u_int, struct in_addr, u_int, u_int);
 struct inpcb *
 	 in_pcblookup_listen(struct inpcbtable *, struct in_addr, u_int,
 	    struct mbuf *, u_int);
 #ifdef INET6
 struct inpcbhead *
-	 in6_pcbhash(struct inpcbtable *, int, const struct in6_addr *,
+	 in6_pcbhash(struct inpcbtable *, u_int, const struct in6_addr *,
 	    u_short, const struct in6_addr *, u_short);
 struct inpcb *
-	 in6_pcbhashlookup(struct inpcbtable *, const struct in6_addr *,
+	 in6_pcblookup(struct inpcbtable *, const struct in6_addr *,
 			       u_int, const struct in6_addr *, u_int, u_int);
 struct inpcb *
 	 in6_pcblookup_listen(struct inpcbtable *, struct in6_addr *, u_int,

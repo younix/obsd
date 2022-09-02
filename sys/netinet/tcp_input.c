@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.375 2022/01/04 06:32:39 yasuoka Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.379 2022/08/30 11:53:04 bluhm Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -275,6 +275,7 @@ tcp_reass(struct tcpcb *tp, struct tcphdr *th, struct mbuf *m, int *tlen)
 		}
 	}
 	tcpstat_pkt(tcps_rcvoopack, tcps_rcvoobyte, *tlen);
+	tp->t_rcvoopack++;
 
 	/*
 	 * While we overlap succeeding segments trim them or,
@@ -530,13 +531,13 @@ findpcb:
 		switch (af) {
 #ifdef INET6
 		case AF_INET6:
-			inp = in6_pcbhashlookup(&tcbtable, &ip6->ip6_src,
+			inp = in6_pcblookup(&tcbtable, &ip6->ip6_src,
 			    th->th_sport, &ip6->ip6_dst, th->th_dport,
 			    m->m_pkthdr.ph_rtableid);
 			break;
 #endif
 		case AF_INET:
-			inp = in_pcbhashlookup(&tcbtable, ip->ip_src,
+			inp = in_pcblookup(&tcbtable, ip->ip_src,
 			    th->th_sport, ip->ip_dst, th->th_dport,
 			    m->m_pkthdr.ph_rtableid);
 			break;
@@ -723,7 +724,8 @@ findpcb:
 					 * full-blown connection.
 					 */
 					tp = NULL;
-					inp = sotoinpcb(so);
+					in_pcbunref(inp);
+					inp = in_pcbref(sotoinpcb(so));
 					tp = intotcpcb(inp);
 					if (tp == NULL)
 						goto badsyn;	/*XXX*/
@@ -832,6 +834,7 @@ findpcb:
 					tcpstat_inc(tcps_dropsyn);
 					goto drop;
 				}
+				in_pcbunref(inp);
 				return IPPROTO_DONE;
 			}
 		}
@@ -945,6 +948,7 @@ findpcb:
 				acked = th->th_ack - tp->snd_una;
 				tcpstat_pkt(tcps_rcvackpack, tcps_rcvackbyte,
 				    acked);
+				tp->t_rcvacktime = tcp_now;
 				ND6_HINT(tp);
 				sbdrop(so, &so->so_snd, acked);
 
@@ -1002,6 +1006,7 @@ findpcb:
 				if (so->so_snd.sb_cc ||
 				    tp->t_flags & TF_NEEDOUTPUT)
 					(void) tcp_output(tp);
+				in_pcbunref(inp);
 				return IPPROTO_DONE;
 			}
 		} else if (th->th_ack == tp->snd_una &&
@@ -1050,6 +1055,7 @@ findpcb:
 			tp->t_flags &= ~TF_BLOCKOUTPUT;
 			if (tp->t_flags & (TF_ACKNOW|TF_NEEDOUTPUT))
 				(void) tcp_output(tp);
+			in_pcbunref(inp);
 			return IPPROTO_DONE;
 		}
 	}
@@ -1244,6 +1250,7 @@ trimthenstep6:
 			    ((arc4random() & 0x7fffffff) | 0x8000);
 			reuse = &iss;
 			tp = tcp_close(tp);
+			in_pcbunref(inp);
 			inp = NULL;
 			goto findpcb;
 		}
@@ -1676,6 +1683,7 @@ trimthenstep6:
 		}
 		acked = th->th_ack - tp->snd_una;
 		tcpstat_pkt(tcps_rcvackpack, tcps_rcvackbyte, acked);
+		tp->t_rcvacktime = tcp_now;
 
 		/*
 		 * If we have a timestamp reply, update smoothed
@@ -2028,6 +2036,7 @@ dodata:							/* XXX */
 	 */
 	if (tp->t_flags & (TF_ACKNOW|TF_NEEDOUTPUT))
 		(void) tcp_output(tp);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 
 badsyn:
@@ -2056,6 +2065,7 @@ dropafterack:
 	m_freem(m);
 	tp->t_flags |= TF_ACKNOW;
 	(void) tcp_output(tp);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 
 dropwithreset_ratelim:
@@ -2090,6 +2100,7 @@ dropwithreset:
 		    (tcp_seq)0, TH_RST|TH_ACK, m->m_pkthdr.ph_rtableid);
 	}
 	m_freem(m);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 
 drop:
@@ -2100,6 +2111,7 @@ drop:
 		tcp_trace(TA_DROP, ostate, tp, otp, saveti, 0, tlen);
 
 	m_freem(m);
+	in_pcbunref(inp);
 	return IPPROTO_DONE;
 }
 
@@ -3611,6 +3623,9 @@ syn_cache_get(struct sockaddr *src, struct sockaddr *dst, struct tcphdr *th,
 	tcp_rcvseqinit(tp);
 	tp->t_state = TCPS_SYN_RECEIVED;
 	tp->t_rcvtime = tcp_now;
+	tp->t_sndtime = tcp_now;
+	tp->t_rcvacktime = tcp_now;
+	tp->t_sndacktime = tcp_now;
 	TCP_TIMER_ARM(tp, TCPT_KEEP, tcptv_keep_init);
 	tcpstat_inc(tcps_accepts);
 
@@ -3644,7 +3659,7 @@ resetandabort:
 abort:
 	m_freem(m);
 	if (so != NULL)
-		(void) soabort(so);
+		soabort(so);
 	syn_cache_put(sc);
 	tcpstat_inc(tcps_sc_aborted);
 	return ((struct socket *)(-1));

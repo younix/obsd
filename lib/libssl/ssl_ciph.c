@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_ciph.c,v 1.129 2022/06/29 20:06:55 tb Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.131 2022/09/01 15:19:16 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -696,9 +696,6 @@ ssl_cipher_collect_ciphers(const SSL_METHOD *ssl_method, int num_of_ciphers,
 			co_list[co_list_num].prev = NULL;
 			co_list[co_list_num].active = 0;
 			co_list_num++;
-			/*
-			if (!sk_push(ca_list,(char *)c)) goto err;
-			*/
 		}
 	}
 
@@ -1365,7 +1362,10 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	if (cipher_list_tls13 != NULL) {
 		for (i = 0; i < sk_SSL_CIPHER_num(cipher_list_tls13); i++) {
 			cipher = sk_SSL_CIPHER_value(cipher_list_tls13, i);
-			sk_SSL_CIPHER_push(cipherstack, cipher);
+			if (!sk_SSL_CIPHER_push(cipherstack, cipher)) {
+				free(co_list);
+				return (NULL);
+			}
 		}
 		tls13_seen = 1;
 	}
@@ -1384,8 +1384,12 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	any_active = 0;
 	for (curr = head; curr != NULL; curr = curr->next) {
 		if (curr->active ||
-		    (!tls13_seen && curr->cipher->algorithm_ssl == SSL_TLSV1_3))
-			sk_SSL_CIPHER_push(cipherstack, curr->cipher);
+		    (!tls13_seen && curr->cipher->algorithm_ssl == SSL_TLSV1_3)) {
+			if (!sk_SSL_CIPHER_push(cipherstack, curr->cipher)) {
+				free(co_list);
+				return (NULL);
+			}
+		}
 		any_active |= curr->active;
 	}
 	if (!any_active)

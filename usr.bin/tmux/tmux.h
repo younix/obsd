@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1178 2022/07/06 08:31:59 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1181 2022/08/15 09:10:34 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -514,6 +514,7 @@ enum tty_code_code {
 	TTYC_KUP6,
 	TTYC_KUP7,
 	TTYC_MS,
+	TTYC_NOBR,
 	TTYC_OL,
 	TTYC_OP,
 	TTYC_RECT,
@@ -1432,37 +1433,44 @@ struct tty_ctx {
 	void			*ptr2;
 
 	/*
+	 * Whether this command should be sent even when the pane is not
+	 * visible (used for a passthrough sequence when allow-passthrough is
+	 * "all").
+	 */
+	int			 allow_invisible_panes;
+
+	/*
 	 * Cursor and region position before the screen was updated - this is
 	 * where the command should be applied; the values in the screen have
 	 * already been updated.
 	 */
-	u_int		 ocx;
-	u_int		 ocy;
+	u_int			 ocx;
+	u_int			 ocy;
 
-	u_int		 orupper;
-	u_int		 orlower;
+	u_int			 orupper;
+	u_int			 orlower;
 
 	/* Target region (usually pane) offset and size. */
-	u_int		 xoff;
-	u_int		 yoff;
-	u_int		 rxoff;
-	u_int		 ryoff;
-	u_int		 sx;
-	u_int		 sy;
+	u_int			 xoff;
+	u_int			 yoff;
+	u_int			 rxoff;
+	u_int			 ryoff;
+	u_int			 sx;
+	u_int			 sy;
 
 	/* The background colour used for clearing (erasing). */
-	u_int		 bg;
+	u_int			 bg;
 
 	/* The default colours and palette. */
-	struct grid_cell defaults;
-	struct colour_palette *palette;
+	struct grid_cell	 defaults;
+	struct colour_palette	*palette;
 
 	/* Containing region (usually window) offset and size. */
-	int		 bigger;
-	u_int		 wox;
-	u_int		 woy;
-	u_int		 wsx;
-	u_int		 wsy;
+	int			 bigger;
+	u_int			 wox;
+	u_int			 woy;
+	u_int			 wsx;
+	u_int			 wsy;
 };
 
 /* Saved message entry. */
@@ -2146,6 +2154,7 @@ void	notify_winlink(const char *, struct winlink *);
 void	notify_session_window(const char *, struct session *, struct window *);
 void	notify_window(const char *, struct window *);
 void	notify_pane(const char *, struct window_pane *);
+void	notify_paste_buffer(const char *);
 
 /* options.c */
 struct options	*options_create(struct options *);
@@ -2889,7 +2898,8 @@ void	 screen_write_collect_add(struct screen_write_ctx *,
 void	 screen_write_cell(struct screen_write_ctx *, const struct grid_cell *);
 void	 screen_write_setselection(struct screen_write_ctx *, const char *,
 	     u_char *, u_int);
-void	 screen_write_rawstring(struct screen_write_ctx *, u_char *, u_int);
+void	 screen_write_rawstring(struct screen_write_ctx *, u_char *, u_int,
+	     int);
 void	 screen_write_alternateon(struct screen_write_ctx *,
 	     struct grid_cell *, int);
 void	 screen_write_alternateoff(struct screen_write_ctx *,
@@ -3165,6 +3175,7 @@ void	control_notify_session_renamed(struct session *);
 void	control_notify_session_created(struct session *);
 void	control_notify_session_closed(struct session *);
 void	control_notify_session_window_changed(struct session *);
+void	control_notify_paste_buffer_changed(const char *);
 
 /* session.c */
 extern struct sessions sessions;

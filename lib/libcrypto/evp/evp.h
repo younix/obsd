@@ -1,4 +1,4 @@
-/* $OpenBSD: evp.h,v 1.103 2022/07/12 14:42:49 kn Exp $ */
+/* $OpenBSD: evp.h,v 1.105 2022/08/27 09:10:10 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -251,10 +251,11 @@ extern "C" {
 #define		EVP_CTRL_AEAD_SET_IVLEN		0x9
 #define		EVP_CTRL_AEAD_GET_TAG		0x10
 #define		EVP_CTRL_AEAD_SET_TAG		0x11
+#define		EVP_CTRL_AEAD_SET_IV_FIXED	0x12
 #define		EVP_CTRL_GCM_SET_IVLEN		EVP_CTRL_AEAD_SET_IVLEN
 #define		EVP_CTRL_GCM_GET_TAG		EVP_CTRL_AEAD_GET_TAG
 #define		EVP_CTRL_GCM_SET_TAG		EVP_CTRL_AEAD_SET_TAG
-#define		EVP_CTRL_GCM_SET_IV_FIXED	0x12
+#define		EVP_CTRL_GCM_SET_IV_FIXED	EVP_CTRL_AEAD_SET_IV_FIXED
 #define		EVP_CTRL_GCM_IV_GEN		0x13
 #define		EVP_CTRL_CCM_SET_IVLEN		EVP_CTRL_AEAD_SET_IVLEN
 #define		EVP_CTRL_CCM_GET_TAG		EVP_CTRL_AEAD_GET_TAG
@@ -280,6 +281,23 @@ extern "C" {
 #define EVP_GCM_TLS_EXPLICIT_IV_LEN			8
 /* Length of tag for TLS */
 #define EVP_GCM_TLS_TAG_LEN				16
+
+#if defined(LIBRESSL_NEXT_API) || defined(LIBRESSL_INTERNAL)
+/* CCM TLS constants */
+/* Length of fixed part of IV derived from PRF */
+#define EVP_CCM_TLS_FIXED_IV_LEN			4
+/* Length of explicit part of IV part of TLS records */
+#define EVP_CCM_TLS_EXPLICIT_IV_LEN			8
+/* Total length of CCM IV length for TLS */
+#define EVP_CCM_TLS_IV_LEN				12
+/* Length of tag for TLS */
+#define EVP_CCM_TLS_TAG_LEN				16
+/* Length of CCM8 tag for TLS */
+#define EVP_CCM8_TLS_TAG_LEN				8
+
+/* Length of tag for TLS */
+#define EVP_CHACHAPOLY_TLS_TAG_LEN			16
+#endif
 
 typedef struct evp_cipher_info_st {
 	const EVP_CIPHER *cipher;
@@ -680,6 +698,11 @@ const EVP_CIPHER *EVP_aes_256_ccm(void);
 const EVP_CIPHER *EVP_aes_256_gcm(void);
 const EVP_CIPHER *EVP_aes_256_wrap(void);
 const EVP_CIPHER *EVP_aes_256_xts(void);
+#if defined(LIBRESSL_NEXT_API) || defined(LIBRESSL_INTERNAL)
+#if !defined(OPENSSL_NO_CHACHA) && !defined(OPENSSL_NO_POLY1305)
+const EVP_CIPHER *EVP_chacha20_poly1305(void);
+#endif
+#endif
 #if !defined(OPENSSL_NO_SHA) && !defined(OPENSSL_NO_SHA1)
 const EVP_CIPHER *EVP_aes_128_cbc_hmac_sha1(void);
 const EVP_CIPHER *EVP_aes_256_cbc_hmac_sha1(void);

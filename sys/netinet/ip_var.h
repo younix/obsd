@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_var.h,v 1.94 2022/07/25 23:19:34 bluhm Exp $	*/
+/*	$OpenBSD: ip_var.h,v 1.103 2022/08/28 18:44:16 mvs Exp $	*/
 /*	$NetBSD: ip_var.h,v 1.16 1996/02/13 23:43:20 christos Exp $	*/
 
 /*
@@ -70,7 +70,7 @@ struct	ipstat {
 	u_long	ips_noproto;		/* unknown or unsupported protocol */
 	u_long	ips_delivered;		/* datagrams delivered to upper level*/
 	u_long	ips_localout;		/* total ip packets generated here */
-	u_long	ips_odropped;		/* lost packets due to nobufs, etc. */
+	u_long	ips_odropped;		/* lost output due to nobufs, etc. */
 	u_long	ips_reassembled;	/* total packets reassembled ok */
 	u_long	ips_fragmented;		/* datagrams successfully fragmented */
 	u_long	ips_ofragments;		/* output fragments created */
@@ -88,6 +88,7 @@ struct	ipstat {
 	u_long	ips_outswcsum;		/* software checksummed on output */
 	u_long	ips_notmember;		/* multicasts for unregistered groups */
 	u_long	ips_wrongif;		/* packet received on wrong interface */
+	u_long	ips_idropped;		/* lost input due to nobufs, etc. */
 };
 
 struct ipoption {
@@ -115,7 +116,7 @@ enum ipstat_counters {
 	ips_noproto,		/* unknown or unsupported protocol */
 	ips_delivered,		/* datagrams delivered to upper level*/
 	ips_localout,		/* total ip packets generated here */
-	ips_odropped,		/* lost packets due to nobufs, etc. */
+	ips_odropped,		/* lost output packets due to nobufs, etc. */
 	ips_reassembled,	/* total packets reassembled ok */
 	ips_fragmented,		/* datagrams successfully fragmented */
 	ips_ofragments,		/* output fragments created */
@@ -133,6 +134,7 @@ enum ipstat_counters {
 	ips_outswcsum,		/* software checksummed on output */
 	ips_notmember,		/* multicasts for unregistered groups */
 	ips_wrongif,		/* packet received on wrong interface */
+	ips_idropped,		/* lost input packets due to nobufs, etc. */
 
 	ips_ncounters
 };
@@ -174,7 +176,7 @@ struct ipqent {
 	LIST_ENTRY(ipqent) ipqe_q;
 	struct ip	*ipqe_ip;
 	struct mbuf	*ipqe_m;	/* mbuf contains packet */
-	u_int8_t	ipqe_mff;	/* for IP fragmentation */
+	uint16_t	 ipqe_mff;	/* for IP fragmentation */
 };
 
 /*
@@ -217,6 +219,8 @@ extern int ipmforwarding;		/* enable multicast forwarding */
 extern int ipmultipath;			/* enable multipath routing */
 extern int la_hold_total;
 
+extern const struct pr_usrreqs rip_usrreqs;
+
 extern struct rttimer_queue ip_mtudisc_timeout_q;
 extern struct pool ipqent_pool;
 struct route;
@@ -256,6 +260,13 @@ int	 rip_usrreq(struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 int	 rip_attach(struct socket *, int);
 int	 rip_detach(struct socket *);
+int	 rip_bind(struct socket *so, struct mbuf *, struct proc *);
+int	 rip_connect(struct socket *, struct mbuf *);
+int	 rip_disconnect(struct socket *);
+int	 rip_shutdown(struct socket *);
+int	 rip_send(struct socket *, struct mbuf *, struct mbuf *,
+	     struct mbuf *);
+int	 rip_abort(struct socket *);
 #ifdef MROUTING
 extern struct socket *ip_mrouter[];	/* multicast routing daemon */
 #endif

@@ -1,4 +1,4 @@
-/*	$OpenBSD: application.c,v 1.6 2022/06/30 11:28:36 martijn Exp $	*/
+/*	$OpenBSD: application.c,v 1.15 2022/08/31 09:19:22 martijn Exp $	*/
 
 /*
  * Copyright (c) 2021 Martijn van Duren <martijn@openbsd.org>
@@ -126,7 +126,7 @@ void appl_request_downstream_send(struct appl_request_downstream *);
 void appl_request_downstream_timeout(int, short, void *);
 void appl_request_upstream_reply(struct appl_request_upstream *);
 int appl_varbind_valid(struct appl_varbind *, struct appl_varbind *, int, int,
-    const char **);
+    int, const char **);
 int appl_varbind_backend(struct appl_varbind_internal *);
 void appl_varbind_error(struct appl_varbind_internal *, enum appl_error);
 void appl_report(struct snmp_message *, int32_t, struct ber_oid *,
@@ -146,10 +146,17 @@ RB_PROTOTYPE_STATIC(appl_requests, appl_request_downstream, ard_entry,
 #define APPL_CONTEXT_NAME(ctx) (ctx->ac_name[0] == '\0' ? NULL : ctx->ac_name)
 
 void
+appl(void)
+{
+	appl_agentx();
+}
+
+void
 appl_init(void)
 {
 	appl_blocklist_init();
 	appl_legacy_init();
+	appl_agentx_init();
 }
 
 void
@@ -159,6 +166,7 @@ appl_shutdown(void)
 
 	appl_blocklist_shutdown();
 	appl_legacy_shutdown();
+	appl_agentx_shutdown();
 
 	TAILQ_FOREACH_SAFE(ctx, &contexts, ac_entries, tctx) {
 		assert(RB_EMPTY(&(ctx->ac_regions)));
@@ -206,24 +214,9 @@ appl_region(struct appl_context *ctx, uint32_t timeout, uint8_t priority,
     struct ber_oid *oid, int instance, int subtree,
     struct appl_backend *backend)
 {
-	struct appl_region *region = NULL, *nregion, search;
+	struct appl_region *region = NULL, *nregion;
 	char oidbuf[1024], regionbuf[1024], subidbuf[11];
 	size_t i;
-
-	/*
-	 * Don't allow overlap when subtree flag is set.
-	 * This allows us to keep control of certain regions like system.
-	 */
-	region = appl_region_find(ctx, oid);
-	if (region != NULL && region->ar_subtree)
-		goto overlap;
-
-	search.ar_oid = *oid;
-	region = RB_NFIND(appl_regions, &(ctx->ac_regions), &search);
-	if (region != NULL && region->ar_subtree && (
-	    appl_region_cmp(&search, region) == 0 ||
-	    appl_region_cmp(&search, region) == -2))
-		goto overlap;
 
 	/* Don't use smi_oid2string, because appl_register can't use it */
 	oidbuf[0] = '\0';
@@ -234,6 +227,16 @@ appl_region(struct appl_context *ctx, uint32_t timeout, uint8_t priority,
 		    oid->bo_id[i]);
 		strlcat(oidbuf, subidbuf, sizeof(oidbuf));
 	}
+
+	/*
+	 * Don't allow overlap when subtree flag is set.
+	 * This allows us to keep control of certain regions like system.
+	 */
+	region = appl_region_find(ctx, oid);
+	if (region != NULL && region->ar_subtree &&
+	    region->ar_backend != backend)
+		goto overlap;
+
 	if ((nregion = malloc(sizeof(*nregion))) == NULL) {
 		log_warn("%s: Can't register %s: Processing error",
 		    backend->ab_name, oidbuf);
@@ -541,7 +544,7 @@ appl_close(struct appl_backend *backend)
 
 	RB_FOREACH_SAFE(request, appl_requests,
 	    &(backend->ab_requests), trequest)
-	appl_request_downstream_free(request);
+		appl_request_downstream_free(request);
 }
 
 struct appl_region *
@@ -716,6 +719,7 @@ void
 appl_request_downstream_free(struct appl_request_downstream *dreq)
 {
 	struct appl_varbind_internal *vb;
+	int retry = 0;
 
 	if (dreq == NULL)
 		return;
@@ -723,9 +727,16 @@ appl_request_downstream_free(struct appl_request_downstream *dreq)
 	RB_REMOVE(appl_requests, &(dreq->ard_backend->ab_requests), dreq);
 	evtimer_del(&(dreq->ard_timer));
 
-	for (vb = dreq->ard_vblist; vb != NULL; vb = vb->avi_next)
+	for (vb = dreq->ard_vblist; vb != NULL; vb = vb->avi_next) {
 		vb->avi_request_downstream = NULL;
+		if (vb->avi_state == APPL_VBSTATE_PENDING) {
+			vb->avi_state = APPL_VBSTATE_NEW;
+			retry = 1;
+		}
+	}
 
+	if (retry)
+		appl_request_upstream_resolve(dreq->ard_request);
 	free(dreq);
 }
 
@@ -1025,14 +1036,13 @@ appl_response(struct appl_backend *backend, int32_t requestid,
 {
 	struct appl_request_downstream *dreq, search;
 	struct appl_request_upstream *ureq = NULL;
-	struct appl_region *nregion;
 	const char *errstr;
 	char oidbuf[1024];
 	enum snmp_pdutype pdutype;
 	struct appl_varbind *vb;
 	struct appl_varbind_internal *origvb = NULL;
 	int invalid = 0;
-	int next = 0;
+	int next = 0, eomv;
 	int32_t i;
 
 	appl_pdu_log(backend, SNMP_C_RESPONSE, requestid, error, index, vblist);
@@ -1055,7 +1065,7 @@ appl_response(struct appl_backend *backend, int32_t requestid,
 	for (i = 1; vb != NULL; vb = vb->av_next, i++) {
                 if (!appl_varbind_valid(vb, origvb == NULL ?
 		    NULL : &(origvb->avi_varbind), next,
-                    error != APPL_ERROR_NOERROR, &errstr)) {
+                    error != APPL_ERROR_NOERROR, backend->ab_range, &errstr)) {
 			smi_oid2string(&(vb->av_oid), oidbuf,
 			    sizeof(oidbuf), 0);
 			log_warnx("%s: %"PRIu32" %s: %s",
@@ -1068,35 +1078,36 @@ appl_response(struct appl_backend *backend, int32_t requestid,
 				appl_varbind_error(origvb, error);
 			origvb->avi_state = APPL_VBSTATE_DONE;
 			origvb->avi_varbind.av_oid = vb->av_oid;
-			if (vb->av_value != NULL &&
+
+			eomv = vb->av_value != NULL &&
 			    vb->av_value->be_class == BER_CLASS_CONTEXT &&
-			    vb->av_value->be_type == APPL_EXC_ENDOFMIBVIEW) {
-				nregion = appl_region_next(ureq->aru_ctx,
-				    &(vb->av_oid), origvb->avi_region);
-				if (nregion != NULL) {
-					ober_free_elements(vb->av_value);
-					origvb->avi_varbind.av_oid =
-					    nregion->ar_oid;
-					origvb->avi_varbind.av_include = 1;
-					vb->av_value = NULL;
-					origvb->avi_state = APPL_VBSTATE_NEW;
-				}
-			}
+			    vb->av_value->be_type == APPL_EXC_ENDOFMIBVIEW;
+			/*
+			 * Treat results past av_oid_end for backends that
+			 * don't support searchranges as EOMV
+			 */
+			eomv |= !backend->ab_range && next &&
+			    ober_oid_cmp(&(vb->av_oid),
+			    &(origvb->avi_varbind.av_oid_end)) > 0;
 			/* RFC 3584 section 4.2.2.1 */
 			if (ureq->aru_pduversion == SNMP_V1 &&
 			    vb->av_value != NULL &&
 			    vb->av_value->be_class == BER_CLASS_APPLICATION &&
 			    vb->av_value->be_type == SNMP_COUNTER64) {
-				if (ureq->aru_pdu->be_type == SNMP_C_GETREQ) {
+				if (next)
+					eomv = 1;
+				else
 					appl_varbind_error(origvb,
 					    APPL_ERROR_NOSUCHNAME);
-				} else {
-					ober_free_elements(vb->av_value);
-					vb->av_value = NULL;
-					origvb->avi_varbind.av_oid = vb->av_oid;
-					origvb->avi_varbind.av_include = 0;
-					origvb->avi_state = APPL_VBSTATE_NEW;
-				}
+			}
+
+			if (eomv) {
+				ober_free_elements(vb->av_value);
+				origvb->avi_varbind.av_oid =
+				    origvb->avi_varbind.av_oid_end;
+				origvb->avi_varbind.av_include = 1;
+				vb->av_value = NULL;
+				origvb->avi_state = APPL_VBSTATE_NEW;
 			}
 			origvb->avi_varbind.av_value = vb->av_value;
 			if (origvb->avi_varbind.av_next == NULL &&
@@ -1122,10 +1133,13 @@ appl_response(struct appl_backend *backend, int32_t requestid,
 		log_warnx("Invalid error index");
 		invalid = 1;
 	}
+/* amavisd-snmp-subagent sets index to 1, no reason to crash over it. */
+#if PEDANTIC
 	if (error == APPL_ERROR_NOERROR && index != 0) {
 		log_warnx("error index with no error");
 		invalid = 1;
 	}
+#endif
 	if (vb == NULL && origvb != NULL) {
 		log_warnx("%s: Request %"PRIu32" returned less varbinds then "
 		    "requested", backend->ab_name, requestid);
@@ -1150,7 +1164,7 @@ appl_response(struct appl_backend *backend, int32_t requestid,
 
 int
 appl_varbind_valid(struct appl_varbind *varbind, struct appl_varbind *request,
-    int next, int null, const char **errstr)
+    int next, int null, int range, const char **errstr)
 {
 	int cmp;
 	int eomv = 0;
@@ -1245,6 +1259,11 @@ appl_varbind_valid(struct appl_varbind *varbind, struct appl_varbind *request,
 				return 0;
 			}
 		}
+		if (range && ober_oid_cmp(&(varbind->av_oid),
+		    &(request->av_oid_end)) > 0) {
+			*errstr = "end oid not honoured";
+			return 0;
+		}
 	} else {
 		if (cmp != 0) {
 			*errstr = "oids not equal";
@@ -1260,6 +1279,7 @@ appl_varbind_backend(struct appl_varbind_internal *ivb)
 	struct appl_request_upstream *ureq = ivb->avi_request_upstream;
 	struct appl_region search, *region, *pregion;
 	struct appl_varbind *vb = &(ivb->avi_varbind);
+	struct ber_oid oid, nextsibling;
 	int next, cmp;
 
 	next = ureq->aru_pdu->be_type == SNMP_C_GETNEXTREQ ||
@@ -1310,28 +1330,41 @@ appl_varbind_backend(struct appl_varbind_internal *ivb)
 	}
 	ivb->avi_region = region;
 	if (next) {
+		oid = vb->av_oid;
+		/*
+		 * For the searchrange end we only want contiguous regions.
+		 * This means directly connecting, or overlapping with the same
+		 * backend.
+		 */
 		do {
 			pregion = region;
-			region = appl_region_next(ureq->aru_ctx,
-			    &(region->ar_oid), pregion);
-		} while (region != NULL &&
-		    region->ar_backend == pregion->ar_backend);
-		if (region == NULL) {
-			vb->av_oid_end = pregion->ar_oid;
-			if (pregion->ar_instance &&
-			    vb->av_oid_end.bo_n < BER_MAX_OID_LEN)
-				vb->av_oid_end.bo_id[vb->av_oid_end.bo_n++] = 0;
-			else
-				ober_oid_nextsibling(&(vb->av_oid_end));
-		} else {
-			if (ober_oid_cmp(&(region->ar_oid),
-			    &(ivb->avi_region->ar_oid)) == 2)
-				vb->av_oid_end = region->ar_oid;
-			else {
-				vb->av_oid_end = ivb->avi_region->ar_oid;
-				ober_oid_nextsibling(&(vb->av_oid_end));
+			region = appl_region_next(ureq->aru_ctx, &oid, pregion);
+			if (region == NULL) {
+				oid = pregion->ar_oid;
+				ober_oid_nextsibling(&oid);
+				break;
 			}
-		}
+			cmp = ober_oid_cmp(&(region->ar_oid), &oid);
+			if (cmp == 2)
+				oid = region->ar_oid;
+			else if (cmp == 1) {
+				/* Break out if we find a gap */
+				nextsibling = pregion->ar_oid;
+				ober_oid_nextsibling(&nextsibling);
+				if (ober_oid_cmp(&(region->ar_oid),
+				    &nextsibling) != 0) {
+					oid = pregion->ar_oid;
+					ober_oid_nextsibling(&oid);
+					break;
+				}
+				oid = region->ar_oid;
+			} else if (cmp == -2) {
+				oid = pregion->ar_oid;
+				ober_oid_nextsibling(&oid);
+			} else
+				fatalx("We can't stop/move back on getnext");
+		} while (region->ar_backend == pregion->ar_backend);
+		vb->av_oid_end = oid;
 	}
 	return 0;
 

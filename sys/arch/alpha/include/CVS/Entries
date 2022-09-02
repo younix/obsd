@@ -1,7 +1,6 @@
 /_float.h/1.1/Tue Jun 26 16:12:43 2012//
 /_types.h/1.24/Mon Mar  5 01:15:24 2018//
 /alpha_cpu.h/1.13/Sun May 15 23:37:42 2016//
-/asm.h/1.14/Thu Jun 29 17:36:16 2017//
 /atomic.h/1.12/Sat Mar 29 18:09:28 2014//
 /autoconf.h/1.13/Mon May 25 15:00:23 2020//
 /bwx.h/1.7/Sat Mar 29 18:09:28 2014//
@@ -45,7 +44,8 @@
 /vmparam.h/1.28/Sun Nov  1 20:09:59 2015//
 /z8530var.h/1.1/Thu Nov  2 14:04:24 2017//
 /timetc.h/1.1/Fri Dec 11 17:58:22 2020//
-/cpu.h/1.65/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.28/Thu Sep  2 14:22:31 2021//
 /bus.h/1.33/Mon Jan 24 14:35:14 2022//
+/asm.h/1.15/Fri Sep  2 14:00:18 2022//
+/cpu.h/1.66/Fri Sep  2 14:00:18 2022//
 D

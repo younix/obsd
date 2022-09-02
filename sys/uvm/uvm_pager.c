@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_pager.c,v 1.85 2022/07/24 11:00:22 mpi Exp $	*/
+/*	$OpenBSD: uvm_pager.c,v 1.89 2022/08/19 05:53:19 mpi Exp $	*/
 /*	$NetBSD: uvm_pager.c,v 1.36 2000/11/27 18:26:41 chs Exp $	*/
 
 /*
@@ -40,8 +40,6 @@
 #include <sys/atomic.h>
 
 #include <uvm/uvm.h>
-
-struct pool *uvm_aiobuf_pool;
 
 const struct uvm_pagerops *uvmpagerops[] = {
 	&aobj_pager,
@@ -211,6 +209,7 @@ uvm_pseg_release(vaddr_t segaddr)
 	struct uvm_pseg *pseg;
 	vaddr_t va = 0;
 
+	mtx_enter(&uvm_pseg_lck);
 	for (pseg = &psegs[0]; pseg != &psegs[PSEG_NUMSEGS]; pseg++) {
 		if (pseg->start <= segaddr &&
 		    segaddr < pseg->start + MAX_PAGER_SEGS * MAXBSIZE)
@@ -224,7 +223,6 @@ uvm_pseg_release(vaddr_t segaddr)
 	/* test for no remainder */
 	KDASSERT(segaddr == pseg->start + id * MAXBSIZE);
 
-	mtx_enter(&uvm_pseg_lck);
 
 	KASSERT(UVM_PSEG_INUSE(pseg, id));
 
@@ -257,6 +255,18 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 	vm_prot_t prot;
 	vsize_t size;
 	struct vm_page *pp;
+
+#if defined(__HAVE_PMAP_DIRECT)
+	/*
+	 * Use direct mappings for single page, unless there is a risk
+	 * of aliasing.
+	 */
+	if (npages == 1 && PMAP_PREFER_ALIGN() == 0) {
+		KASSERT(pps[0]);
+		KASSERT(pps[0]->pg_flags & PG_BUSY);
+		return pmap_map_direct(pps[0]);
+	}
+#endif
 
 	prot = PROT_READ;
 	if (flags & UVMPAGER_MAPIN_READ)
@@ -294,6 +304,16 @@ uvm_pagermapin(struct vm_page **pps, int npages, int flags)
 void
 uvm_pagermapout(vaddr_t kva, int npages)
 {
+#if defined(__HAVE_PMAP_DIRECT)
+	/*
+	 * Use direct mappings for single page, unless there is a risk
+	 * of aliasing.
+	 */
+	if (npages == 1 && PMAP_PREFER_ALIGN() == 0) {
+		pmap_unmap_direct(kva);
+		return;
+	}
+#endif
 
 	pmap_remove(pmap_kernel(), kva, kva + ((vsize_t)npages << PAGE_SHIFT));
 	pmap_update(pmap_kernel());

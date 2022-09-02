@@ -1,4 +1,4 @@
-#	$OpenBSD: rc.subr,v 1.154 2022/05/26 11:27:03 ajacoutot Exp $
+#	$OpenBSD: rc.subr,v 1.157 2022/09/01 07:25:32 ajacoutot Exp $
 #
 # Copyright (c) 2010, 2011, 2014-2022 Antoine Jacoutot <ajacoutot@openbsd.org>
 # Copyright (c) 2010, 2011 Ingo Schwarze <schwarze@openbsd.org>
@@ -16,7 +16,7 @@
 # ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 # OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 
-_rc_actions="start stop restart reload check"
+_rc_actions="start stop restart reload check configtest"
 readonly _rc_actions
 
 _rc_check_name() {
@@ -162,6 +162,10 @@ _rc_wait_for_start() {
 	return
 }
 
+rc_configtest() {
+	return 0
+}
+
 rc_exec() {
 	local _rcexec="su -fl -c ${daemon_class} -s /bin/sh ${daemon_user} -c"
 	[ "${daemon_rtable}" -eq "$(id -R)" ] ||
@@ -171,7 +175,7 @@ rc_exec() {
 		${daemon_execdir:+cd ${daemon_execdir} && } \
 		$@ \
 		${daemon_logger:+ 2>&1 |
-			logger -ip ${daemon_logger} -t ${_name}}"
+			logger -isp ${daemon_logger} -t ${_name}}"
 }
 
 rc_start() {
@@ -215,6 +219,10 @@ rc_cmd() {
 		echo $_n "${INRC:+ }${_name}"
 		_rc_do rc_check && _rc_exit ok || _rc_exit failed
 		;;
+	configtest)
+		echo $_n "${INRC:+ }${_name}"
+		_rc_do rc_configtest && _rc_exit ok || _rc_exit failed
+		;;
 	start)
 		if [ X"${daemon_flags}" = X"NO" ]; then
 			_rc_err "$0: need -f to force $1 since ${_name}_flags=NO"
@@ -222,6 +230,10 @@ rc_cmd() {
 		[ -z "${INRC}" ] && _rc_do rc_check && exit 0
 		echo $_n "${INRC:+ }${_name}"
 		while true; do # no real loop, only needed to break
+			# running during start is mostly useful for daemons
+			# whose child will not return a config parsing error to
+			# the parent during startup; e.g. bgpd, httpd...
+			_rc_do rc_configtest || break
 			if type rc_pre >/dev/null; then
 				_rc_do rc_pre || break
 			fi
@@ -276,6 +288,7 @@ rc_cmd() {
 	reload)
 		echo $_n "${INRC:+ }${_name}"
 		_rc_do rc_check || _rc_exit failed
+		_rc_do rc_configtest || _rc_exit failed
 		_rc_do rc_reload & _timer=$!
 		while ((SECONDS < daemon_timeout)); do
 			pkill -0 -P "$$" 2>/dev/null || break
@@ -289,6 +302,7 @@ rc_cmd() {
 		_rc_exit ${_exit:=ok}
 		;;
 	restart)
+		_rc_do rc_configtest || _rc_exit failed
 		$0 ${_RC_DEBUG} ${_RC_FORCE} stop &&
 			$0 ${_RC_DEBUG} ${_RC_FORCE} start
 		;;

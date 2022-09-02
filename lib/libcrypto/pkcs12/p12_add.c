@@ -1,4 +1,4 @@
-/* $OpenBSD: p12_add.c,v 1.17 2018/05/13 14:24:07 tb Exp $ */
+/* $OpenBSD: p12_add.c,v 1.19 2022/08/20 09:16:18 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -61,6 +61,8 @@
 #include <openssl/err.h>
 #include <openssl/pkcs12.h>
 
+#include "pkcs12_local.h"
+
 /* Pack an object into an OCTET STRING and turn into a safebag */
 
 PKCS12_SAFEBAG *
@@ -89,6 +91,9 @@ PKCS12_item_pack_safebag(void *obj, const ASN1_ITEM *it, int nid1, int nid2)
 	return safebag;
 }
 
+#if !defined(LIBRESSL_NEXT_API)
+#undef PKCS12_MAKE_KEYBAG
+#undef PKCS12_MAKE_SHKEYBAG
 /* Turn PKCS8 object into a keybag */
 
 PKCS12_SAFEBAG *
@@ -136,6 +141,7 @@ PKCS12_MAKE_SHKEYBAG(int pbe_nid, const char *pass, int passlen,
 
 	return bag;
 }
+#endif
 
 /* Turn a stack of SAFEBAGS into a PKCS#7 data Contentinfo */
 PKCS7 *

@@ -1,4 +1,4 @@
-# $OpenBSD: RAMDISK,v 1.174 2022/06/26 20:05:06 sthen Exp $
+# $OpenBSD: RAMDISK,v 1.176 2022/09/02 13:20:46 kettenis Exp $
 
 machine		arm64
 maxusers	4
@@ -105,6 +105,10 @@ wsdisplay*	at simplefb?
 
 # Apple
 apldart*	at fdt? early 1
+apldc*		at fdt?
+apldchidev*	at fdt?
+apldckbd*	at apldchidev?
+wskbd*		at apldckbd? mux 1
 apldog*		at fdt? early 1
 apliic*		at fdt?
 iic*		at apliic?
@@ -116,6 +120,7 @@ aplpcie*	at fdt?
 pci*		at aplpcie?
 aplpinctrl*	at fdt? early 1
 aplpmgr*	at fdt? early 1
+aplrtk*		at fdt?
 aplsart*	at fdt?
 aplsmc*		at fdt?
 aplspi*		at fdt?
@@ -225,6 +230,11 @@ rkrng*		at fdt?
 rkdwusb*	at fdt?
 dwmmc*		at fdt?
 sdmmc*		at dwmmc?
+
+# Qualcomm SoCs
+qcgpio*		at acpi?
+qciic*		at acpi?
+iic*		at qciic?
 
 # Sunxi SoCs
 sxipio*		at fdt? early 1	# GPIO pins for leds & PHYs
@@ -336,6 +346,9 @@ urlphy*		at mii?			# Realtek RTL8150L internal PHY
 abcrtc*		at iic?			# Abracon x80x RTC
 dsxrtc*		at iic?			# DS3231 RTC
 fusbtc*		at iic?			# USB Type-C controller
+ihidev*		at iic?			# HID-over-I2C
+ikbd*		at ihidev?		# HID-over-I2C keyboard
+wskbd*		at ikbd? mux 1
 islrtc*		at iic?			# ISL1208 RTC
 maxrtc*		at iic?			# DS1307 RTC
 mcprtc*		at iic?			# MCP794XX RTC

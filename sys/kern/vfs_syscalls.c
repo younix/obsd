@@ -1,4 +1,4 @@
-/*	$OpenBSD: vfs_syscalls.c,v 1.358 2022/07/20 05:56:36 deraadt Exp $	*/
+/*	$OpenBSD: vfs_syscalls.c,v 1.360 2022/08/14 01:58:28 jsg Exp $	*/
 /*	$NetBSD: vfs_syscalls.c,v 1.71 1996/04/23 10:29:02 mycroft Exp $	*/
 
 /*
@@ -41,9 +41,7 @@
 #include <sys/systm.h>
 #include <sys/namei.h>
 #include <sys/filedesc.h>
-#include <sys/kernel.h>
 #include <sys/conf.h>
-#include <sys/sysctl.h>
 #include <sys/fcntl.h>
 #include <sys/file.h>
 #include <sys/stat.h>
@@ -55,8 +53,6 @@
 #include <sys/uio.h>
 #include <sys/malloc.h>
 #include <sys/pool.h>
-#include <sys/dkio.h>
-#include <sys/disklabel.h>
 #include <sys/ktrace.h>
 #include <sys/unistd.h>
 #include <sys/specdev.h>
@@ -1936,6 +1932,20 @@ sys_lseek(struct proc *p, void *v, register_t *retval)
 	return (error);
 }
 
+#if 1
+int
+sys_pad_lseek(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_lseek_args *uap = v;
+	struct sys_lseek_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, offset) = SCARG(uap, offset);
+	SCARG(&unpad, whence) = SCARG(uap, whence);
+	return sys_lseek(p, &unpad, retval);
+}
+#endif
+
 /*
  * Check access permissions.
  */
@@ -2881,6 +2891,30 @@ bad:
 	return (error);
 }
 
+#if 1
+int
+sys_pad_truncate(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_truncate_args *uap = v;
+	struct sys_truncate_args unpad;
+
+	SCARG(&unpad, path) = SCARG(uap, path);
+	SCARG(&unpad, length) = SCARG(uap, length);
+	return sys_truncate(p, &unpad, retval);
+}
+
+int
+sys_pad_ftruncate(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_ftruncate_args *uap = v;
+	struct sys_ftruncate_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, length) = SCARG(uap, length);
+	return sys_ftruncate(p, &unpad, retval);
+}
+#endif
+
 /*
  * Sync an open file.
  */
@@ -3363,3 +3397,57 @@ sys_pwritev(struct proc *p, void *v, register_t *retval)
 	iovec_free(iov, iovcnt);
 	return (error);
 }
+
+#if 1
+int
+sys_pad_pread(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_pread_args *uap = v;
+	struct sys_pread_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, buf) = SCARG(uap, buf);
+	SCARG(&unpad, nbyte) = SCARG(uap, nbyte);
+	SCARG(&unpad, offset) = SCARG(uap, offset);
+	return sys_pread(p, &unpad, retval);
+}
+
+int
+sys_pad_preadv(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_preadv_args *uap = v;
+	struct sys_preadv_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, iovp) = SCARG(uap, iovp);
+	SCARG(&unpad, iovcnt) = SCARG(uap, iovcnt);
+	SCARG(&unpad, offset) = SCARG(uap, offset);
+	return sys_preadv(p, &unpad, retval);
+}
+
+int
+sys_pad_pwrite(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_pwrite_args *uap = v;
+	struct sys_pwrite_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, buf) = SCARG(uap, buf);
+	SCARG(&unpad, nbyte) = SCARG(uap, nbyte);
+	SCARG(&unpad, offset) = SCARG(uap, offset);
+	return sys_pwrite(p, &unpad, retval);
+}
+
+int
+sys_pad_pwritev(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_pad_pwritev_args *uap = v;
+	struct sys_pwritev_args unpad;
+
+	SCARG(&unpad, fd) = SCARG(uap, fd);
+	SCARG(&unpad, iovp) = SCARG(uap, iovp);
+	SCARG(&unpad, iovcnt) = SCARG(uap, iovcnt);
+	SCARG(&unpad, offset) = SCARG(uap, offset);
+	return sys_pwritev(p, &unpad, retval);
+}
+#endif

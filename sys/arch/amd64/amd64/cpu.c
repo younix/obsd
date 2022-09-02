@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.156 2022/04/26 08:35:30 claudio Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.158 2022/08/12 02:20:36 cheloha Exp $	*/
 /* $NetBSD: cpu.c,v 1.1 2003/04/26 18:39:26 fvdl Exp $ */
 
 /*-
@@ -593,7 +593,8 @@ cpu_attach(struct device *parent, struct device *self, void *aux)
 	switch (caa->cpu_role) {
 	case CPU_ROLE_SP:
 		printf("(uniprocessor)\n");
-		ci->ci_flags |= CPUF_PRESENT | CPUF_SP | CPUF_PRIMARY;
+		atomic_setbits_int(&ci->ci_flags,
+		    CPUF_PRESENT | CPUF_SP | CPUF_PRIMARY);
 		cpu_intr_init(ci);
 #ifndef SMALL_KERNEL
 		cpu_ucode_apply(ci);
@@ -610,7 +611,8 @@ cpu_attach(struct device *parent, struct device *self, void *aux)
 
 	case CPU_ROLE_BP:
 		printf("apid %d (boot processor)\n", caa->cpu_apicid);
-		ci->ci_flags |= CPUF_PRESENT | CPUF_BSP | CPUF_PRIMARY;
+		atomic_setbits_int(&ci->ci_flags,
+		    CPUF_PRESENT | CPUF_BSP | CPUF_PRIMARY);
 		cpu_intr_init(ci);
 		identifycpu(ci);
 #ifdef MTRR
@@ -762,7 +764,7 @@ cpu_init(struct cpu_info *ci)
 #endif /* NVMM > 0 */
 
 #ifdef MULTIPROCESSOR
-	ci->ci_flags |= CPUF_RUNNING;
+	atomic_setbits_int(&ci->ci_flags, CPUF_RUNNING);
 	/*
 	 * Big hammer: flush all TLB entries, including ones from PTEs
 	 * with the G bit set.  This should only be necessary if TLB
@@ -772,9 +774,9 @@ cpu_init(struct cpu_info *ci)
 	lcr4(cr4 & ~CR4_PGE);
 	lcr4(cr4);
 
-	/* Synchronize TSC */
+	/* Check if TSC is synchronized. */
 	if (cold && !CPU_IS_PRIMARY(ci))
-	      tsc_sync_ap(ci);
+	      tsc_test_sync_ap(ci);
 #endif
 }
 
@@ -833,7 +835,7 @@ cpu_start_secondary(struct cpu_info *ci)
 	int i;
 	u_long s;
 
-	ci->ci_flags |= CPUF_AP;
+	atomic_setbits_int(&ci->ci_flags, CPUF_AP);
 
 	pmap_kenter_pa(MP_TRAMPOLINE, MP_TRAMPOLINE, PROT_READ | PROT_EXEC);
 	pmap_kenter_pa(MP_TRAMP_DATA, MP_TRAMP_DATA, PROT_READ | PROT_WRITE);
@@ -854,18 +856,14 @@ cpu_start_secondary(struct cpu_info *ci)
 #endif
 	} else {
 		/*
-		 * Synchronize time stamp counters. Invalidate cache and
-		 * synchronize twice (in tsc_sync_bp) to minimize possible
-		 * cache effects. Disable interrupts to try and rule out any
-		 * external interference.
+		 * Test if TSCs are synchronized.  Invalidate cache to
+		 * minimize possible cache effects.  Disable interrupts to
+		 * try to rule out external interference.
 		 */
 		s = intr_disable();
 		wbinvd();
-		tsc_sync_bp(ci);
+		tsc_test_sync_bp(ci);
 		intr_restore(s);
-#ifdef TSC_DEBUG
-		printf("TSC skew=%lld\n", (long long)ci->ci_tsc_skew);
-#endif
 	}
 
 	if ((ci->ci_flags & CPUF_IDENTIFIED) == 0) {
@@ -890,7 +888,6 @@ void
 cpu_boot_secondary(struct cpu_info *ci)
 {
 	int i;
-	int64_t drift;
 	u_long s;
 
 	atomic_setbits_int(&ci->ci_flags, CPUF_GO);
@@ -905,18 +902,11 @@ cpu_boot_secondary(struct cpu_info *ci)
 		db_enter();
 #endif
 	} else if (cold) {
-		/* Synchronize TSC again, check for drift. */
-		drift = ci->ci_tsc_skew;
+		/* Test if TSCs are synchronized again. */
 		s = intr_disable();
 		wbinvd();
-		tsc_sync_bp(ci);
+		tsc_test_sync_bp(ci);
 		intr_restore(s);
-		drift -= ci->ci_tsc_skew;
-#ifdef TSC_DEBUG
-		printf("TSC skew=%lld drift=%lld\n",
-		    (long long)ci->ci_tsc_skew, (long long)drift);
-#endif
-		tsc_sync_drift(drift);
 	}
 }
 
@@ -942,13 +932,12 @@ cpu_hatch(void *v)
 #endif
 
 	/*
-	 * Synchronize the TSC for the first time. Note that interrupts are
-	 * off at this point.
+	 * Test if our TSC is synchronized for the first time.
+	 * Note that interrupts are off at this point.
 	 */
 	wbinvd();
-	ci->ci_flags |= CPUF_PRESENT;
-	ci->ci_tsc_skew = 0;	/* reset on resume */
-	tsc_sync_ap(ci);
+	atomic_setbits_int(&ci->ci_flags, CPUF_PRESENT);
+	tsc_test_sync_ap(ci);
 
 	lapic_enable();
 	lapic_startclock();

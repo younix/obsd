@@ -1,4 +1,4 @@
-/*	$OpenBSD: unpcb.h,v 1.26 2022/07/01 09:56:17 mvs Exp $	*/
+/*	$OpenBSD: unpcb.h,v 1.38 2022/09/01 18:21:23 mvs Exp $	*/
 /*	$NetBSD: unpcb.h,v 1.6 1994/06/29 06:46:08 cgd Exp $	*/
 
 /*
@@ -102,15 +102,32 @@ struct	unpcb {
 #define	sotounpcb(so)	((struct unpcb *)((so)->so_pcb))
 
 #ifdef _KERNEL
+
+struct stat;
+
 struct fdpass {
 	struct file	*fp;
 	int		 flags;
 };
 
+extern const struct pr_usrreqs uipc_usrreqs;
+
 int	uipc_usrreq(struct socket *, int , struct mbuf *,
 			 struct mbuf *, struct mbuf *, struct proc *);
 int	uipc_attach(struct socket *, int);
 int	uipc_detach(struct socket *);
+int	uipc_bind(struct socket *, struct mbuf *, struct proc *);
+int	uipc_listen(struct socket *);
+int	uipc_connect(struct socket *, struct mbuf *);
+int	uipc_accept(struct socket *, struct mbuf *);
+int	uipc_disconnect(struct socket *);
+int	uipc_shutdown(struct socket *);
+int	uipc_rcvd(struct socket *);
+int	uipc_send(struct socket *, struct mbuf *, struct mbuf *,
+	    struct mbuf *);
+int	uipc_abort(struct socket *);
+int	uipc_sense(struct socket *, struct stat *);
+int	uipc_connect2(struct socket *, struct socket *);
 
 void	unp_init(void);
 int	unp_bind(struct unpcb *, struct mbuf *, struct proc *);

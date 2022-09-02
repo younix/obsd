@@ -1,4 +1,4 @@
-/* $OpenBSD: ssh-keygen.c,v 1.457 2022/07/20 03:33:22 djm Exp $ */
+/* $OpenBSD: ssh-keygen.c,v 1.459 2022/08/11 01:56:51 djm Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1994 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -1894,6 +1894,21 @@ parse_relative_time(const char *s, time_t now)
 }
 
 static void
+parse_hex_u64(const char *s, uint64_t *up)
+{
+	char *ep;
+	unsigned long long ull;
+
+	errno = 0;
+	ull = strtoull(s, &ep, 16);
+	if (*s == '\0' || *ep != '\0')
+		fatal("Invalid certificate time: not a number");
+	if (errno == ERANGE && ull == ULONG_MAX)
+		fatal_fr(SSH_ERR_SYSTEM_ERROR, "Invalid certificate time");
+	*up = (uint64_t)ull;
+}
+
+static void
 parse_cert_times(char *timespec)
 {
 	char *from, *to;
@@ -1915,8 +1930,8 @@ parse_cert_times(char *timespec)
 
 	/*
 	 * from:to, where
-	 * from := [+-]timespec | YYYYMMDD | YYYYMMDDHHMMSS | "always"
-	 *   to := [+-]timespec | YYYYMMDD | YYYYMMDDHHMMSS | "forever"
+	 * from := [+-]timespec | YYYYMMDD | YYYYMMDDHHMMSS | 0x... | "always"
+	 *   to := [+-]timespec | YYYYMMDD | YYYYMMDDHHMMSS | 0x... | "forever"
 	 */
 	from = xstrdup(timespec);
 	to = strchr(from, ':');
@@ -1928,6 +1943,8 @@ parse_cert_times(char *timespec)
 		cert_valid_from = parse_relative_time(from, now);
 	else if (strcmp(from, "always") == 0)
 		cert_valid_from = 0;
+	else if (strncmp(from, "0x", 2) == 0)
+		parse_hex_u64(from, &cert_valid_from);
 	else if (parse_absolute_time(from, &cert_valid_from) != 0)
 		fatal("Invalid from time \"%s\"", from);
 
@@ -1935,6 +1952,8 @@ parse_cert_times(char *timespec)
 		cert_valid_to = parse_relative_time(to, now);
 	else if (strcmp(to, "forever") == 0)
 		cert_valid_to = ~(u_int64_t)0;
+	else if (strncmp(from, "0x", 2) == 0)
+		parse_hex_u64(to, &cert_valid_to);
 	else if (parse_absolute_time(to, &cert_valid_to) != 0)
 		fatal("Invalid to time \"%s\"", to);
 
@@ -3265,7 +3284,7 @@ usage(void)
 int
 main(int argc, char **argv)
 {
-	char comment[1024], *passphrase;
+	char comment[1024], *passphrase = NULL;
 	char *rr_hostname = NULL, *ep, *fp, *ra;
 	struct sshkey *private, *public;
 	struct passwd *pw;
@@ -3775,13 +3794,6 @@ main(int argc, char **argv)
 		}
 		if ((attest = sshbuf_new()) == NULL)
 			fatal("sshbuf_new failed");
-		if ((sk_flags &
-		    (SSH_SK_USER_VERIFICATION_REQD|SSH_SK_RESIDENT_KEY))) {
-			passphrase = read_passphrase("Enter PIN for "
-			    "authenticator: ", RP_ALLOW_STDIN);
-		} else {
-			passphrase = NULL;
-		}
 		r = 0;
 		for (i = 0 ;;) {
 			if (!quiet) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nd6.c,v 1.242 2022/07/28 13:10:37 kn Exp $	*/
+/*	$OpenBSD: nd6.c,v 1.246 2022/08/09 21:10:03 kn Exp $	*/
 /*	$KAME: nd6.c,v 1.280 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
@@ -301,7 +301,7 @@ skip1:
  * ND6 timer routine to handle ND6 entries
  */
 void
-nd6_llinfo_settimer(struct llinfo_nd6 *ln, unsigned int secs)
+nd6_llinfo_settimer(const struct llinfo_nd6 *ln, unsigned int secs)
 {
 	time_t expire = getuptime() + secs;
 
@@ -547,7 +547,7 @@ nd6_purge(struct ifnet *ifp)
 }
 
 struct rtentry *
-nd6_lookup(struct in6_addr *addr6, int create, struct ifnet *ifp,
+nd6_lookup(const struct in6_addr *addr6, int create, struct ifnet *ifp,
     u_int rtableid)
 {
 	struct rtentry *rt;
@@ -641,7 +641,7 @@ nd6_lookup(struct in6_addr *addr6, int create, struct ifnet *ifp,
  * XXX: should take care of the destination of a p2p link?
  */
 int
-nd6_is_addr_neighbor(struct sockaddr_in6 *addr, struct ifnet *ifp)
+nd6_is_addr_neighbor(const struct sockaddr_in6 *addr, struct ifnet *ifp)
 {
 	struct in6_ifaddr *ia6;
 	struct ifaddr *ifa;
@@ -1022,9 +1022,9 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 
 	switch (cmd) {
 	case SIOCGIFINFO_IN6:
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		ndi->ndi = *ND_IFINFO(ifp);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (0);
 	case SIOCGNBRINFO_IN6:
 	{
@@ -1032,7 +1032,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 		struct in6_addr nb_addr = nbi->addr; /* make local for safety */
 		time_t expire;
 
-		NET_RLOCK_IN_IOCTL();
+		NET_LOCK_SHARED();
 		/*
 		 * XXX: KAME specific hack for scoped addresses
 		 *      XXXX: for other scopes than link-local?
@@ -1049,7 +1049,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 		if (rt == NULL ||
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) == NULL) {
 			rtfree(rt);
-			NET_RUNLOCK_IN_IOCTL();
+			NET_UNLOCK_SHARED();
 			return (EINVAL);
 		}
 		expire = ln->ln_rt->rt_expire;
@@ -1064,7 +1064,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
 		nbi->expire = expire;
 
 		rtfree(rt);
-		NET_RUNLOCK_IN_IOCTL();
+		NET_UNLOCK_SHARED();
 		return (0);
 	}
 	}
@@ -1079,7 +1079,7 @@ nd6_ioctl(u_long cmd, caddr_t data, struct ifnet *ifp)
  * code - type dependent information
  */
 void
-nd6_cache_lladdr(struct ifnet *ifp, struct in6_addr *from, char *lladdr,
+nd6_cache_lladdr(struct ifnet *ifp, const struct in6_addr *from, char *lladdr,
     int lladdrlen, int type, int code)
 {
 	struct rtentry *rt = NULL;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_var.h,v 1.114 2021/02/20 04:55:52 dlg Exp $	*/
+/*	$OpenBSD: if_var.h,v 1.116 2022/08/30 18:23:58 kn Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -133,7 +133,6 @@ struct ifnet {				/* and the entries */
 	int	if_pcount;		/* [N] # of promiscuous listeners */
 	unsigned int if_bridgeidx;	/* [K] used by bridge ports */
 	caddr_t	if_bpf;			/* packet filter structure */
-	caddr_t if_switchport;		/* used by switch ports */
 	caddr_t if_mcast;		/* used by multicast code */
 	caddr_t if_mcast6;		/* used by IPv6 multicast code */
 	caddr_t	if_pf_kif;		/* pf interface abstraction */
@@ -242,7 +241,7 @@ struct ifaddr {
 	struct	ifnet *ifa_ifp;		/* back-pointer to interface */
 	TAILQ_ENTRY(ifaddr) ifa_list;	/* list of addresses for interface */
 	u_int	ifa_flags;		/* interface flags, see below */
-	u_int	ifa_refcnt;		/* number of `rt_ifa` references */
+	struct	refcnt ifa_refcnt;	/* number of `rt_ifa` references */
 	int	ifa_metric;		/* cost of going out this interface */
 };
 
@@ -333,6 +332,7 @@ int	p2p_bpf_mtap(caddr_t, const struct mbuf *, u_int);
 struct	ifaddr *ifa_ifwithaddr(struct sockaddr *, u_int);
 struct	ifaddr *ifa_ifwithdstaddr(struct sockaddr *, u_int);
 struct	ifaddr *ifaof_ifpforaddr(struct sockaddr *, struct ifnet *);
+struct	ifaddr *ifaref(struct ifaddr *);
 void	ifafree(struct ifaddr *);
 
 int	if_isconnected(const struct ifnet *, unsigned int);

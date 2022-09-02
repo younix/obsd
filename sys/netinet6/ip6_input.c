@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip6_input.c,v 1.249 2022/07/24 22:38:25 bluhm Exp $	*/
+/*	$OpenBSD: ip6_input.c,v 1.254 2022/08/21 14:15:55 bluhm Exp $	*/
 /*	$KAME: ip6_input.c,v 1.188 2001/03/29 05:34:31 itojun Exp $	*/
 
 /*
@@ -120,7 +120,6 @@ struct cpumem *ip6counters;
 uint8_t ip6_soiikey[IP6_SOIIKEY_LEN];
 
 int ip6_ours(struct mbuf **, int *, int, int);
-int ip6_local(struct mbuf **, int *, int, int);
 int ip6_check_rh0hdr(struct mbuf *, int *);
 int ip6_hbhchcheck(struct mbuf **, int *, int *);
 int ip6_hopopts_input(struct mbuf **, int *, u_int32_t *, u_int32_t *);
@@ -167,17 +166,49 @@ ip6_init(void)
 #endif
 }
 
+struct ip6_offnxt {
+	int	ion_off;
+	int	ion_nxt;
+};
+
 /*
  * Enqueue packet for local delivery.  Queuing is used as a boundary
- * between the network layer (input/forward path) running with shared
- * NET_RLOCK_IN_SOFTNET() and the transport layer needing it exclusively.
+ * between the network layer (input/forward path) running with
+ * NET_LOCK_SHARED() and the transport layer needing it exclusively.
  */
 int
 ip6_ours(struct mbuf **mp, int *offp, int nxt, int af)
 {
+	/* ip6_hbhchcheck() may be run before, then off and nxt are set */
+	if (*offp == 0) {
+		nxt = ip6_hbhchcheck(mp, offp, NULL);
+		if (nxt == IPPROTO_DONE)
+			return IPPROTO_DONE;
+	}
+
 	/* We are already in a IPv4/IPv6 local deliver loop. */
 	if (af != AF_UNSPEC)
-		return ip6_local(mp, offp, nxt, af);
+		return nxt;
+
+	/* save values for later, use after dequeue */
+	if (*offp != sizeof(struct ip6_hdr)) {
+		struct m_tag *mtag;
+		struct ip6_offnxt *ion;
+
+		/* mbuf tags are expensive, but only used for header options */
+		mtag = m_tag_get(PACKET_TAG_IP6_OFFNXT, sizeof(*ion),
+		    M_NOWAIT);
+		if (mtag == NULL) {
+			ip6stat_inc(ip6s_idropped);
+			m_freemp(mp);
+			return IPPROTO_DONE;
+		}
+		ion = (struct ip6_offnxt *)(mtag + 1);
+		ion->ion_off = *offp;
+		ion->ion_nxt = nxt;
+
+		m_tag_prepend(*mp, mtag);
+	}
 
 	niq_enqueue(&ip6intrq, *mp);
 	*mp = NULL;
@@ -186,20 +217,38 @@ ip6_ours(struct mbuf **mp, int *offp, int nxt, int af)
 
 /*
  * Dequeue and process locally delivered packets.
+ * This is called with exclusive NET_LOCK().
  */
 void
 ip6intr(void)
 {
 	struct mbuf *m;
-	int off, nxt;
 
 	while ((m = niq_dequeue(&ip6intrq)) != NULL) {
+		struct m_tag *mtag;
+		int off, nxt;
+
 #ifdef DIAGNOSTIC
 		if ((m->m_flags & M_PKTHDR) == 0)
 			panic("ip6intr no HDR");
 #endif
-		off = 0;
-		nxt = ip6_local(&m, &off, IPPROTO_IPV6, AF_UNSPEC);
+		mtag = m_tag_find(m, PACKET_TAG_IP6_OFFNXT, NULL);
+		if (mtag != NULL) {
+			struct ip6_offnxt *ion;
+
+			ion = (struct ip6_offnxt *)(mtag + 1);
+			off = ion->ion_off;
+			nxt = ion->ion_nxt;
+
+			m_tag_delete(m, mtag);
+		} else {
+			struct ip6_hdr *ip6;
+
+			ip6 = mtod(m, struct ip6_hdr *);
+			off = sizeof(struct ip6_hdr);
+			nxt = ip6->ip6_nxt;
+		}
+		nxt = ip_deliver(&m, &off, nxt, AF_INET6);
 		KASSERT(nxt == IPPROTO_DONE);
 	}
 }
@@ -580,19 +629,6 @@ ip6_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 	return nxt;
 }
 
-int
-ip6_local(struct mbuf **mp, int *offp, int nxt, int af)
-{
-	nxt = ip6_hbhchcheck(mp, offp, NULL);
-	if (nxt == IPPROTO_DONE)
-		return IPPROTO_DONE;
-
-	/* Check whether we are already in a IPv4/IPv6 local deliver loop. */
-	if (af == AF_UNSPEC)
-		nxt = ip_deliver(mp, offp, nxt, AF_INET6);
-	return nxt;
-}
-
 /* On error free mbuf and return IPPROTO_DONE. */
 int
 ip6_hbhchcheck(struct mbuf **mp, int *offp, int *oursp)
@@ -694,21 +730,23 @@ ip6_check_rh0hdr(struct mbuf *m, int *offp)
 	do {
 		switch (proto) {
 		case IPPROTO_ROUTING:
-			*offp = off;
 			if (rh_cnt++) {
 				/* more than one rh header present */
+				*offp = off;
 				return (1);
 			}
 
 			if (off + sizeof(rthdr) > lim) {
 				/* packet to short to make sense */
+				*offp = off;
 				return (1);
 			}
 
 			m_copydata(m, off, sizeof(rthdr), &rthdr);
 
 			if (rthdr.ip6r_type == IPV6_RTHDR_TYPE_0) {
-				*offp += offsetof(struct ip6_rthdr, ip6r_type);
+				*offp = off +
+				    offsetof(struct ip6_rthdr, ip6r_type);
 				return (1);
 			}
 
@@ -1216,8 +1254,10 @@ ip6_pullexthdr(struct mbuf *m, size_t off, int nxt)
 			n = NULL;
 		}
 	}
-	if (!n)
+	if (n == NULL) {
+		ip6stat_inc(ip6s_idropped);
 		return NULL;
+	}
 
 	n->m_len = 0;
 	if (elen >= m_trailingspace(n)) {

@@ -1,4 +1,4 @@
-/*	$OpenBSD: zlib.h,v 1.15 2022/05/08 14:05:29 tb Exp $ */
+/*	$OpenBSD: zlib.h,v 1.17 2022/08/15 13:29:05 tb Exp $ */
 
 /* zlib.h -- interface of the 'zlib' general purpose compression library
   version 1.2.12, March 11th, 2022
@@ -88,11 +88,11 @@ struct internal_state;
 typedef struct z_stream_s {
     z_const Bytef *next_in;     /* next input byte */
     uInt     avail_in;  /* number of bytes available at next_in */
-    z_off_t  total_in;  /* total number of input bytes read so far */
+    uLong    total_in;  /* total number of input bytes read so far */
 
     Bytef    *next_out; /* next output byte will go here */
     uInt     avail_out; /* remaining free space at next_out */
-    z_off_t  total_out; /* total number of bytes output so far */
+    uLong    total_out; /* total number of bytes output so far */
 
     z_const char *msg;  /* last error message, NULL if no error */
     struct internal_state FAR *state; /* not visible by applications */
@@ -545,8 +545,7 @@ ZEXTERN int ZEXPORT deflateInit2 OF((z_streamp strm,
                                      int  strategy));
 
      This is another version of deflateInit with more compression options.  The
-   fields next_in, zalloc, zfree and opaque must be initialized before by the
-   caller.
+   fields zalloc, zfree and opaque must be initialized before by the caller.
 
      The method parameter is the compression method.  It must be Z_DEFLATED in
    this version of the library.

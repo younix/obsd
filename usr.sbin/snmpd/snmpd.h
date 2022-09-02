@@ -1,4 +1,4 @@
-/*	$OpenBSD: snmpd.h,v 1.103 2022/06/30 11:28:36 martijn Exp $	*/
+/*	$OpenBSD: snmpd.h,v 1.105 2022/09/01 14:34:17 martijn Exp $	*/
 
 /*
  * Copyright (c) 2007, 2008, 2012 Reyk Floeter <reyk@openbsd.org>
@@ -21,6 +21,7 @@
 #define SNMPD_H
 
 #include <sys/tree.h>
+#include <sys/un.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -49,9 +50,13 @@
 
 #define CONF_FILE		"/etc/snmpd.conf"
 #define SNMPD_SOCKET		"/var/run/snmpd.sock"
+#define SNMPD_BACKEND		"/usr/libexec/snmpd"                                                                                                                                                                                                                                                                        
 #define SNMPD_USER		"_snmpd"
 #define SNMP_PORT		"161"
 #define SNMPTRAP_PORT		"162"
+
+#define AGENTX_MASTER_PATH	"/var/agentx/master"
+#define AGENTX_GROUP		"_agentx"
 
 #define SNMPD_MAXSTRLEN		484
 #define SNMPD_MAXCOMMUNITYLEN	SNMPD_MAXSTRLEN
@@ -92,7 +97,8 @@ enum imsg_type {
 	IMSG_CTL_VERBOSE,
 	IMSG_CTL_RELOAD,
 	IMSG_CTL_PROCFD,
-	IMSG_TRAP_EXEC
+	IMSG_TRAP_EXEC,
+	IMSG_AX_FD
 };
 
 struct imsgev {
@@ -502,6 +508,19 @@ struct address {
 };
 TAILQ_HEAD(addresslist, address);
 
+struct agentx_master {
+	int			axm_fd;
+	struct sockaddr_un	axm_sun;
+	uid_t			axm_owner;
+	gid_t			axm_group;
+	mode_t			axm_mode;
+
+	struct event		axm_ev;
+
+	TAILQ_ENTRY(agentx_master) axm_entry;
+};
+TAILQ_HEAD(axmasterlist, agentx_master);
+
 #define ADDRESS_FLAG_READ	0x01
 #define ADDRESS_FLAG_WRITE	0x02
 #define ADDRESS_FLAG_NOTIFY	0x04
@@ -575,6 +594,7 @@ struct snmpd {
 
 	const char		*sc_confpath;
 	struct addresslist	 sc_addresses;
+	struct axmasterlist	 sc_agentx_masters;
 	struct timeval		 sc_starttime;
 	u_int32_t		 sc_engine_boots;
 

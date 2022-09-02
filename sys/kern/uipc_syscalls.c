@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_syscalls.c,v 1.199 2022/07/18 04:42:37 deraadt Exp $	*/
+/*	$OpenBSD: uipc_syscalls.c,v 1.202 2022/09/02 13:18:06 mbuhl Exp $	*/
 /*	$NetBSD: uipc_syscalls.c,v 1.19 1996/02/09 19:00:48 christos Exp $	*/
 
 /*
@@ -42,7 +42,6 @@
 #include <sys/kernel.h>
 #include <sys/file.h>
 #include <sys/vnode.h>
-#include <sys/ioctl.h>
 #include <sys/malloc.h>
 #include <sys/event.h>
 #include <sys/mbuf.h>
@@ -51,8 +50,6 @@
 #include <sys/socketvar.h>
 #include <sys/signalvar.h>
 #include <sys/pledge.h>
-#include <sys/unpcb.h>
-#include <sys/un.h>
 #ifdef KTRACE
 #include <sys/ktrace.h>
 #endif
@@ -63,7 +60,7 @@
 
 #include <sys/domain.h>
 #include <netinet/in.h>
-#include <net/route.h>
+#include <net/rtable.h>
 
 int	copyaddrout(struct proc *, struct mbuf *, struct sockaddr *, socklen_t,
 	    socklen_t *);
@@ -808,6 +805,140 @@ done:
 }
 
 int
+sys_recvmmsg(struct proc *p, void *v, register_t *retval)
+{
+	struct sys_recvmmsg_args /* {
+		syscallarg(int)			s;
+		syscallarg(struct mmsghdr *)	mmsg;
+		syscallarg(unsigned int)	vlen;
+		syscallarg(unsigned int)	flags;
+		syscallarg(struct timespec *)	timeout;
+	} */ *uap = v;
+	struct mmsghdr mmsg, *mmsgp;
+	struct timespec ts, now;
+	struct iovec aiov[UIO_SMALLIOV], *uiov, *iov = aiov;
+	struct file *fp;
+	struct socket *so;
+	struct timespec *timeout;
+	size_t iovlen = UIO_SMALLIOV;
+	register_t retrec;
+	unsigned int vlen, dgrams;
+	int error = 0, flags, s;
+
+	s = SCARG(uap, s);
+	if ((error = getsock(p, s, &fp)))
+		return (error);
+	so = (struct socket *)fp->f_data;
+
+	timeout = SCARG(uap, timeout);
+	if (timeout != NULL) {
+		error = copyin(timeout, &ts, sizeof(ts));
+		if (error)
+			return error;
+#ifdef KTRACE
+		if (KTRPOINT(p, KTR_STRUCT))
+			ktrreltimespec(p, &ts);
+#endif
+		getnanotime(&now);
+		timespecadd(&now, &ts, &ts);
+	}
+
+	flags = SCARG(uap, flags);
+
+	/* Arbitrarily capped at 1024 datagrams. */
+	vlen = SCARG(uap, vlen);
+	if (vlen > 1024)
+		vlen = 1024;
+
+	mmsgp = SCARG(uap, mmsg);
+	for (dgrams = 0; dgrams < vlen;) {
+		error = copyin(&mmsgp[dgrams], &mmsg, sizeof(mmsg));
+		if (error)
+			break;
+
+		if (mmsg.msg_hdr.msg_iovlen > IOV_MAX) {
+			error = EMSGSIZE;
+			break;
+		}
+
+		if (mmsg.msg_hdr.msg_iovlen > iovlen) {
+			if (iov != aiov)
+				free(iov, M_IOV, iovlen *
+				    sizeof(struct iovec));
+
+			iovlen = mmsg.msg_hdr.msg_iovlen;
+			iov = mallocarray(iovlen, sizeof(struct iovec),
+			    M_IOV, M_WAITOK);
+		}
+
+		if (mmsg.msg_hdr.msg_iovlen > 0) {
+			error = copyin(mmsg.msg_hdr.msg_iov, iov,
+			    mmsg.msg_hdr.msg_iovlen * sizeof(struct iovec));
+			if (error)
+				break;
+		}
+
+		uiov = mmsg.msg_hdr.msg_iov;
+		mmsg.msg_hdr.msg_iov = iov;
+		mmsg.msg_hdr.msg_flags = flags;
+
+		error = recvit(p, s, &mmsg.msg_hdr, NULL, &retrec);
+		if (error) {
+			if (error == EAGAIN && dgrams > 0)
+				error = 0;
+			break;
+		}
+
+		if (dgrams == 0 && flags & MSG_WAITFORONE) {
+			flags &= ~MSG_WAITFORONE;
+			flags |= MSG_DONTWAIT;
+		}
+
+		mmsg.msg_hdr.msg_iov = uiov;
+		mmsg.msg_len = retrec;
+#ifdef KTRACE
+		if (KTRPOINT(p, KTR_STRUCT)) {
+			ktrmmsghdr(p, &mmsg);
+			if (mmsg.msg_hdr.msg_iovlen)
+				ktriovec(p, iov, mmsg.msg_hdr.msg_iovlen);
+		}
+#endif
+
+		error = copyout(&mmsg, &mmsgp[dgrams], sizeof(mmsg));
+		if (error)
+			break;
+
+		dgrams++;
+		if (mmsg.msg_hdr.msg_flags & MSG_OOB)
+			break;
+
+		if (timeout != NULL) {
+			getnanotime(&now);
+			timespecsub(&now, &ts, &now);
+			if (now.tv_sec > 0)
+				break;
+		}
+	}
+
+	if (iov != aiov)
+		free(iov, M_IOV, iovlen * sizeof(struct iovec));
+
+	*retval = dgrams;
+
+	/*
+	 * If we succeeded at least once, return 0, hopefully so->so_error
+	 * will catch it next time.
+	 */
+	if (error && dgrams > 0) {
+		so->so_error = error;
+		error = 0;
+	}
+
+	FRELE(fp, p);
+	return (error);
+}
+
+int
 recvit(struct proc *p, int s, struct msghdr *mp, caddr_t namelenp,
     register_t *retsize)
 {
@@ -1100,7 +1231,7 @@ sys_getsockname(struct proc *p, void *v, register_t *retval)
 	}
 	m = m_getclr(M_WAIT, MT_SONAME);
 	solock(so);
-	error = (*so->so_proto->pr_usrreq)(so, PRU_SOCKADDR, NULL, m, NULL, p);
+	error = pru_sockaddr(so, m);
 	sounlock(so);
 	if (error)
 		goto bad;
@@ -1147,7 +1278,7 @@ sys_getpeername(struct proc *p, void *v, register_t *retval)
 		goto bad;
 	m = m_getclr(M_WAIT, MT_SONAME);
 	solock(so);
-	error = (*so->so_proto->pr_usrreq)(so, PRU_PEERADDR, NULL, m, NULL, p);
+	error = pru_peeraddr(so, m);
 	sounlock(so);
 	if (error)
 		goto bad;

@@ -1,4 +1,4 @@
-/* $OpenBSD: tty.c,v 1.422 2022/07/06 07:36:36 nicm Exp $ */
+/* $OpenBSD: tty.c,v 1.424 2022/08/15 08:54:03 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -1626,13 +1626,20 @@ tty_write(void (*cmdfn)(struct tty *, const struct tty_ctx *),
 	if (ctx->set_client_cb == NULL)
 		return;
 	TAILQ_FOREACH(c, &clients, entry) {
-		if (!tty_client_ready(c))
-			continue;
-		state = ctx->set_client_cb(ctx, c);
-		if (state == -1)
-			break;
-		if (state == 0)
-			continue;
+		if (ctx->allow_invisible_panes) {
+		    if (c->session == NULL ||
+			c->tty.term == NULL ||
+			c->flags & CLIENT_SUSPENDED)
+			    continue;
+		} else {
+			if (!tty_client_ready(c))
+				continue;
+			state = ctx->set_client_cb(ctx, c);
+			if (state == -1)
+				break;
+			if (state == 0)
+				continue;
+		}
 		cmdfn(&c->tty, ctx);
 	}
 }
@@ -2683,12 +2690,14 @@ tty_check_fg(struct tty *tty, struct colour_palette *palette,
 
 	/*
 	 * Perform substitution if this pane has a palette. If the bright
-	 * attribute is set, use the bright entry in the palette by changing to
-	 * the aixterm colour.
+	 * attribute is set and Nobr is not present, use the bright entry in
+	 * the palette by changing to the aixterm colour
 	 */
 	if (~gc->flags & GRID_FLAG_NOPALETTE) {
 		c = gc->fg;
-		if (c < 8 && gc->attr & GRID_ATTR_BRIGHT)
+		if (c < 8 &&
+		    gc->attr & GRID_ATTR_BRIGHT &&
+		    !tty_term_has(tty->term, TTYC_NOBR))
 			c += 90;
 		if ((c = colour_palette_get(palette, c)) != -1)
 			gc->fg = c;

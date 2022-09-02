@@ -1,4 +1,4 @@
-/* $OpenBSD: term.c,v 1.146 2022/04/27 13:30:19 schwarze Exp $ */
+/* $OpenBSD: term.c,v 1.150 2022/08/16 17:44:53 schwarze Exp $ */
 /*
  * Copyright (c) 2010-2022 Ingo Schwarze <schwarze@openbsd.org>
  * Copyright (c) 2008, 2009, 2010, 2011 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -155,6 +155,11 @@ term_flushln(struct termp *p)
 		/* Finally, print the field content. */
 
 		term_field(p, vbl, nbr);
+		if (vbr < vtarget)
+			p->tcol->taboff += vbr;
+		else
+			p->tcol->taboff += vtarget;
+		p->tcol->taboff += (*p->width)(p, ' ');
 
 		/*
 		 * If there is no text left in the field, exit the loop.
@@ -174,7 +179,9 @@ term_flushln(struct termp *p)
 					vbr += (*p->width)(p, ' ');
 				continue;
 			case '\n':
+			case ASCII_NBRZW:
 			case ASCII_BREAK:
+			case ASCII_TABREF:
 				continue;
 			default:
 				break;
@@ -205,7 +212,6 @@ term_flushln(struct termp *p)
 			return;
 
 		endline(p);
-		p->viscol = 0;
 
 		/*
 		 * Normally, start the next line at the same indentation
@@ -256,9 +262,11 @@ term_fill(struct termp *p, size_t *nbr, size_t *vbr, size_t vtarget)
 	size_t	 vn;        /* Visual position of the next character. */
 	int	 breakline; /* Break at the end of this word. */
 	int	 graph;     /* Last character was non-blank. */
+	int	 taboff;    /* Temporary offset for literal tabs. */
 
 	*nbr = *vbr = vis = 0;
 	breakline = graph = 0;
+	taboff = p->tcol->taboff;
 	for (ic = p->tcol->col; ic < p->tcol->lastcol; ic++) {
 		switch (p->tcol->buf[ic]) {
 		case '\b':  /* Escape \o (overstrike) or backspace markup. */
@@ -266,22 +274,11 @@ term_fill(struct termp *p, size_t *nbr, size_t *vbr, size_t vtarget)
 			vis -= (*p->width)(p, p->tcol->buf[ic - 1]);
 			continue;
 
-		case '\t':  /* Normal ASCII whitespace. */
 		case ' ':
 		case ASCII_BREAK:  /* Escape \: (breakpoint). */
-			switch (p->tcol->buf[ic]) {
-			case '\t':
-				vn = term_tab_next(vis);
-				break;
-			case ' ':
-				vn = vis + (*p->width)(p, ' ');
-				break;
-			case ASCII_BREAK:
-				vn = vis;
-				break;
-			default:
-				abort();
-			}
+			vn = vis;
+			if (p->tcol->buf[ic] == ' ')
+				vn += (*p->width)(p, ' ');
 			/* Can break at the end of a word. */
 			if (breakline || vn > vtarget)
 				break;
@@ -315,12 +312,30 @@ term_fill(struct termp *p, size_t *nbr, size_t *vbr, size_t vtarget)
 			*vbr = vis;
 			continue;
 
-		case ASCII_NBRSP:  /* Non-breakable space. */
-			p->tcol->buf[ic] = ' ';
-			/* FALLTHROUGH */
-		default:  /* Printable character. */
+		case ASCII_TABREF:
+			taboff = -vis - (*p->width)(p, ' ');
+			continue;
+
+		default:
+			switch (p->tcol->buf[ic]) {
+			case '\t':
+				if (taboff < 0 && (size_t)-taboff > vis)
+					vis = 0;
+				else
+					vis += taboff;
+				vis = term_tab_next(vis);
+				vis -= taboff;
+				break;
+			case ASCII_NBRZW:  /* Non-breakable zero-width. */
+				break;
+			case ASCII_NBRSP:  /* Non-breakable space. */
+				p->tcol->buf[ic] = ' ';
+				/* FALLTHROUGH */
+			default:  /* Printable character. */
+				vis += (*p->width)(p, p->tcol->buf[ic]);
+				break;
+			}
 			graph = 1;
-			vis += (*p->width)(p, p->tcol->buf[ic]);
 			if (vis > vtarget && *nbr > 0)
 				return;
 			continue;
@@ -350,10 +365,12 @@ term_field(struct termp *p, size_t vbl, size_t nbr)
 {
 	size_t	 ic;	/* Character position in the input buffer. */
 	size_t	 vis;	/* Visual position of the current character. */
+	size_t	 vt;	/* Visual position including tab offset. */
 	size_t	 dv;	/* Visual width of the current character. */
-	size_t	 vn;	/* Visual position of the next character. */
+	int	 taboff; /* Temporary offset for literal tabs. */
 
 	vis = 0;
+	taboff = p->tcol->taboff;
 	for (ic = p->tcol->col; ic < nbr; ic++) {
 
 		/*
@@ -364,15 +381,22 @@ term_field(struct termp *p, size_t vbl, size_t nbr)
 		switch (p->tcol->buf[ic]) {
 		case '\n':
 		case ASCII_BREAK:
+		case ASCII_NBRZW:
+			continue;
+		case ASCII_TABREF:
+			taboff = -vis - (*p->width)(p, ' ');
 			continue;
 		case '\t':
-			vn = term_tab_next(vis);
-			vbl += vn - vis;
-			vis = vn;
-			continue;
 		case ' ':
 		case ASCII_NBRSP:
-			dv = (*p->width)(p, ' ');
+			if (p->tcol->buf[ic] == '\t') {
+				if (taboff < 0 && (size_t)-taboff > vis)
+					vt = 0;
+				else
+					vt = vis + taboff;
+				dv = term_tab_next(vt) - vt;
+			} else
+				dv = (*p->width)(p, ' ');
 			vbl += dv;
 			vis += dv;
 			continue;
@@ -434,10 +458,10 @@ endline(struct termp *p)
 void
 term_newln(struct termp *p)
 {
-
 	p->flags |= TERMP_NOSPACE;
 	if (p->tcol->lastcol || p->viscol)
 		term_flushln(p);
+	p->tcol->taboff = 0;
 }
 
 /*
@@ -570,18 +594,23 @@ term_word(struct termp *p, const char *word)
 			break;
 		case ESCAPE_NUMBERED:
 			uc = mchars_num2char(seq, sz);
-			if (uc < 0)
-				continue;
-			break;
+			if (uc >= 0)
+				break;
+			bufferc(p, ASCII_NBRZW);
+			continue;
 		case ESCAPE_SPECIAL:
 			if (p->enc == TERMENC_ASCII) {
 				cp = mchars_spec2str(seq, sz, &ssz);
 				if (cp != NULL)
 					encode(p, cp, ssz);
+				else
+					bufferc(p, ASCII_NBRZW);
 			} else {
 				uc = mchars_spec2cp(seq, sz);
 				if (uc > 0)
 					encode1(p, uc);
+				else
+					bufferc(p, ASCII_NBRZW);
 			}
 			continue;
 		case ESCAPE_UNDEF:
@@ -743,6 +772,9 @@ term_word(struct termp *p, const char *word)
 			if (p->col > p->tcol->lastcol)
 				p->col = p->tcol->lastcol;
 			continue;
+		case ESCAPE_IGNORE:
+			bufferc(p, ASCII_NBRZW);
+			continue;
 		default:
 			continue;
 		}
@@ -788,6 +820,14 @@ bufferc(struct termp *p, char c)
 		p->tcol->buf[p->col] = c;
 	if (p->tcol->lastcol < ++p->col)
 		p->tcol->lastcol = p->col;
+}
+
+void
+term_tab_ref(struct termp *p)
+{
+	if (p->tcol->lastcol && p->tcol->lastcol <= p->col &&
+	    (p->flags & TERMP_NOBUF) == 0)
+		bufferc(p, ASCII_TABREF);
 }
 
 /*
@@ -934,8 +974,8 @@ term_strlen(const struct termp *p, const char *cp)
 	int		 ssz, skip, uc;
 	const char	*seq, *rhs;
 	enum mandoc_esc	 esc;
-	static const char rej[] = { '\\', ASCII_NBRSP, ASCII_HYPH,
-			ASCII_BREAK, '\0' };
+	static const char rej[] = { '\\', ASCII_NBRSP, ASCII_NBRZW,
+		ASCII_BREAK, ASCII_HYPH, ASCII_TABREF, '\0' };
 
 	/*
 	 * Account for escaped sequences within string length

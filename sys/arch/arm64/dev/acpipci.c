@@ -1,4 +1,4 @@
-/*	$OpenBSD: acpipci.c,v 1.35 2022/06/28 19:50:40 kettenis Exp $	*/
+/*	$OpenBSD: acpipci.c,v 1.38 2022/08/31 20:49:12 patrick Exp $	*/
 /*
  * Copyright (c) 2018 Mark Kettenis
  *
@@ -436,7 +436,7 @@ acpipci_probe_device_hook(void *v, struct pci_attach_args *pa)
 		return 0;
 
 	node = (struct acpi_iort_node *)((char *)iort + offset);
-	if (node->type == ACPI_IORT_SMMU) {
+	if (node->type == ACPI_IORT_SMMU || node->type == ACPI_IORT_SMMU_V3) {
 		pa->pa_dmat = acpiiort_smmu_map(node, rid, pa->pa_dmat);
 		for (at = pa->pa_iot->bus_private; at; at = at->at_next) {
 			acpiiort_smmu_reserve_region(node, rid,
@@ -455,12 +455,26 @@ int
 acpipci_intr_swizzle(struct pci_attach_args *pa, pci_intr_handle_t *ihp)
 {
 	int dev, swizpin;
+	pcireg_t id;
 
 	if (pa->pa_bridgeih == NULL)
 		return -1;
 
 	pci_decompose_tag(pa->pa_pc, pa->pa_tag, NULL, &dev, NULL);
 	swizpin = PPB_INTERRUPT_SWIZZLE(pa->pa_rawintrpin, dev);
+
+	/*
+	 * Qualcomm SC8280XP Root Complex violates PCI bridge
+	 * interrupt swizzling rules.
+	 */
+	if (pa->pa_bridgetag) {
+		id = pci_conf_read(pa->pa_pc, *pa->pa_bridgetag, PCI_ID_REG);
+		if (PCI_VENDOR(id) == PCI_VENDOR_QUALCOMM &&
+		    PCI_PRODUCT(id) == PCI_PRODUCT_QUALCOMM_SC8280XP_PCIE) {
+			swizpin = (((swizpin - 1) + 3) % 4) + 1;
+		}
+	}
+
 	if (pa->pa_bridgeih[swizpin - 1].ih_type == PCI_NONE)
 		return -1;
 
@@ -816,6 +830,7 @@ acpipci_iort_map(struct acpi_iort *iort, uint32_t offset, uint32_t id)
 	case ACPI_IORT_ITS:
 		return id;
 	case ACPI_IORT_SMMU:
+	case ACPI_IORT_SMMU_V3:
 		return acpipci_iort_map_node(iort, node, id);
 	}
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.143 2022/06/27 10:18:27 job Exp $ */
+/*	$OpenBSD: extern.h,v 1.151 2022/08/30 18:56:49 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -178,10 +178,10 @@ enum rtype {
 	RTYPE_CER,
 	RTYPE_CRL,
 	RTYPE_GBR,
-	RTYPE_ASPA,
 	RTYPE_REPO,
 	RTYPE_FILE,
 	RTYPE_RSC,
+	RTYPE_ASPA,
 };
 
 enum location {
@@ -282,6 +282,45 @@ struct gbr {
 	char		*aki; /* AKI */
 	char		*ski; /* SKI */
 };
+
+struct aspa_provider {
+	uint32_t	 as;
+	enum afi	 afi;
+};
+
+/*
+ * A single ASPA record
+ */
+struct aspa {
+	int			 valid; /* contained in parent auth */
+	int			 talid; /* TAL the ASPA is chained up to */
+	char			*aia; /* AIA */
+	char			*aki; /* AKI */
+	char			*ski; /* SKI */
+	uint32_t	 	 custasid; /* the customerASID */
+	struct aspa_provider	*providers; /* the providers */
+	size_t			 providersz; /* number of providers */
+	time_t		 	 expires; /* NotAfter of the ASPA EE cert */
+};
+
+/*
+ * A Validated ASPA Payload (VAP) tree element.
+ * To ease transformation, this struct mimicks ASPA RTR PDU structure.
+ */
+struct vap {
+	RB_ENTRY(vap)		 entry;
+	enum afi		 afi;
+	uint32_t		 custasid;
+	uint32_t		*providers;
+	size_t			 providersz;
+	time_t			 expires;
+};
+
+/*
+ * Tree of VAPs sorted by afi, custasid, and provideras.
+ */
+RB_HEAD(vap_tree, vap);
+RB_PROTOTYPE(vap_tree, vap, entry, vapcmp);
 
 /*
  * A single VRP element (including ASID)
@@ -433,6 +472,11 @@ struct stats {
 	size_t	 rrdp_fails; /* failed rrdp repositories */
 	size_t	 crls; /* revocation lists */
 	size_t	 gbrs; /* ghostbuster records */
+	size_t	 aspas; /* ASPA objects */
+	size_t	 aspas_fail; /* ASPA objects failing syntactic parse */
+	size_t	 aspas_invalid; /* ASPAs with invalid customerASID */
+	size_t	 vaps; /* total number of Validated ASPA Payloads */
+	size_t	 vaps_uniqs; /* total number of unique VAPs */
 	size_t	 vrps; /* total number of vrps */
 	size_t	 uniqs; /* number of unique vrps */
 	size_t	 del_files; /* number of files removed in cleanup */
@@ -465,6 +509,7 @@ struct tal	*tal_read(struct ibuf *);
 
 void		 cert_buffer(struct ibuf *, const struct cert *);
 void		 cert_free(struct cert *);
+struct cert	*cert_parse_ee_cert(const char *, X509 *);
 struct cert	*cert_parse_pre(const char *, const unsigned char *, size_t);
 struct cert	*cert_parse(const char *, struct cert *);
 struct cert	*ta_parse(const char *, struct cert *, const unsigned char *,
@@ -496,6 +541,14 @@ void		 rsc_free(struct rsc *);
 struct rsc	*rsc_parse(X509 **, const char *, const unsigned char *,
 		    size_t);
 
+void		 aspa_buffer(struct ibuf *, const struct aspa *);
+void		 aspa_free(struct aspa *);
+void		 aspa_insert_vaps(struct vap_tree *, struct aspa *, size_t *,
+		    size_t *);
+struct aspa	*aspa_parse(X509 **, const char *, const unsigned char *,
+		    size_t);
+struct aspa	*aspa_read(struct ibuf *);
+
 /* crl.c */
 struct crl	*crl_parse(const char *, const unsigned char *, size_t);
 struct crl	*crl_get(struct crl_tree *, const struct auth *);
@@ -509,7 +562,7 @@ struct auth	*valid_ski_aki(const char *, struct auth_tree *,
 int		 valid_ta(const char *, struct auth_tree *,
 		    const struct cert *);
 int		 valid_cert(const char *, struct auth *, const struct cert *);
-int		 valid_roa(const char *, struct auth *, struct roa *);
+int		 valid_roa(const char *, struct cert *, struct roa *);
 int		 valid_filehash(int, const char *, size_t);
 int		 valid_hash(unsigned char *, size_t, const char *, size_t);
 int		 valid_filename(const char *, size_t);
@@ -517,8 +570,9 @@ int		 valid_uri(const char *, size_t, const char *);
 int		 valid_origin(const char *, const char *);
 int		 valid_x509(char *, X509_STORE_CTX *, X509 *, struct auth *,
 		    struct crl *, int);
-int		 valid_rsc(const char *, struct auth *, struct rsc *);
+int		 valid_rsc(const char *, struct cert *, struct rsc *);
 int		 valid_econtent_version(const char *, const ASN1_INTEGER *);
+int		 valid_aspa(const char *, struct cert *, struct aspa *);
 
 /* Working with CMS. */
 unsigned char	*cms_parse_validate(X509 **, const char *,
@@ -664,6 +718,7 @@ void		 mft_print(const X509 *, const struct mft *);
 void		 roa_print(const X509 *, const struct roa *);
 void		 gbr_print(const X509 *, const struct gbr *);
 void		 rsc_print(const X509 *, const struct rsc *);
+void		 aspa_print(const X509 *, const struct aspa *);
 
 /* Output! */
 
@@ -674,20 +729,20 @@ extern int	 outformats;
 #define FORMAT_JSON	0x08
 
 int		 outputfiles(struct vrp_tree *v, struct brk_tree *b,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 outputheader(FILE *, struct stats *);
 int		 output_bgpd(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 output_bird1v4(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 output_bird1v6(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 output_bird2(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 output_csv(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 int		 output_json(FILE *, struct vrp_tree *, struct brk_tree *,
-		    struct stats *);
+		    struct vap_tree *, struct stats *);
 
 void		logx(const char *fmt, ...)
 		    __attribute__((format(printf, 1, 2)));
@@ -702,9 +757,12 @@ int	mkpathat(int, const char *);
 #define DEFAULT_SKIPLIST_FILE	"/etc/rpki/skiplist"
 
 /* Maximum number of TAL files we'll load. */
-#define	TALSZ_MAX	8
+#define	TALSZ_MAX		8
 
-/* Maximum number of IP and AS ranges accepted in any single file */
+/*
+ * Maximum number of elements in the sbgp-ipAddrBlock (IP) and
+ * sbgp-autonomousSysNum (AS) X.509v3 extension of CA/EE certificates.
+ */
 #define MAX_IP_SIZE		200000
 #define MAX_AS_SIZE		200000
 
@@ -720,6 +778,9 @@ int	mkpathat(int, const char *);
 /* Maximum number of FileAndHash entries per manifest. */
 #define MAX_MANIFEST_ENTRIES	100000
 
+/* Maximum number of Providers per ASPA object. */
+#define MAX_ASPA_PROVIDERS	10000
+
 /* Maximum depth of the RPKI tree. */
 #define MAX_CERT_DEPTH		12
 
@@ -727,7 +788,13 @@ int	mkpathat(int, const char *);
 #define MAX_HTTP_REQUESTS	64
 #define MAX_RSYNC_REQUESTS	16
 
-/* Maximum allowd repositories per tal */
+/* How many seconds to wait for a connection to succeed. */
+#define MAX_CONN_TIMEOUT	15
+
+/* How many seconds to wait for IO from a remote server. */
+#define MAX_IO_TIMEOUT		30
+
+/* Maximum number of delegated hosting locations (repositories) for each TAL. */
 #define MAX_REPO_PER_TAL	1000
 
 /* Maximum number of delta files per RRDP notification file. */

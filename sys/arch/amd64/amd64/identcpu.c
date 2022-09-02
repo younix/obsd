@@ -1,4 +1,4 @@
-/*	$OpenBSD: identcpu.c,v 1.125 2022/07/12 04:46:00 jsg Exp $	*/
+/*	$OpenBSD: identcpu.c,v 1.127 2022/08/30 17:09:21 dv Exp $	*/
 /*	$NetBSD: identcpu.c,v 1.1 2003/04/26 18:39:28 fvdl Exp $	*/
 
 /*
@@ -335,7 +335,7 @@ cpu_hz_update_sensor(void *args)
 
 	if (mdelta > 0) {
 		val = (adelta * 1000000) / mdelta * tsc_frequency;
-		val = ((val + FREQ_50MHZ / 2) / FREQ_50MHZ) * FREQ_50MHZ; 
+		val = ((val + FREQ_50MHZ / 2) / FREQ_50MHZ) * FREQ_50MHZ;
 		ci->ci_hz_sensor.value = val;
 	}
 
@@ -580,25 +580,23 @@ identifycpu(struct cpu_info *ci)
 		if (!strcmp(cpu_vendor, "GenuineIntel")) {
 			if ((ci->ci_family == 0x0f && ci->ci_model >= 0x03) ||
 			    (ci->ci_family == 0x06 && ci->ci_model >= 0x0e)) {
-				ci->ci_flags |= CPUF_CONST_TSC;
+				atomic_setbits_int(&ci->ci_flags, CPUF_CONST_TSC);
 			}
 		} else if (!strcmp(cpu_vendor, "CentaurHauls")) {
 			/* VIA */
 			if (ci->ci_model >= 0x0f) {
-				ci->ci_flags |= CPUF_CONST_TSC;
+				atomic_setbits_int(&ci->ci_flags, CPUF_CONST_TSC);
 			}
 		} else if (!strcmp(cpu_vendor, "AuthenticAMD")) {
 			if (cpu_apmi_edx & CPUIDEDX_ITSC) {
-				/* Invariant TSC indicates constant TSC on
-				 * AMD.
-				 */
-				ci->ci_flags |= CPUF_CONST_TSC;
+				/* Invariant TSC indicates constant TSC on AMD */
+				atomic_setbits_int(&ci->ci_flags, CPUF_CONST_TSC);
 			}
 		}
 
 		/* Check if it's an invariant TSC */
 		if (cpu_apmi_edx & CPUIDEDX_ITSC)
-			ci->ci_flags |= CPUF_INVAR_TSC;
+			atomic_setbits_int(&ci->ci_flags, CPUF_INVAR_TSC);
 
 		tsc_identify(ci);
 	}
@@ -1057,6 +1055,9 @@ cpu_check_vmm_cap(struct cpu_info *ci)
 
 		if (edx & AMD_SVM_VMCB_CLEAN_CAP)
 			ci->ci_vmm_cap.vcc_svm.svm_vmcb_clean = 1;
+
+		if (edx & AMD_SVM_DECODE_ASSIST_CAP)
+			ci->ci_vmm_cap.vcc_svm.svm_decode_assist = 1;
 	}
 
 	/*

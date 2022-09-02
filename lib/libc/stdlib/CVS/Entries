@@ -61,7 +61,6 @@
 /ptsname.3/1.2/Tue Dec  4 18:42:16 2012//
 /qsort.3/1.27/Sat Feb  8 01:09:57 2020//
 /qsort.c/1.18/Tue May 30 14:54:09 2017//
-/radixsort.3/1.13/Thu Jan 29 01:46:31 2015//
 /radixsort.c/1.9/Sun Sep  2 15:19:17 2007//
 /rand.c/1.18/Tue Nov 28 06:55:49 2017//
 /rand48.3/1.21/Fri Dec 20 19:16:40 2019//
@@ -71,7 +70,6 @@
 /realpath.c/1.27/Fri Jul  5 05:04:26 2019//
 /remque.c/1.3/Fri Aug 15 04:14:36 2014//
 /seed48.c/1.6/Sun Sep 13 15:20:40 2015//
-/setenv.c/1.19/Wed Sep 21 04:38:56 2016//
 /srand48.c/1.6/Sun Sep 13 08:31:48 2015//
 /strtod.3/1.22/Wed Jan 16 12:55:49 2019//
 /strtoimax.c/1.4/Thu Jul  6 16:23:11 2017//
@@ -91,18 +89,20 @@
 /getopt_long.c/1.32/Mon Jun  1 06:23:13 2020//
 /random.3/1.29/Wed Sep  1 16:07:37 2021//
 /recallocarray.c/1.2/Wed Sep  1 16:07:37 2021//
-/getsubopt.3/1.15/Tue Sep 14 08:17:17 2021//
 /realpath.3/1.26/Wed Oct 20 17:28:43 2021//
 /atoll.c/1.4/Mon Nov 15 19:06:15 2021//
 /bsearch.c/1.9/Mon Jan 24 14:35:13 2022//
 /getopt_long.3/1.24/Mon Jan 24 14:35:13 2022//
 /lsearch.c/1.7/Mon Jan 24 14:35:13 2022//
 /atexit.3/1.13/Mon Jun 27 13:01:59 2022//
-/getenv.3/1.22/Mon Aug  1 07:15:36 2022//
 /getopt.3/1.48/Mon Aug  1 07:15:36 2022//
 /malloc.3/1.129/Tue Jul 26 13:42:32 2022//
 /malloc.c/1.274/Tue Jul 26 13:42:32 2022//
 /rand.3/1.21/Tue Jul 26 13:42:32 2022//
 /system.c/1.13/Tue Jul 26 13:42:32 2022//
 /tsearch.3/1.22/Tue Jul 26 13:42:32 2022//
+/getenv.3/1.23/Fri Sep  2 14:00:04 2022//
+/getsubopt.3/1.16/Fri Sep  2 14:00:04 2022//
+/radixsort.3/1.14/Fri Sep  2 14:00:04 2022//
+/setenv.c/1.20/Fri Sep  2 14:00:04 2022//
 D

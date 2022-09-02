@@ -58,7 +58,6 @@
 /dl10019var.h/1.2/Thu Jun 26 05:42:15 2008//
 /dp8390reg.h/1.9/Tue Oct 21 18:58:49 2003//
 /dwiicreg.h/1.2/Tue Aug  6 06:56:29 2019//
-/dwiicvar.h/1.4/Tue Feb 18 12:13:39 2020//
 /elink3reg.h/1.16/Sat Feb 28 11:25:49 2015//
 /elink3var.h/1.19/Mon Nov 23 16:36:22 2009//
 /fxpreg.h/1.14/Tue Apr  3 23:39:09 2012//
@@ -143,7 +142,6 @@
 /silivar.h/1.7/Thu Aug  5 20:21:36 2010//
 /siopreg.h/1.12/Fri Jul 23 07:47:13 2010//
 /siopvar.h/1.17/Fri Sep 23 10:40:06 2011//
-/smc91cxxvar.h/1.8/Tue Oct 13 19:33:16 2009//
 /smc93cx6var.h/1.17/Sat Sep 12 16:24:14 2015//
 /stireg.h/1.14/Sun Apr  5 23:25:57 2015//
 /tea5757.h/1.3/Mon Jan  7 18:32:19 2002//
@@ -192,7 +190,6 @@
 /twevar.h/1.14/Fri Dec 11 17:58:22 2020//
 /uhavar.h/1.5/Fri Dec 11 17:58:22 2020//
 /advlib.c/1.16/Thu Dec 17 19:39:58 2020//
-/adwlib.c/1.27/Thu Dec 17 19:39:58 2020//
 /adwlib.h/1.17/Thu Dec 17 19:39:58 2020//
 /aic79xx_openbsd.h/1.21/Thu Dec 17 19:39:58 2020//
 /aic7xxx_openbsd.h/1.31/Thu Dec 17 19:39:58 2020//
@@ -275,13 +272,11 @@
 /mtd8xx.c/1.35/Mon Jan 24 14:35:14 2022//
 /ne2000.c/1.28/Mon Jan 24 14:35:14 2022//
 /ns16550reg.h/1.6/Mon Jan 24 14:35:14 2022//
-/rtwn.c/1.52/Mon Jan 24 14:35:14 2022//
 /rtwreg.h/1.15/Mon Jan 24 14:35:14 2022//
 /siop_common.c/1.44/Mon Jan 24 14:35:14 2022//
 /smc83c170.c/1.30/Mon Jan 24 14:35:14 2022//
 /smc83c170reg.h/1.3/Mon Jan 24 14:35:14 2022//
 /smc83c170var.h/1.5/Mon Jan 24 14:35:14 2022//
-/smc91cxx.c/1.51/Mon Jan 24 14:35:14 2022//
 /smc91cxxreg.h/1.4/Mon Jan 24 14:35:14 2022//
 /tcic2reg.h/1.5/Mon Jan 24 14:35:14 2022//
 /tea5757.c/1.4/Mon Jan 24 14:35:14 2022//
@@ -334,7 +329,6 @@
 /pluartvar.h/1.5/Tue Jul 26 13:42:35 2022//
 /qla.c/1.69/Tue Jul 26 13:42:35 2022//
 /qlw.c/1.48/Tue Jul 26 13:42:35 2022//
-/r92creg.h/1.26/Tue Jul 26 13:42:35 2022//
 /re.c/1.214/Tue Jul 26 13:42:35 2022//
 /rt2560.c/1.90/Tue Jul 26 13:42:35 2022//
 /rt2661.c/1.99/Tue Jul 26 13:42:35 2022//
@@ -346,4 +340,10 @@
 /sti.c/1.83/Tue Jul 26 13:42:35 2022//
 /twe.c/1.67/Tue Jul 26 13:42:35 2022//
 /uha.c/1.42/Tue Jul 26 13:42:35 2022//
+/adwlib.c/1.29/Fri Sep  2 14:00:21 2022//
+/dwiicvar.h/1.5/Fri Sep  2 14:00:21 2022//
+/r92creg.h/1.28/Fri Sep  2 14:00:21 2022//
+/rtwn.c/1.53/Fri Sep  2 14:00:21 2022//
+/smc91cxx.c/1.52/Fri Sep  2 14:00:21 2022//
+/smc91cxxvar.h/1.9/Fri Sep  2 14:00:21 2022//
 D

@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.128 2022/05/15 09:12:20 dlg Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.145 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -103,6 +103,19 @@ struct inpcbtable rawcbtable;
  * Raw interface to IP protocol.
  */
 
+const struct pr_usrreqs rip_usrreqs = {
+	.pru_usrreq	= rip_usrreq,
+	.pru_attach	= rip_attach,
+	.pru_detach	= rip_detach,
+	.pru_bind	= rip_bind,
+	.pru_connect	= rip_connect,
+	.pru_disconnect	= rip_disconnect,
+	.pru_shutdown	= rip_shutdown,
+	.pru_send	= rip_send,
+	.pru_abort	= rip_abort,
+	.pru_control	= in_control,
+};
+
 /*
  * Initialize raw connection block q.
  */
@@ -152,8 +165,8 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		}
 	}
 #endif
-	NET_ASSERT_WLOCKED();
 	SIMPLEQ_INIT(&inpcblist);
+	rw_enter_write(&rawcbtable.inpt_notify);
 	mtx_enter(&rawcbtable.inpt_mtx);
 	TAILQ_FOREACH(inp, &rawcbtable.inpt_queue, inp_queue) {
 		if (inp->inp_socket->so_state & SS_CANTRCVMORE)
@@ -181,6 +194,8 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 	mtx_leave(&rawcbtable.inpt_mtx);
 
 	if (SIMPLEQ_EMPTY(&inpcblist)) {
+		rw_exit_write(&rawcbtable.inpt_notify);
+
 		if (ip->ip_p != IPPROTO_ICMP)
 			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PROTOCOL,
 			    0, 0);
@@ -191,6 +206,8 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		counters[ips_noproto]++;
 		counters[ips_delivered]--;
 		counters_leave(&ref, ipcounters);
+
+		return IPPROTO_DONE;
 	}
 
 	while ((inp = SIMPLEQ_FIRST(&inpcblist)) != NULL) {
@@ -216,6 +233,8 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		}
 		in_pcbunref(inp);
 	}
+	rw_exit_write(&rawcbtable.inpt_notify);
+
 	return IPPROTO_DONE;
 }
 
@@ -446,10 +465,6 @@ rip_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 	struct inpcb *inp;
 	int error = 0;
 
-	if (req == PRU_CONTROL)
-		return (in_control(so, (u_long)m, (caddr_t)nam,
-		    (struct ifnet *)control));
-
 	soassertlocked(so);
 
 	inp = sotoinpcb(so);
@@ -459,117 +474,6 @@ rip_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
 	}
 
 	switch (req) {
-
-	case PRU_DISCONNECT:
-		if ((so->so_state & SS_ISCONNECTED) == 0) {
-			error = ENOTCONN;
-			break;
-		}
-		soisdisconnected(so);
-		inp->inp_faddr.s_addr = INADDR_ANY;
-		break;
-	case PRU_ABORT:
-		soisdisconnected(so);
-		if (inp == NULL)
-			panic("rip_abort");
-#ifdef MROUTING
-		if (so == ip_mrouter[inp->inp_rtableid])
-			ip_mrouter_done(so);
-#endif
-		in_pcbdetach(inp);
-		break;
-
-	case PRU_BIND:
-	    {
-		struct sockaddr_in *addr;
-
-		if ((error = in_nam2sin(nam, &addr)))
-			break;
-		if (!((so->so_options & SO_BINDANY) ||
-		    addr->sin_addr.s_addr == INADDR_ANY ||
-		    addr->sin_addr.s_addr == INADDR_BROADCAST ||
-		    in_broadcast(addr->sin_addr, inp->inp_rtableid) ||
-		    ifa_ifwithaddr(sintosa(addr), inp->inp_rtableid))) {
-			error = EADDRNOTAVAIL;
-			break;
-		}
-		inp->inp_laddr = addr->sin_addr;
-		break;
-	    }
-	case PRU_CONNECT:
-	    {
-		struct sockaddr_in *addr;
-
-		if ((error = in_nam2sin(nam, &addr)))
-			break;
-		inp->inp_faddr = addr->sin_addr;
-		soisconnected(so);
-		break;
-	    }
-
-	case PRU_CONNECT2:
-		error = EOPNOTSUPP;
-		break;
-
-	/*
-	 * Mark the connection as being incapable of further input.
-	 */
-	case PRU_SHUTDOWN:
-		socantsendmore(so);
-		break;
-
-	/*
-	 * Ship a packet out.  The appropriate raw output
-	 * routine handles any massaging necessary.
-	 */
-	case PRU_SEND:
-	    {
-		struct sockaddr_in dst;
-
-		memset(&dst, 0, sizeof(dst));
-		dst.sin_family = AF_INET;
-		dst.sin_len = sizeof(dst);
-		if (so->so_state & SS_ISCONNECTED) {
-			if (nam) {
-				error = EISCONN;
-				break;
-			}
-			dst.sin_addr = inp->inp_faddr;
-		} else {
-			struct sockaddr_in *addr;
-
-			if (nam == NULL) {
-				error = ENOTCONN;
-				break;
-			}
-			if ((error = in_nam2sin(nam, &addr)))
-				break;
-			dst.sin_addr = addr->sin_addr;
-		}
-#ifdef IPSEC
-		/* XXX Find an IPsec TDB */
-#endif
-		error = rip_output(m, so, sintosa(&dst), NULL);
-		m = NULL;
-		break;
-	    }
-
-	case PRU_SENSE:
-		/*
-		 * stat: don't bother with a blocksize.
-		 */
-		break;
-
-	/*
-	 * Not supported.
-	 */
-	case PRU_LISTEN:
-	case PRU_ACCEPT:
-	case PRU_SENDOOB:
-	case PRU_RCVD:
-	case PRU_RCVOOB:
-		error = EOPNOTSUPP;
-		break;
 
 	case PRU_SOCKADDR:
 		in_setsockaddr(inp, nam);
@@ -623,6 +527,141 @@ rip_detach(struct socket *so)
 	if (inp == NULL)
 		return (EINVAL);
 
+#ifdef MROUTING
+	if (so == ip_mrouter[inp->inp_rtableid])
+		ip_mrouter_done(so);
+#endif
+	in_pcbdetach(inp);
+
+	return (0);
+}
+
+int
+rip_bind(struct socket *so, struct mbuf *nam, struct proc *p)
+{
+	struct inpcb *inp = sotoinpcb(so);
+	struct sockaddr_in *addr;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = in_nam2sin(nam, &addr)))
+		return (error);
+	
+	if (!((so->so_options & SO_BINDANY) ||
+	    addr->sin_addr.s_addr == INADDR_ANY ||
+	    addr->sin_addr.s_addr == INADDR_BROADCAST ||
+	    in_broadcast(addr->sin_addr, inp->inp_rtableid) ||
+	    ifa_ifwithaddr(sintosa(addr), inp->inp_rtableid)))
+		return (EADDRNOTAVAIL);
+
+	inp->inp_laddr = addr->sin_addr;
+	
+	return (0);
+}
+
+int
+rip_connect(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *inp = sotoinpcb(so);
+	struct sockaddr_in *addr;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = in_nam2sin(nam, &addr)))
+		return (error);
+	
+	inp->inp_faddr = addr->sin_addr;
+	soisconnected(so);
+
+	return (0);
+}
+
+int
+rip_disconnect(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	soassertlocked(so);
+
+	if ((so->so_state & SS_ISCONNECTED) == 0)
+		return (ENOTCONN);
+
+	soisdisconnected(so);
+	inp->inp_faddr.s_addr = INADDR_ANY;
+
+	return (0);
+}
+
+int
+rip_shutdown(struct socket *so)
+{
+	/*
+	 * Mark the connection as being incapable of further input.
+	 */
+
+	soassertlocked(so);
+	socantsendmore(so);
+	
+	return (0);
+}
+
+int
+rip_send(struct socket *so, struct mbuf *m, struct mbuf *nam,
+    struct mbuf *control)
+{
+	struct inpcb *inp = sotoinpcb(so);
+	struct sockaddr_in dst;
+	int error;
+
+	soassertlocked(so);
+
+	/*
+	 * Ship a packet out.  The appropriate raw output
+	 * routine handles any massaging necessary.
+	 */
+	memset(&dst, 0, sizeof(dst));
+	dst.sin_family = AF_INET;
+	dst.sin_len = sizeof(dst);
+	if (so->so_state & SS_ISCONNECTED) {
+		if (nam) {
+			error = EISCONN;
+			goto out;
+		}
+		dst.sin_addr = inp->inp_faddr;
+	} else {
+		struct sockaddr_in *addr;
+
+		if (nam == NULL) {
+			error = ENOTCONN;
+			goto out;
+		}
+		if ((error = in_nam2sin(nam, &addr)))
+			goto out;
+		dst.sin_addr = addr->sin_addr;
+	}
+#ifdef IPSEC
+	/* XXX Find an IPsec TDB */
+#endif
+	error = rip_output(m, so, sintosa(&dst), NULL);
+	m = NULL;
+
+out:
+	m_freem(control);
+	m_freem(m);
+
+	return (error);
+}
+
+int
+rip_abort(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	soassertlocked(so);
+
+	soisdisconnected(so);
 #ifdef MROUTING
 	if (so == ip_mrouter[inp->inp_rtableid])
 		ip_mrouter_done(so);

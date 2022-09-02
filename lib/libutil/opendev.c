@@ -1,4 +1,4 @@
-/*	$OpenBSD: opendev.c,v 1.15 2011/06/30 15:04:58 jsing Exp $	*/
+/*	$OpenBSD: opendev.c,v 1.17 2022/08/26 21:47:16 kn Exp $	*/
 
 /*
  * Copyright (c) 2000, Todd C. Miller.  All rights reserved.

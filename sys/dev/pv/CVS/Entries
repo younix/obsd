@@ -11,10 +11,8 @@
 /virtiovar.h/1.14/Sun May 26 15:22:31 2019//
 /xenvar.h/1.51/Fri Jul 21 20:00:47 2017//
 /xen.c/1.97/Fri Dec 11 17:58:24 2020//
-/hyperv.c/1.49/Thu Sep  2 14:22:32 2021//
 /hypervic.c/1.16/Thu Sep  2 14:22:32 2021//
 /if_hvn.c/1.47/Thu Sep  2 14:22:32 2021//
-/pvbus.c/1.24/Sun Nov 21 20:15:22 2021//
 /pvclock.c/1.8/Sun Nov 21 20:15:22 2021//
 /viocon.c/1.8/Sun Nov 21 20:15:22 2021//
 /viomb.c/1.8/Sun Nov 21 20:15:22 2021//
@@ -31,4 +29,6 @@
 /vioblk.c/1.35/Tue Jul 26 13:42:35 2022//
 /vioscsi.c/1.30/Tue Jul 26 13:42:35 2022//
 /xbf.c/1.52/Tue Jul 26 13:42:35 2022//
+/hyperv.c/1.50/Fri Sep  2 14:00:23 2022//
+/pvbus.c/1.25/Fri Sep  2 14:00:23 2022//
 D

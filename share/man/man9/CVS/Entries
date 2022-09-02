@@ -49,7 +49,6 @@
 /km_alloc.9/1.9/Fri Dec  6 19:15:16 2019//
 /knote.9/1.9/Tue Jan 21 03:15:46 2014//
 /kthread.9/1.10/Mon Nov 18 20:21:50 2013//
-/ktrace.9/1.12/Sun Jun 19 21:41:51 2016//
 /lim_cur.9/1.2/Fri Jun 21 12:56:46 2019//
 /loadfirmware.9/1.4/Tue Jun  4 19:27:08 2013//
 /log.9/1.11/Mon Sep 14 15:14:55 2015//
@@ -180,4 +179,5 @@
 /timeout.9/1.55/Tue Jul 26 13:42:34 2022//
 /tsleep.9/1.16/Tue Jul 26 13:42:34 2022//
 /usbd_open_pipe.9/1.5/Tue Jul 26 13:42:34 2022//
+/ktrace.9/1.13/Fri Sep  2 14:00:17 2022//
 D

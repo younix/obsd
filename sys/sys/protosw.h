@@ -1,4 +1,4 @@
-/*	$OpenBSD: protosw.h,v 1.35 2022/02/25 23:51:04 guenther Exp $	*/
+/*	$OpenBSD: protosw.h,v 1.52 2022/09/02 13:12:32 mvs Exp $	*/
 /*	$NetBSD: protosw.h,v 1.10 1996/04/09 20:55:32 cgd Exp $	*/
 
 /*-
@@ -43,8 +43,8 @@
  * every 500ms through the pr_slowtimo for timer based actions.
  *
  * Protocols pass data between themselves as chains of mbufs using
- * the pr_input and pr_output hooks.  Pr_input passes data up (towards
- * UNIX) and pr_output passes it down (towards the imps); control
+ * the pr_input and pr_send hooks.  Pr_input passes data up (towards
+ * UNIX) and pr_send passes it down (towards the imps); control
  * information passes up and down on pr_ctlinput and pr_ctloutput.
  * The protocol is responsible for the space occupied by any the
  * arguments to these entries and must dispose it.
@@ -58,6 +58,34 @@ struct sockaddr;
 struct socket;
 struct domain;
 struct proc;
+struct stat;
+struct ifnet;
+
+struct pr_usrreqs {
+					/* user request: see list below */
+	int	(*pru_usrreq)(struct socket *, int, struct mbuf *,
+		    struct mbuf *, struct mbuf *, struct proc *);
+
+	int	(*pru_attach)(struct socket *, int);
+	int	(*pru_detach)(struct socket *);
+	int	(*pru_bind)(struct socket *, struct mbuf *, struct proc *);
+	int	(*pru_listen)(struct socket *);
+	int	(*pru_connect)(struct socket *, struct mbuf *);
+	int	(*pru_accept)(struct socket *, struct mbuf *);
+	int	(*pru_disconnect)(struct socket *);
+	int	(*pru_shutdown)(struct socket *);
+	int	(*pru_rcvd)(struct socket *);
+	int	(*pru_send)(struct socket *, struct mbuf *, struct mbuf *,
+		    struct mbuf *);
+	int	(*pru_abort)(struct socket *);
+	int	(*pru_control)(struct socket *, u_long, caddr_t,
+		    struct ifnet *);
+	int	(*pru_sense)(struct socket *, struct stat *);
+	int	(*pru_rcvoob)(struct socket *, struct mbuf *, int);
+	int	(*pru_sendoob)(struct socket *, struct mbuf *, struct mbuf *,
+		    struct mbuf *);
+	int	(*pru_connect2)(struct socket *, struct socket *);
+};
 
 struct protosw {
 	short	pr_type;		/* socket type used for */
@@ -68,22 +96,14 @@ struct protosw {
 /* protocol-protocol hooks */
 					/* input to protocol (from below) */
 	int	(*pr_input)(struct mbuf **, int *, int, int);
-					/* output to protocol (from above) */
-	int	(*pr_output)(struct mbuf *, struct socket *, struct sockaddr *,
-		    struct mbuf *);
 					/* control input (from below) */
 	void	(*pr_ctlinput)(int, struct sockaddr *, u_int, void *);
 					/* control output (from above) */
 	int	(*pr_ctloutput)(int, struct socket *, int, int, struct mbuf *);
 
-/* user-protocol hook */
-					/* user request: see list below */
-	int	(*pr_usrreq)(struct socket *, int, struct mbuf *,
-		    struct mbuf *, struct mbuf *, struct proc *);
-
-	int	(*pr_attach)(struct socket *, int);
-	int	(*pr_detach)(struct socket *);
-
+/* user-protocol hooks */
+	const	struct pr_usrreqs *pr_usrreqs;
+	
 /* utility hooks */
 	void	(*pr_init)(void);	/* initialization hook */
 	void	(*pr_fasttimo)(void);	/* fast timeout (200ms) */
@@ -227,6 +247,12 @@ char	*prcorequests[] = {
 #endif
 
 #ifdef _KERNEL
+
+#include <sys/mbuf.h>
+#include <sys/socketvar.h>
+#include <sys/systm.h>
+
+struct ifnet;
 struct sockaddr;
 const struct protosw *pffindproto(int, int, int);
 const struct protosw *pffindtype(int, int);
@@ -239,5 +265,143 @@ extern const struct protosw inetsw[];
 extern u_char ip6_protox[];
 extern const struct protosw inet6sw[];
 #endif /* INET6 */
+
+static inline int
+pru_attach(struct socket *so, int proto)
+{
+	return (*so->so_proto->pr_usrreqs->pru_attach)(so, proto);
+}
+
+static inline int
+pru_detach(struct socket *so)
+{
+	return (*so->so_proto->pr_usrreqs->pru_detach)(so);
+}
+
+static inline int
+pru_bind(struct socket *so, struct mbuf *nam, struct proc *p)
+{
+	if (so->so_proto->pr_usrreqs->pru_bind)
+		return (*so->so_proto->pr_usrreqs->pru_bind)(so, nam, p);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_listen(struct socket *so)
+{
+	if (so->so_proto->pr_usrreqs->pru_listen)
+		return (*so->so_proto->pr_usrreqs->pru_listen)(so);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_connect(struct socket *so, struct mbuf *nam)
+{
+	if (so->so_proto->pr_usrreqs->pru_connect)
+		return (*so->so_proto->pr_usrreqs->pru_connect)(so, nam);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_accept(struct socket *so, struct mbuf *nam)
+{
+	if (so->so_proto->pr_usrreqs->pru_accept)
+		return (*so->so_proto->pr_usrreqs->pru_accept)(so, nam);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_disconnect(struct socket *so)
+{
+	if (so->so_proto->pr_usrreqs->pru_disconnect)
+		return (*so->so_proto->pr_usrreqs->pru_disconnect)(so);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_shutdown(struct socket *so)
+{
+	return (*so->so_proto->pr_usrreqs->pru_shutdown)(so);
+}
+
+static inline int
+pru_rcvd(struct socket *so)
+{
+	if (so->so_proto->pr_usrreqs->pru_rcvd)
+		return (*so->so_proto->pr_usrreqs->pru_rcvd)(so);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_send(struct socket *so, struct mbuf *top, struct mbuf *addr,
+    struct mbuf *control)
+{
+	return (*so->so_proto->pr_usrreqs->pru_send)(so, top, addr, control);
+}
+
+static inline int
+pru_abort(struct socket *so)
+{
+	return (*so->so_proto->pr_usrreqs->pru_abort)(so);
+}
+
+static inline int
+pru_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
+{
+	if (so->so_proto->pr_usrreqs->pru_control)
+		return (*so->so_proto->pr_usrreqs->pru_control)(so,
+		    cmd, data, ifp);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_sense(struct socket *so, struct stat *ub)
+{
+	if (so->so_proto->pr_usrreqs->pru_sense)
+		return (*so->so_proto->pr_usrreqs->pru_sense)(so, ub);
+	return (0);
+}
+
+static inline int
+pru_rcvoob(struct socket *so, struct mbuf *m, int flags)
+{
+	if (so->so_proto->pr_usrreqs->pru_rcvoob)
+		return (*so->so_proto->pr_usrreqs->pru_rcvoob)(so, m, flags);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_sendoob(struct socket *so, struct mbuf *top, struct mbuf *addr,
+    struct mbuf *control)
+{
+	if (so->so_proto->pr_usrreqs->pru_sendoob)
+		return (*so->so_proto->pr_usrreqs->pru_sendoob)(so,
+		    top, addr, control);
+	m_freem(top);
+	m_freem(control);
+	return (EOPNOTSUPP);
+}
+
+static inline int
+pru_sockaddr(struct socket *so, struct mbuf *addr)
+{
+	return (*so->so_proto->pr_usrreqs->pru_usrreq)(so,
+	    PRU_SOCKADDR, NULL, addr, NULL, curproc);
+}
+
+static inline int
+pru_peeraddr(struct socket *so, struct mbuf *addr)
+{
+	return (*so->so_proto->pr_usrreqs->pru_usrreq)(so,
+	    PRU_PEERADDR, NULL, addr, NULL, curproc);
+}
+
+static inline int
+pru_connect2(struct socket *so1, struct socket *so2)
+{
+	if (so1->so_proto->pr_usrreqs->pru_connect2)
+		return (*so1->so_proto->pr_usrreqs->pru_connect2)(so1, so2);
+	return (EOPNOTSUPP);
+}
 
 #endif

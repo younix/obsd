@@ -2,12 +2,12 @@
 /Makefile.inc/1.6/Thu Nov 28 00:17:12 2019//
 /cons.c/1.2/Tue Feb 16 21:28:39 2010//
 /devopen.c/1.1/Sun Feb 14 22:39:33 2010//
-/exec.c/1.4/Wed Apr 10 04:17:35 2019//
 /machdep.c/1.8/Sun Jul 13 09:26:08 2014//
-/conf.c/1.16/Sat May  1 08:41:51 2021//
 /dev.c/1.11/Sat May  1 08:41:51 2021//
 /libsa.h/1.7/Sat May  1 08:41:51 2021//
 /rd.c/1.5/Sat May  1 08:41:51 2021//
 /ld.script/1.2/Wed Sep  1 16:07:38 2021//
 /start.S/1.4/Wed Sep  1 16:07:38 2021//
+/conf.c/1.17/Fri Sep  2 14:00:19 2022//
+/exec.c/1.5/Fri Sep  2 14:00:19 2022//
 D

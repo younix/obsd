@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.375 2022/07/28 22:05:39 bluhm Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.381 2022/08/29 14:43:56 bluhm Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -138,7 +138,6 @@ static struct mbuf_queue	ipsendraw_mq;
 extern struct niqueue		arpinq;
 
 int	ip_ours(struct mbuf **, int *, int, int);
-int	ip_local(struct mbuf **, int *, int, int);
 int	ip_dooptions(struct mbuf *, struct ifnet *);
 int	in_ouraddr(struct mbuf *, struct ifnet *, struct rtentry **);
 
@@ -233,8 +232,8 @@ ip_init(void)
 
 /*
  * Enqueue packet for local delivery.  Queuing is used as a boundary
- * between the network layer (input/forward path) running with shared
- * NET_RLOCK_IN_SOFTNET() and the transport layer needing it exclusively.
+ * between the network layer (input/forward path) running with
+ * NET_LOCK_SHARED() and the transport layer needing it exclusively.
  */
 int
 ip_ours(struct mbuf **mp, int *offp, int nxt, int af)
@@ -245,7 +244,7 @@ ip_ours(struct mbuf **mp, int *offp, int nxt, int af)
 
 	/* We are already in a IPv4/IPv6 local deliver loop. */
 	if (af != AF_UNSPEC)
-		return ip_local(mp, offp, nxt, af);
+		return nxt;
 
 	niq_enqueue(&ipintrq, *mp);
 	*mp = NULL;
@@ -254,20 +253,26 @@ ip_ours(struct mbuf **mp, int *offp, int nxt, int af)
 
 /*
  * Dequeue and process locally delivered packets.
+ * This is called with exclusive NET_LOCK().
  */
 void
 ipintr(void)
 {
 	struct mbuf *m;
-	int off, nxt;
 
 	while ((m = niq_dequeue(&ipintrq)) != NULL) {
+		struct ip *ip;
+		int off, nxt;
+
 #ifdef DIAGNOSTIC
 		if ((m->m_flags & M_PKTHDR) == 0)
 			panic("ipintr no HDR");
 #endif
-		off = 0;
-		nxt = ip_local(&m, &off, IPPROTO_IPV4, AF_UNSPEC);
+		ip = mtod(m, struct ip *);
+		off = ip->ip_hl << 2;
+		nxt = ip->ip_p;
+
+		nxt = ip_deliver(&m, &off, nxt, AF_INET);
 		KASSERT(nxt == IPPROTO_DONE);
 	}
 }
@@ -551,33 +556,14 @@ ip_input_if(struct mbuf **mp, int *offp, int nxt, int af, struct ifnet *ifp)
 	return nxt;
 }
 
-/*
- * IPv4 local-delivery routine.
- *
- * If fragmented try to reassemble.  Pass to next level.
- */
-int
-ip_local(struct mbuf **mp, int *offp, int nxt, int af)
-{
-	struct ip *ip;
-
-	ip = mtod(*mp, struct ip *);
-	*offp = ip->ip_hl << 2;
-	nxt = ip->ip_p;
-
-	/* Check whether we are already in a IPv4/IPv6 local deliver loop. */
-	if (af == AF_UNSPEC)
-		nxt = ip_deliver(mp, offp, nxt, AF_INET);
-	return nxt;
-}
-
 int
 ip_fragcheck(struct mbuf **mp, int *offp)
 {
 	struct ip *ip;
 	struct ipq *fp;
 	struct ipqent *ipqe;
-	int mff, hlen;
+	int hlen;
+	uint16_t mff;
 
 	ip = mtod(*mp, struct ip *);
 	hlen = ip->ip_hl << 2;
@@ -695,19 +681,7 @@ ip_deliver(struct mbuf **mp, int *offp, int nxt, int af)
 	int nest = 0;
 #endif /* INET6 */
 
-	NET_ASSERT_WLOCKED();
-
-	/* pf might have modified stuff, might have to chksum */
-	switch (af) {
-	case AF_INET:
-		in_proto_cksum_out(*mp, NULL);
-		break;
-#ifdef INET6
-	case AF_INET6:
-		in6_proto_cksum_out(*mp, NULL);
-		break;
-#endif /* INET6 */
-	}
+	NET_ASSERT_LOCKED_EXCLUSIVE();
 
 	/*
 	 * Tell launch routine the next header
@@ -1370,8 +1344,10 @@ save_rte(struct mbuf *m, u_char *option, struct in_addr dst)
 		return;
 
 	mtag = m_tag_get(PACKET_TAG_SRCROUTE, sizeof(*isr), M_NOWAIT);
-	if (mtag == NULL)
+	if (mtag == NULL) {
+		ipstat_inc(ips_idropped);
 		return;
+	}
 	isr = (struct ip_srcrt *)(mtag + 1);
 
 	memcpy(isr->isr_hdr, option, olen);
@@ -1404,8 +1380,10 @@ ip_srcroute(struct mbuf *m0)
 	if (isr->isr_nhops == 0)
 		return (NULL);
 	m = m_get(M_DONTWAIT, MT_SOOPTS);
-	if (m == NULL)
+	if (m == NULL) {
+		ipstat_inc(ips_idropped);
 		return (NULL);
+	}
 
 #define OPTSIZ	(sizeof(isr->isr_nop) + sizeof(isr->isr_hdr))
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.208 2022/06/27 10:18:27 job Exp $ */
+/*	$OpenBSD: main.c,v 1.215 2022/08/30 22:42:32 tb Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -475,13 +475,14 @@ queue_add_from_cert(const struct cert *cert)
  */
 static void
 entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
-    struct brk_tree *brktree)
+    struct brk_tree *brktree, struct vap_tree *vaptree)
 {
 	enum rtype	 type;
 	struct tal	*tal;
 	struct cert	*cert;
 	struct mft	*mft;
 	struct roa	*roa;
+	struct aspa	*aspa;
 	char		*file;
 	int		 c;
 
@@ -567,6 +568,21 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 		st->gbrs++;
 		break;
 	case RTYPE_FILE:
+		break;
+	case RTYPE_ASPA:
+		st->aspas++;
+		io_read_buf(b, &c, sizeof(c));
+		if (c == 0) {
+			st->aspas_fail++;
+			break;
+		}
+		aspa = aspa_read(b);
+		if (aspa->valid)
+			aspa_insert_vaps(vaptree, aspa, &st->vaps,
+			    &st->vaps_uniqs);
+		else
+			st->aspas_invalid++;
+		aspa_free(aspa);
 		break;
 	default:
 		errx(1, "unknown entity type %d", type);
@@ -674,16 +690,15 @@ load_skiplist(const char *slf)
 	struct skiplistentry	*sle;
 	FILE			*fp;
 	char			*line = NULL;
-	size_t			 linesize = 0, s;
-	ssize_t			 linelen;
+	size_t			 linesize = 0, linelen;
 
 	if ((fp = fopen(slf, "r")) == NULL) {
-		if (strcmp(slf, DEFAULT_SKIPLIST_FILE) != 0)
-			errx(1, "failed to open skiplist %s", slf);
-		return;
+		if (errno == ENOENT && strcmp(slf, DEFAULT_SKIPLIST_FILE) == 0)
+			return;
+		err(1, "failed to open %s", slf);
 	}
 
-	while ((linelen = getline(&line, &linesize, fp)) != -1) {
+	while (getline(&line, &linesize, fp) != -1) {
 		/* just eat comment lines or empty lines*/
 		if (line[0] == '#' || line[0] == '\n')
 			continue;
@@ -695,12 +710,11 @@ load_skiplist(const char *slf)
 		 * Ignore anything after comment sign, whitespaces,
 		 * also chop off LF or CR.
 		 */
-		line[strcspn(line, " #\r\n\t")] = 0;
+		linelen = strcspn(line, " #\r\n\t");
+		line[linelen] = '\0';
 
-		for (s = 0; s < strlen(line); s++)
-			if (!isalnum((unsigned char)line[s]) &&
-			    !ispunct((unsigned char)line[s]))
-				errx(1, "invalid entry in skiplist: %s", line);
+		if (!valid_uri(line, linelen, NULL))
+			errx(1, "invalid entry in skiplist: %s", line);
 
 		if ((sle = malloc(sizeof(struct skiplistentry))) == NULL)
 			err(1, NULL);
@@ -793,6 +807,7 @@ main(int argc, char *argv[])
 	const char	*skiplistfile = NULL;
 	struct vrp_tree	 vrps = RB_INITIALIZER(&vrps);
 	struct brk_tree	 brks = RB_INITIALIZER(&brks);
+	struct vap_tree	 vaps = RB_INITIALIZER(&vaps);
 	struct rusage	 ru;
 	struct timeval	 start_time, now_time;
 
@@ -1006,8 +1021,7 @@ main(int argc, char *argv[])
 		signal(SIGALRM, suicide);
 	}
 
-	/* TODO unveil cachedir and outputdir, no other access allowed */
-	if (pledge("stdio rpath wpath cpath fattr sendfd", NULL) == -1)
+	if (pledge("stdio rpath wpath cpath fattr sendfd unveil", NULL) == -1)
 		err(1, "pledge");
 
 	msgbuf_init(&procq);
@@ -1048,7 +1062,17 @@ main(int argc, char *argv[])
 	if (filemode) {
 		while (*argv != NULL)
 			queue_add_file(*argv++, RTYPE_FILE, 0);
+
+		if (unveil(cachedir, "r") == -1)
+			err(1, "unveil cachedir");
+	} else {
+		if (unveil(outputdir, "rwc") == -1)
+			err(1, "unveil outputdir");
+		if (unveil(cachedir, "rwc") == -1)
+			err(1, "unveil cachedir");
 	}
+	if (pledge("stdio rpath wpath cpath fattr sendfd", NULL) == -1)
+		err(1, "unveil");
 
 	/* change working directory to the cache directory */
 	if (fchdir(cachefd) == -1)
@@ -1065,7 +1089,7 @@ main(int argc, char *argv[])
 
 		polltim = repo_check_timeout(INFTIM);
 
-		if ((c = poll(pfd, NPFD, polltim)) == -1) {
+		if (poll(pfd, NPFD, polltim) == -1) {
 			if (errno == EINTR)
 				continue;
 			err(1, "poll");
@@ -1150,7 +1174,7 @@ main(int argc, char *argv[])
 		if ((pfd[0].revents & POLLIN)) {
 			b = io_buf_read(proc, &procbuf);
 			if (b != NULL) {
-				entity_process(b, &stats, &vrps, &brks);
+				entity_process(b, &stats, &vrps, &brks, &vaps);
 				ibuf_free(b);
 			}
 		}
@@ -1233,7 +1257,7 @@ main(int argc, char *argv[])
 	if (fchdir(outdirfd) == -1)
 		err(1, "fchdir output dir");
 
-	if (outputfiles(&vrps, &brks, &stats))
+	if (outputfiles(&vrps, &brks, &vaps, &stats))
 		rc = 1;
 
 	printf("Processing time %lld seconds "
@@ -1244,6 +1268,8 @@ main(int argc, char *argv[])
 	printf("Skiplist entries: %zu\n", stats.skiplistentries);
 	printf("Route Origin Authorizations: %zu (%zu failed parse, %zu invalid)\n",
 	    stats.roas, stats.roas_fail, stats.roas_invalid);
+	printf("AS Provider Attestations: %zu (%zu failed parse, %zu invalid)\n",
+	    stats.aspas, stats.aspas_fail, stats.aspas_invalid);
 	printf("BGPsec Router Certificates: %zu\n", stats.brks);
 	printf("Certificates: %zu (%zu invalid)\n",
 	    stats.certs, stats.certs_fail);
@@ -1257,6 +1283,7 @@ main(int argc, char *argv[])
 	printf("Cleanup: removed %zu files, %zu directories, %zu superfluous\n",
 	    stats.del_files, stats.del_dirs, stats.extra_files);
 	printf("VRP Entries: %zu (%zu unique)\n", stats.vrps, stats.uniqs);
+	printf("VAP Entries: %zu (%zu unique)\n", stats.vaps, stats.vaps_uniqs);
 
 	/* Memory cleanup. */
 	repo_free();
@@ -1269,6 +1296,7 @@ usage:
 	    " [-e rsync_prog]\n"
 	    "                   [-S skiplist] [-s timeout] [-T table] [-t tal]"
 	    " [outputdir]\n"
-	    "       rpki-client [-Vv] [-d cachedir] [-t tal] -f file ...\n");
+	    "       rpki-client [-Vv] [-d cachedir] [-j] [-t tal] -f file ..."
+	    "\n");
 	return 1;
 }
