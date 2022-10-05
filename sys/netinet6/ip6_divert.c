@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip6_divert.c,v 1.83 2022/09/02 13:12:32 mvs Exp $ */
+/*      $OpenBSD: ip6_divert.c,v 1.87 2022/10/03 16:43:52 bluhm Exp $ */
 
 /*
  * Copyright (c) 2009 Michele Marchetto <michele@openbsd.org>
@@ -64,14 +64,17 @@ const struct sysctl_bounded_args divert6ctl_vars[] = {
 };
 
 const struct pr_usrreqs divert6_usrreqs = {
-	.pru_usrreq	= divert6_usrreq,
 	.pru_attach	= divert6_attach,
 	.pru_detach	= divert6_detach,
+	.pru_lock	= divert6_lock,
+	.pru_unlock	= divert6_unlock,
 	.pru_bind	= divert6_bind,
 	.pru_shutdown	= divert6_shutdown,
 	.pru_send	= divert6_send,
 	.pru_abort	= divert6_abort,
 	.pru_control	= in6_control,
+	.pru_sockaddr	= in6_sockaddr,
+	.pru_peeraddr	= in6_peeraddr,
 };
 
 int divb6hashsize = DIVERTHASHSIZE;
@@ -257,51 +260,8 @@ divert6_packet(struct mbuf *m, int dir, u_int16_t divert_port)
 	m_freem(m);
 }
 
-/*ARGSUSED*/
 int
-divert6_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
-    struct mbuf *control, struct proc *p)
-{
-	struct inpcb *inp = sotoinpcb(so);
-	int error = 0;
-
-	soassertlocked(so);
-
-	if (inp == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-	switch (req) {
-
-	case PRU_SOCKADDR:
-		in6_setsockaddr(inp, addr);
-		break;
-
-	case PRU_PEERADDR:
-		in6_setpeeraddr(inp, addr);
-		break;
-
-	case PRU_FASTTIMO:
-	case PRU_SLOWTIMO:
-	case PRU_PROTORCV:
-	case PRU_PROTOSEND:
-		error =  EOPNOTSUPP;
-		break;
-
-	default:
-		panic("%s", __func__);
-	}
-
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-int
-divert6_attach(struct socket *so, int proto)
+divert6_attach(struct socket *so, int proto, int wait)
 {
 	int error;
 
@@ -311,7 +271,7 @@ divert6_attach(struct socket *so, int proto)
 	if ((so->so_state & SS_PRIV) == 0)
 		return EACCES;
 
-	error = in_pcballoc(so, &divb6table);
+	error = in_pcballoc(so, &divb6table, wait);
 	if (error)
 		return (error);
 
@@ -335,6 +295,24 @@ divert6_detach(struct socket *so)
 	in_pcbdetach(inp);
 
 	return (0);
+}
+
+void
+divert6_lock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_enter(&inp->inp_mtx);
+}
+
+void
+divert6_unlock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_leave(&inp->inp_mtx);
 }
 
 int

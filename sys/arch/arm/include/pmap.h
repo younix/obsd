@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.49 2019/12/19 17:53:27 mpi Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.51 2022/09/12 19:28:19 miod Exp $	*/
 /*	$NetBSD: pmap.h,v 1.76 2003/09/06 09:10:46 rearnsha Exp $	*/
 
 /*
@@ -212,21 +212,15 @@ typedef struct pv_addr {
  * Flags that indicate attributes of pages or mappings of pages.
  *
  * The PVF_MOD and PVF_REF flags are stored in the mdpage for each
- * page.  PVF_WIRED, PVF_WRITE, and PVF_NC are kept in individual
- * pv_entry's for each page.  They live in the same "namespace" so
- * that we can clear multiple attributes at a time.
- *
- * Note the "non-cacheable" flag generally means the page has
- * multiple mappings in a given address space.
+ * page.  PVF_WIRED and PVF_WRITE are kept in individual pv_entry's
+ * for each page.  They live in the same "namespace" so that we can
+ * clear multiple attributes at a time.
  */
 #define	PVF_MOD		0x01		/* page is modified */
 #define	PVF_REF		0x02		/* page is referenced */
 #define	PVF_WIRED	0x04		/* mapping is wired */
 #define	PVF_WRITE	0x08		/* mapping is writable */
 #define	PVF_EXEC	0x10		/* mapping is executable */
-#define	PVF_UNC		0x20		/* mapping is 'user' non-cacheable */
-#define	PVF_KNC		0x40		/* mapping is 'kernel' non-cacheable */
-#define	PVF_NC		(PVF_UNC|PVF_KNC)
 
 /*
  * Commonly referenced structures
@@ -645,24 +639,12 @@ extern uint32_t pmap_alias_bits;
 struct vm_page_md {
 	struct pv_entry *pvh_list;		/* pv_entry list */
 	int pvh_attrs;				/* page attributes */
-	u_int uro_mappings;
-	u_int urw_mappings;
-	union {
-		u_short s_mappings[2];	/* Assume kernel count <= 65535 */
-		u_int i_mappings;
-	} k_u;
-#define	kro_mappings	k_u.s_mappings[0]
-#define	krw_mappings	k_u.s_mappings[1]
-#define	k_mappings	k_u.i_mappings
 };
 
 #define	VM_MDPAGE_INIT(pg)						\
 do {									\
 	(pg)->mdpage.pvh_list = NULL;					\
 	(pg)->mdpage.pvh_attrs = 0;					\
-	(pg)->mdpage.uro_mappings = 0;					\
-	(pg)->mdpage.urw_mappings = 0;					\
-	(pg)->mdpage.k_mappings = 0;					\
 } while (/*CONSTCOND*/0)
 #endif /* _LOCORE */
 

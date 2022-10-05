@@ -82,6 +82,6 @@ D/i2c////
 /drm_connector.h/1.6/Tue Jul 26 13:42:35 2022//
 /drm_dp_helper.h/1.5/Tue Jul 26 13:42:35 2022//
 /drm_edid.h/1.6/Tue Jul 26 13:42:35 2022//
-/drm_bridge.h/1.5/Fri Sep  2 14:00:23 2022//
 /drm_of.h/1.1/Thu Aug 18 00:55:32 2022//
 /i915_pciids.h/1.14/Fri Sep  2 14:00:23 2022//
+/drm_bridge.h/1.6/Tue Sep 20 07:19:41 2022//

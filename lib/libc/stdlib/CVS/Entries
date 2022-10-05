@@ -10,15 +10,10 @@
 /alloca.3/1.14/Sat Jan 17 18:01:43 2015//
 /atexit.c/1.27/Sat Dec 16 20:06:56 2017//
 /atexit.h/1.12/Sat Dec 16 20:06:56 2017//
-/atof.3/1.9/Wed Jan 16 12:55:49 2019//
 /atof.c/1.5/Mon Aug  8 08:05:36 2005//
-/atoi.3/1.12/Thu Sep 10 15:16:43 2015//
 /atoi.c/1.6/Sun Sep 13 08:31:47 2015//
-/atol.3/1.10/Thu Sep 10 15:16:43 2015//
 /atol.c/1.5/Mon Aug  8 08:05:36 2005//
-/atoll.3/1.8/Thu Sep 10 15:16:43 2015//
 /bsearch.3/1.10/Mon Nov 30 17:03:05 2015//
-/div.3/1.12/Sun Aug 14 23:18:03 2016//
 /div.c/1.6/Sun Sep 13 08:31:47 2015//
 /drand48.c/1.7/Mon Sep 14 13:30:17 2015//
 /ecvt.3/1.13/Fri Jan 25 00:19:25 2019//
@@ -36,7 +31,6 @@
 /icdb_new.3/1.2/Sun Sep  4 19:05:09 2016//
 /imaxabs.3/1.8/Fri Jan 18 07:32:17 2019//
 /imaxabs.c/1.1/Fri Jan 13 17:58:09 2006//
-/imaxdiv.3/1.7/Sun Aug 14 23:18:03 2016//
 /imaxdiv.c/1.1/Fri Jan 13 17:58:09 2006//
 /insque.3/1.12/Sun Apr 26 16:36:14 2020//
 /insque.c/1.3/Fri Aug 15 04:14:36 2014//
@@ -45,10 +39,8 @@
 /labs.3/1.17/Fri Jan 18 07:32:17 2019//
 /labs.c/1.5/Mon Aug  8 08:05:36 2005//
 /lcong48.c/1.6/Sun Sep 13 08:31:47 2015//
-/ldiv.3/1.13/Sun Aug 14 23:18:03 2016//
 /ldiv.c/1.5/Mon Aug  8 08:05:36 2005//
 /llabs.c/1.4/Sun Aug 14 23:18:03 2016//
-/lldiv.3/1.8/Tue Aug  1 14:57:02 2017//
 /lldiv.c/1.2/Sun Aug 14 23:18:03 2016//
 /lrand48.c/1.5/Thu Aug 27 04:33:31 2015//
 /lsearch.3/1.14/Mon Nov 30 17:03:05 2015//
@@ -71,12 +63,10 @@
 /remque.c/1.3/Fri Aug 15 04:14:36 2014//
 /seed48.c/1.6/Sun Sep 13 15:20:40 2015//
 /srand48.c/1.6/Sun Sep 13 08:31:48 2015//
-/strtod.3/1.22/Wed Jan 16 12:55:49 2019//
 /strtoimax.c/1.4/Thu Jul  6 16:23:11 2017//
 /strtol.3/1.27/Tue Apr 14 22:16:03 2015//
 /strtol.c/1.12/Thu Jul  6 16:23:11 2017//
 /strtoll.c/1.10/Thu Jul  6 16:23:11 2017//
-/strtonum.3/1.18/Sun Feb  7 20:50:24 2016//
 /strtonum.c/1.8/Sun Sep 13 08:31:48 2015//
 /strtoul.3/1.24/Sun Nov 30 21:21:59 2014//
 /strtoul.c/1.11/Thu Jul  6 16:23:11 2017//
@@ -92,7 +82,6 @@
 /realpath.3/1.26/Wed Oct 20 17:28:43 2021//
 /atoll.c/1.4/Mon Nov 15 19:06:15 2021//
 /bsearch.c/1.9/Mon Jan 24 14:35:13 2022//
-/getopt_long.3/1.24/Mon Jan 24 14:35:13 2022//
 /lsearch.c/1.7/Mon Jan 24 14:35:13 2022//
 /atexit.3/1.13/Mon Jun 27 13:01:59 2022//
 /getopt.3/1.48/Mon Aug  1 07:15:36 2022//
@@ -105,4 +94,15 @@
 /getsubopt.3/1.16/Fri Sep  2 14:00:04 2022//
 /radixsort.3/1.14/Fri Sep  2 14:00:04 2022//
 /setenv.c/1.20/Fri Sep  2 14:00:04 2022//
+/atof.3/1.10/Tue Sep 20 07:19:20 2022//
+/atoi.3/1.13/Tue Sep 20 07:19:20 2022//
+/atol.3/1.11/Tue Sep 20 07:19:20 2022//
+/atoll.3/1.9/Tue Sep 20 07:19:20 2022//
+/div.3/1.13/Tue Sep 20 07:19:20 2022//
+/getopt_long.3/1.25/Tue Sep 20 07:19:20 2022//
+/imaxdiv.3/1.8/Tue Sep 20 07:19:20 2022//
+/ldiv.3/1.14/Tue Sep 20 07:19:20 2022//
+/lldiv.3/1.9/Tue Sep 20 07:19:20 2022//
+/strtod.3/1.23/Tue Sep 20 07:19:21 2022//
+/strtonum.3/1.19/Tue Sep 20 07:19:21 2022//
 D

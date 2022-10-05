@@ -1,4 +1,4 @@
-/*	$OpenBSD: aspa.c,v 1.1 2022/08/30 18:56:49 job Exp $ */
+/*	$OpenBSD: aspa.c,v 1.4 2022/09/05 18:07:04 tb Exp $ */
 /*
  * Copyright (c) 2022 Job Snijders <job@fastly.com>
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
@@ -90,8 +90,6 @@ aspa_parse_providers(struct parse *p, const STACK_OF(ProviderAS) *providers)
 	struct aspa_provider	 provider;
 	size_t			 providersz, i;
 
-	memset(&provider, 0, sizeof(provider));
-
 	if ((providersz = sk_ProviderAS_num(providers)) == 0) {
 		warnx("%s: ASPA: ProviderASSet needs at least one entry",
 		    p->fn);
@@ -110,6 +108,8 @@ aspa_parse_providers(struct parse *p, const STACK_OF(ProviderAS) *providers)
 
 	for (i = 0; i < providersz; i++) {
 		pa = sk_ProviderAS_value(providers, i);
+
+		memset(&provider, 0, sizeof(provider));
 
 		if (!as_id_parse(pa->providerASID, &provider.as)) {
 			warnx("%s: ASPA: malformed ProviderAS", p->fn);
@@ -230,6 +230,11 @@ aspa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 		goto out;
 	}
 
+	if (x509_any_inherits(*x509)) {
+		warnx("%s: inherit elements not allowed", fn);
+		goto out;
+	}
+
 	if (!aspa_parse_econtent(cms, cmsz, &p))
 		goto out;
 
@@ -246,6 +251,7 @@ aspa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 		X509_free(*x509);
 		*x509 = NULL;
 	}
+	cert_free(cert);
 	free(cms);
 	return p.res;
 }

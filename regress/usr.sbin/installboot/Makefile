@@ -1,9 +1,8 @@
-#	$OpenBSD: Makefile,v 1.17 2022/09/01 17:23:36 kn Exp $
+#	$OpenBSD: Makefile,v 1.33 2022/09/17 09:30:18 kn Exp $
 
 INSTALLBOOT ?=		/usr/sbin/installboot
 DRY_RUN =		${INSTALLBOOT} -n
 REAL_RUN =		${INSTALLBOOT}
-
 
 # see distrib/${MACHINE}/ramdisk/install.md for FORMAT_DISK values
 # default to root on softraid(4) on all architectures that have
@@ -14,84 +13,84 @@ FORMAT_DISK =		fdisk -iy
 STAGENAMES =		biosboot boot
 USE_SOFTRAID ?=		Yes
 .elif ${MACHINE} == "arm64"
-FORMAT_DISK =		fdisk -g -y -b32768
 STAGENAMES =		BOOTAA64.EFI
 USE_SOFTRAID ?=		Yes
 .elif ${MACHINE} == "armv7"
-FORMAT_DISK =		fdisk -g -y -b32768@32768:C
 STAGENAMES =		BOOTARM.EFI
-USE_SOFTRAID ?=		No
 .elif ${MACHINE} == "macppc"	# assume MBR
-FORMAT_DISK =		fdisk -iy -b2048@1:06
+FORMAT_DISK =		fdisk -iy -b '2048@1:06'
 STAGENAMES =		ofwboot
-USE_SOFTRAID ?=		No
-.elif ${MACHINE} == "powerpc64"
-FORMAT_DISK =		fdisk -iy -b32768@32768:C
+.elif ${MACHINE} == "octeon"
+FORMAT_DISK =		fdisk -iy -b '65536@64:C'
 STAGENAMES =		boot
-USE_SOFTRAID ?=		No
+.elif ${MACHINE} == "powerpc64"
+STAGENAMES =		boot
 .elif ${MACHINE} == "riscv64"
-FORMAT_DISK =		fdisk -g -y -b32768@32768:C
 STAGENAMES =		BOOTRISCV64.EFI
-USE_SOFTRAID ?=		No
 .elif ${MACHINE} == "sparc64"
 FORMAT_DISK =		true	# NOOP
 STAGENAMES =		bootblk ofwboot
 USE_SOFTRAID ?=		Yes
+.else
+# missing: alpha, hppa, landisk, loongson, luna88k
+regress:
+	@echo SKIPPED
 .endif
 
+FORMAT_DISK ?=		fdisk -iy -b '32768@32768:C'
 STAGEDIR =		/usr/mdec
 STAGEFILES =		${STAGENAMES:=${STAGEDIR}/%}
+USE_SOFTRAID ?=		No
 
 .if ${USE_SOFTRAID:L} == "yes"
-# installboot(8) behaviour for multi-chunk softraid(4) differs across platforms
-NDISKS ?=		1 2
+# install on multi-chunk RAID 1C with keydisk so installboot(8) must
+# - iterate over chunks
+# - ignore the keydisk/not install to it
+NDISKS ?=		2
+KEYDISKFILE =		keydisk.img
+KEYDEVFILE =		keydev.txt
 .else
 NDISKS =		1
 .endif
-DISKFILES =		${NDISKS:=disk%.img}
-DISKDEVFILES =		${NDISKS:=diskdev%.txt}
+
+DISKFILES !=		jot -w disk%d.img    -- ${NDISKS}
+DISKDEVFILES !=		jot -w diskdev%d.txt -- ${NDISKS}
 ROOTDEVFILE =		rootdev.txt
 MOUNTPOINT =		mnt
 
 
-REGRESS_SETUP_ONCE =	copy-bootstrap-to-root
+REGRESS_SETUP_ONCE =	create-root
 
+# |1.img ... n.img|    |1.img 1.txt|
+# |1.txt ... n.txt| => |...   ...  |
+#                      |n.img n.txt|
+FILETUPLES !=		{ echo ${DISKFILES}    ${KEYDISKFILE}; \
+			  echo ${DISKDEVFILES} ${KEYDEVFILE} ; } | \
+				rs -T -- $$((${NDISKS} + 1)) 2
 create-disks:
-.for n in ${NDISKS}
-	dd if=/dev/zero  of=disk${n}.img bs=1m count=0 seek=64 status=none
-	${SUDO} vnconfig -- disk${n}.img 1>diskdev${n}.txt
-.endfor
-
-format-disks: create-disks
-.for devfile in ${DISKDEVFILES}
+.for diskfile devfile in ${FILETUPLES}
+	dd if=/dev/zero  of=${diskfile} bs=1m count=0 seek=128 status=none
+	${SUDO} vnconfig -- ${diskfile} 1>${devfile}
 	${SUDO} ${FORMAT_DISK} -- "$$(<${devfile})" 1>/dev/null
 .  if ${USE_SOFTRAID:L} == "yes"
-	printf 'a\n\n\n\nRAID\nw\nq\n' | \
-		${SUDO} disklabel -E -- "$$(<${devfile})" 1>/dev/null
+	echo 'RAID 1M-* 100%' | \
+		${SUDO} disklabel -wAT/dev/stdin -- "$$(<${devfile})" 1>/dev/null
 .  endif
 .endfor
 
-create-root: format-disks
+create-root: create-disks
 .if ${USE_SOFTRAID:L} == "yes"
 	${SUDO} bioctl -l"$$(sed -- s/$$/a/ ${DISKDEVFILES} | paste -sd, -- -)" \
-	    -cc -- softraid0 | \
+	    -c1C -k"$$(<${KEYDEVFILE})"a -- softraid0 | \
 		awk -- '{ print $$NF }' 1>${ROOTDEVFILE}
+	${SUDO} ${FORMAT_DISK} -- "$$(<${ROOTDEVFILE})" 1>/dev/null
 .else
 	ln -s -- ${DISKDEVFILES} ${ROOTDEVFILE}
 .endif
-
-format-root: create-root
-.if ${USE_SOFTRAID:L} == "yes"
-	${SUDO} ${FORMAT_DISK} -- "$$(<${ROOTDEVFILE})" 1>/dev/null
-.endif
 	${SUDO} disklabel -Aw -- "$$(<${ROOTDEVFILE})"
 	${SUDO} newfs -q -- "$$(<${ROOTDEVFILE})"a 1>/dev/null
-
-mount-root: format-root
 	mkdir -- ${MOUNTPOINT}
 	${SUDO} mount -- /dev/"$$(<${ROOTDEVFILE})"a ${MOUNTPOINT}
-
-copy-bootstrap-to-root: mount-root
 	${SUDO} mkdir -- ${MOUNTPOINT}/usr
 	${SUDO} cp -r -- ${STAGEDIR} ${MOUNTPOINT}/usr/
 
@@ -121,7 +120,6 @@ dry-default:
 dry-root:
 	${SUDO} ${DRY_RUN} -r/ -- "$$(<${ROOTDEVFILE})"
 
-# XXX fails with NDISKS > 1 on sparc64, 1 <= NDISKS <= 4 works on amd64
 root:
 	${SUDO} ${REAL_RUN} -r ${MOUNTPOINT} "$$(<${ROOTDEVFILE})"
 root-stages:
@@ -136,31 +134,32 @@ REGRESS_EXPECTED_FAILURES =	dry-prepare-root \
 REGRESS_TARGETS +=		${REGRESS_EXPECTED_FAILURES}
 
 dry-prepare-root:
-	${DRY_RUN} -p -r/ -- "$$(<${ROOTDEVFILE})"
+	${DRY_RUN} -p -r/ -- "$$(<${ROOTDEVFILE})" 2>/dev/null
 dry-prepare-stages:
-	${DRY_RUN} -p -- "$$(<${ROOTDEVFILE})" ${STAGEFILES}
+	${DRY_RUN} -p -- "$$(<${ROOTDEVFILE})" ${STAGEFILES} 2>/dev/null
 
 dry-nodisk-stages:
-	${SUDO} ${DRY_RUN} -- ${STAGEFILES}
+	${SUDO} ${DRY_RUN} -- ${STAGEFILES} 2>/dev/null
 
 dry-toofew:
-	${DRY_RUN} --
+	${DRY_RUN} -- 2>/dev/null
 dry-toomany:
-	${DRY_RUN} -- disk stage1 stage2 too many
+	${DRY_RUN} -- disk stage1 stage2 too many 2>/dev/null
 
 
-CLEANFILES =		${DISKFILES} ${DISKDEVFILES} ${ROOTDEVFILE}
+CLEANFILES =		*.txt *.img
 REGRESS_CLEANUP =	cleanup
 
 # allow failure to always cleanup as much as possible
+.IGNORE: cleanup
 cleanup:
-	-${SUDO} umount -- ${MOUNTPOINT} 2>/dev/null
-	-rmdir -- ${MOUNTPOINT} 2>/dev/null
+	${SUDO} umount -- ${MOUNTPOINT} 2>/dev/null
+	rmdir -- ${MOUNTPOINT} 2>/dev/null
 .if ${USE_SOFTRAID:L} == "yes"
-	-${SUDO} bioctl -d -- "$$(<${ROOTDEVFILE})" 2>/dev/null
+	${SUDO} bioctl -d -- "$$(<${ROOTDEVFILE})" 2>/dev/null
 .endif
-.for devfile in ${DISKDEVFILES}
-	-${SUDO} vnconfig -u -- "$$(<${devfile})" 2>/dev/null
+.for _ devfile in ${FILETUPLES}
+	${SUDO} vnconfig -u -- "$$(<${devfile})" 2>/dev/null
 .endfor
 
 .include <bsd.regress.mk>

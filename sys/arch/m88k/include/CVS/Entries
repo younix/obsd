@@ -22,7 +22,6 @@
 /mutex.h/1.8/Tue May 26 11:55:10 2020//
 /param.h/1.21/Fri Sep 14 13:58:20 2018//
 /pcb.h/1.8/Mon Oct  5 01:22:34 2015//
-/pmap.h/1.26/Sat Jul 25 20:45:05 2015//
 /pmap_table.h/1.5/Sat Nov 16 18:45:20 2013//
 /proc.h/1.8/Thu Apr 13 03:52:25 2017//
 /profile.h/1.7/Thu Feb 14 05:56:02 2013//
@@ -39,4 +38,5 @@
 /cpu.h/1.70/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.20/Thu Sep  2 14:22:31 2021//
 /atomic.h/1.16/Fri Sep  2 14:00:19 2022//
+/pmap.h/1.27/Tue Sep 20 07:19:38 2022//
 D

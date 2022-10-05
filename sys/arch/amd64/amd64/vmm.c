@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmm.c,v 1.321 2022/09/01 22:01:40 dv Exp $	*/
+/*	$OpenBSD: vmm.c,v 1.323 2022/09/07 18:44:09 dv Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -3522,7 +3522,9 @@ vcpu_reset_regs_vmx(struct vcpu *vcpu, struct vcpu_reg_state *vrs)
 	vmx_setmsrbrw(vcpu, MSR_FSBASE);
 	vmx_setmsrbrw(vcpu, MSR_GSBASE);
 	vmx_setmsrbrw(vcpu, MSR_KERNELGSBASE);
+	
 	vmx_setmsrbr(vcpu, MSR_MISC_ENABLE);
+	vmx_setmsrbr(vcpu, MSR_TSC);
 
 	/* XXX CR0 shadow */
 	/* XXX CR4 shadow */
@@ -6081,6 +6083,9 @@ svm_handle_inout(struct vcpu *vcpu)
 	/* Data */
 	vcpu->vc_exit.vei.vei_data = vmcb->v_rax;
 
+	TRACEPOINT(vmm, inout, vcpu, vcpu->vc_exit.vei.vei_port,
+	    vcpu->vc_exit.vei.vei_dir, vcpu->vc_exit.vei.vei_data);
+
 	vcpu->vc_gueststate.vg_rip += insn_length;
 
 	return (0);
@@ -6136,6 +6141,9 @@ vmx_handle_inout(struct vcpu *vcpu)
 	vcpu->vc_exit.vei.vei_port = (exit_qual & 0xFFFF0000) >> 16;
 	/* Data */
 	vcpu->vc_exit.vei.vei_data = (uint32_t)vcpu->vc_gueststate.vg_rax;
+
+	TRACEPOINT(vmm, inout, vcpu, vcpu->vc_exit.vei.vei_port,
+	    vcpu->vc_exit.vei.vei_dir, vcpu->vc_exit.vei.vei_data);
 
 	vcpu->vc_gueststate.vg_rip += insn_length;
 

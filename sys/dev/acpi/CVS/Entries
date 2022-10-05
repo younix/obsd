@@ -1,7 +1,5 @@
 /acpidebug.h/1.4/Tue Oct 24 19:01:48 2006//
 /acpidev.h/1.44/Fri Jun 29 17:39:18 2018//
-/amltypes.h/1.48/Thu Jan 10 18:50:32 2019//
-/efi.h/1.4/Sun Aug  4 09:27:09 2019//
 /smbus.h/1.1/Wed Feb 22 16:39:56 2017//
 /acpisbs.c/1.10/Fri Dec 11 17:58:22 2020//
 /acpiutil.c/1.9/Fri Dec 11 17:58:22 2020//
@@ -55,18 +53,19 @@
 /sdhc_acpi.c/1.21/Tue Jul 26 13:42:35 2022//
 /tipmic.c/1.7/Tue Jul 26 13:42:35 2022//
 /tpm.c/1.17/Tue Jul 26 13:42:35 2022//
-/xhci_acpi.c/1.8/Tue Jul 26 13:42:35 2022//
-/acpi.c/1.414/Fri Sep  2 14:00:21 2022//
 /acpidebug.c/1.33/Fri Sep  2 14:00:21 2022//
 /acpidock.c/1.46/Fri Sep  2 14:00:21 2022//
 /acpiec.c/1.65/Fri Sep  2 14:00:21 2022//
-/acpihpet.c/1.28/Fri Sep  2 14:00:21 2022//
 /acpipwrres.c/1.12/Fri Sep  2 14:00:21 2022//
 /acpitimer.c/1.16/Fri Sep  2 14:00:21 2022//
 /acpitz.c/1.59/Fri Sep  2 14:00:21 2022//
-/acpivar.h/1.121/Fri Sep  2 14:00:21 2022//
 /dwiic_acpi.c/1.20/Fri Sep  2 14:00:21 2022//
 /files.acpi/1.65/Fri Sep  2 14:00:21 2022//
-/qcgpio.c/1.1/Wed Aug 31 16:10:59 2022//
-/qciic.c/1.1/Wed Aug 31 16:10:59 2022//
+/acpi.c/1.418/Tue Sep 20 07:19:39 2022//
+/acpihpet.c/1.29/Tue Sep 20 07:19:39 2022//
+/acpivar.h/1.122/Tue Sep 20 07:19:39 2022//
+/amltypes.h/1.49/Tue Sep 20 07:19:39 2022//
+/qcgpio.c/1.6/Tue Sep 20 07:19:39 2022//
+/qciic.c/1.4/Tue Sep 20 07:19:39 2022//
+/xhci_acpi.c/1.10/Tue Sep 20 07:19:39 2022//
 D

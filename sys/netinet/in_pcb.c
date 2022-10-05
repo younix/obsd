@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.273 2022/08/30 11:53:04 bluhm Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.276 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -226,11 +226,12 @@ in_rootonly(u_int16_t port, u_int16_t proto)
 }
 
 int
-in_pcballoc(struct socket *so, struct inpcbtable *table)
+in_pcballoc(struct socket *so, struct inpcbtable *table, int wait)
 {
 	struct inpcb *inp;
 
-	inp = pool_get(&inpcb_pool, PR_NOWAIT|PR_ZERO);
+	inp = pool_get(&inpcb_pool, (wait == M_WAIT ? PR_WAITOK : PR_NOWAIT) |
+	    PR_ZERO);
 	if (inp == NULL)
 		return (ENOBUFS);
 	inp->inp_table = table;
@@ -663,6 +664,28 @@ in_setpeeraddr(struct inpcb *inp, struct mbuf *nam)
 	sin->sin_len = sizeof(*sin);
 	sin->sin_port = inp->inp_fport;
 	sin->sin_addr = inp->inp_faddr;
+}
+
+int
+in_sockaddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *inp;
+
+	inp = sotoinpcb(so);
+	in_setsockaddr(inp, nam);
+
+	return (0);
+}
+
+int
+in_peeraddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *inp;
+
+	inp = sotoinpcb(so);
+	in_setpeeraddr(inp, nam);
+
+	return (0);
 }
 
 /*

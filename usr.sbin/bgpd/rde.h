@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.h,v 1.270 2022/09/01 13:23:24 claudio Exp $ */
+/*	$OpenBSD: rde.h,v 1.273 2022/09/23 15:49:20 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Claudio Jeker <claudio@openbsd.org> and
@@ -99,6 +99,7 @@ struct rde_peer {
 	uint32_t			 remote_bgpid; /* host byte order! */
 	uint32_t			 up_nlricnt;
 	uint32_t			 up_wcnt;
+	uint32_t			 path_id_tx;
 	enum peer_state			 state;
 	enum export_type		 export_type;
 	uint16_t			 loc_rib_id;
@@ -389,7 +390,8 @@ void		rde_pftable_del(uint16_t, struct prefix *);
 
 int		rde_evaluate_all(void);
 void		rde_generate_updates(struct rib *, struct prefix *,
-		    struct prefix *, enum eval_mode);
+		    struct prefix *, struct prefix *, struct prefix *,
+		    enum eval_mode);
 uint32_t	rde_local_as(void);
 int		rde_decisionflags(void);
 void		rde_peer_send_rrefresh(struct rde_peer *, uint8_t, uint8_t);
@@ -570,6 +572,11 @@ int		 rib_dump_new(uint16_t, uint8_t, unsigned int, void *,
 		    void (*)(struct rib_entry *, void *),
 		    void (*)(void *, uint8_t),
 		    int (*)(void *));
+int		 rib_dump_subtree(uint16_t, struct bgpd_addr *, uint8_t,
+		    unsigned int count, void *arg,
+		    void (*)(struct rib_entry *, void *),
+		    void (*)(void *, uint8_t),
+		    int (*)(void *));
 void		 rib_dump_terminate(void *);
 
 static inline struct rib *
@@ -611,6 +618,10 @@ void		 prefix_adjout_dump(struct rde_peer *, void *,
 		    void (*)(struct prefix *, void *));
 int		 prefix_dump_new(struct rde_peer *, uint8_t, unsigned int,
 		    void *, void (*)(struct prefix *, void *),
+		    void (*)(void *, uint8_t), int (*)(void *));
+int		 prefix_dump_subtree(struct rde_peer *, struct bgpd_addr *,
+		    uint8_t, unsigned int, void *,
+		    void (*)(struct prefix *, void *),
 		    void (*)(void *, uint8_t), int (*)(void *));
 int		 prefix_write(u_char *, int, struct bgpd_addr *, uint8_t, int);
 int		 prefix_writebuf(struct ibuf *, struct bgpd_addr *, uint8_t);
@@ -690,6 +701,9 @@ void		 up_generate_updates(struct filter_head *, struct rde_peer *,
 		    struct prefix *, struct prefix *);
 void		 up_generate_addpath(struct filter_head *, struct rde_peer *,
 		    struct prefix *, struct prefix *);
+void		 up_generate_addpath_all(struct filter_head *,
+		    struct rde_peer *, struct prefix *, struct prefix *,
+		    struct prefix *);
 void		 up_generate_default(struct filter_head *, struct rde_peer *,
 		    uint8_t);
 int		 up_is_eor(struct rde_peer *, uint8_t);

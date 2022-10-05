@@ -106,7 +106,7 @@ struct page_size_map {
 	u_int64_t use;
 #endif
 };
-extern struct page_size_map page_size_map[];
+extern const struct page_size_map page_size_map[];
 
 struct pmap {
 	struct mutex pm_mtx;
@@ -176,6 +176,8 @@ void pmap_bootstrap(u_long, u_long, u_int, u_int);
 #define PMAP_PREFER_OFFSET(of)	((of) & VA_ALIAS_MASK)
 
 #define PMAP_GROWKERNEL         /* turn on pmap_growkernel interface */
+
+#define	__HAVE_PMAP_COLLECT
 
 /* SPARC specific? */
 void		pmap_redzone(void);

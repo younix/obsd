@@ -1,4 +1,4 @@
-#	$OpenBSD: install.md,v 1.32 2022/08/07 03:22:29 deraadt Exp $
+#	$OpenBSD: install.md,v 1.35 2022/09/26 00:20:14 kettenis Exp $
 #
 #
 # Copyright (c) 1996 The NetBSD Foundation, Inc.
@@ -55,6 +55,10 @@ md_installboot() {
 
 	case $_plat in
 	apple)
+		if [[ -d /etc/firmware/apple ]]; then
+			(cd /etc/firmware
+				pax -rw apple /mnt/etc/firmware)
+		fi
 		if [[ -d /etc/firmware/apple-bwfm ]]; then
 			(cd /etc/firmware
 				pax -rw apple-bwfm /mnt/etc/firmware)
@@ -192,7 +196,7 @@ md_congrats() {
 }
 
 md_consoleinfo() {
-	local _fw
+	local _fw _fw2
 
 	DEFCONS=y
 	case $(scan_dmesg '/^\([^ ]*\).*: console.*std.*$/s//\1/p') in
@@ -211,13 +215,17 @@ md_consoleinfo() {
 	_fw=$(dmesgtail | sed -n '\!^bwfm0: failed!{s!^.*/\(.*\),.*$!\1!p;q;}')
 	case $(sysctl -n machdep.compatible) in
 	apple,*)
+		_fw2=$(sysctl -n machdep.compatible | sed 's/.*apple,//')
 		make_dev sd0
 		if mount -o ro /dev/sd0l /mnt2 2>/dev/null; then
-			rm -rf /usr/mdec/rpi /etc/firmware/brcm /etc/firmware/apple-bwfm
+			rm -rf /usr/mdec/rpi /etc/firmware/apple
+			rm -rf /etc/firmware/brcm /etc/firmware/apple-bwfm
 			if [[ -s /mnt2/vendorfw/firmware.tar ]]; then
 				tar -x -C /etc/firmware \
-				    -f /mnt2/vendorfw/firmware.tar "*$_fw*"
-				mv /etc/firmware/brcm /etc/firmware/apple-bwfm
+				    -f /mnt2/vendorfw/firmware.tar "*$_fw*" 2>/dev/null
+				tar -x -C /etc/firmware \
+				    -f /mnt2/vendorfw/firmware.tar "*$_fw2*" 2>/dev/null
+				mv /etc/firmware/brcm /etc/firmware/apple-bwfm 2>/dev/null
 			fi
 			umount /mnt2
 		fi

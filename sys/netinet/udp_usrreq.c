@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_usrreq.c,v 1.299 2022/09/02 13:12:32 mvs Exp $	*/
+/*	$OpenBSD: udp_usrreq.c,v 1.303 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: udp_usrreq.c,v 1.28 1996/03/16 23:54:03 christos Exp $	*/
 
 /*
@@ -123,9 +123,10 @@ u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
 					/* 40 1K datagrams */
 
 const struct pr_usrreqs udp_usrreqs = {
-	.pru_usrreq	= udp_usrreq,
 	.pru_attach	= udp_attach,
 	.pru_detach	= udp_detach,
+	.pru_lock	= udp_lock,
+	.pru_unlock	= udp_unlock,
 	.pru_bind	= udp_bind,
 	.pru_connect	= udp_connect,
 	.pru_disconnect	= udp_disconnect,
@@ -133,13 +134,16 @@ const struct pr_usrreqs udp_usrreqs = {
 	.pru_send	= udp_send,
 	.pru_abort	= udp_abort,
 	.pru_control	= in_control,
+	.pru_sockaddr	= in_sockaddr,
+	.pru_peeraddr	= in_peeraddr,
 };
 
 #ifdef INET6
 const struct pr_usrreqs udp6_usrreqs = {
-	.pru_usrreq	= udp_usrreq,
 	.pru_attach	= udp_attach,
 	.pru_detach	= udp_detach,
+	.pru_lock	= udp_lock,
+	.pru_unlock	= udp_unlock,
 	.pru_bind	= udp_bind,
 	.pru_connect	= udp_connect,
 	.pru_disconnect	= udp_disconnect,
@@ -147,6 +151,8 @@ const struct pr_usrreqs udp6_usrreqs = {
 	.pru_send	= udp_send,
 	.pru_abort	= udp_abort,
 	.pru_control	= in6_control,
+	.pru_sockaddr	= in6_sockaddr,
+	.pru_peeraddr	= in6_peeraddr,
 };
 #endif
 
@@ -1072,66 +1078,8 @@ release:
 	goto bail;
 }
 
-/*ARGSUSED*/
 int
-udp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
-    struct mbuf *control, struct proc *p)
-{
-	struct inpcb *inp;
-	int error = 0;
-
-	soassertlocked(so);
-
-	inp = sotoinpcb(so);
-	if (inp == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-
-	/*
-	 * Note: need to block udp_input while changing
-	 * the udp pcb queue and/or pcb addresses.
-	 */
-	switch (req) {
-
-	case PRU_SOCKADDR:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			in6_setsockaddr(inp, addr);
-		else
-#endif /* INET6 */
-			in_setsockaddr(inp, addr);
-		break;
-
-	case PRU_PEERADDR:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			in6_setpeeraddr(inp, addr);
-		else
-#endif /* INET6 */
-			in_setpeeraddr(inp, addr);
-		break;
-
-	case PRU_FASTTIMO:
-	case PRU_SLOWTIMO:
-	case PRU_PROTORCV:
-	case PRU_PROTOSEND:
-		error =  EOPNOTSUPP;
-		break;
-
-	default:
-		panic("udp_usrreq");
-	}
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-int
-udp_attach(struct socket *so, int proto)
+udp_attach(struct socket *so, int proto, int wait)
 {
 	int error;
 
@@ -1142,7 +1090,7 @@ udp_attach(struct socket *so, int proto)
 		return error;
 
 	NET_ASSERT_LOCKED();
-	if ((error = in_pcballoc(so, &udbtable)))
+	if ((error = in_pcballoc(so, &udbtable, wait)))
 		return error;
 #ifdef INET6
 	if (sotoinpcb(so)->inp_flags & INP_IPV6)
@@ -1166,6 +1114,24 @@ udp_detach(struct socket *so)
 
 	in_pcbdetach(inp);
 	return (0);
+}
+
+void
+udp_lock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_enter(&inp->inp_mtx);
+}
+
+void
+udp_unlock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_leave(&inp->inp_mtx);
 }
 
 int

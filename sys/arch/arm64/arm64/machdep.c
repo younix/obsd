@@ -1,4 +1,4 @@
-/* $OpenBSD: machdep.c,v 1.71 2022/08/29 17:13:57 kettenis Exp $ */
+/* $OpenBSD: machdep.c,v 1.74 2022/10/04 19:41:21 kettenis Exp $ */
 /*
  * Copyright (c) 2014 Patrick Wildt <patrick@blueri.se>
  * Copyright (c) 2021 Mark Kettenis <kettenis@openbsd.org>
@@ -49,7 +49,7 @@
 #include <machine/db_machdep.h>
 #include <ddb/db_extern.h>
 
-#include <dev/acpi/efi.h>
+#include <dev/efi/efi.h>
 
 #include "softraid.h"
 #if NSOFTRAID > 0
@@ -433,7 +433,7 @@ setregs(struct proc *p, struct exec_package *pack, u_long stack,
 	tf->tf_sp = stack;
 	tf->tf_lr = pack->ep_entry;
 	tf->tf_elr = pack->ep_entry; /* ??? */
-	tf->tf_spsr = PSR_M_EL0t;
+	tf->tf_spsr = PSR_M_EL0t | PSR_DIT;
 
 	retval[1] = 0;
 }
@@ -963,8 +963,7 @@ initarm(struct arm64_bootparams *abp)
 		/*
 		 * Load all memory marked as EfiConventionalMemory,
 		 * EfiBootServicesCode or EfiBootServicesData.
-		 * Don't bother with blocks smaller than 64KB.  The
-		 * initial 64MB memory block should be marked as
+		 * The initial 64MB memory block should be marked as
 		 * EfiLoaderData so it won't be added here.
 		 */
 		for (i = 0; i < mmap_size / mmap_desc_size; i++) {
@@ -974,10 +973,9 @@ initarm(struct arm64_bootparams *abp)
 			    desc->VirtualStart, desc->NumberOfPages,
 			    desc->Attribute);
 #endif
-			if ((desc->Type == EfiConventionalMemory ||
-			     desc->Type == EfiBootServicesCode ||
-			     desc->Type == EfiBootServicesData) &&
-			    desc->NumberOfPages >= 16) {
+			if (desc->Type == EfiConventionalMemory ||
+			    desc->Type == EfiBootServicesCode ||
+			    desc->Type == EfiBootServicesData) {
 				reg.addr = desc->PhysicalStart;
 				reg.size = ptoa(desc->NumberOfPages);
 				memreg_add(&reg);

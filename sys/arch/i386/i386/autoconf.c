@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.106 2019/12/08 12:25:30 mpi Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.108 2022/09/08 10:22:06 kn Exp $	*/
 /*	$NetBSD: autoconf.c,v 1.20 1996/05/03 19:41:56 christos Exp $	*/
 
 /*-
@@ -232,7 +232,7 @@ diskconf(void)
 	if (bios_bootmac) {
 		struct ifnet *ifp;
 
-		TAILQ_FOREACH(ifp, &ifnet, if_list) {
+		TAILQ_FOREACH(ifp, &ifnetlist, if_list) {
 			if (ifp->if_type == IFT_ETHER &&
 			    memcmp(bios_bootmac->mac,
 			    ((struct arpcom *)ifp)->ac_enaddr,
@@ -260,7 +260,7 @@ diskconf(void)
 #endif /* HIBERNATE */
 }
 
-struct nam2blk nam2blk[] = {
+const struct nam2blk nam2blk[] = {
 	{ "wd",		0 },
 	{ "fd",		2 },
 	{ "sd",		4 },

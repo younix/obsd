@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.2004 2022/09/02 10:34:07 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.2006 2022/10/03 05:39:07 jsg Exp 
  */
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
 
@@ -1228,6 +1228,7 @@
 #define	PCI_PRODUCT_ATI_VANGOGH	0x163f		/* Van Gogh */
 #define	PCI_PRODUCT_ATI_LUCIENNE	0x164c		/* Lucienne */
 #define	PCI_PRODUCT_ATI_YELLOW_CARP_1	0x164d		/* Yellow Carp */
+#define	PCI_PRODUCT_ATI_RAPHAEL	0x164e		/* Raphael */
 #define	PCI_PRODUCT_ATI_YELLOW_CARP_2	0x1681		/* Yellow Carp */
 #define	PCI_PRODUCT_ATI_RADEON_HD6500D_HDA	0x1714		/* Radeon HD 6500D HD Audio */
 #define	PCI_PRODUCT_ATI_RADEON_M241P	0x3150		/* Mobility Radeon X600 */
@@ -4013,6 +4014,9 @@
 #define	PCI_PRODUCT_INTEL_I219_V7	0x15bc		/* I219-V */
 #define	PCI_PRODUCT_INTEL_I219_LM6	0x15bd		/* I219-LM */
 #define	PCI_PRODUCT_INTEL_I219_V6	0x15be		/* I219-V */
+#define	PCI_PRODUCT_INTEL_JHL6240	0x15bf		/* JHL6240 Thunderbolt 3 */
+#define	PCI_PRODUCT_INTEL_JHL6240_PCIE	0x15c0		/* JHL6240 Thunderbolt 3 */
+#define	PCI_PRODUCT_INTEL_JHL6240_XHCI	0x15c1		/* JHL6240 Thunderbolt 3 */
 #define	PCI_PRODUCT_INTEL_X550EM_A_KR	0x15c2		/* X553 Backplane */
 #define	PCI_PRODUCT_INTEL_X550EM_A_KR_L	0x15c3		/* X553 Backplane */
 #define	PCI_PRODUCT_INTEL_X550EM_A_SFP_N	0x15c4		/* X553 SFP+ */

@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.2004 2022/09/02 10:34:07 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.2006 2022/10/03 05:39:07 jsg Exp 
  */
 
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
@@ -3050,6 +3050,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_YELLOW_CARP_1,
 	    "Yellow Carp",
+	},
+	{
+	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_RAPHAEL,
+	    "Raphael",
 	},
 	{
 	    PCI_VENDOR_ATI, PCI_PRODUCT_ATI_YELLOW_CARP_2,
@@ -13426,6 +13430,18 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_I219_V6,
 	    "I219-V",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JHL6240,
+	    "JHL6240 Thunderbolt 3",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JHL6240_PCIE,
+	    "JHL6240 Thunderbolt 3",
+	},
+	{
+	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_JHL6240_XHCI,
+	    "JHL6240 Thunderbolt 3",
 	},
 	{
 	    PCI_VENDOR_INTEL, PCI_PRODUCT_INTEL_X550EM_A_KR,

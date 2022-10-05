@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.236 2022/08/31 16:10:59 kettenis Exp $
+# $OpenBSD: GENERIC,v 1.239 2022/09/12 20:31:53 kettenis Exp $
 #
 # GENERIC machine description file
 #
@@ -39,6 +39,8 @@ apm0		at mainbus?
 efi0		at mainbus?
 smbios0		at efi?
 acpi0		at mainbus?
+acpiac*		at acpi?
+acpibat*	at acpi?
 acpibtn*	at acpi?
 acpiec*		at acpi?
 acpige*		at acpi?
@@ -149,12 +151,14 @@ apldc*		at fdt?
 apldchidev*	at fdt?
 apldckbd*	at apldchidev?
 wskbd*		at apldckbd? mux 1
+apldcms*	at apldchidev?
+wsmouse*	at apldcms? mux 0
 apldma*		at fdt?
 apldog*		at fdt? early 1
 apliic*		at fdt?
 iic*		at apliic?
 aplintc*	at fdt? early 1
-aplmbox*	at fdt?
+aplmbox*	at fdt? early 1
 aplmca*		at fdt?
 aplnco*		at fdt?
 aplns*		at fdt?			# Apple NVME Storage controllers

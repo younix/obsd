@@ -1,4 +1,4 @@
-/*	$OpenBSD: repo.c,v 1.36 2022/08/30 12:45:13 claudio Exp $ */
+/*	$OpenBSD: repo.c,v 1.39 2022/09/02 21:56:45 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -41,6 +41,8 @@ extern struct stats	stats;
 extern int		noop;
 extern int		rrdpon;
 extern int		repo_timeout;
+extern time_t		deadline;
+int			nofetch;
 
 enum repo_state {
 	REPO_LOADING = 0,
@@ -288,7 +290,7 @@ repo_done(const void *vp, int ok)
 		if (vp == rp->rsync)
 			entityq_flush(&rp->queue, rp);
 		if (vp == rp->rrdp) {
-			if (!ok) {
+			if (!ok && !nofetch) {
 				/* try to fall back to rsync */
 				rp->rrdp = NULL;
 				rp->rsync = rsync_get(rp->repouri,
@@ -937,8 +939,8 @@ rrdp_finish(unsigned int id, int ok)
 		stats.rrdp_repos++;
 		rr->state = REPO_DONE;
 	} else {
-		warnx("%s: load from network failed, fallback to rsync",
-		    rr->notifyuri);
+		warnx("%s: load from network failed, fallback to %s",
+		    rr->notifyuri, nofetch ? "cache" : "rsync");
 		stats.rrdp_fails++;
 		rr->state = REPO_FAILED;
 		/* clear the RRDP repo since it failed */
@@ -1016,16 +1018,16 @@ ta_lookup(int id, struct tal *tal)
 	if ((rp->repouri = strdup(tal->descr)) == NULL)
 		err(1, NULL);
 
-	/* try to create base directory */
-	if (mkpath(rp->basedir) == -1)
-		warn("mkpath %s", rp->basedir);
-
 	/* check if sync disabled ... */
 	if (noop) {
 		logx("ta/%s: using cache", rp->repouri);
 		entityq_flush(&rp->queue, rp);
 		return rp;
 	}
+
+	/* try to create base directory */
+	if (mkpath(rp->basedir) == -1)
+		warn("mkpath %s", rp->basedir);
 
 	rp->ta = ta_get(tal);
 
@@ -1044,7 +1046,6 @@ repo_lookup(int talid, const char *uri, const char *notify)
 {
 	struct repo	*rp;
 	char		*repouri;
-	int		 nofetch = 0;
 
 	if ((repouri = rsync_base_uri(uri)) == NULL)
 		errx(1, "bad caRepository URI: %s", uri);
@@ -1078,16 +1079,16 @@ repo_lookup(int talid, const char *uri, const char *notify)
 		nofetch = 1;
 	}
 
-	/* try to create base directory */
-	if (mkpath(rp->basedir) == -1)
-		warn("mkpath %s", rp->basedir);
-
 	/* check if sync disabled ... */
 	if (noop || nofetch) {
 		logx("%s: using cache", rp->basedir);
 		entityq_flush(&rp->queue, rp);
 		return rp;
 	}
+
+	/* try to create base directory */
+	if (mkpath(rp->basedir) == -1)
+		warn("mkpath %s", rp->basedir);
 
 	/* ... else try RRDP first if available then rsync */
 	if (notify != NULL)
@@ -1204,22 +1205,54 @@ repo_fail(struct repo *rp)
 		errx(1, "%s: bad repo", rp->repouri);
 }
 
+static void
+repo_abort(struct repo *rp)
+{
+	/* reset the alarm */
+	rp->alarm = getmonotime() + repo_timeout;
+
+	if (rp->rsync)
+		rsync_abort(rp->rsync->id);
+	else if (rp->rrdp)
+		rrdp_abort(rp->rrdp->id);
+	else
+		repo_fail(rp);
+}
+
 int
 repo_check_timeout(int timeout)
 {
 	struct repo	*rp;
 	time_t		 now;
+	int		 diff;
 
 	now = getmonotime();
+
+	/* check against our runtime deadline first */
+	if (deadline != 0) {
+		if (deadline <= now) {
+			warnx("deadline reached, giving up on repository sync");
+			nofetch = 1;
+			/* clear deadline since nofetch is set */
+			deadline = 0;
+			/* increase now enough so that all pending repos fail */
+			now += repo_timeout;
+		} else {
+			diff = deadline - now;
+			diff *= 1000;
+			if (timeout == INFTIM || diff < timeout)
+				timeout = diff;
+		}
+	}
 	/* Look up in repository table. (Lookup should actually fail here) */
 	SLIST_FOREACH(rp, &repos, entry) {
 		if (repo_state(rp) == REPO_LOADING) {
 			if (rp->alarm <= now) {
 				warnx("%s: synchronisation timeout",
 				    rp->repouri);
-				repo_fail(rp);
+				repo_abort(rp);
 			} else {
-				int diff = rp->alarm - now;
+				diff = rp->alarm - now;
 				diff *= 1000;
 				if (timeout == INFTIM || diff < timeout)
 					timeout = diff;

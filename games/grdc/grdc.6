@@ -1,8 +1,8 @@
-.\"	$OpenBSD: grdc.6,v 1.12 2019/02/06 15:02:01 schwarze Exp $
+.\"	$OpenBSD: grdc.6,v 1.14 2022/09/24 16:07:26 florian Exp $
 .\"
 .\" Copyright 2002 Amos Shapir.  Public domain.
 .\"
-.Dd $Mdocdate: February 6 2019 $
+.Dd $Mdocdate: September 24 2022 $
 .Dt GRDC 6
 .Os
 .Sh NAME
@@ -30,6 +30,18 @@ skips seconds.
 Pressing the
 .Sq q
 key exits the program.
+.Sh ENVIRONMENT
+.Bl -tag -width Ds
+.It Ev TZ
+The time zone to use for displaying the time.
+It is normally specified as a pathname relative to
+.Pa /usr/share/zoneinfo ,
+though see
+.Xr tzset 3
+for more information.
+If this variable is not set, the time zone is determined based on
+.Pa /etc/localtime .
+.El
 .Sh AUTHORS
 .An -nosplit
 .An Amos Shapir ,

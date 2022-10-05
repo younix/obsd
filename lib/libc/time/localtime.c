@@ -1,4 +1,4 @@
-/*	$OpenBSD: localtime.c,v 1.62 2022/08/25 13:32:13 millert Exp $ */
+/*	$OpenBSD: localtime.c,v 1.65 2022/10/03 15:34:39 millert Exp $ */
 /*
 ** This file is in the public domain, so clarified as of
 ** 1996-06-05 by Arthur David Olson.
@@ -296,6 +296,58 @@ differ_by_repeat(time_t t1, time_t t0)
 }
 
 static int
+tzpath_ok(const char *name)
+{
+	/* Reject absolute paths that don't start with TZDIR.  */
+	if (name[0] == '/' && (strncmp(name, TZDIR, sizeof(TZDIR) - 1) != 0 ||
+	    name[sizeof(TZDIR) - 1] != '/'))
+		return 0;
+
+	/* Reject paths that contain "../". */
+	if (strstr(name, "../") != NULL)
+		return 0;
+
+	return 1;
+}
+
+static int
+open_tzfile(const char *name)
+{
+	char fullname[PATH_MAX];
+	int i;
+
+	if (name != NULL) {
+		/*
+		 * POSIX section 8 says that names starting with a ':' are
+		 * "implementation-defined".  We treat them as timezone paths.
+		 */
+		if (name[0] == ':')
+			name++;
+
+		/*
+		 * Ignore absolute paths that don't start with TZDIR
+		 * or that contain "../".
+		 */
+		if (!tzpath_ok(name))
+			name = NULL;
+	}
+
+	if (name == NULL) {
+		name = TZDEFAULT;
+	} else if (name[0] != '/') {
+		/* Time zone data path is relative to TZDIR. */
+		i = snprintf(fullname, sizeof(fullname), "%s/%s", TZDIR, name);
+		if (i < 0 || i >= sizeof(fullname)) {
+			errno = ENAMETOOLONG;
+			return -1;
+		}
+		name = fullname;
+	}
+
+	return open(name, O_RDONLY);
+}
+
+static int
 tzload(const char *name, struct state *sp, int doextend)
 {
 	const char *		p;
@@ -310,35 +362,17 @@ tzload(const char *name, struct state *sp, int doextend)
 				    4 * TZ_MAX_TIMES];
 	} u_t;
 	u_t *			up;
-	char			fullname[PATH_MAX];
 
 	up = calloc(1, sizeof *up);
 	if (up == NULL)
 		return -1;
 
 	sp->goback = sp->goahead = FALSE;
-	if (name != NULL && issetugid() != 0) {
-		if ((name[0] == ':' && (strchr(name, '/') || strstr(name, ".."))) ||
-		    name[0] == '/' || strchr(name, '.'))
-			name = NULL;
-	}
-	if (name == NULL && (name = TZDEFAULT) == NULL)
-		goto oops;
 
-	if (name[0] == ':')
-		++name;
-	if (name[0] != '/') {
-		if ((p = TZDIR) == NULL)
-			goto oops;
-		if ((strlen(p) + strlen(name) + 1) >= sizeof fullname)
-			goto oops;
-		strlcpy(fullname, p, sizeof fullname);
-		strlcat(fullname, "/", sizeof fullname);
-		strlcat(fullname, name, sizeof fullname);
-		name = fullname;
-	}
-	if ((fid = open(name, O_RDONLY)) == -1)
+	if ((fid = open_tzfile(name)) == -1) {
+		/* Could be a POSIX section 8-style TZ string. */
 		goto oops;
+	}
 
 	nread = read(fid, up->buf, sizeof up->buf);
 	if (close(fid) == -1 || nread <= 0)
@@ -1115,8 +1149,7 @@ tzset_basic(void)
 {
 	const char *	name;
 
-	name = getenv("TZ");
-	if (name == NULL) {
+	if (issetugid() || (name = getenv("TZ")) == NULL) {
 		tzsetwall_basic();
 		return;
 	}

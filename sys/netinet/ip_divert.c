@@ -1,4 +1,4 @@
-/*      $OpenBSD: ip_divert.c,v 1.84 2022/09/02 13:12:32 mvs Exp $ */
+/*      $OpenBSD: ip_divert.c,v 1.88 2022/10/03 16:43:52 bluhm Exp $ */
 
 /*
  * Copyright (c) 2009 Michele Marchetto <michele@openbsd.org>
@@ -63,14 +63,17 @@ const struct sysctl_bounded_args divertctl_vars[] = {
 };
 
 const struct pr_usrreqs divert_usrreqs = {
-	.pru_usrreq	= divert_usrreq,
 	.pru_attach	= divert_attach,
 	.pru_detach	= divert_detach,
+	.pru_lock	= divert_lock,
+	.pru_unlock	= divert_unlock,
 	.pru_bind	= divert_bind,
 	.pru_shutdown	= divert_shutdown,
 	.pru_send	= divert_send,
 	.pru_abort	= divert_abort,
 	.pru_control	= in_control,
+	.pru_sockaddr	= in_sockaddr,
+	.pru_peeraddr	= in_peeraddr,
 };
 
 int divbhashsize = DIVERTHASHSIZE;
@@ -251,51 +254,8 @@ divert_packet(struct mbuf *m, int dir, u_int16_t divert_port)
 	m_freem(m);
 }
 
-/*ARGSUSED*/
 int
-divert_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *addr,
-    struct mbuf *control, struct proc *p)
-{
-	struct inpcb *inp = sotoinpcb(so);
-	int error = 0;
-
-	soassertlocked(so);
-
-	if (inp == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-	switch (req) {
-
-	case PRU_SOCKADDR:
-		in_setsockaddr(inp, addr);
-		break;
-
-	case PRU_PEERADDR:
-		in_setpeeraddr(inp, addr);
-		break;
-
-	case PRU_FASTTIMO:
-	case PRU_SLOWTIMO:
-	case PRU_PROTORCV:
-	case PRU_PROTOSEND:
-		error =  EOPNOTSUPP;
-		break;
-
-	default:
-		panic("divert_usrreq");
-	}
-
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-int
-divert_attach(struct socket *so, int proto)
+divert_attach(struct socket *so, int proto, int wait)
 {
 	int error;
 
@@ -304,7 +264,7 @@ divert_attach(struct socket *so, int proto)
 	if ((so->so_state & SS_PRIV) == 0)
 		return EACCES;
 
-	error = in_pcballoc(so, &divbtable);
+	error = in_pcballoc(so, &divbtable, wait);
 	if (error)
 		return error;
 
@@ -328,6 +288,24 @@ divert_detach(struct socket *so)
 
 	in_pcbdetach(inp);
 	return (0);
+}
+
+void
+divert_lock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_enter(&inp->inp_mtx);
+}
+
+void
+divert_unlock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_leave(&inp->inp_mtx);
 }
 
 int

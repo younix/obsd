@@ -1,4 +1,4 @@
-/*	$OpenBSD: qcgpio.c,v 1.1 2022/08/31 16:10:59 kettenis Exp $	*/
+/*	$OpenBSD: qcgpio.c,v 1.6 2022/09/15 18:03:52 mglocker Exp $	*/
 /*
  * Copyright (c) 2022 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -43,6 +43,11 @@
 #define TLMM_GPIO_INTR_STATUS(pin)	(0x000c + 0x1000 * (pin))
 #define  TLMM_GPIO_INTR_STATUS_INTR_STATUS		(1 << 0)
 
+/* SC7180 has multiple tiles */
+#define QCGPIO_SC7180_WEST	0x00100000
+#define QCGPIO_SC7180_NORTH	0x00500000
+#define QCGPIO_SC7180_SOUTH	0x00900000
+
 #define HREAD4(sc, reg)							\
 	(bus_space_read_4((sc)->sc_iot, (sc)->sc_ioh, (reg)))
 #define HWRITE4(sc, reg, val)						\
@@ -68,6 +73,7 @@ struct qcgpio_softc {
 	void			*sc_ih;
 
 	uint32_t		sc_npins;
+	int			(*sc_pin_map)(int, bus_size_t *);
 	struct qcgpio_intrhand	*sc_pin_ih;
 
 	struct acpi_gpio sc_gpio;
@@ -86,12 +92,18 @@ struct cfdriver qcgpio_cd = {
 
 const char *qcgpio_hids[] = {
 	"QCOM060C",
+	"QCOM080D",
 	NULL
 };
+
+int	qcgpio_sc7180_pin_map(int, bus_size_t *);
+int	qcgpio_sc8280xp_pin_map(int, bus_size_t *);
 
 int	qcgpio_read_pin(void *, int);
 void	qcgpio_write_pin(void *, int, int);
 void	qcgpio_intr_establish(void *, int, int, int (*)(void *), void *);
+void	qcgpio_intr_enable(void *, int);
+void	qcgpio_intr_disable(void *, int);
 int	qcgpio_pin_intr(struct qcgpio_softc *, int);
 int	qcgpio_intr(void *);
 
@@ -125,7 +137,15 @@ qcgpio_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
-	sc->sc_npins = 1024;
+	if (strcmp(aaa->aaa_dev, "QCOM080D") == 0) {
+		sc->sc_npins = 119;
+		sc->sc_pin_map = qcgpio_sc7180_pin_map;
+	} else if (strcmp(aaa->aaa_dev, "QCOM060C") == 0) {
+		sc->sc_npins = 228;
+		sc->sc_pin_map = qcgpio_sc8280xp_pin_map;
+	}
+	KASSERT(sc->sc_npins != 0);
+
 	sc->sc_pin_ih = mallocarray(sc->sc_npins, sizeof(*sc->sc_pin_ih),
 	    M_DEVBUF, M_WAITOK | M_ZERO);
 
@@ -143,15 +163,11 @@ qcgpio_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_gpio.read_pin = qcgpio_read_pin;
 	sc->sc_gpio.write_pin = qcgpio_write_pin;
 	sc->sc_gpio.intr_establish = qcgpio_intr_establish;
+	sc->sc_gpio.intr_enable = qcgpio_intr_enable;
+	sc->sc_gpio.intr_disable = qcgpio_intr_disable;
 	sc->sc_node->gpio = &sc->sc_gpio;
 
 	printf("\n");
-
-#if 0
-	/* XXX */
-	HWRITE4(sc, 0x0008 + 0x1000 * 104, 0x71);
-	HWRITE4(sc, 0x0008 + 0x1000 * 182, 0x71);
-#endif
 
 	acpi_register_gpio(sc->sc_acpi, sc->sc_node);
 	return;
@@ -163,14 +179,42 @@ unmap:
 	bus_space_unmap(sc->sc_iot, sc->sc_ioh, aaa->aaa_size[0]);
 }
 
-
 int
-qcgpio_pin_map(int pin)
+qcgpio_sc7180_pin_map(int pin, bus_size_t *off)
 {
 	switch (pin) {
-	case 832:
+	case 30:
+		*off = QCGPIO_SC7180_SOUTH;
+		return 30;
+	case 32:
+	case 0x140:
+		*off = QCGPIO_SC7180_NORTH;
+		return 32;
+	case 33:
+	case 0x180:
+		*off = QCGPIO_SC7180_NORTH;
+		return 33;
+	case 94:
+	case 0x1c0:
+		*off = QCGPIO_SC7180_SOUTH;
+		return 94;
+	default:
+		return -1;
+	}
+}
+
+int
+qcgpio_sc8280xp_pin_map(int pin, bus_size_t *off)
+{
+	switch (pin) {
+	case 107:
+	case 175:
+		return pin;
+	case 0x2c0:
+		return 107;
+	case 0x340:
 		return 104;
-	case 896:
+	case 0x380:
 		return 182;
 	default:
 		return -1;
@@ -181,13 +225,14 @@ int
 qcgpio_read_pin(void *cookie, int pin)
 {
 	struct qcgpio_softc *sc = cookie;
+	bus_size_t off = 0;
 	uint32_t reg;
 
-	pin = qcgpio_pin_map(pin);
+	pin = sc->sc_pin_map(pin, &off);
 	if (pin < 0 || pin >= sc->sc_npins)
 		return 0;
 
-	reg = HREAD4(sc, TLMM_GPIO_IN_OUT(pin));
+	reg = HREAD4(sc, off + TLMM_GPIO_IN_OUT(pin));
 	return !!(reg & TLMM_GPIO_IN_OUT_GPIO_IN);
 }
 
@@ -195,15 +240,19 @@ void
 qcgpio_write_pin(void *cookie, int pin, int val)
 {
 	struct qcgpio_softc *sc = cookie;
+	bus_size_t off = 0;
 
-	pin = qcgpio_pin_map(pin);
+	pin = sc->sc_pin_map(pin, &off);
 	if (pin < 0 || pin >= sc->sc_npins)
 		return;
 
-	if (val)
-		HSET4(sc, TLMM_GPIO_IN_OUT(pin), TLMM_GPIO_IN_OUT_GPIO_OUT);
-	else
-		HCLR4(sc, TLMM_GPIO_IN_OUT(pin), TLMM_GPIO_IN_OUT_GPIO_OUT);
+	if (val) {
+		HSET4(sc, off + TLMM_GPIO_IN_OUT(pin),
+		    TLMM_GPIO_IN_OUT_GPIO_OUT);
+	} else {
+		HCLR4(sc, off + TLMM_GPIO_IN_OUT(pin),
+		    TLMM_GPIO_IN_OUT_GPIO_OUT);
+	}
 }
 
 void
@@ -211,16 +260,17 @@ qcgpio_intr_establish(void *cookie, int pin, int flags,
     int (*func)(void *), void *arg)
 {
 	struct qcgpio_softc *sc = cookie;
+	bus_size_t off = 0;
 	uint32_t reg;
 
-	pin = qcgpio_pin_map(pin);
+	pin = sc->sc_pin_map(pin, &off);
 	if (pin < 0 || pin >= sc->sc_npins)
 		return;
 
 	sc->sc_pin_ih[pin].ih_func = func;
 	sc->sc_pin_ih[pin].ih_arg = arg;
 
-	reg = HREAD4(sc, TLMM_GPIO_INTR_CFG(pin));
+	reg = HREAD4(sc, off + TLMM_GPIO_INTR_CFG(pin));
 	reg &= ~TLMM_GPIO_INTR_CFG_INTR_DECT_CTL_MASK;
 	reg &= ~TLMM_GPIO_INTR_CFG_INTR_POL_CTL;
 	switch (flags & (LR_GPIO_MODE | LR_GPIO_POLARITY)) {
@@ -251,7 +301,35 @@ qcgpio_intr_establish(void *cookie, int pin, int flags,
 	reg |= TLMM_GPIO_INTR_CFG_TARGET_PROC_RPM;
 	reg |= TLMM_GPIO_INTR_CFG_INTR_RAW_STATUS_EN;
 	reg |= TLMM_GPIO_INTR_CFG_INTR_ENABLE;
-	HWRITE4(sc, TLMM_GPIO_INTR_CFG(pin), reg);
+	HWRITE4(sc, off + TLMM_GPIO_INTR_CFG(pin), reg);
+}
+
+void
+qcgpio_intr_enable(void *cookie, int pin)
+{
+	struct qcgpio_softc *sc = cookie;
+	bus_size_t off = 0;
+
+	pin = sc->sc_pin_map(pin, &off);
+	if (pin < 0 || pin >= sc->sc_npins)
+		return;
+
+	HSET4(sc, off + TLMM_GPIO_INTR_CFG(pin),
+	    TLMM_GPIO_INTR_CFG_INTR_ENABLE);
+}
+
+void
+qcgpio_intr_disable(void *cookie, int pin)
+{
+	struct qcgpio_softc *sc = cookie;
+	bus_size_t off = 0;
+
+	pin = sc->sc_pin_map(pin, &off);
+	if (pin < 0 || pin >= sc->sc_npins)
+		return;
+
+	HCLR4(sc, off + TLMM_GPIO_INTR_CFG(pin),
+	    TLMM_GPIO_INTR_CFG_INTR_ENABLE);
 }
 
 int
@@ -259,18 +337,21 @@ qcgpio_intr(void *arg)
 {
 	struct qcgpio_softc *sc = arg;
 	int pin, handled = 0;
+	bus_size_t off = 0;
 	uint32_t stat;
 
 	for (pin = 0; pin < sc->sc_npins; pin++) {
 		if (sc->sc_pin_ih[pin].ih_func == NULL)
 			continue;
 
-		stat = HREAD4(sc, TLMM_GPIO_INTR_STATUS(pin));
+		sc->sc_pin_map(pin, &off);
+
+		stat = HREAD4(sc, off + TLMM_GPIO_INTR_STATUS(pin));
 		if (stat & TLMM_GPIO_INTR_STATUS_INTR_STATUS) {
 			sc->sc_pin_ih[pin].ih_func(sc->sc_pin_ih[pin].ih_arg);
 			handled = 1;
 		}
-		HWRITE4(sc, TLMM_GPIO_INTR_STATUS(pin),
+		HWRITE4(sc, off + TLMM_GPIO_INTR_STATUS(pin),
 		    stat & ~TLMM_GPIO_INTR_STATUS_INTR_STATUS);
 	}
 

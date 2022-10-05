@@ -1,4 +1,4 @@
-/* $OpenBSD: tasn_dec.c,v 1.78 2022/06/29 08:56:44 beck Exp $ */
+/* $OpenBSD: tasn_dec.c,v 1.83 2022/09/03 19:15:23 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -276,17 +276,16 @@ asn1_find_end(CBS *cbs, size_t length, int indefinite)
 static int
 asn1_c2i_primitive(ASN1_VALUE **pval, CBS *content, int utype, const ASN1_ITEM *it)
 {
-	ASN1_STRING *stmp;
-	ASN1_INTEGER **tint;
-	ASN1_BOOLEAN *tbool;
-	uint8_t u8val;
+	ASN1_BOOLEAN *abool;
+	ASN1_STRING *astr;
+	uint8_t val;
 	int ret = 0;
 
 	if (it->funcs != NULL)
-		return 0;
+		goto err;
 
 	if (CBS_len(content) > INT_MAX)
-		return 0;
+		goto err;
 
 	switch (utype) {
 	case V_ASN1_OBJECT:
@@ -303,14 +302,14 @@ asn1_c2i_primitive(ASN1_VALUE **pval, CBS *content, int utype, const ASN1_ITEM *
 		break;
 
 	case V_ASN1_BOOLEAN:
-		tbool = (ASN1_BOOLEAN *)pval;
+		abool = (ASN1_BOOLEAN *)pval;
 		if (CBS_len(content) != 1) {
 			ASN1error(ASN1_R_BOOLEAN_IS_WRONG_LENGTH);
 			goto err;
 		}
-		if (!CBS_get_u8(content, &u8val))
+		if (!CBS_get_u8(content, &val))
 			goto err;
-		*tbool = u8val;
+		*abool = val;
 		break;
 
 	case V_ASN1_BIT_STRING:
@@ -318,13 +317,14 @@ asn1_c2i_primitive(ASN1_VALUE **pval, CBS *content, int utype, const ASN1_ITEM *
 			goto err;
 		break;
 
-	case V_ASN1_INTEGER:
 	case V_ASN1_ENUMERATED:
-		tint = (ASN1_INTEGER **)pval;
-		if (!c2i_ASN1_INTEGER_cbs(tint, content))
+		if (!c2i_ASN1_ENUMERATED_cbs((ASN1_ENUMERATED **)pval, content))
 			goto err;
-		/* Fixup type to match the expected form */
-		(*tint)->type = utype | ((*tint)->type & V_ASN1_NEG);
+		break;
+
+	case V_ASN1_INTEGER:
+		if (!c2i_ASN1_INTEGER_cbs((ASN1_INTEGER **)pval, content))
+			goto err;
 		break;
 
 	case V_ASN1_OCTET_STRING:
@@ -361,21 +361,19 @@ asn1_c2i_primitive(ASN1_VALUE **pval, CBS *content, int utype, const ASN1_ITEM *
 			}
 		}
 		/* All based on ASN1_STRING and handled the same way. */
-		if (*pval == NULL) {
-			if ((stmp = ASN1_STRING_type_new(utype)) == NULL) {
-				ASN1error(ERR_R_MALLOC_FAILURE);
-				goto err;
-			}
-			*pval = (ASN1_VALUE *)stmp;
-		} else {
-			stmp = (ASN1_STRING *)*pval;
-			stmp->type = utype;
-		}
-		if (!ASN1_STRING_set(stmp, CBS_data(content), CBS_len(content))) {
-			ASN1_STRING_free(stmp);
+		if (*pval != NULL) {
+			ASN1_STRING_free((ASN1_STRING *)*pval);
 			*pval = NULL;
+		}
+		if ((astr = ASN1_STRING_type_new(utype)) == NULL) {
+			ASN1error(ERR_R_MALLOC_FAILURE);
 			goto err;
 		}
+		if (!ASN1_STRING_set(astr, CBS_data(content), CBS_len(content))) {
+			ASN1_STRING_free(astr);
+			goto err;
+		}
+		*pval = (ASN1_VALUE *)astr;
 		break;
 	}
 
@@ -467,11 +465,12 @@ asn1_d2i_primitive_content(ASN1_VALUE **pval, CBS *cbs, CBS *cbs_object,
 	CBS_dup(cbs, &cbs_initial);
 	CBS_init(&cbs_content, NULL, 0);
 
-	/* XXX - check primitive vs constructed based on utype. */
-
-	/* SEQUENCE and SET must be constructed. */
-	if ((utype == V_ASN1_SEQUENCE || utype == V_ASN1_SET) && !constructed) {
+	if (asn1_must_be_constructed(utype) && !constructed) {
 		ASN1error(ASN1_R_TYPE_NOT_CONSTRUCTED);
+		goto err;
+	}
+	if (asn1_must_be_primitive(utype) && constructed) {
+		ASN1error(ASN1_R_TYPE_NOT_PRIMITIVE);
 		goto err;
 	}
 
@@ -1000,7 +999,9 @@ asn1_item_d2i(ASN1_VALUE **pval, CBS *cbs, const ASN1_ITEM *it,
 }
 
 static void
-asn1_template_stack_of_free(STACK_OF(ASN1_VALUE) *avals, const ASN1_TEMPLATE *at) {
+asn1_template_stack_of_free(STACK_OF(ASN1_VALUE) *avals,
+    const ASN1_TEMPLATE *at)
+{
 	ASN1_VALUE *aval;
 
 	if (avals == NULL)
@@ -1080,8 +1081,8 @@ asn1_template_stack_of_d2i(ASN1_VALUE **pval, CBS *cbs, const ASN1_TEMPLATE *at,
 			eoc_needed = 0;
 			break;
 		}
-		if (!asn1_item_d2i(&aval, &cbs_object_content, at->item,
-		    -1, 0, 0, depth)) {
+		if (!asn1_item_d2i(&aval, &cbs_object_content, at->item, -1, 0,
+		    0, depth)) {
 			ASN1error(ERR_R_NESTED_ASN1_ERROR);
 			goto err;
 		}

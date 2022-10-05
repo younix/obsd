@@ -7,7 +7,6 @@
 /mem.c/1.1/Fri Dec 11 17:58:22 2020//
 /openprom.c/1.2/Fri Dec 11 17:58:22 2020//
 /bus_space.c/1.2/Thu Dec 17 19:39:58 2020//
-/autoconf.c/1.7/Sat May  1 08:41:51 2021//
 /softintr.c/1.2/Sat May  1 08:41:51 2021//
 /genassym.cf/1.14/Sun Aug 29 08:01:51 2021//
 /trap_subr.S/1.19/Sun Aug 29 08:01:51 2021//
@@ -15,8 +14,6 @@
 /process_machdep.c/1.5/Wed Sep  1 16:07:38 2021//
 /trap.c/1.51/Wed Sep  1 16:07:38 2021//
 /vm_machdep.c/1.8/Wed Sep  1 16:07:38 2021//
-/pmap.c/1.57/Wed Oct 20 17:29:10 2021//
-/conf.c/1.13/Sun Nov 21 20:15:22 2021//
 /syscall.c/1.8/Mon Jan 24 14:35:14 2022//
 /db_trace.c/1.8/Mon Jun 27 13:02:00 2022//
 /cpu.c/1.24/Tue Jul 26 13:42:34 2022//
@@ -26,4 +23,7 @@
 /clock.c/1.5/Fri Sep  2 14:00:20 2022//
 /intr.c/1.11/Fri Sep  2 14:00:20 2022//
 /syncicache.c/1.4/Fri Sep  2 14:00:20 2022//
+/autoconf.c/1.9/Tue Sep 20 07:19:39 2022//
+/conf.c/1.14/Tue Sep 20 07:19:39 2022//
+/pmap.c/1.58/Tue Sep 20 07:19:39 2022//
 D

@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.31 2022/09/01 00:43:14 kn Exp $
+#	$OpenBSD: Makefile,v 1.33 2022/09/17 09:30:18 kn Exp $
 
 SUBDIR += acme-client
 SUBDIR += arp
@@ -6,6 +6,7 @@ SUBDIR += bgpd
 SUBDIR += btrace
 SUBDIR += httpd
 SUBDIR += ifstated
+SUBDIR += installboot
 SUBDIR += ldapd
 SUBDIR += mtree
 SUBDIR += ocspcheck
@@ -18,13 +19,6 @@ SUBDIR += syslogd
 
 .if ${MACHINE} == "amd64"
 SUBDIR += vmd
-.endif
-
-.if ${MACHINE} == "amd64" || \
-    ${MACHINE} == "i386" || \
-    ${MACHINE} == "macppc" || \
-    ${MACHINE} == "sparc64"
-SUBDIR += installboot
 .endif
 
 .if defined(REGRESS_FULL) || make(clean) || make(cleandir) || make(obj)

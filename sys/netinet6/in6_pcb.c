@@ -1,4 +1,4 @@
-/*	$OpenBSD: in6_pcb.c,v 1.121 2022/08/30 11:53:04 bluhm Exp $	*/
+/*	$OpenBSD: in6_pcb.c,v 1.123 2022/09/03 22:43:38 mvs Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -363,6 +363,28 @@ in6_setpeeraddr(struct inpcb *inp, struct mbuf *nam)
 	sin6->sin6_addr = inp->inp_faddr6;
 	/* KAME hack: recover scopeid */
 	in6_recoverscope(sin6, &inp->inp_faddr6);
+}
+
+int
+in6_sockaddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *in6p;
+
+	in6p = sotoinpcb(so);
+	in6_setsockaddr(in6p, nam);
+
+	return (0);
+}
+
+int
+in6_peeraddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *in6p;
+
+	in6p = sotoinpcb(so);
+	in6_setpeeraddr(in6p, nam);
+
+	return (0);
 }
 
 /*

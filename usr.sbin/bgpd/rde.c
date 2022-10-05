@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.c,v 1.574 2022/09/01 13:23:24 claudio Exp $ */
+/*	$OpenBSD: rde.c,v 1.578 2022/09/23 15:49:20 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -1607,28 +1607,38 @@ pathid_conflict(struct rib_entry *re, uint32_t pathid)
 	return 0;
 }
 
+/*
+ * Assign a send side path_id to all paths.
+ */
 static uint32_t
 pathid_assign(struct rde_peer *peer, uint32_t path_id,
     struct bgpd_addr *prefix, uint8_t prefixlen)
 {
 	struct rib_entry *re;
-	struct prefix *p = NULL;
 	uint32_t path_id_tx;
 
-	/*
-	 * Assign a send side path_id to all paths.
-	 */
+	/* If peer has no add-path use the per peer path_id */
+	if (!peer_has_add_path(peer, prefix->aid, CAPA_AP_RECV))
+		return peer->path_id_tx;
+
+	/* peer uses add-path, therefore new path_ids need to be assigned */
 	re = rib_get(rib_byid(RIB_ADJ_IN), prefix, prefixlen);
-	if (re != NULL)
+	if (re != NULL) {
+		struct prefix *p;
+
 		p = prefix_bypeer(re, peer, path_id);
-	if (p != NULL)
-		path_id_tx = p->path_id_tx;
-	else {
-		do {
-			/* assign new local path_id */
-			path_id_tx = arc4random();
-		} while (pathid_conflict(re, path_id_tx));
+		if (p != NULL)
+			return p->path_id_tx;
 	}
+
+	/*
+	 * Assign new local path_id, must be an odd number.
+	 * Even numbers are used by the per peer path_id_tx.
+	 */
+	do {
+		path_id_tx = arc4random() | 1;
+	} while (pathid_conflict(re, path_id_tx));
+
 	return path_id_tx;
 }
 
@@ -2641,37 +2651,10 @@ rde_dump_upcall(struct rib_entry *re, void *ptr)
 	struct rde_dump_ctx	*ctx = ptr;
 	struct prefix		*p;
 
+	if (re == NULL)
+		return;
 	TAILQ_FOREACH(p, &re->prefix_h, entry.list.rib)
 		rde_dump_filter(p, &ctx->req, 0);
-}
-
-static void
-rde_dump_prefix_upcall(struct rib_entry *re, void *ptr)
-{
-	struct rde_dump_ctx	*ctx = ptr;
-	struct prefix		*p;
-	struct pt_entry		*pt;
-	struct bgpd_addr	 addr;
-
-	pt = re->prefix;
-	pt_getaddr(pt, &addr);
-	if (addr.aid != ctx->req.prefix.aid)
-		return;
-	if (ctx->req.flags & F_LONGER) {
-		if (ctx->req.prefixlen > pt->prefixlen)
-			return;
-		if (!prefix_compare(&ctx->req.prefix, &addr,
-		    ctx->req.prefixlen))
-			TAILQ_FOREACH(p, &re->prefix_h, entry.list.rib)
-				rde_dump_filter(p, &ctx->req, 0);
-	} else {
-		if (ctx->req.prefixlen < pt->prefixlen)
-			return;
-		if (!prefix_compare(&addr, &ctx->req.prefix,
-		    pt->prefixlen))
-			TAILQ_FOREACH(p, &re->prefix_h, entry.list.rib)
-				rde_dump_filter(p, &ctx->req, 0);
-	}
 }
 
 static void
@@ -2684,35 +2667,6 @@ rde_dump_adjout_upcall(struct prefix *p, void *ptr)
 	if (p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD))
 		return;
 	rde_dump_filter(p, &ctx->req, 1);
-}
-
-static void
-rde_dump_adjout_prefix_upcall(struct prefix *p, void *ptr)
-{
-	struct rde_dump_ctx	*ctx = ptr;
-	struct bgpd_addr	 addr;
-
-	if ((p->flags & PREFIX_FLAG_ADJOUT) == 0)
-		fatalx("%s: prefix without PREFIX_FLAG_ADJOUT hit", __func__);
-	if (p->flags & (PREFIX_FLAG_WITHDRAW | PREFIX_FLAG_DEAD))
-		return;
-
-	pt_getaddr(p->pt, &addr);
-	if (addr.aid != ctx->req.prefix.aid)
-		return;
-	if (ctx->req.flags & F_LONGER) {
-		if (ctx->req.prefixlen > p->pt->prefixlen)
-			return;
-		if (!prefix_compare(&ctx->req.prefix, &addr,
-		    ctx->req.prefixlen))
-			rde_dump_filter(p, &ctx->req, 1);
-	} else {
-		if (ctx->req.prefixlen < p->pt->prefixlen)
-			return;
-		if (!prefix_compare(&addr, &ctx->req.prefix,
-		    p->pt->prefixlen))
-			rde_dump_filter(p, &ctx->req, 1);
-	}
 }
 
 static int
@@ -2743,10 +2697,10 @@ rde_dump_done(void *arg, uint8_t aid)
 				goto nomem;
 			break;
 		case IMSG_CTL_SHOW_RIB_PREFIX:
-			if (prefix_dump_new(peer, ctx->req.aid,
-			    CTL_MSG_HIGH_MARK, ctx,
-			    rde_dump_adjout_prefix_upcall,
-			    rde_dump_done, rde_dump_throttled) == -1)
+			if (prefix_dump_subtree(peer, &ctx->req.prefix,
+			    ctx->req.prefixlen, CTL_MSG_HIGH_MARK, ctx,
+			    rde_dump_adjout_upcall, rde_dump_done,
+			    rde_dump_throttled) == -1)
 				goto nomem;
 			break;
 		default:
@@ -2776,7 +2730,7 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 	struct rib_entry	*re;
 	struct prefix		*p;
 	u_int			 error;
-	uint8_t			 hostplen;
+	uint8_t			 hostplen, plen;
 	uint16_t		 rid;
 
 	if ((ctx = calloc(1, sizeof(*ctx))) == NULL) {
@@ -2814,10 +2768,10 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 				goto nomem;
 			break;
 		case IMSG_CTL_SHOW_RIB_PREFIX:
-			if (req->flags & (F_LONGER|F_SHORTER)) {
-				if (prefix_dump_new(peer, ctx->req.aid,
-				    CTL_MSG_HIGH_MARK, ctx,
-				    rde_dump_adjout_prefix_upcall,
+			if (req->flags & F_LONGER) {
+				if (prefix_dump_subtree(peer, &req->prefix,
+				    req->prefixlen, CTL_MSG_HIGH_MARK, ctx,
+				    rde_dump_adjout_upcall,
 				    rde_dump_done, rde_dump_throttled) == -1)
 					goto nomem;
 				break;
@@ -2836,12 +2790,27 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 			}
 
 			do {
-				if (req->prefixlen == hostplen)
+				if (req->flags & F_SHORTER) {
+					for (plen = 0; plen <= req->prefixlen;
+					    plen++) {
+						p = prefix_adjout_lookup(peer,
+						    &req->prefix, plen);
+						/* dump all matching paths */
+						while (p != NULL) {
+							rde_dump_adjout_upcall(
+							    p, ctx);
+							p = prefix_adjout_next(
+							    peer, p);
+						}
+					}
+					p = NULL;
+				} else if (req->prefixlen == hostplen) {
 					p = prefix_adjout_match(peer,
 					    &req->prefix);
-				else
+				} else {
 					p = prefix_adjout_lookup(peer,
 					    &req->prefix, req->prefixlen);
+				}
 				/* dump all matching paths */
 				while (p != NULL) {
 					rde_dump_adjout_upcall(p, ctx);
@@ -2882,9 +2851,9 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 			goto nomem;
 		break;
 	case IMSG_CTL_SHOW_RIB_PREFIX:
-		if (req->flags & (F_LONGER|F_SHORTER)) {
-			if (rib_dump_new(rid, ctx->req.aid,
-			    CTL_MSG_HIGH_MARK, ctx, rde_dump_prefix_upcall,
+		if (req->flags & F_LONGER) {
+			if (rib_dump_subtree(rid, &req->prefix, req->prefixlen,
+			    CTL_MSG_HIGH_MARK, ctx, rde_dump_upcall,
 			    rde_dump_done, rde_dump_throttled) == -1)
 				goto nomem;
 			break;
@@ -2901,13 +2870,20 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 		default:
 			fatalx("%s: unknown af", __func__);
 		}
-		if (req->prefixlen == hostplen)
+
+		if (req->flags & F_SHORTER) {
+			for (plen = 0; plen <= req->prefixlen; plen++) {
+				re = rib_get(rib_byid(rid), &req->prefix, plen);
+				rde_dump_upcall(re, ctx);
+			}
+		} else if (req->prefixlen == hostplen) {
 			re = rib_match(rib_byid(rid), &req->prefix);
-		else
+			rde_dump_upcall(re, ctx);
+		} else {
 			re = rib_get(rib_byid(rid), &req->prefix,
 			    req->prefixlen);
-		if (re)
 			rde_dump_upcall(re, ctx);
+		}
 		imsg_compose(ibuf_se_ctl, IMSG_CTL_END, 0, ctx->req.pid,
 		    -1, NULL, 0);
 		free(ctx);
@@ -3782,7 +3758,7 @@ rde_softreconfig_out(struct rib_entry *re, void *arg)
 		/* no valid path for prefix */
 		return;
 
-	rde_generate_updates(rib, p, NULL, EVAL_RECONF);
+	rde_generate_updates(rib, p, NULL, NULL, NULL, EVAL_RECONF);
 }
 
 static void

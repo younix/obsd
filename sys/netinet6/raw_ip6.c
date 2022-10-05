@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip6.c,v 1.166 2022/09/02 13:12:32 mvs Exp $	*/
+/*	$OpenBSD: raw_ip6.c,v 1.170 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$KAME: raw_ip6.c,v 1.69 2001/03/04 15:55:44 itojun Exp $	*/
 
 /*
@@ -106,9 +106,10 @@ struct	inpcbtable rawin6pcbtable;
 struct cpumem *rip6counters;
 
 const struct pr_usrreqs rip6_usrreqs = {
-	.pru_usrreq	= rip6_usrreq,
 	.pru_attach	= rip6_attach,
 	.pru_detach	= rip6_detach,
+	.pru_lock	= rip6_lock,
+	.pru_unlock	= rip6_unlock,
 	.pru_bind	= rip6_bind,
 	.pru_connect	= rip6_connect,
 	.pru_disconnect	= rip6_disconnect,
@@ -116,6 +117,8 @@ const struct pr_usrreqs rip6_usrreqs = {
 	.pru_send	= rip6_send,
 	.pru_abort	= rip6_abort,
 	.pru_control	= in6_control,
+	.pru_sockaddr	= in6_sockaddr,
+	.pru_peeraddr	= in6_peeraddr,
 };
 
 /*
@@ -260,13 +263,20 @@ rip6_input(struct mbuf **mp, int *offp, int proto, int af)
 		else
 			n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
 		if (n != NULL) {
+			int ret;
+
 			if (in6p->inp_flags & IN6P_CONTROLOPTS)
 				ip6_savecontrol(in6p, n, &opts);
 			/* strip intermediate headers */
 			m_adj(n, *offp);
-			if (sbappendaddr(in6p->inp_socket,
+
+			mtx_enter(&in6p->inp_mtx);
+			ret = sbappendaddr(in6p->inp_socket,
 			    &in6p->inp_socket->so_rcv,
-			    sin6tosa(&rip6src), n, opts) == 0) {
+			    sin6tosa(&rip6src), n, opts);
+			mtx_leave(&in6p->inp_mtx);
+
+			if (ret == 0) {
 				/* should notify about lost packet */
 				m_freem(n);
 				m_freem(opts);
@@ -575,42 +585,7 @@ extern	u_long rip6_sendspace;
 extern	u_long rip6_recvspace;
 
 int
-rip6_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
-	struct mbuf *control, struct proc *p)
-{
-	struct inpcb *in6p;
-	int error = 0;
-
-	soassertlocked(so);
-
-	in6p = sotoinpcb(so);
-	if (in6p == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-
-	switch (req) {
-	case PRU_SOCKADDR:
-		in6_setsockaddr(in6p, nam);
-		break;
-
-	case PRU_PEERADDR:
-		in6_setpeeraddr(in6p, nam);
-		break;
-
-	default:
-		panic("%s", __func__);
-	}
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-int
-rip6_attach(struct socket *so, int proto)
+rip6_attach(struct socket *so, int proto, int wait)
 {
 	struct inpcb *in6p;
 	int error;
@@ -625,15 +600,15 @@ rip6_attach(struct socket *so, int proto)
 	if ((error = soreserve(so, rip6_sendspace, rip6_recvspace)))
 		return error;
 	NET_ASSERT_LOCKED();
-	if ((error = in_pcballoc(so, &rawin6pcbtable)))
+	if ((error = in_pcballoc(so, &rawin6pcbtable, wait)))
 		return error;
 
 	in6p = sotoinpcb(so);
 	in6p->inp_ipv6.ip6_nxt = proto;
 	in6p->inp_cksum6 = -1;
 
-	in6p->inp_icmp6filt = malloc(sizeof(struct icmp6_filter),
-	    M_PCB, M_NOWAIT);
+	in6p->inp_icmp6filt = malloc(sizeof(struct icmp6_filter), M_PCB,
+	    wait == M_WAIT ? M_WAITOK : M_NOWAIT);
 	if (in6p->inp_icmp6filt == NULL) {
 		in_pcbdetach(in6p);
 		return ENOMEM;
@@ -661,6 +636,24 @@ rip6_detach(struct socket *so)
 	in_pcbdetach(in6p);
 
 	return (0);
+}
+
+void
+rip6_lock(struct socket *so)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_enter(&in6p->inp_mtx);
+}
+
+void
+rip6_unlock(struct socket *so)
+{
+	struct inpcb *in6p = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_leave(&in6p->inp_mtx);
 }
 
 int

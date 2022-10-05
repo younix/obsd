@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.1138 2022/08/30 11:53:03 bluhm Exp $ */
+/*	$OpenBSD: pf.c,v 1.1140 2022/09/03 19:22:19 bluhm Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -1148,6 +1148,8 @@ pf_find_state(struct pf_pdesc *pd, struct pf_state_key_cmp *key,
 
 	if (s == NULL)
 		return (PF_DROP);
+	if (ISSET(s->state_flags, PFSTATE_INP_UNLINKED))
+		return (PF_DROP);
 
 	if (s->rule.ptr->pktrate.limit && pd->dir == s->direction) {
 		pf_add_threshold(&s->rule.ptr->pktrate);
@@ -1461,7 +1463,23 @@ pf_remove_divert_state(struct pf_state_key *sk)
 		if (sk == si->s->key[PF_SK_STACK] && si->s->rule.ptr &&
 		    (si->s->rule.ptr->divert.type == PF_DIVERT_TO ||
 		    si->s->rule.ptr->divert.type == PF_DIVERT_REPLY)) {
-			pf_remove_state(si->s);
+			if (si->s->key[PF_SK_STACK]->proto == IPPROTO_TCP &&
+			    si->s->key[PF_SK_WIRE] != si->s->key[PF_SK_STACK]) {
+				/*
+				 * If the local address is translated, keep
+				 * the state for "tcp.closed" seconds to
+				 * prevent its source port from being reused.
+				 */
+				if (si->s->src.state < TCPS_FIN_WAIT_2 ||
+				    si->s->dst.state < TCPS_FIN_WAIT_2) {
+					pf_set_protostate(si->s, PF_PEER_BOTH,
+					    TCPS_TIME_WAIT);
+					si->s->timeout = PFTM_TCP_CLOSED;
+					si->s->expire = getuptime();
+				}
+				si->s->state_flags |= PFSTATE_INP_UNLINKED;
+			} else
+				pf_remove_state(si->s);
 			break;
 		}
 	}
@@ -3562,7 +3580,7 @@ pf_tcp_iss(struct pf_pdesc *pd)
 	}
 	SHA512Final(digest.bytes, &ctx);
 	pf_tcp_iss_off += 4096;
-	return (digest.words[0] + tcp_iss + pf_tcp_iss_off);
+	return (digest.words[0] + READ_ONCE(tcp_iss) + pf_tcp_iss_off);
 }
 
 void

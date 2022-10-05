@@ -1,4 +1,4 @@
-/*	$OpenBSD: socketvar.h,v 1.109 2022/09/01 05:31:49 jsg Exp $	*/
+/*	$OpenBSD: socketvar.h,v 1.111 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: socketvar.h,v 1.18 1996/02/09 18:25:38 christos Exp $	*/
 
 /*-
@@ -331,7 +331,7 @@ void	soisconnecting(struct socket *);
 void	soisdisconnected(struct socket *);
 void	soisdisconnecting(struct socket *);
 int	solisten(struct socket *, int);
-struct socket *sonewconn(struct socket *, int);
+struct socket *sonewconn(struct socket *, int, int);
 void	soqinsque(struct socket *, struct socket *, int);
 int	soqremque(struct socket *, int);
 int	soreceive(struct socket *, struct mbuf **, struct uio *,
@@ -348,9 +348,11 @@ int	sockargs(struct mbuf **, const void *, size_t, int);
 
 int	sosleep_nsec(struct socket *, void *, int, const char *, uint64_t);
 void	solock(struct socket *);
+void	solock_shared(struct socket *);
 int	solock_persocket(struct socket *);
 void	solock_pair(struct socket *, struct socket *);
 void	sounlock(struct socket *);
+void	sounlock_shared(struct socket *);
 
 int	sendit(struct proc *, int, struct msghdr *, int, register_t *);
 int	recvit(struct proc *, int, struct msghdr *, caddr_t, register_t *);

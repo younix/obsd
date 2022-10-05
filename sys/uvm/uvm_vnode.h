@@ -1,4 +1,4 @@
-/*	$OpenBSD: uvm_vnode.h,v 1.18 2021/10/12 07:37:42 mpi Exp $	*/
+/*	$OpenBSD: uvm_vnode.h,v 1.20 2022/09/21 07:32:59 mpi Exp $	*/
 /*	$NetBSD: uvm_vnode.h,v 1.9 2000/03/26 20:54:48 kleink Exp $	*/
 
 /*

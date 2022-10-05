@@ -3,8 +3,6 @@
 /i2c_exec.c/1.3/Sat Mar 14 03:38:47 2015//
 /i2c_io.h/1.2/Sat Jan 11 11:30:47 2020//
 /i2c_scan.c/1.146/Mon Dec 16 19:17:04 2019//
-/ikbd.c/1.1/Thu Jan 14 21:01:49 2016//
-/ihidev.h/1.8/Fri Dec 11 17:58:22 2020//
 /imt.c/1.5/Fri Dec 11 17:58:22 2020//
 /m41t8x.c/1.2/Sat May  1 08:41:51 2021//
 /ims.c/1.3/Wed Sep  1 16:07:39 2021//
@@ -57,4 +55,6 @@
 /w83l784r.c/1.14/Tue Jul 26 13:42:35 2022//
 /i2cvar.h/1.19/Fri Sep  2 14:00:21 2022//
 /ihidev.c/1.28/Fri Sep  2 14:00:21 2022//
+/ihidev.h/1.9/Tue Sep 20 07:19:40 2022//
+/ikbd.c/1.2/Tue Sep 20 07:19:40 2022//
 D

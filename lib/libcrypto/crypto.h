@@ -1,4 +1,4 @@
-/* $OpenBSD: crypto.h,v 1.55 2022/07/12 14:42:48 kn Exp $ */
+/* $OpenBSD: crypto.h,v 1.57 2022/09/11 17:26:51 tb Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
  *
@@ -562,6 +562,7 @@ void ERR_load_CRYPTO_strings(void);
 #define OPENSSL_INIT_ENGINE_ALL_BUILTIN		_OPENSSL_INIT_FLAG_NOOP
 
 int OPENSSL_init_crypto(uint64_t opts, const void *settings);
+void OPENSSL_cleanup(void);
 
 #ifdef  __cplusplus
 }

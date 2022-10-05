@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.85 2022/08/19 12:45:53 tb Exp $ */
+/*	$OpenBSD: cert.c,v 1.89 2022/09/03 21:24:02 job Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
@@ -736,6 +736,13 @@ cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 			    p.fn);
 			goto out;
 		}
+		for (i = 0; i < p.res->asz; i++) {
+			if (p.res->as[i].type == CERT_AS_INHERIT) {
+				warnx("%s: inherited AS numbers in BGPsec cert",
+				    p.fn);
+				goto out;
+			}
+		}
 		if (sia_present) {
 			warnx("%s: unexpected SIA extension in BGPsec cert",
 			    p.fn);
@@ -854,6 +861,10 @@ ta_parse(const char *fn, struct cert *p, const unsigned char *pkey,
 		warnx("%s: BGPsec cert cannot be a trust anchor", fn);
 		goto badcert;
 	}
+	if (x509_any_inherits(p->x509)) {
+		warnx("%s: Trust anchor IP/AS resources may not inherit", fn);
+		goto badcert;
+	}
 
 	EVP_PKEY_free(pk);
 	return p;
@@ -898,6 +909,7 @@ cert_buffer(struct ibuf *b, const struct cert *p)
 	io_simple_buffer(b, &p->expires, sizeof(p->expires));
 	io_simple_buffer(b, &p->purpose, sizeof(p->purpose));
 	io_simple_buffer(b, &p->talid, sizeof(p->talid));
+	io_simple_buffer(b, &p->repoid, sizeof(p->repoid));
 	io_simple_buffer(b, &p->ipsz, sizeof(p->ipsz));
 	io_simple_buffer(b, &p->asz, sizeof(p->asz));
 
@@ -930,6 +942,7 @@ cert_read(struct ibuf *b)
 	io_read_buf(b, &p->expires, sizeof(p->expires));
 	io_read_buf(b, &p->purpose, sizeof(p->purpose));
 	io_read_buf(b, &p->talid, sizeof(p->talid));
+	io_read_buf(b, &p->repoid, sizeof(p->repoid));
 	io_read_buf(b, &p->ipsz, sizeof(p->ipsz));
 	io_read_buf(b, &p->asz, sizeof(p->asz));
 
@@ -964,6 +977,18 @@ authcmp(struct auth *a, struct auth *b)
 }
 
 RB_GENERATE_STATIC(auth_tree, auth, entry, authcmp);
+
+void
+auth_tree_free(struct auth_tree *auths)
+{
+	struct auth	*auth, *tauth;
+
+	RB_FOREACH_SAFE(auth, auth_tree, auths, tauth) {
+		RB_REMOVE(auth_tree, auths, auth);
+		cert_free(auth->cert);
+		free(auth);
+	}
+}
 
 struct auth *
 auth_find(struct auth_tree *auths, const char *aki)

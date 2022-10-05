@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.68 2022/08/24 22:01:16 kettenis Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.71 2022/10/04 19:41:21 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -48,6 +48,7 @@
 #define CPU_IMPL_ARM		0x41
 #define CPU_IMPL_CAVIUM		0x43
 #define CPU_IMPL_AMCC		0x50
+#define CPU_IMPL_QCOM		0x51
 #define CPU_IMPL_APPLE		0x61
 
 /* ARM */
@@ -78,6 +79,7 @@
 #define CPU_PART_CORTEX_X1C	0xd4c
 #define CPU_PART_CORTEX_A715	0xd4d
 #define CPU_PART_CORTEX_X3	0xd4e
+#define CPU_PART_NEOVERSE_V2	0xd4f
 
 /* Cavium */
 #define CPU_PART_THUNDERX_T88	0x0a1
@@ -87,6 +89,10 @@
 
 /* Applied Micro */
 #define CPU_PART_X_GENE		0x000
+
+/* Qualcomm */
+#define CPU_PART_KRYO400_GOLD	0x804
+#define CPU_PART_KRYO400_SILVER	0x805
 
 /* Apple */
 #define CPU_PART_ICESTORM	0x022
@@ -140,6 +146,7 @@ struct cpu_cores cpu_cores_arm[] = {
 	{ CPU_PART_NEOVERSE_N1, "Neoverse N1" },
 	{ CPU_PART_NEOVERSE_N2, "Neoverse N2" },
 	{ CPU_PART_NEOVERSE_V1, "Neoverse V1" },
+	{ CPU_PART_NEOVERSE_V2, "Neoverse V2" },
 	{ 0, NULL },
 };
 
@@ -153,6 +160,12 @@ struct cpu_cores cpu_cores_cavium[] = {
 
 struct cpu_cores cpu_cores_amcc[] = {
 	{ CPU_PART_X_GENE, "X-Gene" },
+	{ 0, NULL },
+};
+
+struct cpu_cores cpu_cores_qcom[] = {
+	{ CPU_PART_KRYO400_GOLD, "Kryo 400 Gold" },
+	{ CPU_PART_KRYO400_SILVER, "Kryo 400 Silver" },
 	{ 0, NULL },
 };
 
@@ -177,6 +190,7 @@ const struct implementers {
 	{ CPU_IMPL_ARM,	"ARM", cpu_cores_arm },
 	{ CPU_IMPL_CAVIUM, "Cavium", cpu_cores_cavium },
 	{ CPU_IMPL_AMCC, "Applied Micro", cpu_cores_amcc },
+	{ CPU_IMPL_QCOM, "Qualcomm", cpu_cores_qcom },
 	{ CPU_IMPL_APPLE, "Apple", cpu_cores_apple },
 	{ 0, NULL },
 };
@@ -742,6 +756,7 @@ void
 cpu_init(void)
 {
 	uint64_t id_aa64mmfr1, sctlr;
+	uint64_t id_aa64pfr0;
 	uint64_t tcr;
 
 	WRITE_SPECIALREG(ttbr0_el1, pmap_kernel()->pm_pt0pa);
@@ -760,6 +775,11 @@ cpu_init(void)
 		sctlr &= ~SCTLR_SPAN;
 		WRITE_SPECIALREG(sctlr_el1, sctlr);
 	}
+
+	/* Enable DIT. */
+	id_aa64pfr0 = READ_SPECIALREG(id_aa64pfr0_el1);
+	if (ID_AA64PFR0_DIT(id_aa64pfr0) >= ID_AA64PFR0_DIT_IMPL)
+		__asm volatile (".arch armv8.4-a; msr dit, #1");
 
 	/* Initialize debug registers. */
 	WRITE_SPECIALREG(mdscr_el1, DBG_MDSCR_TDCC);

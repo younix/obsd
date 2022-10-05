@@ -3,7 +3,6 @@
 /cmdtab.c/1.31/Thu May 16 12:44:17 2019//
 /complete.c/1.33/Thu May 16 12:44:17 2019//
 /domacro.c/1.22/Mon Nov 18 04:37:35 2019//
-/ftp.c/1.107/Mon Nov 18 04:37:35 2019//
 /list.c/1.9/Thu May 16 12:44:18 2019//
 /pathnames.h/1.9/Thu May 16 12:44:18 2019//
 /ruserpass.c/1.33/Fri Jun 28 13:35:01 2019//
@@ -13,10 +12,11 @@
 /stringlist.h/1.8/Thu May 16 12:44:18 2019//
 /Makefile/1.35/Wed Sep  1 16:07:40 2021//
 /cookie.c/1.10/Wed Sep  1 16:07:40 2021//
-/extern.h/1.52/Wed Sep  1 16:07:40 2021//
 /ftp_var.h/1.46/Wed Sep  1 16:07:40 2021//
-/util.c/1.95/Wed Sep  1 16:07:40 2021//
 /main.c/1.138/Thu Sep  2 14:22:33 2021//
-/fetch.c/1.208/Sun Nov 21 20:15:22 2021//
-/ftp.1/1.123/Tue Jul 26 13:42:36 2022//
+/extern.h/1.53/Tue Sep 20 07:19:43 2022//
+/fetch.c/1.210/Tue Sep 20 07:19:43 2022//
+/ftp.1/1.124/Tue Sep 20 07:19:43 2022//
+/ftp.c/1.108/Tue Sep 20 07:19:43 2022//
+/util.c/1.97/Tue Sep 20 07:19:43 2022//
 D

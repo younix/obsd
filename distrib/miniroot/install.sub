@@ -1,5 +1,5 @@
 #!/bin/ksh
-#	$OpenBSD: install.sub,v 1.1204 2022/08/23 16:08:09 kn Exp $
+#	$OpenBSD: install.sub,v 1.1209 2022/10/04 19:59:10 kn Exp $
 #
 # Copyright (c) 1997-2015 Todd Miller, Theo de Raadt, Ken Westerback
 # Copyright (c) 2015, Robert Peichaer <rpe@openbsd.org>
@@ -1434,7 +1434,7 @@ select_sets() {
 	# account for 4 spaces added to the sets list
 	let COLUMNS=_col-8
 
-	cat <<__EOT
+	cat <<'__EOT'
 
 Select sets by entering a set name, a file name pattern or 'all'. De-select
 sets by prepending a '-', e.g.: '-game*'. Selected sets are labelled '[X]'.
@@ -2902,18 +2902,16 @@ finish_up() {
 	# Run syspatch -c on reboot if the arch is supported and if it is a
 	# release system (not -stable or -current). List uninstalled syspatches
 	# on the console and in the rc.firsttime output mail.
-	isin "$ARCH" $_syspatch_archs && cat <<__EOT >>/mnt/etc/rc.firsttime
-set -A _KERNV -- \$(sysctl -n kern.version |
+	isin "$ARCH" $_syspatch_archs && cat <<'__EOT' >>/mnt/etc/rc.firsttime
+set -A _KERNV -- $(sysctl -n kern.version |
 	sed 's/^OpenBSD \([1-9][0-9]*\.[0-9]\)\([^ ]*\).*/\1 \2/;q')
-if ((\${#_KERNV[*]} == 1)) && [[ -s /etc/installurl ]] &&
-	_CKPATCH=\$(mktemp /tmp/_ckpatch.XXXXXXXXXX); then
+if ((${#_KERNV[*]} == 1)) && [[ -s /etc/installurl ]]; then
 	echo "Checking for available binary patches..."
-	syspatch -c > \$_CKPATCH
-	if [[ -s \$_CKPATCH ]]; then
+	_CKPATCH=$(syspatch -c)
+	if [[ -n $_CKPATCH ]]; then
 		echo "Run syspatch(8) to install:"
-		column -xc 80 \$_CKPATCH
+		echo "$_CKPATCH" | column -xc 80
 	fi
-	rm -f \$_CKPATCH
 fi
 __EOT
 
@@ -2927,10 +2925,10 @@ __EOT
 		mkdir -m 700 -p $_kernel_dir
 		tar -C $_kernel_dir -xzf $_kernel_dir.tgz $_kernel
 		rm -f $_kernel_dir.tgz
-		chroot /mnt /bin/ksh -e -c "cd ${_kernel_dir#/mnt}/$_kernel; \
-			make newbsd; \
-			[ -f /etc/bsd.re-config ] && \
-			    config -e -c /etc/bsd.re-config -f bsd; \
+		chroot /mnt /bin/ksh -e -c "cd ${_kernel_dir#/mnt}/$_kernel
+			make newbsd
+			[ -f /etc/bsd.re-config ] &&
+				config -e -c /etc/bsd.re-config -f bsd
 			make newinstall"
 		) >/dev/null 2>&1 && echo " done." || echo " failed."
 	fi
@@ -3137,13 +3135,12 @@ do_install() {
 	# than 120 seconds, ask if the user wants to adjust the time.
 	if _time=$(http_time) && _now=$(date +%s) &&
 		(( _now - _time > 120 || _time - _now > 120 )); then
-		_tz=/mnt/usr/share/zoneinfo/$TZ
-		if ask_yn "Time appears wrong.  Set to '$(TZ=$_tz date -r "$(http_time)")'?" yes; then
-			# We do not need to specify TZ below since both date
-			# invocations use the same one.
+		ln -sf /mnt/usr/share/zoneinfo/$TZ /etc/localtime
+		if ask_yn "Time appears wrong.  Set to '$(date -r "$(http_time)")'?" yes; then
 			date $(date -r "$(http_time)" "+%Y%m%d%H%M.%S") >/dev/null
 			# N.B. This will screw up SECONDS.
 		fi
+		rm -f /etc/localtime
 	fi
 
 	# If we managed to talk to the cgi server before, tell it what
@@ -3184,10 +3181,9 @@ do_install() {
 
 	# Note we may have no hosts file if no interfaces were configured.
 	if [[ -f /tmp/i/hosts ]]; then
-		# Remove the entry for ftplist*.openbsd.org
-		sed -i '/ ftplist[0-9]\.openbsd\.org$/d' /tmp/i/hosts
 		_dn=$(get_fqdn)
 		while read _addr _hn _aliases; do
+			[[ $_hn == ftplist[0-9].openbsd.org ]] && continue
 			if [[ -n $_aliases || $_hn != ${_hn%%.*} || -z $_dn ]]; then
 				echo "$_addr\t$_hn $_aliases"
 			else
@@ -3498,7 +3494,7 @@ export COLUMNS=$(stty -a </dev/console |
 
 # Interactive or automatic installation?
 if ! $AI; then
-	cat <<__EOT
+	cat <<'__EOT'
 At any prompt except password prompts you can escape to a shell by
 typing '!'. Default answers are shown in []'s and are selected by
 pressing RETURN.  You can exit this program at any time by pressing

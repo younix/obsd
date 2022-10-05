@@ -1,4 +1,4 @@
-/*	$OpenBSD: http.c,v 1.65 2022/08/30 14:33:26 tb Exp $ */
+/*	$OpenBSD: http.c,v 1.69 2022/09/20 08:53:27 claudio Exp $ */
 /*
  * Copyright (c) 2020 Nils Fisher <nils_fisher@hotmail.com>
  * Copyright (c) 2020 Claudio Jeker <claudio@openbsd.org>
@@ -91,6 +91,7 @@ enum http_state {
 	STATE_RESPONSE_HEADER,
 	STATE_RESPONSE_DATA,
 	STATE_RESPONSE_CHUNKED_HEADER,
+	STATE_RESPONSE_CHUNKED_CRLF,
 	STATE_RESPONSE_CHUNKED_TRAILER,
 	STATE_WRITE_DATA,
 	STATE_IDLE,
@@ -1164,11 +1165,11 @@ http_redirect(struct http_connection *conn)
 static int
 http_parse_header(struct http_connection *conn, char *buf)
 {
-#define CONTENTLEN "Content-Length: "
-#define LOCATION "Location: "
-#define CONNECTION "Connection: "
-#define TRANSFER_ENCODING "Transfer-Encoding: "
-#define LAST_MODIFIED "Last-Modified: "
+#define CONTENTLEN "Content-Length:"
+#define LOCATION "Location:"
+#define CONNECTION "Connection:"
+#define TRANSFER_ENCODING "Transfer-Encoding:"
+#define LAST_MODIFIED "Last-Modified:"
 	const char *errstr;
 	char *cp, *redirurl;
 	char *locbase, *loctail;
@@ -1178,10 +1179,9 @@ http_parse_header(struct http_connection *conn, char *buf)
 	if (*cp == '\0')
 		return 0;
 	else if (strncasecmp(cp, CONTENTLEN, sizeof(CONTENTLEN) - 1) == 0) {
-		size_t s;
 		cp += sizeof(CONTENTLEN) - 1;
-		if ((s = strcspn(cp, " \t")) != 0)
-			*(cp + s) = 0;
+		cp += strspn(cp, " \t");
+		cp[strcspn(cp, " \t")] = '\0';
 		conn->iosz = strtonum(cp, 0, MAX_CONTENTLEN, &errstr);
 		if (errstr != NULL) {
 			warnx("Content-Length of %s is %s",
@@ -1191,6 +1191,7 @@ http_parse_header(struct http_connection *conn, char *buf)
 	} else if (http_isredirect(conn) &&
 	    strncasecmp(cp, LOCATION, sizeof(LOCATION) - 1) == 0) {
 		cp += sizeof(LOCATION) - 1;
+		cp += strspn(cp, " \t");
 		/*
 		 * If there is a colon before the first slash, this URI
 		 * is not relative. RFC 3986 4.2
@@ -1232,11 +1233,13 @@ http_parse_header(struct http_connection *conn, char *buf)
 	} else if (strncasecmp(cp, TRANSFER_ENCODING,
 	    sizeof(TRANSFER_ENCODING) - 1) == 0) {
 		cp += sizeof(TRANSFER_ENCODING) - 1;
+		cp += strspn(cp, " \t");
 		cp[strcspn(cp, " \t")] = '\0';
 		if (strcasecmp(cp, "chunked") == 0)
 			conn->chunked = 1;
 	} else if (strncasecmp(cp, CONNECTION, sizeof(CONNECTION) - 1) == 0) {
 		cp += sizeof(CONNECTION) - 1;
+		cp += strspn(cp, " \t");
 		cp[strcspn(cp, " \t")] = '\0';
 		if (strcasecmp(cp, "close") == 0)
 			conn->keep_alive = 0;
@@ -1245,6 +1248,7 @@ http_parse_header(struct http_connection *conn, char *buf)
 	} else if (strncasecmp(cp, LAST_MODIFIED,
 	    sizeof(LAST_MODIFIED) - 1) == 0) {
 		cp += sizeof(LAST_MODIFIED) - 1;
+		cp += strspn(cp, " \t");
 		free(conn->last_modified);
 		if ((conn->last_modified = strdup(cp)) == NULL)
 			err(1, NULL);
@@ -1270,8 +1274,10 @@ http_get_line(struct http_connection *conn)
 		return NULL;
 
 	len = end - conn->buf;
-	while (len > 0 && conn->buf[len - 1] == '\r')
+	while (len > 0 && (conn->buf[len - 1] == '\r' ||
+	    conn->buf[len - 1] == ' ' || conn->buf[len - 1] == '\t'))
 		--len;
+
 	if ((line = strndup(conn->buf, len)) == NULL)
 		err(1, NULL);
 
@@ -1286,7 +1292,6 @@ http_get_line(struct http_connection *conn)
 /*
  * Parse the header between data chunks during chunked transfers.
  * Returns 0 if a new chunk size could be correctly read.
- * Returns 1 for the empty trailer lines.
  * If the chuck size could not be converted properly -1 is returned.
  */
 static int
@@ -1296,12 +1301,8 @@ http_parse_chunked(struct http_connection *conn, char *buf)
 	char *end;
 	unsigned long chunksize;
 
-	/* empty lines are used as trailer */
-	if (*header == '\0')
-		return 1;
-
-	/* strip CRLF and any optional chunk extension */
-	header[strcspn(header, ";\r\n")] = '\0';
+	/* strip any optional chunk extension */
+	header[strcspn(header, "; \t")] = '\0';
 	errno = 0;
 	chunksize = strtoul(header, &end, 16);
 	if (header[0] == '\0' || *end != '\0' || (errno == ERANGE &&
@@ -1428,7 +1429,7 @@ again:
 		    conn->iosz > (off_t)conn->bufpos)
 			goto read_more;
 
-		/* got a full buffer full of data */
+		/* got a buffer full of data */
 		if (conn->req == NULL) {
 			/*
 			 * After redirects all data needs to be discarded.
@@ -1441,7 +1442,7 @@ again:
 				conn->bufpos = 0;
 			}
 			if (conn->chunked)
-				conn->state = STATE_RESPONSE_CHUNKED_TRAILER;
+				conn->state = STATE_RESPONSE_CHUNKED_CRLF;
 			else
 				conn->state = STATE_RESPONSE_DATA;
 			goto read_more;
@@ -1466,31 +1467,36 @@ again:
 		 * check if transfer is done, in which case the last trailer
 		 * still needs to be processed.
 		 */
-		if (conn->iosz == 0) {
-			conn->chunked = 0;
+		if (conn->iosz == 0)
 			conn->state = STATE_RESPONSE_CHUNKED_TRAILER;
-			goto again;
-		}
-
-		conn->state = STATE_RESPONSE_DATA;
+		else
+			conn->state = STATE_RESPONSE_DATA;
 		goto again;
-	case STATE_RESPONSE_CHUNKED_TRAILER:
+	case STATE_RESPONSE_CHUNKED_CRLF:
 		buf = http_get_line(conn);
 		if (buf == NULL)
 			goto read_more;
-		if (http_parse_chunked(conn, buf) != 1) {
+		/* expect empty line to finish a chunk of data */
+		if (*buf != '\0') {
 			warnx("%s: bad chunk encoding", http_info(conn->host));
 			free(buf);
 			return http_failed(conn);
 		}
 		free(buf);
-
-		/* if chunked got cleared then the transfer is over */
-		if (conn->chunked == 0)
-			return http_done(conn, HTTP_OK);
-
 		conn->state = STATE_RESPONSE_CHUNKED_HEADER;
 		goto again;
+	case STATE_RESPONSE_CHUNKED_TRAILER:
+		buf = http_get_line(conn);
+		if (buf == NULL)
+			goto read_more;
+		/* the trailer may include extra headers, just ignore them */
+		if (*buf != '\0') {
+			free(buf);
+			goto again;
+		}
+		free(buf);
+		conn->chunked = 0;
+		return http_done(conn, HTTP_OK);
 	default:
 		errx(1, "unexpected http state");
 	}
@@ -1690,7 +1696,7 @@ data_write(struct http_connection *conn)
 	/* all data written, switch back to read */
 	if (conn->bufpos == 0 || conn->iosz == 0) {
 		if (conn->chunked && conn->iosz == 0)
-			conn->state = STATE_RESPONSE_CHUNKED_TRAILER;
+			conn->state = STATE_RESPONSE_CHUNKED_CRLF;
 		else
 			conn->state = STATE_RESPONSE_DATA;
 		return http_read(conn);
@@ -1729,6 +1735,7 @@ http_handle(struct http_connection *conn)
 	case STATE_RESPONSE_HEADER:
 	case STATE_RESPONSE_DATA:
 	case STATE_RESPONSE_CHUNKED_HEADER:
+	case STATE_RESPONSE_CHUNKED_CRLF:
 	case STATE_RESPONSE_CHUNKED_TRAILER:
 		return http_read(conn);
 	case STATE_WRITE_DATA:

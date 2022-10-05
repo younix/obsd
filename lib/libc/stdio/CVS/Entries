@@ -39,7 +39,6 @@
 /fread.c/1.19/Sun Dec 16 15:38:29 2018//
 /freopen.c/1.17/Sat Jun 29 16:12:21 2019//
 /fscanf.c/1.11/Mon Aug 31 02:53:57 2015//
-/fseek.3/1.18/Sat Mar 26 22:32:29 2016//
 /fsetpos.c/1.8/Wed Sep 21 04:38:56 2016//
 /ftell.c/1.11/Mon Aug 31 02:53:57 2015//
 /fvwrite.c/1.20/Fri Mar 17 16:06:33 2017//
@@ -50,7 +49,6 @@
 /fwprintf.c/1.4/Mon Aug 31 02:53:57 2015//
 /fwrite.c/1.12/Mon Aug 31 02:53:57 2015//
 /fwscanf.c/1.3/Mon Aug 31 02:53:57 2015//
-/getc.3/1.15/Fri Dec  1 11:18:40 2017//
 /getc.c/1.10/Mon Aug 31 02:53:57 2015//
 /getchar.c/1.8/Mon Aug 31 02:53:57 2015//
 /getdelim.3/1.6/Tue Oct 17 22:47:58 2017//
@@ -69,7 +67,6 @@
 /perror.3/1.11/Thu May 16 13:35:16 2019//
 /perror.c/1.9/Mon Aug 31 02:53:57 2015//
 /printf.c/1.9/Mon Aug 31 02:53:57 2015//
-/putc.3/1.13/Fri Dec  1 11:18:40 2017//
 /putc.c/1.13/Mon Aug 31 02:53:57 2015//
 /putchar.c/1.8/Mon Aug 31 02:53:57 2015//
 /puts.c/1.12/Mon Aug 31 02:53:57 2015//
@@ -85,7 +82,6 @@
 /setbuf.3/1.16/Tue Nov 25 19:08:14 2014//
 /setbuf.c/1.6/Mon Aug 31 02:53:57 2015//
 /setbuffer.c/1.7/Wed Sep 21 04:38:56 2016//
-/setvbuf.c/1.14/Wed Sep 21 04:38:56 2016//
 /snprintf.c/1.19/Mon Aug 31 02:53:57 2015//
 /sprintf.c/1.19/Tue Nov 28 06:55:49 2017//
 /sscanf.c/1.15/Mon Aug 31 02:53:57 2015//
@@ -97,7 +93,6 @@
 /tmpfile.c/1.12/Fri Apr 26 06:33:29 2019//
 /tmpnam.3/1.23/Fri Aug 30 23:33:45 2019//
 /tmpnam.c/1.12/Tue Nov 28 06:55:49 2017//
-/ungetc.3/1.10/Fri Dec  1 11:18:40 2017//
 /ungetc.c/1.15/Wed Sep 21 04:38:56 2016//
 /ungetwc.c/1.6/Mon Aug 31 02:53:57 2015//
 /vasprintf.c/1.23/Fri Jan 25 00:19:25 2019//
@@ -136,4 +131,9 @@
 /funopen.3/1.20/Fri Sep  2 14:00:04 2022//
 /mktemp.3/1.56/Fri Sep  2 14:00:04 2022//
 /printf.3/1.93/Fri Sep  2 14:00:04 2022//
+/fseek.3/1.19/Tue Sep 20 07:19:20 2022//
+/getc.3/1.16/Tue Sep 20 07:19:20 2022//
+/putc.3/1.14/Tue Sep 20 07:19:20 2022//
+/ungetc.3/1.11/Tue Sep 20 07:19:20 2022//
+/setvbuf.c/1.15/Wed Oct  5 18:34:40 2022//
 D

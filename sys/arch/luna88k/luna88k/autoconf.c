@@ -1,4 +1,4 @@
-/*	$OpenBSD: autoconf.c,v 1.25 2022/08/13 06:44:48 jsg Exp $	*/
+/*	$OpenBSD: autoconf.c,v 1.27 2022/09/23 02:35:46 aoyama Exp $	*/
 /*
  * Copyright (c) 1998 Steve Murphree, Jr.
  * Copyright (c) 1996 Nivas Madhur
@@ -61,10 +61,7 @@
 void	dumpconf(void);
 void	get_autoboot_device(void);
 
-int cold = 1;	/* 1 if still booting */
-
-void *bootaddr;
-int bootpart;
+int cold = 1;		/* 1 if still booting */
 struct device *bootdv;	/* set by device drivers (if found) */
 
 /*
@@ -169,13 +166,12 @@ device_register(struct device *dev, void *aux)
 		    sa->sa_sc_link->target == autoboot.targ &&
 		    sa->sa_sc_link->lun == 0) {
 			bootdv = dev;
-			bootpart = autoboot.part;
 			return;
 		}
 	}
 }
 
-struct nam2blk nam2blk[] = {
+const struct nam2blk nam2blk[] = {
 	{ "sd",		4 },
 	{ "cd",		6 },
 	{ "rd",		7 },

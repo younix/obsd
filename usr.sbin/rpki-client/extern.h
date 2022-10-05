@@ -1,4 +1,4 @@
-/*	$OpenBSD: extern.h,v 1.151 2022/08/30 18:56:49 job Exp $ */
+/*	$OpenBSD: extern.h,v 1.156 2022/09/03 21:24:02 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -137,6 +137,7 @@ struct cert {
 	struct cert_as	*as; /* list of AS numbers and ranges */
 	size_t		 asz; /* length of "asz" */
 	int		 talid; /* cert is covered by which TAL */
+	unsigned int	 repoid; /* repository of this cert file */
 	char		*repo; /* CA repository (rsync:// uri) */
 	char		*mft; /* manifest (rsync:// uri) */
 	char		*notify; /* RRDP notify (https:// uri) */
@@ -408,6 +409,7 @@ enum rrdp_msg {
 	RRDP_HTTP_REQ,
 	RRDP_HTTP_INI,
 	RRDP_HTTP_FIN,
+	RRDP_ABORT,
 };
 
 /*
@@ -509,6 +511,7 @@ struct tal	*tal_read(struct ibuf *);
 
 void		 cert_buffer(struct ibuf *, const struct cert *);
 void		 cert_free(struct cert *);
+void		 auth_tree_free(struct auth_tree *);
 struct cert	*cert_parse_ee_cert(const char *, X509 *);
 struct cert	*cert_parse_pre(const char *, const unsigned char *, size_t);
 struct cert	*cert_parse(const char *, struct cert *);
@@ -554,6 +557,7 @@ struct crl	*crl_parse(const char *, const unsigned char *, size_t);
 struct crl	*crl_get(struct crl_tree *, const struct auth *);
 int		 crl_insert(struct crl_tree *, struct crl *);
 void		 crl_free(struct crl *);
+void		 crl_tree_free(struct crl_tree *);
 
 /* Validation of our objects. */
 
@@ -652,9 +656,11 @@ void		 rrdp_finish(unsigned int, int);
 
 void		 rsync_fetch(unsigned int, const char *, const char *,
 		    const char *);
+void		 rsync_abort(unsigned int);
 void		 http_fetch(unsigned int, const char *, const char *, int);
 void		 rrdp_fetch(unsigned int, const char *, const char *,
 		    struct rrdp_session *);
+void		 rrdp_abort(unsigned int);
 void		 rrdp_http_done(unsigned int, enum http_result, const char *);
 int		 repo_check_timeout(int);
 
@@ -707,6 +713,7 @@ char		*x509_convert_seqnum(const char *, const ASN1_INTEGER *);
 int		 x509_location(const char *, const char *, const char *,
 		    GENERAL_NAME *, char **);
 int		 x509_inherits(X509 *);
+int	 	 x509_any_inherits(X509 *);
 
 /* printers */
 char		*time2str(time_t);

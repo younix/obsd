@@ -1,4 +1,4 @@
-/*	$OpenBSD: gpt.c,v 1.80 2022/08/29 19:39:10 krw Exp $	*/
+/*	$OpenBSD: gpt.c,v 1.83 2022/09/15 15:05:58 krw Exp $	*/
 /*
  * Copyright (c) 2015 Markus Muller <mmu@grummel.net>
  * Copyright (c) 2015 Kenneth R Westerback <krw@openbsd.org>
@@ -434,18 +434,19 @@ GPT_print_parthdr(const int verbosity)
 void
 GPT_print_part(const unsigned int pn, const char *units, const int verbosity)
 {
+	const uint8_t		 gpt_uuid_msdos[] = GPT_UUID_MSDOS;
 	const struct unit_type	*ut;
+	struct uuid		 uuid;
 	char			*guidstr = NULL;
 	double			 size;
-	uint64_t		 end, start;
+	uint64_t		 attrs, end, start;
 	uint32_t		 status;
 
 	start = gp[pn].gp_lba_start;
 	end = gp[pn].gp_lba_end;
 	size = units_size(units, (start > end) ? 0 : end - start + 1, &ut);
 
-	printf("%c%3u: %-36s [%12lld: %12.0f%s]\n",
-	    gp[pn].gp_attrs & GPTDOSACTIVE ? '*' : ' ', pn,
+	printf(" %3u: %-36s [%12lld: %12.0f%s]\n", pn,
 	    PRT_uuid_to_sname(&gp[pn].gp_type), start, size, ut->ut_abbr);
 
 	if (verbosity == VERBOSE) {
@@ -456,6 +457,28 @@ GPT_print_part(const unsigned int pn, const char *units, const int verbosity)
 			printf("      %-36s ", guidstr);
 		printf("%-36s\n", name_to_string(pn));
 		free(guidstr);
+		attrs = gp[pn].gp_attrs;
+		if (attrs) {
+			printf("      Attributes: (0x%016llx) ", attrs);
+			if (attrs & GPTPARTATTR_REQUIRED)
+				printf("Required " );
+			if (attrs & GPTPARTATTR_IGNORE)
+				printf("Ignore ");
+			if (attrs & GPTPARTATTR_BOOTABLE)
+				printf("Bootable ");
+			uuid_dec_be(gpt_uuid_msdos, &uuid);
+			if (uuid_compare(&uuid, &gp[pn].gp_type, NULL) == 0) {
+				if (attrs & GPTPARTATTR_MS_READONLY)
+					printf("ReadOnly " );
+				if (attrs & GPTPARTATTR_MS_SHADOW)
+					printf("Shadow ");
+				if (attrs & GPTPARTATTR_MS_HIDDEN)
+					printf("Hidden ");
+				if (attrs & GPTPARTATTR_MS_NOAUTOMOUNT)
+					printf("NoAutoMount ");
+			}
+			printf("\n");
+		}
 	}
 
 	if (start > end)
@@ -592,7 +615,8 @@ init_gp(const int how)
 		memset(&gp, 0, sizeof(gp));
 	else {
 		for (pn = 0; pn < gh.gh_part_num; pn++) {
-			if (PRT_protected_guid(&gp[pn].gp_type))
+			if (PRT_protected_guid(&gp[pn].gp_type) ||
+			    (gp[pn].gp_attrs & GPTPARTATTR_REQUIRED))
 				continue;
 			memset(&gp[pn], 0, sizeof(gp[pn]));
 		}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysv_sem.c,v 1.61 2021/04/30 13:52:48 bluhm Exp $	*/
+/*	$OpenBSD: sysv_sem.c,v 1.63 2022/09/28 13:21:13 mbuhl Exp $	*/
 /*	$NetBSD: sysv_sem.c,v 1.26 1996/02/09 19:00:25 christos Exp $	*/
 
 /*
@@ -229,8 +229,15 @@ sys___semctl(struct proc *p, void *v, register_t *retval)
 		syscallarg(int) cmd;
 		syscallarg(union semun *) arg;
 	} */ *uap = v;
-	union semun arg;
-	int error = 0, cmd = SCARG(uap, cmd);
+	struct ucred *cred = p->p_ucred;
+	int semid = SCARG(uap, semid);
+	int semnum = SCARG(uap, semnum);
+	int cmd = SCARG(uap, cmd);
+	union semun arg, *uarg = SCARG(uap, arg);
+	struct semid_ds sbuf;
+	struct semid_ds *semaptr;
+	unsigned short *semval = NULL, nsems;
+	int i, ix, error;
 
 	switch (cmd) {
 	case IPC_SET:
@@ -238,33 +245,20 @@ sys___semctl(struct proc *p, void *v, register_t *retval)
 	case GETALL:
 	case SETVAL:
 	case SETALL:
-		error = copyin(SCARG(uap, arg), &arg, sizeof(arg));
-		break;
+		if ((error = copyin(uarg, &arg, sizeof(union semun))))
+			return (error);
 	}
-	if (error == 0) {
-		error = semctl1(p, SCARG(uap, semid), SCARG(uap, semnum),
-		    cmd, &arg, retval, copyin, copyout);
-	}
-	return (error);
-}
+	if (cmd == IPC_SET)
+		if ((error = copyin(arg.buf, &sbuf, sizeof(sbuf))))
+			return (error);
 
-int
-semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
-    register_t *retval, int (*ds_copyin)(const void *, void *, size_t),
-    int (*ds_copyout)(const void *, void *, size_t))
-{
-	struct ucred *cred = p->p_ucred;
-	int i, ix, error = 0;
-	struct semid_ds sbuf;
-	struct semid_ds *semaptr;
-	unsigned short *semval = NULL;
-
-	DPRINTF(("call to semctl(%d, %d, %d, %p)\n", semid, semnum, cmd, arg));
+	DPRINTF(("call to semctl(%d, %d, %d, %p)\n", semid, semnum, cmd, uarg));
 
 	ix = IPCID_TO_IX(semid);
 	if (ix < 0 || ix >= seminfo.semmni)
 		return (EINVAL);
 
+again:
 	if ((semaptr = sema[ix]) == NULL ||
 	    semaptr->sem_perm.seq != IPCID_TO_SEQ(semid))
 		return (EINVAL);
@@ -287,8 +281,6 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 	case IPC_SET:
 		if ((error = ipcperm(cred, &semaptr->sem_perm, IPC_M)))
 			return (error);
-		if ((error = ds_copyin(arg->buf, &sbuf, sizeof(sbuf))) != 0)
-			return (error);
 		semaptr->sem_perm.uid = sbuf.sem_perm.uid;
 		semaptr->sem_perm.gid = sbuf.sem_perm.gid;
 		semaptr->sem_perm.mode = (semaptr->sem_perm.mode & ~0777) |
@@ -301,7 +293,7 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 			return (error);
 		memcpy(&sbuf, semaptr, sizeof sbuf);
 		sbuf.sem_base = NULL;
-		error = ds_copyout(&sbuf, arg->buf, sizeof(struct semid_ds));
+		error = copyout(&sbuf, arg.buf, sizeof(struct semid_ds));
 		break;
 
 	case GETNCNT:
@@ -329,11 +321,22 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 		break;
 
 	case GETALL:
+		nsems = semaptr->sem_nsems;
+		semval = mallocarray(nsems, sizeof(arg.array[0]),
+		    M_TEMP, M_WAITOK);
+		if (semaptr != sema[ix] || 
+		    semaptr->sem_perm.seq != IPCID_TO_SEQ(semid) ||
+		    semaptr->sem_nsems != nsems) {
+			free(semval, M_TEMP, nsems * sizeof(arg.array[0]));
+			goto again;
+		}
 		if ((error = ipcperm(cred, &semaptr->sem_perm, IPC_R)))
-			return (error);
-		for (i = 0; i < semaptr->sem_nsems; i++) {
-			error = ds_copyout(&semaptr->sem_base[i].semval,
-			    &arg->array[i], sizeof(arg->array[0]));
+			goto error;
+		for (i = 0; i < nsems; i++)
+			semval[i] = semaptr->sem_base[i].semval;
+		for (i = 0; i < nsems; i++) {
+			error = copyout(&semval[i], &arg.array[i],
+			    sizeof(arg.array[0]));
 			if (error != 0)
 				break;
 		}
@@ -352,21 +355,20 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 			return (error);
 		if (semnum < 0 || semnum >= semaptr->sem_nsems)
 			return (EINVAL);
-		if (arg->val > seminfo.semvmx)
+		if (arg.val > seminfo.semvmx)
 			return (ERANGE);
-		semaptr->sem_base[semnum].semval = arg->val;
+		semaptr->sem_base[semnum].semval = arg.val;
 		semundo_clear(ix, semnum);
 		wakeup(&sema[ix]);
 		break;
 
 	case SETALL:
-		if ((error = ipcperm(cred, &semaptr->sem_perm, IPC_W)))
-			return (error);
-		semval = mallocarray(semaptr->sem_nsems, sizeof(arg->array[0]),
+		nsems = semaptr->sem_nsems;
+		semval = mallocarray(nsems, sizeof(arg.array[0]),
 		    M_TEMP, M_WAITOK);
-		for (i = 0; i < semaptr->sem_nsems; i++) {
-			error = ds_copyin(&arg->array[i], &semval[i],
-			    sizeof(arg->array[0]));
+		for (i = 0; i < nsems; i++) {
+			error = copyin(&arg.array[i], &semval[i],
+			    sizeof(arg.array[0]));
 			if (error != 0)
 				goto error;
 			if (semval[i] > seminfo.semvmx) {
@@ -374,7 +376,15 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 				goto error;
 			}
 		}
-		for (i = 0; i < semaptr->sem_nsems; i++)
+		if (semaptr != sema[ix] ||
+		    semaptr->sem_perm.seq != IPCID_TO_SEQ(semid) ||
+		    semaptr->sem_nsems != nsems) {
+			free(semval, M_TEMP, nsems * sizeof(arg.array[0]));
+			goto again;
+		}
+		if ((error = ipcperm(cred, &semaptr->sem_perm, IPC_W)))
+			goto error;
+		for (i = 0; i < nsems; i++)
 			semaptr->sem_base[i].semval = semval[i];
 		semundo_clear(ix, -1);
 		wakeup(&sema[ix]);
@@ -385,9 +395,7 @@ semctl1(struct proc *p, int semid, int semnum, int cmd, union semun *arg,
 	}
 
 error:
-	if (semval)
-		free(semval, M_TEMP,
-		    semaptr->sem_nsems * sizeof(arg->array[0]));
+	free(semval, M_TEMP, nsems * sizeof(arg.array[0]));
 
 	return (error);
 }
@@ -428,6 +436,10 @@ sys_semget(struct proc *p, void *v, register_t *retval)
 		semaptr_new = pool_get(&sema_pool, PR_WAITOK | PR_ZERO);
 		semaptr_new->sem_base = mallocarray(nsems, sizeof(struct sem),
 		    M_SEM, M_WAITOK|M_ZERO);
+		if (nsems > seminfo.semmns - semtot) {
+			error = ENOSPC;
+			goto error;
+		}
 	}
 
 	if (key != IPC_PRIVATE) {

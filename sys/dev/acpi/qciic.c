@@ -1,4 +1,4 @@
-/*	$OpenBSD: qciic.c,v 1.1 2022/08/31 16:10:59 kettenis Exp $	*/
+/*	$OpenBSD: qciic.c,v 1.4 2022/09/11 18:07:26 kettenis Exp $	*/
 /*
  * Copyright (c) 2022 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -58,6 +58,7 @@ struct qciic_softc {
 	bus_space_tag_t		sc_iot;
 	bus_space_handle_t	sc_ioh;
 
+	struct acpi_softc	*sc_acpi;
 	struct aml_node		*sc_node;
 	struct device		*sc_iic;
 
@@ -105,6 +106,7 @@ int	qciic_acpi_found_ihidev(struct qciic_softc *,
 
 const char *qciic_hids[] = {
 	"QCOM0610",
+	"QCOM0811",
 	NULL
 };
 
@@ -126,6 +128,7 @@ qciic_attach(struct device *parent, struct device *self, void *aux)
 	struct acpi_attach_args *aaa = aux;
 	struct i2cbus_attach_args iba;
 
+	sc->sc_acpi = (struct acpi_softc *)parent;
 	sc->sc_node = aaa->aaa_node;
 	printf(" %s", aaa->aaa_node->name);
 
@@ -147,6 +150,18 @@ qciic_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_ic.ic_intr_establish = qciic_i2c_intr_establish;
 	sc->sc_ic.ic_intr_disestablish = qciic_i2c_intr_disestablish;
 	sc->sc_ic.ic_intr_string = qciic_i2c_intr_string;
+
+#ifndef SMALL_KERNEL
+	/*
+	 * XXX Registering the I2C9 node with ACPI leads to AML
+	 * executing I2C transaction that fail and spin with the
+	 * kernel lock held until they fail.
+	 */
+	if (strcmp(aaa->aaa_dev, "QCOM0610") != 0) {
+		sc->sc_node->i2c = &sc->sc_ic;
+		acpi_register_gsb(sc->sc_acpi, sc->sc_node);
+	}
+#endif
 
 	memset(&iba, 0, sizeof(iba));
 	iba.iba_name = "iic";
@@ -429,8 +444,7 @@ qciic_acpi_found_hid(struct aml_node *node, void *arg)
 
 	acpi_attach_deps(acpi_softc, node->parent);
 
-	if (strcmp(dev, "ELAN0674") == 0 ||
-	    strcmp(dev, "ELAN06F0") == 0)
+	if (strcmp(dev, "PNP0C50") == 0 || strcmp(cdev, "PNP0C50") == 0)
 		return qciic_acpi_found_ihidev(sc, node, dev, crs);
 
 	memset(&ia, 0, sizeof(ia));

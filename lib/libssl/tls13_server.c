@@ -1,4 +1,4 @@
-/* $OpenBSD: tls13_server.c,v 1.101 2022/08/17 07:39:19 jsing Exp $ */
+/* $OpenBSD: tls13_server.c,v 1.104 2022/10/02 16:36:42 jsing Exp $ */
 /*
  * Copyright (c) 2019, 2020 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2020 Bob Beck <beck@openbsd.org>
@@ -37,7 +37,7 @@ tls13_server_init(struct tls13_ctx *ctx)
 	s->version = ctx->hs->our_max_tls_version;
 
 	tls13_record_layer_set_retry_after_phh(ctx->rl,
-	    (s->internal->mode & SSL_MODE_AUTO_RETRY) != 0);
+	    (s->mode & SSL_MODE_AUTO_RETRY) != 0);
 
 	if (!ssl_get_new_session(s, 0)) /* XXX */
 		return 0;
@@ -174,6 +174,15 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 	/* Ensure we send subsequent alerts with the correct record version. */
 	tls13_record_layer_set_legacy_version(ctx->rl, TLS1_2_VERSION);
 
+	/*
+	 * Ensure that the client has not requested middlebox compatibility mode
+	 * if it is prohibited from doing so.
+	 */
+	if (!ctx->middlebox_compat && CBS_len(&session_id) != 0) {
+		ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
+		goto err;
+	}
+
 	/* Add decoded values to the current ClientHello hash */
 	if (!tls13_clienthello_hash_init(ctx)) {
 		ctx->alert = TLS13_ALERT_INTERNAL_ERROR;
@@ -234,8 +243,14 @@ tls13_client_hello_process(struct tls13_ctx *ctx, CBS *cbs)
 		goto err;
 	}
 
-	/* Store legacy session identifier so we can echo it. */
-	if (CBS_len(&session_id) > sizeof(ctx->hs->tls13.legacy_session_id)) {
+	/*
+	 * The legacy session identifier must either be zero length or a 32 byte
+	 * value (in which case the client is requesting middlebox compatibility
+	 * mode), as per RFC 8446 section 4.1.2. If it is valid, store the value
+	 * so that we can echo it back to the client.
+	 */
+	if (CBS_len(&session_id) != 0 &&
+	    CBS_len(&session_id) != sizeof(ctx->hs->tls13.legacy_session_id)) {
 		ctx->alert = TLS13_ALERT_ILLEGAL_PARAMETER;
 		goto err;
 	}
@@ -303,7 +318,6 @@ tls13_client_hello_recv(struct tls13_ctx *ctx, CBS *cbs)
 	if (ctx->hs->key_share != NULL)
 		ctx->handshake_stage.hs_type |= NEGOTIATED | WITHOUT_HRR;
 
-	/* XXX - check this is the correct point */
 	tls13_record_layer_allow_ccs(ctx->rl, 1);
 
 	return 1;
@@ -642,7 +656,7 @@ tls13_server_certificate_send(struct tls13_ctx *ctx, CBB *cbb)
 	if ((chain = cpk->chain) == NULL)
 		chain = s->ctx->extra_certs;
 
-	if (chain == NULL && !(s->internal->mode & SSL_MODE_NO_AUTO_CHAIN)) {
+	if (chain == NULL && !(s->mode & SSL_MODE_NO_AUTO_CHAIN)) {
 		if ((xsc = X509_STORE_CTX_new()) == NULL)
 			goto err;
 		if (!X509_STORE_CTX_init(xsc, s->ctx->cert_store, cpk->x509, NULL))

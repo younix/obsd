@@ -1,4 +1,4 @@
-/*	$OpenBSD: protosw.h,v 1.52 2022/09/02 13:12:32 mvs Exp $	*/
+/*	$OpenBSD: protosw.h,v 1.57 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: protosw.h,v 1.10 1996/04/09 20:55:32 cgd Exp $	*/
 
 /*-
@@ -62,19 +62,17 @@ struct stat;
 struct ifnet;
 
 struct pr_usrreqs {
-					/* user request: see list below */
-	int	(*pru_usrreq)(struct socket *, int, struct mbuf *,
-		    struct mbuf *, struct mbuf *, struct proc *);
-
-	int	(*pru_attach)(struct socket *, int);
+	int	(*pru_attach)(struct socket *, int, int);
 	int	(*pru_detach)(struct socket *);
+	void	(*pru_lock)(struct socket *);
+	void	(*pru_unlock)(struct socket *);
 	int	(*pru_bind)(struct socket *, struct mbuf *, struct proc *);
 	int	(*pru_listen)(struct socket *);
 	int	(*pru_connect)(struct socket *, struct mbuf *);
 	int	(*pru_accept)(struct socket *, struct mbuf *);
 	int	(*pru_disconnect)(struct socket *);
 	int	(*pru_shutdown)(struct socket *);
-	int	(*pru_rcvd)(struct socket *);
+	void	(*pru_rcvd)(struct socket *);
 	int	(*pru_send)(struct socket *, struct mbuf *, struct mbuf *,
 		    struct mbuf *);
 	int	(*pru_abort)(struct socket *);
@@ -84,6 +82,8 @@ struct pr_usrreqs {
 	int	(*pru_rcvoob)(struct socket *, struct mbuf *, int);
 	int	(*pru_sendoob)(struct socket *, struct mbuf *, struct mbuf *,
 		    struct mbuf *);
+	int	(*pru_sockaddr)(struct socket *, struct mbuf *);
+	int	(*pru_peeraddr)(struct socket *, struct mbuf *);
 	int	(*pru_connect2)(struct socket *, struct socket *);
 };
 
@@ -267,15 +267,27 @@ extern const struct protosw inet6sw[];
 #endif /* INET6 */
 
 static inline int
-pru_attach(struct socket *so, int proto)
+pru_attach(struct socket *so, int proto, int wait)
 {
-	return (*so->so_proto->pr_usrreqs->pru_attach)(so, proto);
+	return (*so->so_proto->pr_usrreqs->pru_attach)(so, proto, wait);
 }
 
 static inline int
 pru_detach(struct socket *so)
 {
 	return (*so->so_proto->pr_usrreqs->pru_detach)(so);
+}
+
+static inline void
+pru_lock(struct socket *so)
+{
+	(*so->so_proto->pr_usrreqs->pru_lock)(so);
+}
+
+static inline void
+pru_unlock(struct socket *so)
+{
+	(*so->so_proto->pr_usrreqs->pru_unlock)(so);
 }
 
 static inline int
@@ -324,12 +336,10 @@ pru_shutdown(struct socket *so)
 	return (*so->so_proto->pr_usrreqs->pru_shutdown)(so);
 }
 
-static inline int
+static inline void
 pru_rcvd(struct socket *so)
 {
-	if (so->so_proto->pr_usrreqs->pru_rcvd)
-		return (*so->so_proto->pr_usrreqs->pru_rcvd)(so);
-	return (EOPNOTSUPP);
+	(*so->so_proto->pr_usrreqs->pru_rcvd)(so);
 }
 
 static inline int
@@ -385,15 +395,13 @@ pru_sendoob(struct socket *so, struct mbuf *top, struct mbuf *addr,
 static inline int
 pru_sockaddr(struct socket *so, struct mbuf *addr)
 {
-	return (*so->so_proto->pr_usrreqs->pru_usrreq)(so,
-	    PRU_SOCKADDR, NULL, addr, NULL, curproc);
+	return (*so->so_proto->pr_usrreqs->pru_sockaddr)(so, addr);
 }
 
 static inline int
 pru_peeraddr(struct socket *so, struct mbuf *addr)
 {
-	return (*so->so_proto->pr_usrreqs->pru_usrreq)(so,
-	    PRU_PEERADDR, NULL, addr, NULL, curproc);
+	return (*so->so_proto->pr_usrreqs->pru_peeraddr)(so, addr);
 }
 
 static inline int

@@ -1,4 +1,4 @@
-/*	$OpenBSD: validate.c,v 1.42 2022/08/30 18:56:49 job Exp $ */
+/*	$OpenBSD: validate.c,v 1.45 2022/09/03 14:41:47 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -106,28 +106,12 @@ valid_ski_aki(const char *fn, struct auth_tree *auths,
 }
 
 /*
- * Authenticate a trust anchor by making sure its resources are not
- * inheriting and that the SKI is unique.
+ * Validate a trust anchor by making sure that the SKI is unique.
  * Returns 1 if valid, 0 otherwise.
  */
 int
 valid_ta(const char *fn, struct auth_tree *auths, const struct cert *cert)
 {
-	size_t	 i;
-
-	/* AS and IP resources must not inherit. */
-	if (cert->asz && cert->as[0].type == CERT_AS_INHERIT) {
-		warnx("%s: RFC 6487 (trust anchor): "
-		    "inheriting AS resources", fn);
-		return 0;
-	}
-	for (i = 0; i < cert->ipsz; i++)
-		if (cert->ips[i].type == CERT_IP_INHERIT) {
-			warnx("%s: RFC 6487 (trust anchor): "
-			    "inheriting IP resources", fn);
-			return 0;
-		}
-
 	/* SKI must not be a dupe. */
 	if (auth_find(auths, cert->ski) != NULL) {
 		warnx("%s: RFC 6487: duplicate SKI", fn);
@@ -150,11 +134,8 @@ valid_cert(const char *fn, struct auth *a, const struct cert *cert)
 	char		 buf1[64], buf2[64];
 
 	for (i = 0; i < cert->asz; i++) {
-		if (cert->as[i].type == CERT_AS_INHERIT) {
-			if (cert->purpose == CERT_PURPOSE_BGPSEC_ROUTER)
-				return 0; /* BGPsec doesn't permit inheriting */
+		if (cert->as[i].type == CERT_AS_INHERIT)
 			continue;
-		}
 		min = cert->as[i].type == CERT_AS_ID ?
 		    cert->as[i].id : cert->as[i].range.min;
 		max = cert->as[i].type == CERT_AS_ID ?
@@ -449,11 +430,6 @@ valid_rsc(const char *fn, struct cert *cert, struct rsc *rsc)
 	char		buf1[64], buf2[64];
 
 	for (i = 0; i < rsc->asz; i++) {
-		if (rsc->as[i].type == CERT_AS_INHERIT) {
-			warnx("%s: RSC ResourceBlock: illegal inherit", fn);
-			return 0;
-		}
-
 		min = rsc->as[i].type == CERT_AS_RANGE ? rsc->as[i].range.min
 		    : rsc->as[i].id;
 		max = rsc->as[i].type == CERT_AS_RANGE ? rsc->as[i].range.max
@@ -478,11 +454,6 @@ valid_rsc(const char *fn, struct cert *cert, struct rsc *rsc)
 	}
 
 	for (i = 0; i < rsc->ipsz; i++) {
-		if (rsc->ips[i].type == CERT_IP_INHERIT) {
-			warnx("%s: RSC ResourceBlock: illegal inherit", fn);
-			return 0;
-		}
-
 		if (ip_addr_check_covered(rsc->ips[i].afi, rsc->ips[i].min,
 		    rsc->ips[i].max, cert->ips, cert->ipsz) > 0)
 			continue;

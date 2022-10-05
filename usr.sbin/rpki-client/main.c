@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.215 2022/08/30 22:42:32 tb Exp $ */
+/*	$OpenBSD: main.c,v 1.219 2022/09/03 09:22:25 claudio Exp $ */
 /*
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
@@ -66,6 +66,7 @@ int	noop;
 int	filemode;
 int	rrdpon = 1;
 int	repo_timeout;
+time_t	deadline;
 
 struct skiplist skiplist = LIST_HEAD_INITIALIZER(skiplist);
 
@@ -256,6 +257,18 @@ rrdp_fetch(unsigned int id, const char *uri, const char *local,
 	io_close_buffer(&rrdpq, b);
 }
 
+void
+rrdp_abort(unsigned int id)
+{
+	enum rrdp_msg type = RRDP_ABORT;
+	struct ibuf *b;
+
+	b = io_new_buffer();
+	io_simple_buffer(b, &type, sizeof(type));
+	io_simple_buffer(b, &id, sizeof(id));
+	io_close_buffer(&rrdpq, b);
+}
+
 /*
  * Request a repository sync via rsync URI to directory local.
  */
@@ -270,6 +283,19 @@ rsync_fetch(unsigned int id, const char *uri, const char *local,
 	io_str_buffer(b, local);
 	io_str_buffer(b, base);
 	io_str_buffer(b, uri);
+	io_close_buffer(&rsyncq, b);
+}
+
+void
+rsync_abort(unsigned int id)
+{
+	struct ibuf	*b;
+
+	b = io_new_buffer();
+	io_simple_buffer(b, &id, sizeof(id));
+	io_str_buffer(b, NULL);
+	io_str_buffer(b, NULL);
+	io_str_buffer(b, NULL);
 	io_close_buffer(&rsyncq, b);
 }
 
@@ -333,12 +359,14 @@ rrdp_http_done(unsigned int id, enum http_result res, const char *last_mod)
  * These are always relative to the directory in which "mft" sits.
  */
 static void
-queue_add_from_mft(const struct mft *mft, struct repo *rp)
+queue_add_from_mft(const struct mft *mft)
 {
 	size_t			 i;
+	struct repo		*rp;
 	const struct mftfile	*f;
 	char			*nfile, *npath = NULL;
 
+	rp = repo_byid(mft->repoid);
 	for (i = 0; i < mft->filesz; i++) {
 		f = &mft->files[i];
 
@@ -542,7 +570,7 @@ entity_process(struct ibuf *b, struct stats *st, struct vrp_tree *tree,
 		}
 		mft = mft_read(b);
 		if (!mft->stale)
-			queue_add_from_mft(mft, repo_byid(mft->repoid));
+			queue_add_from_mft(mft);
 		else
 			st->mfts_stale++;
 		mft_free(mft);
@@ -1019,6 +1047,10 @@ main(int argc, char *argv[])
 		 */
 		alarm(timeout);
 		signal(SIGALRM, suicide);
+
+		/* give up a bit before the hard timeout and try to finish up */
+		if (!noop)
+			deadline = getmonotime() + timeout - repo_timeout / 2;
 	}
 
 	if (pledge("stdio rpath wpath cpath fattr sendfd unveil", NULL) == -1)
@@ -1266,10 +1298,10 @@ main(int argc, char *argv[])
 	    (long long)stats.user_time.tv_sec,
 	    (long long)stats.system_time.tv_sec);
 	printf("Skiplist entries: %zu\n", stats.skiplistentries);
-	printf("Route Origin Authorizations: %zu (%zu failed parse, %zu invalid)\n",
-	    stats.roas, stats.roas_fail, stats.roas_invalid);
-	printf("AS Provider Attestations: %zu (%zu failed parse, %zu invalid)\n",
-	    stats.aspas, stats.aspas_fail, stats.aspas_invalid);
+	printf("Route Origin Authorizations: %zu (%zu failed parse, %zu "
+	    "invalid)\n", stats.roas, stats.roas_fail, stats.roas_invalid);
+	printf("AS Provider Attestations: %zu (%zu failed parse, %zu "
+	    "invalid)\n", stats.aspas, stats.aspas_fail, stats.aspas_invalid);
 	printf("BGPsec Router Certificates: %zu\n", stats.brks);
 	printf("Certificates: %zu (%zu invalid)\n",
 	    stats.certs, stats.certs_fail);

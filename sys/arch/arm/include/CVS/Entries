@@ -21,7 +21,6 @@
 /openpromio.h/1.1/Sat May 21 21:24:36 2016//
 /param.h/1.24/Fri Sep 14 13:58:20 2018//
 /pcb.h/1.8/Fri Jan 26 16:22:20 2018//
-/pmap.h/1.49/Thu Dec 19 17:53:27 2019//
 /proc.h/1.5/Thu Apr 13 03:52:25 2017//
 /profile.h/1.5/Wed Sep 21 11:33:05 2016//
 /ptrace.h/1.1/Sun Feb  1 05:09:49 2004//
@@ -47,4 +46,5 @@
 /conf.h/1.12/Tue Jul 26 13:42:34 2022//
 /asm.h/1.12/Fri Sep  2 14:00:18 2022//
 /atomic.h/1.19/Fri Sep  2 14:00:18 2022//
+/pmap.h/1.51/Tue Sep 20 07:19:36 2022//
 D

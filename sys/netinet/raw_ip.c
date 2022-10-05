@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.145 2022/09/02 13:12:32 mvs Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.149 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -104,9 +104,10 @@ struct inpcbtable rawcbtable;
  */
 
 const struct pr_usrreqs rip_usrreqs = {
-	.pru_usrreq	= rip_usrreq,
 	.pru_attach	= rip_attach,
 	.pru_detach	= rip_detach,
+	.pru_lock	= rip_lock,
+	.pru_unlock	= rip_unlock,
 	.pru_bind	= rip_bind,
 	.pru_connect	= rip_connect,
 	.pru_disconnect	= rip_disconnect,
@@ -114,6 +115,8 @@ const struct pr_usrreqs rip_usrreqs = {
 	.pru_send	= rip_send,
 	.pru_abort	= rip_abort,
 	.pru_control	= in_control,
+	.pru_sockaddr	= in_sockaddr,
+	.pru_peeraddr	= in_peeraddr,
 };
 
 /*
@@ -219,12 +222,19 @@ rip_input(struct mbuf **mp, int *offp, int proto, int af)
 		else
 			n = m_copym(m, 0, M_COPYALL, M_NOWAIT);
 		if (n != NULL) {
+			int ret;
+
 			if (inp->inp_flags & INP_CONTROLOPTS ||
 			    inp->inp_socket->so_options & SO_TIMESTAMP)
 				ip_savecontrol(inp, &opts, ip, n);
-			if (sbappendaddr(inp->inp_socket,
+
+			mtx_enter(&inp->inp_mtx);
+			ret = sbappendaddr(inp->inp_socket,
 			    &inp->inp_socket->so_rcv,
-			    sintosa(&ripsrc), n, opts) == 0) {
+			    sintosa(&ripsrc), n, opts);
+			mtx_leave(&inp->inp_mtx);
+
+			if (ret == 0) {
 				/* should notify about lost packet */
 				m_freem(n);
 				m_freem(opts);
@@ -457,45 +467,8 @@ rip_ctloutput(int op, struct socket *so, int level, int optname,
 u_long	rip_sendspace = RIPSNDQ;
 u_long	rip_recvspace = RIPRCVQ;
 
-/*ARGSUSED*/
 int
-rip_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
-    struct mbuf *control, struct proc *p)
-{
-	struct inpcb *inp;
-	int error = 0;
-
-	soassertlocked(so);
-
-	inp = sotoinpcb(so);
-	if (inp == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-
-	switch (req) {
-
-	case PRU_SOCKADDR:
-		in_setsockaddr(inp, nam);
-		break;
-
-	case PRU_PEERADDR:
-		in_setpeeraddr(inp, nam);
-		break;
-
-	default:
-		panic("rip_usrreq");
-	}
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-int
-rip_attach(struct socket *so, int proto)
+rip_attach(struct socket *so, int proto, int wait)
 {
 	struct inpcb *inp;
 	int error;
@@ -510,7 +483,7 @@ rip_attach(struct socket *so, int proto)
 	if ((error = soreserve(so, rip_sendspace, rip_recvspace)))
 		return error;
 	NET_ASSERT_LOCKED();
-	if ((error = in_pcballoc(so, &rawcbtable)))
+	if ((error = in_pcballoc(so, &rawcbtable, wait)))
 		return error;
 	inp = sotoinpcb(so);
 	inp->inp_ip.ip_p = proto;
@@ -534,6 +507,24 @@ rip_detach(struct socket *so)
 	in_pcbdetach(inp);
 
 	return (0);
+}
+
+void
+rip_lock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_enter(&inp->inp_mtx);
+}
+
+void
+rip_unlock(struct socket *so)
+{
+	struct inpcb *inp = sotoinpcb(so);
+
+	NET_ASSERT_LOCKED();
+	mtx_leave(&inp->inp_mtx);
 }
 
 int

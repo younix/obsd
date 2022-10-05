@@ -1,4 +1,4 @@
-/*	$OpenBSD: grdc.c,v 1.34 2021/10/23 11:22:49 mestre Exp $	*/
+/*	$OpenBSD: grdc.c,v 1.37 2022/09/27 03:01:42 deraadt Exp $	*/
 /*
  *
  * Copyright 2002 Amos Shapir.  Public domain.
@@ -20,6 +20,7 @@
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -78,6 +79,14 @@ main(int argc, char *argv[])
 	int xbase;
 	int ybase;
 	int wintoosmall;
+	int tz_len = 0;
+	int h, m;
+	int prev_tm_gmtoff;
+	char *tz;
+
+	tz = getenv("TZ");
+	if (tz != NULL)
+		tz_len = strlen(tz);
 
 	scrol = wintoosmall = 0;
 	while ((i = getopt(argc, argv, "sh")) != -1) {
@@ -132,6 +141,7 @@ main(int argc, char *argv[])
 
 	curs_set(0);
 	sigwinched = 1;	/* force initial sizing */
+	prev_tm_gmtoff = 24 * 3600; /* force initial header printing */
 
 	clock_gettime(CLOCK_REALTIME, &now);
 	if (n) {
@@ -139,9 +149,21 @@ main(int argc, char *argv[])
 		alarm(n);
 	}
 	do {
-		if (sigwinched) {
+		mask = 0;
+		tm = localtime(&now.tv_sec);
+		set(tm->tm_sec % 10, 0);
+		set(tm->tm_sec / 10, 4);
+		set(tm->tm_min % 10, 10);
+		set(tm->tm_min / 10, 14);
+		set(tm->tm_hour % 10, 20);
+		set(tm->tm_hour / 10, 24);
+		set(10, 7);
+		set(10, 17);
+		/* force repaint if window size changed or DST changed */
+		if (sigwinched || prev_tm_gmtoff != tm->tm_gmtoff) {
 			sigwinched = 0;
 			wintoosmall = 0;
+			prev_tm_gmtoff = tm->tm_gmtoff;
 			getwinsize(&i, &j);
 			if (i >= XLENGTH + 2)
 				xbase = (i - XLENGTH) / 2;
@@ -171,21 +193,25 @@ main(int argc, char *argv[])
 				move(ybase, xbase + XLENGTH);
 				vline(ACS_VLINE, YDEPTH);
 
+				move(ybase - 1, xbase);
+
+				h = tm->tm_gmtoff / 3600;
+				m = abs((int)tm->tm_gmtoff % 3600 / 60);
+
+				if (tz_len > 0 && tz_len <= XLENGTH -
+				    strlen("[  () +0000 ]") -
+				    strlen(tm->tm_zone))
+					printw("[ %s (%s) %+2.2d%02d ]", tz,
+					    tm->tm_zone, h, m);
+				else
+					printw("[ %s %+2.2d%02d ]",
+					    tm->tm_zone, h, m);
+
 				attrset(COLOR_PAIR(2));
 			}
 			for (k = 0; k < 6; k++)
 				old[k] = 0;
 		}
-		mask = 0;
-		tm = localtime(&now.tv_sec);
-		set(tm->tm_sec % 10, 0);
-		set(tm->tm_sec / 10, 4);
-		set(tm->tm_min % 10, 10);
-		set(tm->tm_min / 10, 14);
-		set(tm->tm_hour % 10, 20);
-		set(tm->tm_hour / 10, 24);
-		set(10, 7);
-		set(10, 17);
 		if (wintoosmall) {
 			move(0, 0);
 			printw("%02d:%02d:%02d", tm->tm_hour, tm->tm_min,
@@ -251,7 +277,7 @@ main(int argc, char *argv[])
 			clear();
 			refresh();
 			endwin();
-			errx(1, "terminated by signal %d", sigtermed);
+			exit(0);
 		}
 	} while (!sigalrmed);
 	standend();

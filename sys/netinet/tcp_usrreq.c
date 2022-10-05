@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_usrreq.c,v 1.204 2022/09/02 13:12:32 mvs Exp $	*/
+/*	$OpenBSD: tcp_usrreq.c,v 1.209 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: tcp_usrreq.c,v 1.20 1996/02/13 23:44:16 christos Exp $	*/
 
 /*
@@ -112,7 +112,6 @@ u_int	tcp_recvspace = TCP_RECVSPACE;
 u_int	tcp_autorcvbuf_inc = 16 * 1024;
 
 const struct pr_usrreqs tcp_usrreqs = {
-	.pru_usrreq	= tcp_usrreq,
 	.pru_attach	= tcp_attach,
 	.pru_detach	= tcp_detach,
 	.pru_bind	= tcp_bind,
@@ -128,11 +127,12 @@ const struct pr_usrreqs tcp_usrreqs = {
 	.pru_rcvoob	= tcp_rcvoob,
 	.pru_sendoob	= tcp_sendoob,
 	.pru_control	= in_control,
+	.pru_sockaddr	= tcp_sockaddr,
+	.pru_peeraddr	= tcp_peeraddr,
 };
 
 #ifdef INET6
 const struct pr_usrreqs tcp6_usrreqs = {
-	.pru_usrreq	= tcp_usrreq,
 	.pru_attach	= tcp_attach,
 	.pru_detach	= tcp_detach,
 	.pru_bind	= tcp_bind,
@@ -148,6 +148,8 @@ const struct pr_usrreqs tcp6_usrreqs = {
 	.pru_rcvoob	= tcp_rcvoob,
 	.pru_sendoob	= tcp_sendoob,
 	.pru_control	= in6_control,
+	.pru_sockaddr	= tcp_sockaddr,
+	.pru_peeraddr	= tcp_peeraddr,
 };
 #endif
 
@@ -203,71 +205,6 @@ tcp_sogetpcb(struct socket *so, struct inpcb **rinp, struct tcpcb **rtp)
 }
 
 /*
- * Process a TCP user request for TCP tb.  If this is a send request
- * then m is the mbuf chain of send data.  If this is a timer expiration
- * (called from the software clock routine), then timertype tells which timer.
- */
-/*ARGSUSED*/
-int
-tcp_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
-    struct mbuf *control, struct proc *p)
-{
-	struct inpcb *inp;
-	struct tcpcb *otp = NULL, *tp;
-	int error = 0;
-	short ostate;
-
-	soassertlocked(so);
-
-	if (control && control->m_len) {
-		error = EINVAL;
-		goto release;
-	}
-
-	if ((error = tcp_sogetpcb(so, &inp, &tp)))
-		goto release;
-
-	if (so->so_options & SO_DEBUG) {
-		otp = tp;
-		ostate = tp->t_state;
-	}
-
-	switch (req) {
-
-	case PRU_SOCKADDR:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			in6_setsockaddr(inp, nam);
-		else
-#endif
-			in_setsockaddr(inp, nam);
-		break;
-
-	case PRU_PEERADDR:
-#ifdef INET6
-		if (inp->inp_flags & INP_IPV6)
-			in6_setpeeraddr(inp, nam);
-		else
-#endif
-			in_setpeeraddr(inp, nam);
-		break;
-
-	default:
-		panic("tcp_usrreq");
-	}
-	if (otp)
-		tcp_trace(TA_USER, ostate, tp, otp, NULL, req, 0);
-	return (error);
-
- release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
-/*
  * Export internal TCP state information via a struct tcp_info without
  * leaking any sensitive information. Sequence numbers are reported
  * relative to the initial sequence number.
@@ -278,6 +215,7 @@ tcp_fill_info(struct tcpcb *tp, struct socket *so, struct mbuf *m)
 	struct proc *p = curproc;
 	struct tcp_info *ti;
 	u_int t = 1000000 / PR_SLOWHZ;
+	uint32_t now;
 
 	if (sizeof(*ti) > MLEN) {
 		MCLGETL(m, M_WAITOK, sizeof(*ti));
@@ -287,6 +225,7 @@ tcp_fill_info(struct tcpcb *tp, struct socket *so, struct mbuf *m)
 	ti = mtod(m, struct tcp_info *);
 	m->m_len = sizeof(*ti);
 	memset(ti, 0, sizeof(*ti));
+	now = READ_ONCE(tcp_now);
 
 	ti->tcpi_state = tp->t_state;
 	if ((tp->t_flags & TF_REQ_TSTMP) && (tp->t_flags & TF_RCVD_TSTMP))
@@ -307,10 +246,10 @@ tcp_fill_info(struct tcpcb *tp, struct socket *so, struct mbuf *m)
 	ti->tcpi_snd_mss = tp->t_maxseg;
 	ti->tcpi_rcv_mss = tp->t_peermss;
 
-	ti->tcpi_last_data_sent = (tcp_now - tp->t_sndtime) * t;
-	ti->tcpi_last_ack_sent = (tcp_now - tp->t_sndacktime) * t;
-	ti->tcpi_last_data_recv = (tcp_now - tp->t_rcvtime) * t;
-	ti->tcpi_last_ack_recv = (tcp_now - tp->t_rcvacktime) * t;
+	ti->tcpi_last_data_sent = (now - tp->t_sndtime) * t;
+	ti->tcpi_last_ack_sent = (now - tp->t_sndacktime) * t;
+	ti->tcpi_last_data_recv = (now - tp->t_rcvtime) * t;
+	ti->tcpi_last_ack_recv = (now - tp->t_rcvacktime) * t;
 
 	ti->tcpi_rtt = ((uint64_t)tp->t_srtt * t) >>
 	    (TCP_RTT_SHIFT + TCP_RTT_BASE_SHIFT);
@@ -348,9 +287,9 @@ tcp_fill_info(struct tcpcb *tp, struct socket *so, struct mbuf *m)
 	ti->tcpi_snd_max = tp->snd_max - tp->iss;
 
 	ti->tcpi_ts_recent = tp->ts_recent; /* XXX value from the wire */
-	ti->tcpi_ts_recent_age = (tcp_now - tp->ts_recent_age) * t;
+	ti->tcpi_ts_recent_age = (now - tp->ts_recent_age) * t;
 	ti->tcpi_rfbuf_cnt = tp->rfbuf_cnt;
-	ti->tcpi_rfbuf_ts = (tcp_now - tp->rfbuf_ts) * t;
+	ti->tcpi_rfbuf_ts = (now - tp->rfbuf_ts) * t;
 
 	ti->tcpi_so_rcv_sb_cc = so->so_rcv.sb_cc;
 	ti->tcpi_so_rcv_sb_hiwat = so->so_rcv.sb_hiwat;
@@ -521,7 +460,7 @@ tcp_ctloutput(int op, struct socket *so, int level, int optname,
  * buffer space, and entering LISTEN state to accept connections.
  */
 int
-tcp_attach(struct socket *so, int proto)
+tcp_attach(struct socket *so, int proto, int wait)
 {
 	struct tcpcb *tp;
 	struct inpcb *inp;
@@ -538,11 +477,11 @@ tcp_attach(struct socket *so, int proto)
 	}
 
 	NET_ASSERT_LOCKED();
-	error = in_pcballoc(so, &tcbtable);
+	error = in_pcballoc(so, &tcbtable, wait);
 	if (error)
 		return (error);
 	inp = sotoinpcb(so);
-	tp = tcp_newtcpcb(inp);
+	tp = tcp_newtcpcb(inp, wait);
 	if (tp == NULL) {
 		unsigned int nofd = so->so_state & SS_NOFDREF;	/* XXX */
 
@@ -853,18 +792,17 @@ out:
 /*
  * After a receive, possibly send window update to peer.
  */
-int
+void
 tcp_rcvd(struct socket *so)
 {
 	struct inpcb *inp;
 	struct tcpcb *tp;
-	int error;
 	short ostate;
 
 	soassertlocked(so);
 
-	if ((error = tcp_sogetpcb(so, &inp, &tp)))
-		return (error);
+	if (tcp_sogetpcb(so, &inp, &tp))
+		return;
 
 	if (so->so_options & SO_DEBUG)
 		ostate = tp->t_state;
@@ -881,7 +819,6 @@ tcp_rcvd(struct socket *so)
 
 	if (so->so_options & SO_DEBUG)
 		tcp_trace(TA_USER, ostate, tp, tp, NULL, PRU_RCVD, 0);
-	return (0);
 }
 
 /*
@@ -1058,6 +995,55 @@ release:
 	return (error);
 }
 
+int
+tcp_sockaddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *inp;
+	struct tcpcb *tp;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = tcp_sogetpcb(so, &inp, &tp)))
+		return (error);
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
+		in6_setsockaddr(inp, nam);
+	else
+#endif
+		in_setsockaddr(inp, nam);
+
+	if (so->so_options & SO_DEBUG)
+		tcp_trace(TA_USER, tp->t_state, tp, tp, NULL,
+		    PRU_SOCKADDR, 0);
+	return (0);
+}
+
+int
+tcp_peeraddr(struct socket *so, struct mbuf *nam)
+{
+	struct inpcb *inp;
+	struct tcpcb *tp;
+	int error;
+
+	soassertlocked(so);
+
+	if ((error = tcp_sogetpcb(so, &inp, &tp)))
+		return (error);
+
+#ifdef INET6
+	if (inp->inp_flags & INP_IPV6)
+		in6_setpeeraddr(inp, nam);
+	else
+#endif
+		in_setpeeraddr(inp, nam);
+
+	if (so->so_options & SO_DEBUG)
+		tcp_trace(TA_USER, tp->t_state, tp, tp, NULL,
+		    PRU_PEERADDR, 0);
+	return (0);
+}
 
 /*
  * Initiate (or continue) disconnect.

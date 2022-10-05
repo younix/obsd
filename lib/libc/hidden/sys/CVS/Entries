@@ -7,7 +7,6 @@
 /resource.h/1.1/Fri Sep 11 15:38:33 2015//
 /select.h/1.1/Sat May  7 19:05:22 2016//
 /sem.h/1.1/Mon Sep 14 12:08:49 2015//
-/socket.h/1.4/Sat May  7 19:05:22 2016//
 /stat.h/1.2/Mon Sep 14 10:11:54 2015//
 /sysctl.h/1.1/Sun Sep 13 20:54:33 2015//
 /tree.h/1.1/Mon Jun 19 03:06:26 2017//
@@ -15,4 +14,5 @@
 /wait.h/1.2/Sat May  7 19:05:22 2016//
 /time.h/1.2/Fri Dec 11 17:58:18 2020//
 /timetc.h/1.1/Fri Dec 11 17:58:18 2020//
+/socket.h/1.5/Tue Sep 20 07:19:20 2022//
 D

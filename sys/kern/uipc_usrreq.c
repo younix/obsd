@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_usrreq.c,v 1.183 2022/09/02 13:12:31 mvs Exp $	*/
+/*	$OpenBSD: uipc_usrreq.c,v 1.190 2022/10/03 16:43:52 bluhm Exp $	*/
 /*	$NetBSD: uipc_usrreq.c,v 1.18 1996/02/09 19:00:50 christos Exp $	*/
 
 /*
@@ -127,7 +127,6 @@ int	unp_defer;	/* [G] number of deferred fp to close by the GC task */
 int	unp_gcing;	/* [G] GC task currently running */
 
 const struct pr_usrreqs uipc_usrreqs = {
-	.pru_usrreq	= uipc_usrreq,
 	.pru_attach	= uipc_attach,
 	.pru_detach	= uipc_detach,
 	.pru_bind	= uipc_bind,
@@ -140,6 +139,8 @@ const struct pr_usrreqs uipc_usrreqs = {
 	.pru_send	= uipc_send,
 	.pru_abort	= uipc_abort,
 	.pru_sense	= uipc_sense,
+	.pru_sockaddr	= uipc_sockaddr,
+	.pru_peeraddr	= uipc_peeraddr,
 	.pru_connect2	= uipc_connect2,
 };
 
@@ -211,50 +212,6 @@ uipc_setaddr(const struct unpcb *unp, struct mbuf *nam)
 	}
 }
 
-int
-uipc_usrreq(struct socket *so, int req, struct mbuf *m, struct mbuf *nam,
-    struct mbuf *control, struct proc *p)
-{
-	struct unpcb *unp = sotounpcb(so);
-	struct socket *so2;
-	int error = 0;
-
-	if (req != PRU_SEND && control && control->m_len) {
-		error = EOPNOTSUPP;
-		goto release;
-	}
-	if (unp == NULL) {
-		error = EINVAL;
-		goto release;
-	}
-
-	switch (req) {
-
-	case PRU_SOCKADDR:
-		uipc_setaddr(unp, nam);
-		break;
-
-	case PRU_PEERADDR:
-		so2 = unp_solock_peer(so);
-		uipc_setaddr(unp->unp_conn, nam);
-		if (so2 != NULL && so2 != so)
-			sounlock(so2);
-		break;
-
-	case PRU_SLOWTIMO:
-		break;
-
-	default:
-		panic("uipc_usrreq");
-	}
-release:
-	if (req != PRU_RCVD && req != PRU_RCVOOB && req != PRU_SENSE) {
-		m_freem(control);
-		m_freem(m);
-	}
-	return (error);
-}
-
 /*
  * Both send and receive buffers are allocated PIPSIZ bytes of buffering
  * for stream sockets, although the total for sender and receiver is
@@ -285,7 +242,7 @@ const struct sysctl_bounded_args unpdgctl_vars[] = {
 };
 
 int
-uipc_attach(struct socket *so, int proto)
+uipc_attach(struct socket *so, int proto, int wait)
 {
 	struct unpcb *unp;
 	int error;
@@ -313,7 +270,8 @@ uipc_attach(struct socket *so, int proto)
 		if (error)
 			return (error);
 	}
-	unp = pool_get(&unpcb_pool, PR_NOWAIT|PR_ZERO);
+	unp = pool_get(&unpcb_pool, (wait == M_WAIT ? PR_WAITOK : PR_NOWAIT) |
+	    PR_ZERO);
 	if (unp == NULL)
 		return (ENOBUFS);
 	refcnt_init(&unp->unp_refcnt);
@@ -406,7 +364,7 @@ uipc_shutdown(struct socket *so)
 	return (0);
 }
 
-int
+void
 uipc_rcvd(struct socket *so)
 {
 	struct socket *so2;
@@ -433,8 +391,6 @@ uipc_rcvd(struct socket *so)
 	default:
 		panic("uipc 2");
 	}
-
-	return (0);
 }
 
 int
@@ -576,6 +532,28 @@ uipc_sense(struct socket *so, struct stat *sb)
 	    sb->st_ctim.tv_nsec = unp->unp_ctime.tv_nsec;
 	sb->st_ino = unp->unp_ino;
 
+	return (0);
+}
+
+int
+uipc_sockaddr(struct socket *so, struct mbuf *nam)
+{
+	struct unpcb *unp = sotounpcb(so);
+
+	uipc_setaddr(unp, nam);
+	return (0);
+}
+
+int
+uipc_peeraddr(struct socket *so, struct mbuf *nam)
+{
+	struct unpcb *unp = sotounpcb(so);
+	struct socket *so2;
+
+	so2 = unp_solock_peer(so);
+	uipc_setaddr(unp->unp_conn, nam);
+	if (so2 != NULL && so2 != so)
+		sounlock(so2);
 	return (0);
 }
 
@@ -757,6 +735,7 @@ unp_bind(struct unpcb *unp, struct mbuf *nam, struct proc *p)
 	NDINIT(&nd, CREATE, NOFOLLOW | LOCKPARENT, UIO_SYSSPACE,
 	    soun->sun_path, p);
 	nd.ni_pledge = PLEDGE_UNIX;
+	nd.ni_unveil = UNVEIL_CREATE;
 
 	KERNEL_LOCK();
 /* SHOULD BE ABLE TO ADOPT EXISTING AND wakeup() ALA FIFO's */
@@ -824,6 +803,7 @@ unp_connect(struct socket *so, struct mbuf *nam, struct proc *p)
 
 	NDINIT(&nd, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, soun->sun_path, p);
 	nd.ni_pledge = PLEDGE_UNIX;
+	nd.ni_unveil = UNVEIL_WRITE;
 
 	unp->unp_flags |= UNP_CONNECTING;
 
@@ -860,7 +840,7 @@ unp_connect(struct socket *so, struct mbuf *nam, struct proc *p)
 		solock(so2);
 
 		if ((so2->so_options & SO_ACCEPTCONN) == 0 ||
-		    (so3 = sonewconn(so2, 0)) == NULL) {
+		    (so3 = sonewconn(so2, 0, M_WAIT)) == NULL) {
 			error = ECONNREFUSED;
 		}
 
@@ -1016,13 +996,6 @@ unp_shutdown(struct unpcb *unp)
 		break;
 	}
 }
-
-#ifdef notdef
-unp_drain(void)
-{
-
-}
-#endif
 
 static struct unpcb *
 fptounp(struct file *fp)

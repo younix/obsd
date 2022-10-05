@@ -1,4 +1,4 @@
-/*	$OpenBSD: policy.c,v 1.89 2021/12/01 16:42:13 deraadt Exp $	*/
+/*	$OpenBSD: policy.c,v 1.91 2022/09/19 20:54:02 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2020-2021 Tobias Heider <tobhe@openbsd.org>
@@ -414,6 +414,28 @@ sa_state(struct iked *env, struct iked_sa *sa, int state)
 		}
 	}
 
+	if (ostate != sa->sa_state) {
+		switch (sa->sa_state) {
+		case IKEV2_STATE_ESTABLISHED:
+			ikestat_inc(env, ikes_sa_established_total);
+			ikestat_inc(env, ikes_sa_established_current);
+			break;
+		case IKEV2_STATE_CLOSED:
+		case IKEV2_STATE_CLOSING:
+			switch (ostate) {
+			case IKEV2_STATE_ESTABLISHED:
+				ikestat_dec(env, ikes_sa_established_current);
+				break;
+			case IKEV2_STATE_CLOSED:
+			case IKEV2_STATE_CLOSING:
+				break;
+			default:
+				ikestat_inc(env, ikes_sa_established_failures);
+				break;
+			}
+			break;
+		}
+	}
 }
 
 void
@@ -1216,6 +1238,8 @@ flow_cmp(struct iked_flow *a, struct iked_flow *b)
 		diff = addr_cmp(&a->flow_dst, &b->flow_dst, 1);
 	if (!diff)
 		diff = addr_cmp(&a->flow_src, &b->flow_src, 1);
+	if (!diff)
+		diff = addr_cmp(&a->flow_prenat, &b->flow_prenat, 0);
 
 	return (diff);
 }

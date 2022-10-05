@@ -1,4 +1,4 @@
-/* $OpenBSD: smmu.c,v 1.19 2022/08/10 17:02:37 patrick Exp $ */
+/* $OpenBSD: smmu.c,v 1.21 2022/09/11 10:28:56 patrick Exp $ */
 /*
  * Copyright (c) 2008-2009,2014-2016 Dale Rahn <drahn@dalerahn.com>
  * Copyright (c) 2021 Patrick Wildt <patrick@blueri.se>
@@ -23,6 +23,7 @@
 #include <sys/atomic.h>
 
 #include <machine/bus.h>
+#include <machine/cpufunc.h>
 
 #include <uvm/uvm_extern.h>
 #include <arm64/vmparam.h>
@@ -260,6 +261,8 @@ smmu_attach(struct smmu_softc *sc)
 		 */
 		sc->sc_cb[sc->sc_num_context_banks - 1] =
 		    malloc(sizeof(struct smmu_cb), M_DEVBUF, M_WAITOK | M_ZERO);
+		smmu_cb_write_4(sc, sc->sc_num_context_banks - 1,
+		    SMMU_CB_SCTLR, 0);
 		smmu_gr1_write_4(sc, SMMU_CBAR(sc->sc_num_context_banks - 1),
 		    SMMU_CBAR_TYPE_S1_TRANS_S2_BYPASS);
 	}
@@ -272,8 +275,13 @@ smmu_attach(struct smmu_softc *sc)
 		/* On QCOM HW we need to keep current streams running. */
 		if (sc->sc_is_qcom && sc->sc_smr &&
 		    smmu_gr0_read_4(sc, SMMU_SMR(i)) & SMMU_SMR_VALID) {
+			reg = smmu_gr0_read_4(sc, SMMU_SMR(i));
 			sc->sc_smr[i] = malloc(sizeof(struct smmu_smr),
 			    M_DEVBUF, M_WAITOK | M_ZERO);
+			sc->sc_smr[i]->ss_id = (reg >> SMMU_SMR_ID_SHIFT) &
+			    SMMU_SMR_ID_MASK;
+			sc->sc_smr[i]->ss_mask = (reg >> SMMU_SMR_MASK_SHIFT) &
+			    SMMU_SMR_MASK_MASK;
 			if (sc->sc_bypass_quirk) {
 				smmu_gr0_write_4(sc, SMMU_S2CR(i),
 				    SMMU_S2CR_TYPE_TRANS |
@@ -603,10 +611,22 @@ smmu_domain_create(struct smmu_softc *sc, uint32_t sid)
 	/* Stream mapping is a bit more effort */
 	if (sc->sc_smr) {
 		for (i = 0; i < sc->sc_num_streams; i++) {
+			/* Take over QCOM SMRs */
+			if (sc->sc_is_qcom && sc->sc_smr[i] != NULL &&
+			    sc->sc_smr[i]->ss_dom == NULL &&
+			    sc->sc_smr[i]->ss_id == sid &&
+			    sc->sc_smr[i]->ss_mask == 0) {
+				free(sc->sc_smr[i], M_DEVBUF,
+				    sizeof(struct smmu_smr));
+				sc->sc_smr[i] = NULL;
+			}
 			if (sc->sc_smr[i] != NULL)
 				continue;
 			sc->sc_smr[i] = malloc(sizeof(struct smmu_smr),
 			    M_DEVBUF, M_WAITOK | M_ZERO);
+			sc->sc_smr[i]->ss_dom = dom;
+			sc->sc_smr[i]->ss_id = sid;
+			sc->sc_smr[i]->ss_mask = 0;
 			dom->sd_smr_idx = i;
 			break;
 		}
@@ -833,6 +853,7 @@ VP_Lx(paddr_t pa)
 void
 smmu_set_l1(struct smmu_domain *dom, uint64_t va, struct smmuvp1 *l1_va)
 {
+	struct smmu_softc *sc = dom->sd_sc;
 	uint64_t pg_entry;
 	paddr_t l1_pa;
 	int idx0;
@@ -848,12 +869,17 @@ smmu_set_l1(struct smmu_domain *dom, uint64_t va, struct smmuvp1 *l1_va)
 	idx0 = VP_IDX0(va);
 	dom->sd_vp.l0->vp[idx0] = l1_va;
 	dom->sd_vp.l0->l0[idx0] = pg_entry;
+	membar_producer(); /* XXX bus dma sync? */
+	if (!sc->sc_coherent)
+		cpu_dcache_wb_range((vaddr_t)&dom->sd_vp.l0->l0[idx0],
+		    sizeof(dom->sd_vp.l0->l0[idx0]));
 }
 
 void
 smmu_set_l2(struct smmu_domain *dom, uint64_t va, struct smmuvp1 *vp1,
     struct smmuvp2 *l2_va)
 {
+	struct smmu_softc *sc = dom->sd_sc;
 	uint64_t pg_entry;
 	paddr_t l2_pa;
 	int idx1;
@@ -869,12 +895,17 @@ smmu_set_l2(struct smmu_domain *dom, uint64_t va, struct smmuvp1 *vp1,
 	idx1 = VP_IDX1(va);
 	vp1->vp[idx1] = l2_va;
 	vp1->l1[idx1] = pg_entry;
+	membar_producer(); /* XXX bus dma sync? */
+	if (!sc->sc_coherent)
+		cpu_dcache_wb_range((vaddr_t)&vp1->l1[idx1],
+		    sizeof(vp1->l1[idx1]));
 }
 
 void
 smmu_set_l3(struct smmu_domain *dom, uint64_t va, struct smmuvp2 *vp2,
     struct smmuvp3 *l3_va)
 {
+	struct smmu_softc *sc = dom->sd_sc;
 	uint64_t pg_entry;
 	paddr_t l3_pa;
 	int idx2;
@@ -890,6 +921,10 @@ smmu_set_l3(struct smmu_domain *dom, uint64_t va, struct smmuvp2 *vp2,
 	idx2 = VP_IDX2(va);
 	vp2->vp[idx2] = l3_va;
 	vp2->l2[idx2] = pg_entry;
+	membar_producer(); /* XXX bus dma sync? */
+	if (!sc->sc_coherent)
+		cpu_dcache_wb_range((vaddr_t)&vp2->l2[idx2],
+		    sizeof(vp2->l2[idx2]));
 }
 
 int
@@ -1023,6 +1058,7 @@ smmu_fill_pte(struct smmu_domain *dom, vaddr_t va, paddr_t pa,
 void
 smmu_pte_update(struct smmu_domain *dom, uint64_t pted, uint64_t *pl3)
 {
+	struct smmu_softc *sc = dom->sd_sc;
 	uint64_t pte, access_bits;
 	uint64_t attr = 0;
 
@@ -1085,6 +1121,9 @@ smmu_pte_update(struct smmu_domain *dom, uint64_t pted, uint64_t *pl3)
 
 	pte = (pted & PTE_RPGN) | attr | access_bits | L3_P;
 	*pl3 = pte;
+	membar_producer(); /* XXX bus dma sync? */
+	if (!sc->sc_coherent)
+		cpu_dcache_wb_range((vaddr_t)pl3, sizeof(*pl3));
 }
 
 void
@@ -1092,6 +1131,7 @@ smmu_pte_remove(struct smmu_domain *dom, vaddr_t va)
 {
 	/* put entry into table */
 	/* need to deal with ref/change here */
+	struct smmu_softc *sc = dom->sd_sc;
 	struct smmuvp1 *vp1;
 	struct smmuvp2 *vp2;
 	struct smmuvp3 *vp3;
@@ -1115,6 +1155,10 @@ smmu_pte_remove(struct smmu_domain *dom, vaddr_t va)
 		    va, dom);
 	}
 	vp3->l3[VP_IDX3(va)] = 0;
+	membar_producer(); /* XXX bus dma sync? */
+	if (!sc->sc_coherent)
+		cpu_dcache_wb_range((vaddr_t)&vp3->l3[VP_IDX3(va)],
+		    sizeof(vp3->l3[VP_IDX3(va)]));
 }
 
 int
@@ -1151,7 +1195,6 @@ smmu_map(struct smmu_domain *dom, vaddr_t va, paddr_t pa, vm_prot_t prot,
 
 	/* Insert updated information */
 	smmu_pte_update(dom, pted, pl3);
-	membar_producer(); /* XXX bus dma sync? */
 }
 
 void
@@ -1166,7 +1209,6 @@ smmu_unmap(struct smmu_domain *dom, vaddr_t va)
 
 	/* Remove mapping from pagetable */
 	smmu_pte_remove(dom, va);
-	membar_producer(); /* XXX bus dma sync? */
 
 	/* Invalidate IOTLB */
 	if (dom->sd_stage == 1)
