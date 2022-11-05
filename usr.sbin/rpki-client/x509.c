@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.50 2022/09/03 14:40:09 job Exp $ */
+/*	$OpenBSD: x509.c,v 1.56 2022/11/04 23:52:59 tb Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
@@ -34,6 +34,7 @@
 ASN1_OBJECT	*certpol_oid;	/* id-cp-ipAddr-asNumber cert policy */
 ASN1_OBJECT	*carepo_oid;	/* 1.3.6.1.5.5.7.48.5 (caRepository) */
 ASN1_OBJECT	*manifest_oid;	/* 1.3.6.1.5.5.7.48.10 (rpkiManifest) */
+ASN1_OBJECT	*signedobj_oid;	/* 1.3.6.1.5.5.7.48.11 (signedObject) */
 ASN1_OBJECT	*notify_oid;	/* 1.3.6.1.5.5.7.48.13 (rpkiNotify) */
 ASN1_OBJECT	*roa_oid;	/* id-ct-routeOriginAuthz CMS content type */
 ASN1_OBJECT	*mft_oid;	/* id-ct-rpkiManifest CMS content type */
@@ -45,46 +46,88 @@ ASN1_OBJECT	*sign_time_oid;	/* pkcs-9 id-signingTime */
 ASN1_OBJECT	*bin_sign_time_oid;	/* pkcs-9 id-aa-binarySigningTime */
 ASN1_OBJECT	*rsc_oid;	/* id-ct-signedChecklist */
 ASN1_OBJECT	*aspa_oid;	/* id-ct-ASPA */
+ASN1_OBJECT	*tak_oid;	/* id-ct-SignedTAL */
+
+static const struct {
+	const char	 *oid;
+	ASN1_OBJECT	**ptr;
+} oid_table[] = {
+	{
+		.oid = "1.3.6.1.5.5.7.14.2",
+		.ptr = &certpol_oid,
+	},
+	{
+		.oid = "1.3.6.1.5.5.7.48.5",
+		.ptr = &carepo_oid,
+	},
+	{
+		.oid = "1.3.6.1.5.5.7.48.10",
+		.ptr = &manifest_oid,
+	},
+	{
+		.oid = "1.3.6.1.5.5.7.48.11",
+		.ptr = &signedobj_oid,
+	},
+	{
+		.oid = "1.3.6.1.5.5.7.48.13",
+		.ptr = &notify_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.24",
+		.ptr = &roa_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.26",
+		.ptr = &mft_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.35",
+		.ptr = &gbr_oid,
+	},
+	{
+		.oid = "1.3.6.1.5.5.7.3.30",
+		.ptr = &bgpsec_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.3",
+		.ptr = &cnt_type_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.4",
+		.ptr = &msg_dgst_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.5",
+		.ptr = &sign_time_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.2.46",
+		.ptr = &bin_sign_time_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.48",
+		.ptr = &rsc_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.49",
+		.ptr = &aspa_oid,
+	},
+	{
+		.oid = "1.2.840.113549.1.9.16.1.50",
+		.ptr = &tak_oid,
+	},
+};
 
 void
 x509_init_oid(void)
 {
+	size_t	i;
 
-	if ((certpol_oid = OBJ_txt2obj("1.3.6.1.5.5.7.14.2", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.14.2");
-	if ((carepo_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.5", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.5");
-	if ((manifest_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.10", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.10");
-	if ((notify_oid = OBJ_txt2obj("1.3.6.1.5.5.7.48.13", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.48.13");
-	if ((roa_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.24", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.1.24");
-	if ((mft_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.26", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.1.26");
-	if ((gbr_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.35", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.1.35");
-	if ((bgpsec_oid = OBJ_txt2obj("1.3.6.1.5.5.7.3.30", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.3.6.1.5.5.7.3.30");
-	if ((cnt_type_oid = OBJ_txt2obj("1.2.840.113549.1.9.3", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.3");
-	if ((msg_dgst_oid = OBJ_txt2obj("1.2.840.113549.1.9.4", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.4");
-	if ((sign_time_oid = OBJ_txt2obj("1.2.840.113549.1.9.5", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed", "1.2.840.113549.1.9.5");
-	if ((bin_sign_time_oid =
-	    OBJ_txt2obj("1.2.840.113549.1.9.16.2.46", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.2.46");
-	if ((rsc_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.48", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.1.48");
-	if ((aspa_oid = OBJ_txt2obj("1.2.840.113549.1.9.16.1.49", 1)) == NULL)
-		errx(1, "OBJ_txt2obj for %s failed",
-		    "1.2.840.113549.1.9.16.1.49");
+	for (i = 0; i < sizeof(oid_table) / sizeof(oid_table[0]); i++) {
+		*oid_table[i].ptr = OBJ_txt2obj(oid_table[i].oid, 1);
+		if (*oid_table[i].ptr == NULL)
+			errx(1, "OBJ_txt2obj for %s failed", oid_table[i].oid);
+	}
 }
 
 /*
@@ -332,6 +375,74 @@ out:
 }
 
 /*
+ * Parse the Subject Information Access (SIA) extension
+ * See RFC 6487, section 4.8.8 for details.
+ * Returns NULL on failure, on success returns the SIA signedObject URI
+ * (which has to be freed after use).
+ */
+int
+x509_get_sia(X509 *x, const char *fn, char **sia)
+{
+	ACCESS_DESCRIPTION		*ad;
+	AUTHORITY_INFO_ACCESS		*info;
+	ASN1_OBJECT			*oid;
+	int				 i, crit, rsync_found = 0;
+
+	*sia = NULL;
+
+	info = X509_get_ext_d2i(x, NID_sinfo_access, &crit, NULL);
+	if (info == NULL)
+		return 1;
+
+	if (crit != 0) {
+		warnx("%s: RFC 6487 section 4.8.8: "
+		    "SIA: extension not non-critical", fn);
+		goto out;
+	}
+
+	for (i = 0; i < sk_ACCESS_DESCRIPTION_num(info); i++) {
+		ad = sk_ACCESS_DESCRIPTION_value(info, i);
+		oid = ad->method;
+
+		/*
+		 * XXX: RFC 6487 4.8.8.2 disallows other accessMethods, however
+		 * they do exist in the wild.  Consider making this an error.
+		 * See also https://www.rfc-editor.org/errata/eid7239.
+		 */
+		if (OBJ_cmp(oid, signedobj_oid) != 0) {
+			if (verbose > 1) {
+				char buf[128];
+
+				OBJ_obj2txt(buf, sizeof(buf), oid, 0);
+				warnx("%s: RFC 6487 section 4.8.8.2: unexpected"
+				    " accessMethod: %s", fn, buf);
+			}
+			continue;
+		}
+
+		/* Don't fail on non-rsync URI, so check this afterward. */
+		if (!x509_location(fn, "SIA: signedObject", NULL, ad->location,
+		    sia))
+			goto out;
+
+		if (rsync_found)
+			continue;
+
+		if (strncasecmp(*sia, "rsync://", 8) == 0) {
+			rsync_found = 1;
+			continue;
+		}
+
+		free(*sia);
+		*sia = NULL;
+	}
+
+ out:
+	AUTHORITY_INFO_ACCESS_free(info);
+	return rsync_found;
+}
+
+/*
  * Extract the expire time (not-after) of a certificate.
  */
 int
@@ -344,7 +455,7 @@ x509_get_expire(X509 *x, const char *fn, time_t *tt)
 		warnx("%s: X509_get0_notafter failed", fn);
 		return 0;
 	}
-	if (x509_get_time(at, tt) == -1) {
+	if (!x509_get_time(at, tt)) {
 		warnx("%s: ASN1_time_parse failed", fn);
 		return 0;
 	}
@@ -436,7 +547,7 @@ x509_get_crl(X509 *x, const char *fn, char **crl)
 	DIST_POINT		*dp;
 	GENERAL_NAMES		*names;
 	GENERAL_NAME		*name;
-	int			 i, crit, rc = 0;
+	int			 i, crit, rsync_found = 0;
 
 	*crl = NULL;
 	crldp = X509_get_ext_d2i(x, NID_crl_distribution_points, &crit, NULL);
@@ -471,14 +582,17 @@ x509_get_crl(X509 *x, const char *fn, char **crl)
 	names = dp->distpoint->name.fullname;
 	for (i = 0; i < sk_GENERAL_NAME_num(names); i++) {
 		name = sk_GENERAL_NAME_value(names, i);
-		/* Don't warn on non-rsync URI, so check this afterward. */
+
+		/* Don't fail on non-rsync URI, so check this afterward. */
 		if (!x509_location(fn, "CRL distribution point", NULL, name,
 		    crl))
 			goto out;
+
 		if (strncasecmp(*crl, "rsync://", 8) == 0) {
-			rc = 1;
+			rsync_found = 1;
 			goto out;
 		}
+
 		free(*crl);
 		*crl = NULL;
 	}
@@ -488,7 +602,7 @@ x509_get_crl(X509 *x, const char *fn, char **crl)
 
  out:
 	CRL_DIST_POINTS_free(crldp);
-	return rc;
+	return rsync_found;
 }
 
 /*

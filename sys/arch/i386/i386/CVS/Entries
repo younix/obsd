@@ -57,11 +57,11 @@
 /hibernate_machdep.c/1.59/Fri Sep  2 14:00:19 2022//
 /locore.s/1.197/Fri Sep  2 14:00:19 2022//
 /locore0.S/1.9/Fri Sep  2 14:00:19 2022//
-/machdep.c/1.656/Fri Sep  2 14:00:19 2022//
 /mptramp.s/1.26/Fri Sep  2 14:00:19 2022//
 /acpi_wakecode.S/1.33/Tue Sep 20 07:19:37 2022//
 /autoconf.c/1.108/Tue Sep 20 07:19:37 2022//
 /conf.c/1.174/Tue Sep 20 07:19:37 2022//
 /lapic.c/1.52/Tue Sep 20 07:19:37 2022//
-/amd64errata.c/1.15/Wed Oct  5 18:34:59 2022//
+/amd64errata.c/1.16/Sat Nov  5 22:12:14 2022//
+/machdep.c/1.657/Sat Nov  5 22:12:14 2022//
 D

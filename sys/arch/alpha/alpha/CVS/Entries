@@ -17,13 +17,11 @@
 /dec_eb64plus.c/1.9/Thu May  8 20:46:49 2014//
 /dec_kn20aa.c/1.20/Thu May  8 20:46:49 2014//
 /dec_kn300.c/1.9/Sun Apr 30 13:04:49 2017//
-/disksubr.c/1.100/Tue Feb 28 10:49:37 2017//
 /fp_complete.c/1.12/Wed Mar 30 15:39:46 2016//
 /genassym.cf/1.12/Thu Nov  1 21:09:17 2012//
 /interrupt.c/1.40/Sat Jan 21 05:42:03 2017//
 /ipifuncs.c/1.6/Sun Feb  2 22:49:38 2014//
 /lock_machdep.c/1.8/Thu Mar  5 09:28:31 2020//
-/locore.s/1.48/Sun May 17 13:48:29 2020//
 /locore0.S/1.2/Fri Jul 14 05:34:10 2017//
 /mcclock.c/1.5/Thu Mar 14 01:26:26 2002//
 /mcclockvar.h/1.4/Thu Mar 14 01:26:26 2002//
@@ -34,16 +32,18 @@
 /prom.c/1.16/Thu Dec 18 10:50:02 2014//
 /prom_disp.s/1.7/Sun Jan 13 20:59:52 2008//
 /promcons.c/1.19/Mon Feb 19 08:59:52 2018//
-/sys_machdep.c/1.7/Thu Jun 26 05:42:08 2008//
 /clock.c/1.25/Wed Sep  1 16:07:38 2021//
 /in_cksum.c/1.10/Mon Jun 27 13:02:00 2022//
-/vm_machdep.c/1.48/Mon Jun 27 13:02:00 2022//
 /cpu.c/1.45/Tue Jul 26 13:42:34 2022//
 /db_interface.c/1.28/Tue Jul 26 13:42:34 2022//
 /mainbus.c/1.15/Tue Jul 26 13:42:34 2022//
-/machdep.c/1.198/Fri Sep  2 14:00:18 2022//
-/trap.c/1.103/Fri Sep  2 14:00:18 2022//
 /autoconf.c/1.39/Tue Sep 20 07:19:36 2022//
-/conf.c/1.91/Tue Sep 20 07:19:36 2022//
 /pmap.c/1.88/Tue Sep 20 07:19:36 2022//
+/conf.c/1.92/Sat Nov  5 22:12:12 2022//
+/disksubr.c/1.101/Sat Nov  5 22:12:12 2022//
+/locore.s/1.49/Sat Nov  5 22:12:12 2022//
+/machdep.c/1.199/Sat Nov  5 22:12:12 2022//
+/sys_machdep.c/1.8/Sat Nov  5 22:12:12 2022//
+/trap.c/1.104/Sat Nov  5 22:12:12 2022//
+/vm_machdep.c/1.49/Sat Nov  5 22:12:12 2022//
 D

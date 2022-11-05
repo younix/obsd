@@ -1,4 +1,4 @@
-/*	$OpenBSD: gus.c,v 1.51 2022/08/29 06:08:04 jsg Exp $	*/
+/*	$OpenBSD: gus.c,v 1.55 2022/11/02 10:41:34 kn Exp $	*/
 /*	$NetBSD: gus.c,v 1.51 1998/01/25 23:48:06 mycroft Exp $	*/
 
 /*-
@@ -261,66 +261,39 @@ static const unsigned short gus_log_volumes[512] = {
  * Interface to higher level audio driver
  */
 const struct audio_hw_if gus_hw_if = {
-	gusopen,
-	gusclose,
-	gus_set_params,
-
-	gus_round_blocksize,
-
-	gus_commit_settings,
-
-	NULL,
-	NULL,
-
-	gus_dma_output,
-	gus_dma_input,
-	gus_halt_out_dma,
-	gus_halt_in_dma,
-	gus_speaker_ctl,
-
-	NULL,
-	gus_mixer_set_port,
-	gus_mixer_get_port,
-	gus_mixer_query_devinfo,
-	gus_malloc,
-	gus_free,
-	gus_round,
-	gus_get_props,
-
-	NULL,
-	NULL
+	.open = gusopen,
+	.close = gusclose,
+	.set_params = gus_set_params,
+	.round_blocksize = gus_round_blocksize,
+	.commit_settings = gus_commit_settings,
+	.start_output = gus_dma_output,
+	.start_input = gus_dma_input,
+	.halt_output = gus_halt_out_dma,
+	.halt_input = gus_halt_in_dma,
+	.set_port = gus_mixer_set_port,
+	.get_port = gus_mixer_get_port,
+	.query_devinfo = gus_mixer_query_devinfo,
+	.allocm = gus_malloc,
+	.freem = gus_free,
+	.round_buffersize = gus_round,
 };
 
 static const struct audio_hw_if gusmax_hw_if = {
-	gusmaxopen,
-	gusmax_close,
-	gusmax_set_params,
-
-	gusmax_round_blocksize,
-
-	gusmax_commit_settings,
-
-	NULL,
-	NULL,
-
-	gusmax_dma_output,
-	gusmax_dma_input,
-	gusmax_halt_out_dma,
-	gusmax_halt_in_dma,
-
-	gusmax_speaker_ctl,
-
-	NULL,
-	gusmax_mixer_set_port,
-	gusmax_mixer_get_port,
-	gusmax_mixer_query_devinfo,
-	ad1848_malloc,
-	ad1848_free,
-	ad1848_round,
-	gusmax_get_props,
-
-	NULL,
-	NULL
+	.open = gusmaxopen,
+	.close = gusmax_close,
+	.set_params = gusmax_set_params,
+	.round_blocksize = gusmax_round_blocksize,
+	.commit_settings = gusmax_commit_settings,
+	.start_output = gusmax_dma_output,
+	.start_input = gusmax_dma_input,
+	.halt_output = gusmax_halt_out_dma,
+	.halt_input = gusmax_halt_in_dma,
+	.set_port = gusmax_mixer_set_port,
+	.get_port = gusmax_mixer_get_port,
+	.query_devinfo = gusmax_mixer_query_devinfo,
+	.allocm = ad1848_malloc,
+	.freem = ad1848_free,
+	.round_buffersize = ad1848_round,
 };
 
 int
@@ -330,8 +303,14 @@ gusopen(void *addr, int flags)
 
 	DPRINTF(("gusopen() called\n"));
 
+	if ((flags & (FWRITE | FREAD)) == (FWRITE | FREAD) &&
+	    sc->sc_recdrq == sc->sc_drq)
+		return ENXIO;
+
 	if (sc->sc_flags & GUS_OPEN)
 		return EBUSY;
+
+	gus_speaker_ctl(sc, (flags & FWRITE) ? SPKR_ON : SPKR_OFF);
 
 	/*
 	 * Some initialization
@@ -1700,16 +1679,9 @@ gus_set_recrate(struct gus_softc *sc, u_long rate)
 }
 
 /*
- * Interface to the audio layer - turn the output on or off.  Note that some
+ * Turn the output on or off.  Note that some
  * of these bits are flipped in the register
  */
-
-int
-gusmax_speaker_ctl(void *addr, int newstate)
-{
-	struct ad1848_softc *sc = addr;
-	return gus_speaker_ctl(sc->parent, newstate);
-}
 
 int
 gus_speaker_ctl(void *addr, int newstate)
@@ -2692,21 +2664,6 @@ gus_mixer_set_port(void *addr, mixer_ctrl_t *cp)
 	    /*NOTREACHED*/
 	}
 	return error;
-}
-
-int
-gus_get_props(void *addr)
-{
-	struct gus_softc *sc = addr;
-	return AUDIO_PROP_MMAP |
-		(sc->sc_recdrq == sc->sc_drq ? 0 : AUDIO_PROP_FULLDUPLEX);
-}
-
-int
-gusmax_get_props(void *addr)
-{
-	struct ad1848_softc *ac = addr;
-	return gus_get_props(ac->parent);
 }
 
 int

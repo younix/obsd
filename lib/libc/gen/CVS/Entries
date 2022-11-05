@@ -101,7 +101,6 @@
 /siginterrupt.3/1.14/Wed Jun  5 03:39:22 2013//
 /siginterrupt.c/1.9/Fri Jun 28 13:32:41 2019//
 /siglist.c/1.8/Sat Sep 19 04:02:21 2015//
-/signal.3/1.56/Tue Aug  1 14:57:02 2017//
 /signal.c/1.11/Fri Jun 28 13:32:41 2019//
 /signame.c/1.7/Sat Sep 19 04:02:21 2015//
 /signbit.c/1.7/Wed Jul  3 04:46:36 2013//
@@ -121,7 +120,6 @@
 /tolower_.c/1.11/Sat Sep 19 04:02:21 2015//
 /toupper_.c/1.12/Sat Sep 19 04:02:21 2015//
 /tree.c/1.2/Tue Oct  9 08:28:43 2018//
-/ttyname.3/1.19/Tue Nov 12 05:12:15 2013//
 /ttyname.c/1.20/Fri Apr 14 15:02:51 2017//
 /ttyslot.c/1.8/Tue Nov 12 06:07:12 2013//
 /ualarm.3/1.17/Fri Jul 26 12:08:18 2019//
@@ -196,7 +194,6 @@
 /vis.3/1.37/Mon Aug  1 07:15:36 2022//
 /vis.c/1.26/Tue Jul 26 13:42:32 2022//
 /alarm.3/1.17/Fri Sep  2 14:00:04 2022//
-/disklabel.c/1.26/Fri Sep  2 14:00:04 2022//
 /getgrent.c/1.50/Fri Sep  2 14:00:04 2022//
 /getgrouplist.c/1.30/Fri Sep  2 14:00:04 2022//
 /getnetgrent.c/1.29/Fri Sep  2 14:00:04 2022//
@@ -230,4 +227,7 @@
 /toupper.3/1.17/Tue Sep 20 07:19:20 2022//
 /uname.3/1.18/Tue Sep 20 07:19:20 2022//
 /utime.3/1.23/Tue Sep 20 07:19:20 2022//
+/disklabel.c/1.27/Sat Nov  5 22:11:43 2022//
+/signal.3/1.57/Sat Nov  5 22:11:43 2022//
+/ttyname.3/1.20/Sat Nov  5 22:11:43 2022//
 D

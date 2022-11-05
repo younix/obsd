@@ -47,7 +47,6 @@
 /rlmbutil.h/1.1.1.1/Mon May 10 18:48:19 2004//
 /rlprivate.h/1.2/Thu Mar 25 18:47:22 2010//
 /rlshell.h/1.1.1.2/Mon May 10 18:48:19 2004//
-/rlstdc.h/1.1.1.2/Mon May 10 18:48:19 2004//
 /rltty.c/1.5/Thu Jul 27 18:01:46 2017//
 /rltty.h/1.1.1.1/Sun Mar 18 17:32:02 2001//
 /rltypedefs.h/1.1.1.1/Mon May 10 18:48:19 2004//
@@ -72,3 +71,4 @@ D/doc////
 D/examples////
 D/shlib////
 D/support////
+/rlstdc.h/1.2/Sat Nov  5 22:10:55 2022//

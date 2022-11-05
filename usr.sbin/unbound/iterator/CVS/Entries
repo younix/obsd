@@ -4,16 +4,16 @@
 /iter_hints.h/1.2/Fri Feb 17 18:53:32 2017//
 /iter_priv.c/1.1.1.4/Thu Jul 16 01:42:20 2015//
 /iter_priv.h/1.2/Fri Feb 17 18:53:32 2017//
-/iter_resptype.c/1.4/Thu Jul 16 01:44:00 2015//
 /iter_resptype.h/1.1.1.2/Sun Mar 16 11:38:25 2014//
 /iter_scrub.h/1.1.1.2/Sun Mar 16 11:38:25 2014//
 /iter_scrub.c/1.12/Thu Sep  2 14:22:33 2021//
 /iter_fwd.c/1.7/Mon Jun 27 13:02:01 2022//
-/iter_hints.c/1.15/Mon Jun 27 13:02:01 2022//
-/iterator.h/1.18/Fri Sep  2 14:00:29 2022//
 /iter_delegpt.c/1.7/Wed Oct  5 18:35:08 2022//
 /iter_delegpt.h/1.10/Wed Oct  5 18:35:08 2022//
 /iter_utils.c/1.20/Wed Oct  5 18:35:08 2022//
 /iter_utils.h/1.14/Wed Oct  5 18:35:08 2022//
-/iterator.c/1.32/Wed Oct  5 18:35:08 2022//
+/iter_hints.c/1.16/Sat Nov  5 22:12:31 2022//
+/iter_resptype.c/1.5/Sat Nov  5 22:12:31 2022//
+/iterator.c/1.33/Sat Nov  5 22:12:31 2022//
+/iterator.h/1.19/Sat Nov  5 22:12:31 2022//
 D

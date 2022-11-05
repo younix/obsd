@@ -1,4 +1,4 @@
-/* $OpenBSD: tty-keys.c,v 1.158 2022/07/19 06:51:31 nicm Exp $ */
+/* $OpenBSD: tty-keys.c,v 1.160 2022/11/02 07:36:07 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -208,6 +208,9 @@ static const struct tty_default_key_raw tty_default_raw_keys[] = {
 	/* Paste keys. */
 	{ "\033[200~", KEYC_PASTE_START },
 	{ "\033[201~", KEYC_PASTE_END },
+
+	/* Extended keys. */
+	{ "\033[1;5Z", '\011'|KEYC_CTRL|KEYC_SHIFT },
 };
 
 /* Default xterm keys. */

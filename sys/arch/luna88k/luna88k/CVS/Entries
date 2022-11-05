@@ -9,9 +9,9 @@
 /mainbus.c/1.17/Mon Nov 15 19:06:15 2021//
 /romcons.c/1.1/Mon Jun 27 13:02:00 2022//
 /m8820x.c/1.18/Tue Jul 26 13:42:34 2022//
-/disksubr.c/1.60/Fri Sep  2 14:00:19 2022//
-/locore0.S/1.4/Fri Sep  2 14:00:19 2022//
-/machdep.c/1.138/Fri Sep  2 14:00:19 2022//
-/conf.c/1.36/Tue Sep 20 07:19:38 2022//
-/autoconf.c/1.27/Wed Oct  5 18:34:59 2022//
+/autoconf.c/1.28/Sat Nov  5 22:12:15 2022//
+/conf.c/1.37/Sat Nov  5 22:12:15 2022//
+/disksubr.c/1.62/Sat Nov  5 22:12:15 2022//
+/locore0.S/1.5/Sat Nov  5 22:12:15 2022//
+/machdep.c/1.140/Sat Nov  5 22:12:15 2022//
 D

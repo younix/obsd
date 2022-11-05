@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.c,v 1.23 2022/09/10 20:35:29 miod Exp $	*/
+/*	$OpenBSD: pmap.c,v 1.26 2022/11/03 23:30:55 jca Exp $	*/
 
 /*
  * Copyright (c) 2019-2020 Brian Bamsch <bbamsch@google.com>
@@ -30,6 +30,8 @@
 #include <machine/riscvreg.h>
 #include <machine/sbi.h>
 
+#include <dev/ofw/fdt.h>
+
 #ifdef MULTIPROCESSOR
 
 static inline int
@@ -39,8 +41,6 @@ pmap_is_active(struct pmap *pm, struct cpu_info *ci)
 }
 
 #endif
-
-int sifive_cip_1200_errata;
 
 void
 do_tlb_flush_page(pmap_t pm, vaddr_t va)
@@ -57,8 +57,23 @@ do_tlb_flush_page(pmap_t pm, vaddr_t va)
 			hart_mask |= (1UL << ci->ci_hartid);
 	}
 
-	if (hart_mask != 0)
+	/*
+	 * From the RISC-V privileged spec:
+	 *
+	 * SFENCE.VMA orders only the local hart's implicit references
+	 * to the memory-management data structures. Consequently, other
+	 * harts must be notified separately when the memory-management
+	 * data structures have been modified. One approach is to use 1)
+	 * a local data fence to ensure local writes are visible
+	 * globally, then 2) an interprocessor interrupt to the other
+	 * thread, then 3) a local SFENCE.VMA in the interrupt handler
+	 * of the remote thread, and finally 4) signal back to
+	 * originating thread that operation is complete.
+	 */
+	if (hart_mask != 0) {
+		membar_sync();
 		sbi_remote_sfence_vma(&hart_mask, va, PAGE_SIZE);
+	}
 #endif
 
 	sfence_vma_page(va);
@@ -79,8 +94,23 @@ do_tlb_flush(pmap_t pm)
 			hart_mask |= (1UL << ci->ci_hartid);
 	}
 
-	if (hart_mask != 0)
+	/*
+	 * From the RISC-V privileged spec:
+	 *
+	 * SFENCE.VMA orders only the local hart's implicit references
+	 * to the memory-management data structures. Consequently, other
+	 * harts must be notified separately when the memory-management
+	 * data structures have been modified. One approach is to use 1)
+	 * a local data fence to ensure local writes are visible
+	 * globally, then 2) an interprocessor interrupt to the other
+	 * thread, then 3) a local SFENCE.VMA in the interrupt handler
+	 * of the remote thread, and finally 4) signal back to
+	 * originating thread that operation is complete.
+	 */
+	if (hart_mask != 0) {
+		membar_sync();
 		sbi_remote_sfence_vma(&hart_mask, 0, -1);
+	}
 #endif
 
 	sfence_vma();
@@ -203,6 +233,9 @@ struct mem_region *pmap_avail = &pmap_avail_regions[0];
 struct mem_region *pmap_allocated = &pmap_allocated_regions[0];
 int pmap_cnt_avail, pmap_cnt_allocated;
 uint64_t pmap_avail_kvo;
+
+paddr_t pmap_cached_start, pmap_cached_end;
+paddr_t pmap_uncached_start, pmap_uncached_end;
 
 static inline void
 pmap_lock(struct pmap *pmap)
@@ -631,6 +664,7 @@ _pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags, int cache)
 {
 	pmap_t pm = pmap_kernel();
 	struct pte_desc *pted;
+	struct vm_page *pg;
 
 	pted = pmap_vp_lookup(pm, va, NULL);
 
@@ -657,6 +691,10 @@ _pmap_kenter_pa(vaddr_t va, paddr_t pa, vm_prot_t prot, int flags, int cache)
 	pmap_pte_insert(pted);
 
 	tlb_flush_page(pm, va & ~PAGE_MASK);
+
+	pg = PHYS_TO_VM_PAGE(pa);
+	if (pg && cache == PMAP_CACHE_CI)
+		cpu_dcache_wbinv_range(pa & ~PAGE_MASK, PAGE_SIZE);
 }
 
 void
@@ -741,6 +779,8 @@ pmap_fill_pte(pmap_t pm, vaddr_t va, paddr_t pa, struct pte_desc *pted,
 	case PMAP_CACHE_WT:
 		break;
 	case PMAP_CACHE_CI:
+		if (pa >= pmap_cached_start && pa <= pmap_cached_end)
+			pa += (pmap_uncached_start - pmap_cached_start);
 		break;
 	case PMAP_CACHE_DEV:
 		break;
@@ -1171,6 +1211,15 @@ pmap_bootstrap(long kvo, vaddr_t l1pt, vaddr_t kernelstart, vaddr_t kernelend,
 	vaddr_t vstart;
 	int i, j, k;
 	int lb_idx2, ub_idx2;
+	void *node;
+
+	node = fdt_find_node("/");
+	if (fdt_is_compatible(node, "starfive,jh7100")) {
+		pmap_cached_start = 0x0080000000ULL;
+		pmap_cached_end = 0x087fffffffULL;
+		pmap_uncached_start = 0x1000000000ULL;
+		pmap_uncached_end = 0x17ffffffffULL;
+	}
 
 	pmap_setup_avail(memstart, memend, kvo);
 	pmap_remove_avail(kernelstart + kvo, kernelend + kvo);
@@ -1407,6 +1456,7 @@ int
 pmap_extract(pmap_t pm, vaddr_t va, paddr_t *pap)
 {
 	struct pte_desc *pted;
+	paddr_t pa;
 
 	pmap_lock(pm);
 	pted = pmap_vp_lookup(pm, va, NULL);
@@ -1414,8 +1464,12 @@ pmap_extract(pmap_t pm, vaddr_t va, paddr_t *pap)
 		pmap_unlock(pm);
 		return 0;
 	}
-	if (pap != NULL)
-		*pap = (pted->pted_pte & PTE_RPGN) | (va & PAGE_MASK);
+	if (pap != NULL) {
+		pa = pted->pted_pte & PTE_RPGN;
+		if (pa >= pmap_uncached_start && pa <= pmap_uncached_end)
+			pa -= (pmap_uncached_start - pmap_cached_start);
+		*pap = pa | (va & PAGE_MASK);
+	}
 	pmap_unlock(pm);
 
 	return 1;

@@ -7,9 +7,7 @@
 /ahcireg.h/1.5/Wed Feb 11 07:13:44 2015//
 /aic6360reg.h/1.2/Sat Nov  8 19:17:28 2003//
 /aic7xxx_inline.h/1.17/Wed Aug 17 01:17:54 2016//
-/am7930.c/1.7/Wed Sep 14 06:12:19 2016//
 /am7930reg.h/1.6/Sat Sep  3 20:03:29 2011//
-/am7930var.h/1.5/Mon Sep 19 06:46:44 2016//
 /am79900reg.h/1.2/Thu Jun 26 05:42:15 2008//
 /am79900var.h/1.1/Tue Sep 24 20:10:56 2013//
 /am7990reg.h/1.9/Tue Sep 24 20:10:57 2013//
@@ -86,7 +84,6 @@
 /lpt.c/1.15/Wed Jan 15 16:43:13 2020//
 /lptreg.h/1.4/Mon Jun  2 23:28:02 2003//
 /lptvar.h/1.4/Wed Jun 12 19:07:40 2013//
-/lsi64854.c/1.11/Fri Sep  8 05:36:52 2017//
 /lsi64854reg.h/1.4/Thu Jun 26 05:42:15 2008//
 /lsi64854var.h/1.7/Thu Jun 26 05:42:15 2008//
 /malo.h/1.12/Fri Dec  6 21:03:03 2013//
@@ -207,7 +204,6 @@
 /athnvar.h/1.42/Wed Sep  1 16:07:39 2021//
 /ax88190.c/1.9/Wed Sep  1 16:07:39 2021//
 /i82365.c/1.40/Wed Sep  1 16:07:39 2021//
-/mk48txx.c/1.8/Wed Sep  1 16:07:39 2021//
 /rtl80x9.c/1.12/Wed Sep  1 16:07:39 2021//
 /smc93cx6.c/1.19/Wed Sep  1 16:07:39 2021//
 /stivar.h/1.27/Wed Sep  1 16:07:39 2021//
@@ -229,11 +225,9 @@
 /aic6915.c/1.24/Mon Jan 24 14:35:14 2022//
 /aic6915.h/1.5/Mon Jan 24 14:35:14 2022//
 /aic79xx.c/1.67/Mon Jan 24 14:35:14 2022//
-/aic79xx.h/1.29/Mon Jan 24 14:35:14 2022//
 /aic79xx_inline.h/1.5/Mon Jan 24 14:35:14 2022//
 /aic7xxx.c/1.97/Mon Jan 24 14:35:14 2022//
 /aic7xxx_cam.h/1.10/Mon Jan 24 14:35:14 2022//
-/aic7xxxvar.h/1.37/Mon Jan 24 14:35:14 2022//
 /anxdp.c/1.6/Mon Jan 24 14:35:14 2022//
 /ar5210.c/1.48/Mon Jan 24 14:35:14 2022//
 /ar5210reg.h/1.14/Mon Jan 24 14:35:14 2022//
@@ -300,7 +294,6 @@
 /an.c/1.79/Tue Jul 26 13:42:35 2022//
 /ar5008.c/1.70/Tue Jul 26 13:42:35 2022//
 /ar9003.c/1.55/Tue Jul 26 13:42:35 2022//
-/arcofi.c/1.20/Tue Jul 26 13:42:35 2022//
 /ath.c/1.123/Tue Jul 26 13:42:35 2022//
 /atw.c/1.100/Tue Jul 26 13:42:35 2022//
 /bcmgenet.c/1.6/Tue Jul 26 13:42:35 2022//
@@ -346,4 +339,11 @@
 /smc91cxx.c/1.52/Fri Sep  2 14:00:21 2022//
 /smc91cxxvar.h/1.9/Fri Sep  2 14:00:21 2022//
 /mfireg.h/1.52/Tue Sep 20 07:19:40 2022//
+/aic79xx.h/1.30/Sat Nov  5 22:12:18 2022//
+/aic7xxxvar.h/1.38/Sat Nov  5 22:12:18 2022//
+/am7930.c/1.8/Sat Nov  5 22:12:18 2022//
+/am7930var.h/1.6/Sat Nov  5 22:12:18 2022//
+/arcofi.c/1.21/Sat Nov  5 22:12:18 2022//
+/lsi64854.c/1.12/Sat Nov  5 22:12:18 2022//
+/mk48txx.c/1.10/Sat Nov  5 22:12:18 2022//
 D

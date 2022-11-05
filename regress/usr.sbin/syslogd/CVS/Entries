@@ -168,15 +168,7 @@
 /args-sendsyslog-logstash.pl/1.1/Wed Sep  1 16:07:38 2021//
 /args-sendsyslog-nostash.pl/1.1/Wed Sep  1 16:07:38 2021//
 /args-client-tls-tcp.pl/1.8/Thu Sep  2 14:22:31 2021//
-/args-privsep.pl/1.6/Thu Sep  2 14:22:31 2021//
 /args-server-tls-tcp.pl/1.13/Thu Sep  2 14:22:31 2021//
-/args-sighup-config.pl/1.9/Thu Sep  2 14:22:31 2021//
-/args-sighup-privsep.pl/1.8/Thu Sep  2 14:22:31 2021//
-/args-sighup-tcp.pl/1.8/Thu Sep  2 14:22:31 2021//
-/args-sighup-tls.pl/1.8/Thu Sep  2 14:22:31 2021//
-/args-sighup.pl/1.10/Thu Sep  2 14:22:31 2021//
-/args-sigpipe.pl/1.6/Thu Sep  2 14:22:31 2021//
-/args-sigterm.pl/1.10/Thu Sep  2 14:22:31 2021//
 /args-tls-cafile-default.pl/1.14/Thu Sep  2 14:22:31 2021//
 /ttylog.c/1.8/Thu Sep  2 14:22:31 2021//
 /args-server-tls-error.pl/1.8/Wed Oct 20 17:29:05 2021//
@@ -201,4 +193,12 @@
 /args-hostname.pl/1.2/Tue Jul 26 13:42:33 2022//
 /args-length-vis.pl/1.5/Tue Jul 26 13:42:33 2022//
 /funcs.pl/1.40/Tue Jul 26 13:42:33 2022//
+/args-privsep.pl/1.7/Sat Nov  5 22:12:09 2022//
+/args-sighup-config.pl/1.10/Sat Nov  5 22:12:09 2022//
+/args-sighup-privsep.pl/1.9/Sat Nov  5 22:12:09 2022//
+/args-sighup-tcp.pl/1.9/Sat Nov  5 22:12:09 2022//
+/args-sighup-tls.pl/1.9/Sat Nov  5 22:12:09 2022//
+/args-sighup.pl/1.11/Sat Nov  5 22:12:09 2022//
+/args-sigpipe.pl/1.7/Sat Nov  5 22:12:09 2022//
+/args-sigterm.pl/1.11/Sat Nov  5 22:12:09 2022//
 D

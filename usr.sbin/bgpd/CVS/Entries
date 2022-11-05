@@ -21,13 +21,9 @@
 /rde_community.c/1.9/Fri Sep  2 14:00:27 2022//
 /rde_prefix.c/1.42/Fri Sep  2 14:00:27 2022//
 /rde_trie.c/1.16/Fri Sep  2 14:00:27 2022//
-/rtr.c/1.7/Fri Sep  2 14:00:27 2022//
-/session.c/1.435/Fri Sep  2 14:00:27 2022//
 /session.h/1.158/Fri Sep  2 14:00:27 2022//
 /util.c/1.71/Fri Sep  2 14:00:27 2022//
-/rde_rib.c/1.249/Tue Sep 20 07:19:45 2022//
 /bgpd.h/1.454/Wed Oct  5 18:35:06 2022//
-/kroute.c/1.300/Wed Oct  5 18:35:06 2022//
 /parse.y/1.436/Wed Oct  5 18:35:06 2022//
 /printconf.c/1.159/Wed Oct  5 18:35:06 2022//
 /rde.c/1.578/Wed Oct  5 18:35:06 2022//
@@ -36,4 +32,8 @@
 /rde_peer.c/1.25/Wed Oct  5 18:35:06 2022//
 /rde_update.c/1.148/Wed Oct  5 18:35:06 2022//
 /version.h/1.8/Wed Oct  5 18:35:06 2022//
+/kroute.c/1.301/Sat Nov  5 22:12:27 2022//
+/rde_rib.c/1.250/Sat Nov  5 22:12:27 2022//
+/rtr.c/1.8/Sat Nov  5 22:12:27 2022//
+/session.c/1.436/Sat Nov  5 22:12:27 2022//
 D

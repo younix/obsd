@@ -6,7 +6,6 @@
 /autoconf.h/1.12/Thu Apr  2 11:12:24 2015//
 /bus.h/1.26/Mon May  8 00:27:45 2017//
 /cdefs.h/1.1/Sat Sep  1 15:49:06 2001//
-/cpu.h/1.14/Wed Oct  9 17:43:50 2013//
 /db_machdep.h/1.7/Sat Mar  5 17:41:55 2016//
 /disklabel.h/1.16/Wed Sep 30 15:13:54 2015//
 /endian.h/1.1/Sat Sep  1 15:49:06 2001//
@@ -45,4 +44,5 @@
 /vmparam.h/1.32/Wed Sep  1 16:07:38 2021//
 /z8530var.h/1.10/Wed Sep  1 16:07:38 2021//
 /conf.h/1.15/Tue Jul 26 13:42:34 2022//
+/cpu.h/1.15/Sat Nov  5 22:12:15 2022//
 D

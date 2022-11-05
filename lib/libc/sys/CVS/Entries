@@ -18,7 +18,6 @@
 /getgroups.2/1.15/Mon Jul  8 18:48:30 2019//
 /getitimer.2/1.33/Mon Jun 24 21:20:12 2019//
 /getlogin.2/1.22/Sun Feb  9 02:32:43 2020//
-/getpgrp.2/1.18/Thu Sep 10 17:55:21 2015//
 /getpid.2/1.13/Thu Sep 10 17:55:21 2015//
 /getpriority.2/1.15/Thu Sep 10 17:55:21 2015//
 /getrtable.2/1.4/Thu Sep 10 17:55:21 2015//
@@ -43,7 +42,6 @@
 /msgrcv.2/1.18/Thu Jul 18 13:45:03 2019//
 /msgsnd.2/1.21/Thu Jul 18 13:45:03 2019//
 /msyscall.2/1.2/Wed Nov 27 20:53:05 2019//
-/munmap.2/1.19/Sat Dec 21 05:23:38 2019//
 /pathconf.2/1.25/Thu Jun 21 20:30:36 2018//
 /pipe.2/1.18/Wed Dec 10 19:30:22 2014//
 /posix_madvise.c/1.4/Fri Sep 11 13:26:20 2015//
@@ -122,7 +120,6 @@
 /sendsyslog.2/1.13/Wed Sep  1 16:07:37 2021//
 /symlink.2/1.22/Wed Sep  1 16:07:37 2021//
 /futex.2/1.6/Thu Sep  2 14:22:30 2021//
-/mprotect.2/1.26/Thu Sep  2 14:22:30 2021//
 /msync.2/1.29/Thu Sep  2 14:22:30 2021//
 /revoke.2/1.16/Thu Sep  2 14:22:30 2021//
 /unlink.2/1.28/Thu Sep  2 14:22:30 2021//
@@ -151,18 +148,14 @@
 /getfh.2/1.20/Mon Aug  1 07:15:36 2022//
 /getfsstat.2/1.22/Mon Aug  1 07:15:36 2022//
 /gettimeofday.2/1.33/Tue Jul 26 13:42:32 2022//
-/kqueue.2/1.46/Tue Jul 26 13:42:32 2022//
 /ktrace.2/1.41/Mon Aug  1 07:15:36 2022//
 /microtime.c/1.2/Mon Aug  1 07:15:36 2022//
-/mmap.2/1.68/Tue Jul 26 13:42:32 2022//
 /mquery.2/1.13/Tue Jul 26 13:42:32 2022//
 /nanosleep.2/1.19/Tue Jul 26 13:42:32 2022//
 /nfssvc.2/1.25/Mon Aug  1 07:15:36 2022//
 /open.2/1.51/Tue Jul 26 13:42:32 2022//
 /pledge.2/1.64/Tue Jul 26 13:42:32 2022//
 /shmat.2/1.17/Tue Jul 26 13:42:32 2022//
-/sigaction.2/1.76/Tue Jul 26 13:42:32 2022//
-/sigaltstack.2/1.25/Tue Jul 26 13:42:32 2022//
 /socket.2/1.44/Tue Jul 26 13:42:32 2022//
 /statfs.2/1.29/Mon Aug  1 07:15:36 2022//
 /sync.2/1.17/Tue Jul 26 13:42:32 2022//
@@ -175,7 +168,6 @@
 /syscall.2/1.14/Fri Sep  2 14:00:04 2022//
 /sysctl.2/1.49/Fri Sep  2 14:00:04 2022//
 /wait.2/1.32/Fri Sep  2 14:00:04 2022//
-/Makefile.inc/1.164/Tue Sep 20 07:19:21 2022//
 /accept.2/1.30/Tue Sep 20 07:19:21 2022//
 /fcntl.2/1.35/Tue Sep 20 07:19:21 2022//
 /getpeername.2/1.27/Tue Sep 20 07:19:21 2022//
@@ -189,5 +181,15 @@
 /send.2/1.35/Tue Sep 20 07:19:21 2022//
 /w_recvmmsg.c/1.1/Fri Sep  9 13:52:59 2022//
 /w_sendmmsg.c/1.1/Fri Sep  9 13:53:00 2022//
-/execve.2/1.57/Wed Oct  5 18:34:40 2022//
+/Makefile.inc/1.166/Sat Nov  5 22:11:43 2022//
+/execve.2/1.58/Sat Nov  5 22:11:43 2022//
+/getpgrp.2/1.19/Sat Nov  5 22:11:43 2022//
+/kqueue.2/1.47/Sat Nov  5 22:11:43 2022//
+/mimmutable.2/1.1/Fri Oct  7 15:21:04 2022//
+/mmap.2/1.70/Sat Nov  5 22:11:43 2022//
+/mprotect.2/1.27/Sat Nov  5 22:11:43 2022//
+/munmap.2/1.20/Sat Nov  5 22:11:43 2022//
+/sigaction.2/1.77/Sat Nov  5 22:11:43 2022//
+/sigaltstack.2/1.26/Sat Nov  5 22:11:43 2022//
+/w_waitid.c/1.1/Wed Oct 26 23:16:24 2022//
 D

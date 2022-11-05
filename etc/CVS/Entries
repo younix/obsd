@@ -46,7 +46,6 @@ D/signify////
 D/skel////
 D/etc.powerpc64////
 D/etc.riscv64////
-/daily/1.95/Sat May  1 08:41:43 2021//
 /unbound.conf/1.21/Sat May  1 08:41:43 2021//
 /locate.rc/1.8/Thu Sep  2 14:22:29 2021//
 /syslog.conf/1.21/Wed Oct 20 17:27:56 2021//
@@ -57,8 +56,9 @@ D/etc.riscv64////
 /changelist/1.132/Tue Jul 26 13:42:31 2022//
 /master.passwd/1.106/Tue Jul 26 13:42:31 2022//
 /moduli/1.32/Tue Jul 26 13:42:31 2022//
-/netstart/1.219/Tue Jul 26 13:42:31 2022//
 /group/1.98/Fri Sep  2 13:59:26 2022//
 /rc/1.564/Fri Sep  2 13:59:26 2022//
 /protocols/1.25/Wed Oct  5 18:34:08 2022//
 /rc.conf/1.227/Wed Oct  5 18:34:08 2022//
+/daily/1.96/Sat Nov  5 22:10:51 2022//
+/netstart/1.229/Sat Nov  5 22:10:51 2022//

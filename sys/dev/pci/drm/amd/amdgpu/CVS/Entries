@@ -388,7 +388,6 @@
 /gmc_v9_0.c/1.16/Tue Sep 20 07:19:40 2022//
 /mmhub_v1_0.c/1.7/Tue Sep 20 07:19:40 2022//
 /amdgpu_device.c/1.35/Wed Oct  5 18:35:01 2022//
-/amdgpu_display.c/1.7/Wed Oct  5 18:35:01 2022//
 /amdgpu_psp.c/1.15/Wed Oct  5 18:35:01 2022//
 /amdgpu_virt.c/1.7/Wed Oct  5 18:35:01 2022//
 /amdgpu_virt.h/1.6/Wed Oct  5 18:35:01 2022//
@@ -399,4 +398,5 @@
 /soc15.c/1.18/Wed Oct  5 18:35:01 2022//
 /vega10_ih.c/1.4/Wed Oct  5 18:35:01 2022//
 /vega20_ih.c/1.2/Wed Oct  5 18:35:01 2022//
+/amdgpu_display.c/1.8/Sat Nov  5 22:12:19 2022//
 D

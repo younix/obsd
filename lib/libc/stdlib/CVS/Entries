@@ -8,7 +8,6 @@
 /abs.3/1.12/Fri Jan 18 07:32:17 2019//
 /abs.c/1.6/Sun Sep 13 08:31:47 2015//
 /alloca.3/1.14/Sat Jan 17 18:01:43 2015//
-/atexit.c/1.27/Sat Dec 16 20:06:56 2017//
 /atexit.h/1.12/Sat Dec 16 20:06:56 2017//
 /atof.c/1.5/Mon Aug  8 08:05:36 2005//
 /atoi.c/1.6/Sun Sep 13 08:31:47 2015//
@@ -86,7 +85,6 @@
 /atexit.3/1.13/Mon Jun 27 13:01:59 2022//
 /getopt.3/1.48/Mon Aug  1 07:15:36 2022//
 /malloc.3/1.129/Tue Jul 26 13:42:32 2022//
-/malloc.c/1.274/Tue Jul 26 13:42:32 2022//
 /rand.3/1.21/Tue Jul 26 13:42:32 2022//
 /system.c/1.13/Tue Jul 26 13:42:32 2022//
 /tsearch.3/1.22/Tue Jul 26 13:42:32 2022//
@@ -105,4 +103,6 @@
 /lldiv.3/1.9/Tue Sep 20 07:19:20 2022//
 /strtod.3/1.23/Tue Sep 20 07:19:21 2022//
 /strtonum.3/1.19/Tue Sep 20 07:19:21 2022//
+/atexit.c/1.28/Sat Nov  5 22:11:43 2022//
+/malloc.c/1.275/Sat Nov  5 22:11:43 2022//
 D
