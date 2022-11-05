@@ -72,7 +72,6 @@
 /if_ethersubr.c/1.284/Tue Jul 26 13:42:36 2022//
 /if_gre.c/1.172/Tue Jul 26 13:42:36 2022//
 /if_media.h/1.45/Tue Jul 26 13:42:36 2022//
-/if_pfsync.c/1.305/Tue Jul 26 13:42:36 2022//
 /if_pppoe.c/1.83/Tue Jul 26 13:42:36 2022//
 /if_pppoe.h/1.8/Tue Jul 26 13:42:36 2022//
 /if_tun.c/1.237/Tue Jul 26 13:42:36 2022//
@@ -113,4 +112,5 @@
 /pfkeyv2.c/1.254/Sat Nov  5 22:12:22 2022//
 /pfvar.h/1.511/Sat Nov  5 22:12:22 2022//
 /rtsock.c/1.358/Sat Nov  5 22:12:22 2022//
+/if_pfsync.c/1.306/Sat Nov  5 22:33:11 2022//
 D
