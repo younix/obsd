@@ -1,4 +1,4 @@
-/*	$OpenBSD: aplpmgr.c,v 1.1 2021/12/09 11:38:27 kettenis Exp $	*/
+/*	$OpenBSD: aplpmgr.c,v 1.3 2022/11/10 11:44:06 kettenis Exp $	*/
 /*
  * Copyright (c) 2021 Mark Kettenis <kettenis@openbsd.org>
  *
@@ -24,6 +24,7 @@
 #include <machine/fdt.h>
 
 #include <dev/ofw/openfirm.h>
+#include <dev/ofw/ofw_clock.h>
 #include <dev/ofw/ofw_misc.h>
 #include <dev/ofw/ofw_power.h>
 #include <dev/ofw/fdt.h>
@@ -34,6 +35,10 @@
 #define PMGR_PS_ACTUAL_SHIFT	4
 #define  PMGR_PS_ACTIVE		0xf
 #define  PMGR_PS_PWRGATE	0x0
+#define PMGR_WAS_PWRGATED	0x00000100
+#define PMGR_WAS_CLKGATED	0x00000200
+#define PMGR_DEV_DISABLE	0x00000400
+#define PMGR_RESET		0x80000000
 
 #define HREAD4(sc, reg)							\
 	(bus_space_read_4((sc)->sc_iot, (sc)->sc_ioh, (reg)))
@@ -44,8 +49,10 @@ struct aplpmgr_softc;
 
 struct aplpmgr_pwrstate {
 	struct aplpmgr_softc	*ps_sc;
-	struct power_domain_device ps_pd;
 	bus_size_t		ps_offset;
+	int			ps_enablecount;
+	struct power_domain_device ps_pd;
+	struct reset_device	ps_rd;
 };
 
 struct aplpmgr_softc {
@@ -59,6 +66,7 @@ struct aplpmgr_softc {
 
 int	aplpmgr_match(struct device *, void *, void *);
 void	aplpmgr_attach(struct device *, struct device *, void *);
+int	aplpmgr_activate(struct device *, int act);
 
 const struct cfattach aplpmgr_ca = {
 	sizeof (struct aplpmgr_softc), aplpmgr_match, aplpmgr_attach
@@ -69,6 +77,7 @@ struct cfdriver aplpmgr_cd = {
 };
 
 void	aplpmgr_enable(void *, uint32_t *, int);
+void	aplpmgr_reset(void *, uint32_t *, int);
 
 int
 aplpmgr_match(struct device *parent, void *match, void *aux)
@@ -126,10 +135,19 @@ aplpmgr_attach(struct device *parent, struct device *self, void *aux)
 
 		ps->ps_sc = sc;
 		ps->ps_offset = reg[0];
+		if (OF_getpropbool(node, "apple,always-on"))
+			ps->ps_enablecount = 1;
+
 		ps->ps_pd.pd_node = node;
 		ps->ps_pd.pd_cookie = ps;
 		ps->ps_pd.pd_enable = aplpmgr_enable;
 		power_domain_register(&ps->ps_pd);
+
+		ps->ps_rd.rd_node = node;
+		ps->ps_rd.rd_cookie = ps;
+		ps->ps_rd.rd_reset = aplpmgr_reset;
+		reset_register(&ps->ps_rd);
+
 		ps++;
 	}
 }
@@ -143,7 +161,25 @@ aplpmgr_enable(void *cookie, uint32_t *cells, int on)
 	uint32_t val;
 	int timo;
 
-	power_domain_enable_all(ps->ps_pd.pd_node);
+	KASSERT(on || ps->ps_enablecount > 0);
+	KASSERT(!on || ps->ps_enablecount < INT_MAX);
+
+	if (on && ps->ps_enablecount > 0) {
+		power_domain_enable_all(ps->ps_pd.pd_node);
+		ps->ps_enablecount++;
+		return;
+	}
+	if (!on && ps->ps_enablecount > 1) {
+		power_domain_disable_all(ps->ps_pd.pd_node);
+		ps->ps_enablecount--;
+		return;
+	}
+
+	/* Enable parents before enabling ourselves. */
+	if (on) {
+		power_domain_enable_all(ps->ps_pd.pd_node);
+		ps->ps_enablecount++;
+	}
 
 	val = HREAD4(sc, ps->ps_offset);
 	val &= ~PMGR_PS_TARGET_MASK;
@@ -156,5 +192,35 @@ aplpmgr_enable(void *cookie, uint32_t *cells, int on)
 		if ((val >> PMGR_PS_ACTUAL_SHIFT) == pstate)
 			break;
 		delay(1);
+	}
+
+	/* Disable parents after disabling ourselves. */
+	if (!on) {
+		power_domain_disable_all(ps->ps_pd.pd_node);
+		ps->ps_enablecount--;
+	}
+}
+
+void
+aplpmgr_reset(void *cookie, uint32_t *cells, int on)
+{
+	struct aplpmgr_pwrstate *ps = cookie;
+	struct aplpmgr_softc *sc = ps->ps_sc;
+	uint32_t val;
+
+	if (on) {
+		val = HREAD4(sc, ps->ps_offset);
+		val &= ~(PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED);
+		HWRITE4(sc, ps->ps_offset, val | PMGR_DEV_DISABLE);
+		val = HREAD4(sc, ps->ps_offset);
+		val &= ~(PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED);
+		HWRITE4(sc, ps->ps_offset, val | PMGR_RESET);
+	} else {
+		val = HREAD4(sc, ps->ps_offset);
+		val &= ~(PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED);
+		HWRITE4(sc, ps->ps_offset, val & ~PMGR_RESET);
+		val = HREAD4(sc, ps->ps_offset);
+		val &= ~(PMGR_WAS_CLKGATED | PMGR_WAS_PWRGATED);
+		HWRITE4(sc, ps->ps_offset, val & ~PMGR_DEV_DISABLE);
 	}
 }

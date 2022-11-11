@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.429 2022/10/20 15:22:51 tb Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.432 2022/11/11 17:15:26 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -162,6 +162,7 @@
 #include <openssl/stack.h>
 
 #include "bytestring.h"
+#include "tls_content.h"
 #include "tls13_internal.h"
 
 __BEGIN_HIDDEN_DECLS
@@ -706,7 +707,7 @@ int tls12_record_layer_change_read_cipher_state(struct tls12_record_layer *rl,
 int tls12_record_layer_change_write_cipher_state(struct tls12_record_layer *rl,
     CBS *mac_key, CBS *key, CBS *iv);
 int tls12_record_layer_open_record(struct tls12_record_layer *rl,
-    uint8_t *buf, size_t buf_len, uint8_t **out, size_t *out_len);
+    uint8_t *buf, size_t buf_len, struct tls_content *out);
 int tls12_record_layer_seal_record(struct tls12_record_layer *rl,
     uint8_t content_type, const uint8_t *content, size_t content_len,
     CBB *out);
@@ -1157,6 +1158,10 @@ typedef struct ssl3_state_st {
 	SSL3_BUFFER_INTERNAL rbuf;	/* read IO goes into here */
 	SSL3_BUFFER_INTERNAL wbuf;	/* write IO goes into here */
 
+	SSL3_RECORD_INTERNAL rrec;	/* each decoded record goes in here */
+
+	struct tls_content *rcontent;	/* Content from opened TLS records. */
+
 	/* we allow one fatal and one warning alert to be outstanding,
 	 * send close alert via the warning alert */
 	int alert_dispatch;
@@ -1166,14 +1171,9 @@ typedef struct ssl3_state_st {
 	int need_empty_fragments;
 	int empty_fragment_done;
 
-	SSL3_RECORD_INTERNAL rrec;	/* each decoded record goes in here */
-
-	/* storage for Alert/Handshake protocol data received but not
-	 * yet processed by ssl3_read_bytes: */
-	unsigned char alert_fragment[2];
-	unsigned int alert_fragment_len;
-	unsigned char handshake_fragment[4];
-	unsigned int handshake_fragment_len;
+	/* Unprocessed Alert/Handshake protocol data. */
+	struct tls_buffer *alert_fragment;
+	struct tls_buffer *handshake_fragment;
 
 	/* partial write - check the numbers match */
 	unsigned int wnum;	/* number of bytes sent so far */
@@ -1463,9 +1463,6 @@ int tls1_change_read_cipher_state(SSL *s);
 int tls1_change_write_cipher_state(SSL *s);
 int tls1_setup_key_block(SSL *s);
 int tls1_generate_key_block(SSL *s, uint8_t *key_block, size_t key_block_len);
-int tls1_export_keying_material(SSL *s, unsigned char *out, size_t olen,
-    const char *label, size_t llen, const unsigned char *p, size_t plen,
-    int use_context);
 int ssl_ok(SSL *s);
 
 int tls12_derive_finished(SSL *s);

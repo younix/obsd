@@ -1,6 +1,6 @@
 #!/bin/ksh
 #
-# $OpenBSD: reorder_kernel.sh,v 1.11 2022/05/13 13:20:16 sthen Exp $
+# $OpenBSD: reorder_kernel.sh,v 1.13 2022/11/07 15:55:56 kn Exp $
 #
 # Copyright (c) 2017 Robert Peichaer <rpe@openbsd.org>
 #
@@ -20,9 +20,6 @@ set -o errexit
 
 export PATH=/usr/bin:/bin:/usr/sbin:/sbin
 
-# Skip if /usr/share is on a nfs mounted filesystem.
-df -t nfs /usr/share >/dev/null 2>&1 && exit 1
-
 KERNEL=$(sysctl -n kern.osversion)
 KERNEL=${KERNEL%#*}
 KERNEL_DIR=/usr/share/relink/kernel
@@ -30,15 +27,20 @@ LOGFILE=$KERNEL_DIR/$KERNEL/relink.log
 PROGNAME=${0##*/}
 SHA256=/var/db/kernel.SHA256
 
+# Silently skip if on a NFS mounted filesystem.
+df -t nonfs $KERNEL_DIR >/dev/null 2>&1
+
+# Install trap handlers to inform about success or failure via syslog.
+ERRMSG='failed'
+trap 'trap - EXIT; logger -st $PROGNAME "$ERRMSG" >/dev/console 2>&1' ERR
+trap 'logger -t $PROGNAME "kernel relinking done"' EXIT
+
 # Create kernel compile dir and redirect stdout/stderr to a logfile.
 mkdir -m 700 -p $KERNEL_DIR/$KERNEL
 exec 1>$LOGFILE
 exec 2>&1
 
-# Install trap handlers to inform about success or failure via syslog.
-trap 'trap - EXIT; logger -st $PROGNAME \
-	"failed -- see $LOGFILE" >>/dev/console 2>&1' ERR
-trap 'logger -t $PROGNAME "kernel relinking done"' EXIT
+ERRMSG="failed -- see $LOGFILE"
 
 if [[ -f $KERNEL_DIR.tgz ]]; then
 	rm -rf $KERNEL_DIR/$KERNEL/*

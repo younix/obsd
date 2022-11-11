@@ -1,14 +1,9 @@
-/COPYRIGHT/1.1.1.1/Mon Oct  5 20:12:36 1998//
-/INSTALL/1.1.1.1/Mon Oct  5 20:12:36 1998//
-/README/1.1.1.1/Mon Oct  5 20:12:36 1998//
-/VERSION/1.1.1.1/Mon Oct  5 20:12:36 1998//
-/bf_cbc.c/1.5/Tue Oct 28 07:35:58 2014//
-/bf_cfb64.c/1.5/Tue Oct 28 07:35:58 2014//
-/bf_ecb.c/1.6/Wed Jul  9 11:10:50 2014//
-/bf_enc.c/1.6/Tue Oct 28 07:35:58 2014//
-/bf_locl.h/1.3/Thu Jun 12 15:49:28 2014//
-/bf_ofb64.c/1.5/Tue Oct 28 07:35:58 2014//
-/bf_pi.h/1.4/Wed Dec 21 15:49:29 2016//
-/bf_skey.c/1.12/Thu Jun 12 15:49:28 2014//
 D/asm////
-/blowfish.h/1.15/Mon Jan 24 14:35:13 2022//
+/bf_cbc.c/1.7/Fri Nov 11 20:28:05 2022//
+/bf_cfb64.c/1.7/Fri Nov 11 20:28:05 2022//
+/bf_ecb.c/1.8/Fri Nov 11 20:28:05 2022//
+/bf_enc.c/1.8/Fri Nov 11 20:28:05 2022//
+/bf_locl.h/1.4/Fri Nov 11 20:28:05 2022//
+/bf_ofb64.c/1.7/Fri Nov 11 20:28:05 2022//
+/bf_skey.c/1.16/Fri Nov 11 20:28:05 2022//
+/blowfish.h/1.16/Fri Nov 11 20:28:05 2022//

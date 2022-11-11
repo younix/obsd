@@ -4,7 +4,6 @@
 /ntp.h/1.14/Thu Jan 30 15:55:41 2020//
 /ntp_msg.c/1.22/Sat Sep  3 11:52:06 2016//
 /ntpctl.8/1.8/Wed Mar 11 19:38:48 2015//
-/ntpd.8/1.45/Mon Nov 11 17:42:28 2019//
 /sensors.c/1.54/Mon Nov 11 06:32:52 2019//
 /server.c/1.44/Sat Sep  3 11:52:06 2016//
 /util.c/1.25/Thu Jan 30 15:55:41 2020//
@@ -18,4 +17,5 @@
 /ntp.c/1.169/Tue Jul 26 13:42:36 2022//
 /ntpd.conf.5/1.48/Tue Jul 26 13:42:36 2022//
 /ntpd.h/1.151/Tue Jul 26 13:42:36 2022//
+/ntpd.8/1.48/Fri Nov 11 20:28:32 2022//
 D

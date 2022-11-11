@@ -1,4 +1,4 @@
-/*	$OpenBSD: pf.c,v 1.1141 2022/10/10 16:43:12 bket Exp $ */
+/*	$OpenBSD: pf.c,v 1.1152 2022/11/11 16:12:08 dlg Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -119,10 +119,6 @@ SHA2_CTX		 pf_tcp_secret_ctx;
 u_char			 pf_tcp_secret[16];
 int			 pf_tcp_secret_init;
 int			 pf_tcp_iss_off;
-
-int		 pf_npurge;
-struct task	 pf_purge_task = TASK_INITIALIZER(pf_purge, &pf_npurge);
-struct timeout	 pf_purge_to = TIMEOUT_INITIALIZER(pf_purge_timeout, NULL);
 
 enum pf_test_status {
 	PF_TEST_FAIL = -1,
@@ -316,9 +312,6 @@ RB_GENERATE(pf_src_tree, pf_src_node, entry, pf_src_compare);
 RB_GENERATE(pf_state_tree, pf_state_key, entry, pf_state_compare_key);
 RB_GENERATE(pf_state_tree_id, pf_state,
     entry_id, pf_state_compare_id);
-
-SLIST_HEAD(pf_rule_gcl, pf_rule)	pf_rule_gcl =
-	SLIST_HEAD_INITIALIZER(pf_rule_gcl);
 
 __inline int
 pf_addr_compare(struct pf_addr *a, struct pf_addr *b, sa_family_t af)
@@ -1023,10 +1016,10 @@ pf_state_insert(struct pfi_kif *kif, struct pf_state_key **skw,
 	pf_status.fcounters[FCNT_STATE_INSERT]++;
 	pf_status.states++;
 	pfi_kif_ref(kif, PFI_KIF_REF_STATE);
-	PF_STATE_EXIT_WRITE();
 #if NPFSYNC > 0
 	pfsync_insert_state(s);
 #endif	/* NPFSYNC > 0 */
+	PF_STATE_EXIT_WRITE();
 	return (0);
 }
 
@@ -1190,6 +1183,44 @@ pf_find_state_all(struct pf_state_key_cmp *key, u_int dir, int *more)
 }
 
 void
+pf_state_peer_hton(const struct pf_state_peer *s, struct pfsync_state_peer *d)
+{
+	d->seqlo = htonl(s->seqlo);
+	d->seqhi = htonl(s->seqhi);
+	d->seqdiff = htonl(s->seqdiff);
+	d->max_win = htons(s->max_win);
+	d->mss = htons(s->mss);
+	d->state = s->state;
+	d->wscale = s->wscale;
+	if (s->scrub) {
+		d->scrub.pfss_flags =
+		    htons(s->scrub->pfss_flags & PFSS_TIMESTAMP);
+		d->scrub.pfss_ttl = (s)->scrub->pfss_ttl;
+		d->scrub.pfss_ts_mod = htonl((s)->scrub->pfss_ts_mod);
+		d->scrub.scrub_flag = PFSYNC_SCRUB_FLAG_VALID;
+	}
+}
+
+void
+pf_state_peer_ntoh(const struct pfsync_state_peer *s, struct pf_state_peer *d)
+{
+	d->seqlo = ntohl(s->seqlo);
+	d->seqhi = ntohl(s->seqhi);
+	d->seqdiff = ntohl(s->seqdiff);
+	d->max_win = ntohs(s->max_win);
+	d->mss = ntohs(s->mss);
+	d->state = s->state;
+	d->wscale = s->wscale;
+	if (s->scrub.scrub_flag == PFSYNC_SCRUB_FLAG_VALID &&
+	    d->scrub != NULL) {
+		d->scrub->pfss_flags =
+		    ntohs(s->scrub.pfss_flags) & PFSS_TIMESTAMP;
+		d->scrub->pfss_ttl = s->scrub.pfss_ttl;
+		d->scrub->pfss_ts_mod = ntohl(s->scrub.pfss_ts_mod);
+	}
+}
+
+void
 pf_state_export(struct pfsync_state *sp, struct pf_state *st)
 {
 	int32_t expire;
@@ -1261,68 +1292,332 @@ pf_state_export(struct pfsync_state *sp, struct pf_state *st)
 	sp->set_prio[1] = st->set_prio[1];
 }
 
+int
+pf_state_alloc_scrub_memory(const struct pfsync_state_peer *s,
+    struct pf_state_peer *d)
+{
+	if (s->scrub.scrub_flag && d->scrub == NULL)
+		return (pf_normalize_tcp_alloc(d));
+
+	return (0);
+}
+
+int
+pf_state_import(const struct pfsync_state *sp, int flags)
+{
+	struct pf_state *st = NULL;
+	struct pf_state_key *skw = NULL, *sks = NULL;
+	struct pf_rule *r = NULL;
+	struct pfi_kif  *kif;
+	int pool_flags;
+	int error = ENOMEM;
+	int n = 0;
+
+	if (sp->creatorid == 0) {
+		DPFPRINTF(LOG_NOTICE, "%s: invalid creator id: %08x", __func__,
+		    ntohl(sp->creatorid));
+		return (EINVAL);
+	}
+
+	if ((kif = pfi_kif_get(sp->ifname, NULL)) == NULL) {
+		DPFPRINTF(LOG_NOTICE, "%s: unknown interface: %s", __func__,
+		    sp->ifname);
+		if (flags & PFSYNC_SI_IOCTL)
+			return (EINVAL);
+		return (0);	/* skip this state */
+	}
+
+	if (sp->af == 0)
+		return (0);	/* skip this state */
+
+	/*
+	 * If the ruleset checksums match or the state is coming from the ioctl,
+	 * it's safe to associate the state with the rule of that number.
+	 */
+	if (sp->rule != htonl(-1) && sp->anchor == htonl(-1) &&
+	    (flags & (PFSYNC_SI_IOCTL | PFSYNC_SI_CKSUM)) &&
+	    ntohl(sp->rule) < pf_main_ruleset.rules.active.rcount) {
+		TAILQ_FOREACH(r, pf_main_ruleset.rules.active.ptr, entries)
+			if (ntohl(sp->rule) == n++)
+				break;
+	} else
+		r = &pf_default_rule;
+
+	if ((r->max_states && r->states_cur >= r->max_states))
+		goto cleanup;
+
+	if (flags & PFSYNC_SI_IOCTL)
+		pool_flags = PR_WAITOK | PR_LIMITFAIL | PR_ZERO;
+	else
+		pool_flags = PR_NOWAIT | PR_LIMITFAIL | PR_ZERO;
+
+	if ((st = pool_get(&pf_state_pl, pool_flags)) == NULL)
+		goto cleanup;
+
+	if ((skw = pf_alloc_state_key(pool_flags)) == NULL)
+		goto cleanup;
+
+	if ((sp->key[PF_SK_WIRE].af &&
+	    (sp->key[PF_SK_WIRE].af != sp->key[PF_SK_STACK].af)) ||
+	    PF_ANEQ(&sp->key[PF_SK_WIRE].addr[0],
+	    &sp->key[PF_SK_STACK].addr[0], sp->af) ||
+	    PF_ANEQ(&sp->key[PF_SK_WIRE].addr[1],
+	    &sp->key[PF_SK_STACK].addr[1], sp->af) ||
+	    sp->key[PF_SK_WIRE].port[0] != sp->key[PF_SK_STACK].port[0] ||
+	    sp->key[PF_SK_WIRE].port[1] != sp->key[PF_SK_STACK].port[1] ||
+	    sp->key[PF_SK_WIRE].rdomain != sp->key[PF_SK_STACK].rdomain) {
+		if ((sks = pf_alloc_state_key(pool_flags)) == NULL)
+			goto cleanup;
+	} else
+		sks = skw;
+
+	/* allocate memory for scrub info */
+	if (pf_state_alloc_scrub_memory(&sp->src, &st->src) ||
+	    pf_state_alloc_scrub_memory(&sp->dst, &st->dst))
+		goto cleanup;
+
+	/* copy to state key(s) */
+	skw->addr[0] = sp->key[PF_SK_WIRE].addr[0];
+	skw->addr[1] = sp->key[PF_SK_WIRE].addr[1];
+	skw->port[0] = sp->key[PF_SK_WIRE].port[0];
+	skw->port[1] = sp->key[PF_SK_WIRE].port[1];
+	skw->rdomain = ntohs(sp->key[PF_SK_WIRE].rdomain);
+	PF_REF_INIT(skw->refcnt);
+	skw->proto = sp->proto;
+	if (!(skw->af = sp->key[PF_SK_WIRE].af))
+		skw->af = sp->af;
+	if (sks != skw) {
+		sks->addr[0] = sp->key[PF_SK_STACK].addr[0];
+		sks->addr[1] = sp->key[PF_SK_STACK].addr[1];
+		sks->port[0] = sp->key[PF_SK_STACK].port[0];
+		sks->port[1] = sp->key[PF_SK_STACK].port[1];
+		sks->rdomain = ntohs(sp->key[PF_SK_STACK].rdomain);
+		PF_REF_INIT(sks->refcnt);
+		if (!(sks->af = sp->key[PF_SK_STACK].af))
+			sks->af = sp->af;
+		if (sks->af != skw->af) {
+			switch (sp->proto) {
+			case IPPROTO_ICMP:
+				sks->proto = IPPROTO_ICMPV6;
+				break;
+			case IPPROTO_ICMPV6:
+				sks->proto = IPPROTO_ICMP;
+				break;
+			default:
+				sks->proto = sp->proto;
+			}
+		} else
+			sks->proto = sp->proto;
+
+		if (((sks->af != AF_INET) && (sks->af != AF_INET6)) ||
+		    ((skw->af != AF_INET) && (skw->af != AF_INET6))) {
+			error = EINVAL;
+			goto cleanup;
+		}
+
+	} else if ((sks->af != AF_INET) && (sks->af != AF_INET6)) {
+		error = EINVAL;
+		goto cleanup;
+	}
+	st->rtableid[PF_SK_WIRE] = ntohl(sp->rtableid[PF_SK_WIRE]);
+	st->rtableid[PF_SK_STACK] = ntohl(sp->rtableid[PF_SK_STACK]);
+
+	/* copy to state */
+	st->rt_addr = sp->rt_addr;
+	st->rt = sp->rt;
+	st->creation = getuptime() - ntohl(sp->creation);
+	st->expire = getuptime();
+	if (ntohl(sp->expire)) {
+		u_int32_t timeout;
+
+		timeout = r->timeout[sp->timeout];
+		if (!timeout)
+			timeout = pf_default_rule.timeout[sp->timeout];
+
+		/* sp->expire may have been adaptively scaled by export. */
+		st->expire -= timeout - ntohl(sp->expire);
+	}
+
+	st->direction = sp->direction;
+	st->log = sp->log;
+	st->timeout = sp->timeout;
+	st->state_flags = ntohs(sp->state_flags);
+	st->max_mss = ntohs(sp->max_mss);
+	st->min_ttl = sp->min_ttl;
+	st->set_tos = sp->set_tos;
+	st->set_prio[0] = sp->set_prio[0];
+	st->set_prio[1] = sp->set_prio[1];
+
+	st->id = sp->id;
+	st->creatorid = sp->creatorid;
+	pf_state_peer_ntoh(&sp->src, &st->src);
+	pf_state_peer_ntoh(&sp->dst, &st->dst);
+
+	st->rule.ptr = r;
+	st->anchor.ptr = NULL;
+
+	st->pfsync_time = getuptime();
+	st->sync_state = PFSYNC_S_NONE;
+
+	refcnt_init(&st->refcnt);
+	mtx_init(&st->mtx, IPL_NET);
+
+	/* XXX when we have anchors, use STATE_INC_COUNTERS */
+	r->states_cur++;
+	r->states_tot++;
+
+#if NPFSYNC > 0
+	if (!ISSET(flags, PFSYNC_SI_IOCTL))
+		SET(st->state_flags, PFSTATE_NOSYNC);
+#endif
+
+	/*
+	 * We just set PFSTATE_NOSYNC bit, which prevents
+	 * pfsync_insert_state() to insert state to pfsync.
+	 */
+	if (pf_state_insert(kif, &skw, &sks, st) != 0) {
+		/* XXX when we have anchors, use STATE_DEC_COUNTERS */
+		r->states_cur--;
+		error = EEXIST;
+		goto cleanup_state;
+	}
+
+#if NPFSYNC > 0
+	if (!ISSET(flags, PFSYNC_SI_IOCTL)) {
+		CLR(st->state_flags, PFSTATE_NOSYNC);
+		if (ISSET(st->state_flags, PFSTATE_ACK))
+			pfsync_iack(st);
+	}
+	CLR(st->state_flags, PFSTATE_ACK);
+#endif
+
+	return (0);
+
+ cleanup:
+	if (skw == sks)
+		sks = NULL;
+	if (skw != NULL)
+		pool_put(&pf_state_key_pl, skw);
+	if (sks != NULL)
+		pool_put(&pf_state_key_pl, sks);
+
+ cleanup_state: /* pf_state_insert frees the state keys */
+	if (st) {
+		if (st->dst.scrub)
+			pool_put(&pf_state_scrub_pl, st->dst.scrub);
+		if (st->src.scrub)
+			pool_put(&pf_state_scrub_pl, st->src.scrub);
+		pool_put(&pf_state_pl, st);
+	}
+	return (error);
+}
+
 /* END state table stuff */
 
+void		 pf_purge_states(void *);
+struct task	 pf_purge_states_task =
+		     TASK_INITIALIZER(pf_purge_states, NULL);
+
+void		 pf_purge_states_tick(void *);
+struct timeout	 pf_purge_states_to =
+		     TIMEOUT_INITIALIZER(pf_purge_states_tick, NULL);
+
+unsigned int	 pf_purge_expired_states(unsigned int, unsigned int);
+
+/*
+ * how many states to scan this interval.
+ *
+ * this is set when the timeout fires, and reduced by the task. the
+ * task will reschedule itself until the limit is reduced to zero,
+ * and then it adds the timeout again.
+ */
+unsigned int pf_purge_states_limit;
+
+/*
+ * limit how many states are processed with locks held per run of
+ * the state purge task.
+ */
+unsigned int pf_purge_states_collect = 64;
+
 void
-pf_purge_expired_rules(void)
+pf_purge_states_tick(void *null)
 {
-	struct pf_rule	*r;
+	unsigned int limit = pf_status.states;
+	unsigned int interval = pf_default_rule.timeout[PFTM_INTERVAL];
 
-	PF_ASSERT_LOCKED();
-
-	if (SLIST_EMPTY(&pf_rule_gcl))
+	if (limit == 0) {
+		timeout_add_sec(&pf_purge_states_to, 1);
 		return;
-
-	while ((r = SLIST_FIRST(&pf_rule_gcl)) != NULL) {
-		SLIST_REMOVE(&pf_rule_gcl, r, pf_rule, gcle);
-		KASSERT(r->rule_flag & PFRULE_EXPIRED);
-		pf_purge_rule(r);
 	}
-}
-
-void
-pf_purge_timeout(void *unused)
-{
-	/* XXX move to systqmp to avoid KERNEL_LOCK */
-	task_add(systq, &pf_purge_task);
-}
-
-void
-pf_purge(void *xnloops)
-{
-	int *nloops = xnloops;
 
 	/*
 	 * process a fraction of the state table every second
-	 * Note:
-	 *     we no longer need PF_LOCK() here, because
-	 *     pf_purge_expired_states() uses pf_state_lock to maintain
-	 *     consistency.
 	 */
-	if (pf_default_rule.timeout[PFTM_INTERVAL] > 0)
-		pf_purge_expired_states(1 + (pf_status.states
-		    / pf_default_rule.timeout[PFTM_INTERVAL]));
 
+	if (interval > 1)
+		limit /= interval;
+
+	pf_purge_states_limit = limit;
+	task_add(systqmp, &pf_purge_states_task);
+}
+
+void
+pf_purge_states(void *null)
+{
+	unsigned int limit;
+	unsigned int scanned;
+
+	limit = pf_purge_states_limit;
+	if (limit < pf_purge_states_collect)
+		limit = pf_purge_states_collect;
+
+	scanned = pf_purge_expired_states(limit, pf_purge_states_collect);
+	if (scanned >= pf_purge_states_limit) {
+		/* we've run out of states to scan this "interval" */
+		timeout_add_sec(&pf_purge_states_to, 1);
+		return;
+	}
+
+	pf_purge_states_limit -= scanned;
+	task_add(systqmp, &pf_purge_states_task);
+}
+
+void		 pf_purge_tick(void *);
+struct timeout	 pf_purge_to =
+		     TIMEOUT_INITIALIZER(pf_purge_tick, NULL);
+
+void		 pf_purge(void *);
+struct task	 pf_purge_task =
+		     TASK_INITIALIZER(pf_purge, NULL);
+
+void
+pf_purge_tick(void *null)
+{
+	task_add(systqmp, &pf_purge_task);
+}
+
+void
+pf_purge(void *null)
+{
+	unsigned int interval = max(1, pf_default_rule.timeout[PFTM_INTERVAL]);
+
+	/* XXX is NET_LOCK necessary? */
 	NET_LOCK();
 
 	PF_LOCK();
-	/* purge other expired types every PFTM_INTERVAL seconds */
-	if (++(*nloops) >= pf_default_rule.timeout[PFTM_INTERVAL]) {
-		pf_purge_expired_src_nodes();
-		pf_purge_expired_rules();
-	}
+
+	pf_purge_expired_src_nodes();
+
 	PF_UNLOCK();
 
 	/*
 	 * Fragments don't require PF_LOCK(), they use their own lock.
 	 */
-	if ((*nloops) >= pf_default_rule.timeout[PFTM_INTERVAL]) {
-		pf_purge_expired_fragments();
-		*nloops = 0;
-	}
+	pf_purge_expired_fragments();
 	NET_UNLOCK();
 
-	timeout_add_sec(&pf_purge_to, 1);
+	/* interpret the interval as idle time between runs */
+	timeout_add_sec(&pf_purge_to, interval);
 }
 
 int32_t
@@ -1522,8 +1817,8 @@ pf_free_state(struct pf_state *cur)
 	pf_status.states--;
 }
 
-void
-pf_purge_expired_states(u_int32_t maxcheck)
+unsigned int
+pf_purge_expired_states(const unsigned int limit, const unsigned int collect)
 {
 	/*
 	 * this task/thread/context/whatever is the only thing that
@@ -1537,6 +1832,8 @@ pf_purge_expired_states(u_int32_t maxcheck)
 	struct pf_state		*st;
 	SLIST_HEAD(pf_state_gcl, pf_state) gcl = SLIST_HEAD_INITIALIZER(gcl);
 	time_t			 now;
+	unsigned int		 scanned;
+	unsigned int		 collected = 0;
 
 	PF_ASSERT_UNLOCKED();
 
@@ -1550,7 +1847,7 @@ pf_purge_expired_states(u_int32_t maxcheck)
 	if (head == NULL) {
 		/* the list is empty */
 		rw_exit_read(&pf_state_list.pfs_rwl);
-		return;
+		return (limit);
 	}
 
 	/* (re)start at the front of the list */
@@ -1559,28 +1856,38 @@ pf_purge_expired_states(u_int32_t maxcheck)
 
 	now = getuptime();
 
-	do {
+	for (scanned = 0; scanned < limit; scanned++) {
 		uint8_t stimeout = cur->timeout;
+		unsigned int limited = 0;
 
 		if ((stimeout == PFTM_UNLINKED) ||
 		    (pf_state_expires(cur, stimeout) <= now)) {
 			st = pf_state_ref(cur);
 			SLIST_INSERT_HEAD(&gcl, st, gc_list);
+
+			if (++collected >= collect)
+				limited = 1;
 		}
 
 		/* don't iterate past the end of our view of the list */
 		if (cur == tail) {
+			scanned = limit;
 			cur = NULL;
 			break;
 		}
 
 		cur = TAILQ_NEXT(cur, entry_list);
-	} while (maxcheck--);
+
+		/* don't spend too much time here. */
+		if (ISSET(READ_ONCE(curcpu()->ci_schedstate.spc_schedflags),
+		     SPCF_SHOULDYIELD) || limited)
+			break;
+	}
 
 	rw_exit_read(&pf_state_list.pfs_rwl);
 
 	if (SLIST_EMPTY(&gcl))
-		return;
+		return (scanned);
 
 	NET_LOCK();
 	rw_enter_write(&pf_state_list.pfs_rwl);
@@ -1601,6 +1908,8 @@ pf_purge_expired_states(u_int32_t maxcheck)
 		SLIST_REMOVE_HEAD(&gcl, gc_list);
 		pf_state_unref(st);
 	}
+
+	return (scanned);
 }
 
 int
@@ -3625,8 +3934,11 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_ruleset *ruleset)
 	struct pf_rule	*save_a;
 	struct pf_ruleset	*save_aruleset;
 
+retry:
 	r = TAILQ_FIRST(ruleset->rules.active.ptr);
 	while (r != NULL) {
+		PF_TEST_ATTRIB(r->rule_flag & PFRULE_EXPIRED,
+		    TAILQ_NEXT(r, entries));
 		r->evaluations++;
 		PF_TEST_ATTRIB(
 		    (pfi_kif_match(r->kif, ctx->pd->kif) == r->ifnot),
@@ -3751,6 +4063,19 @@ pf_match_rule(struct pf_test_ctx *ctx, struct pf_ruleset *ruleset)
 		if (r->tag)
 			ctx->tag = r->tag;
 		if (r->anchor == NULL) {
+
+			if (r->rule_flag & PFRULE_ONCE) {
+				u_int32_t	rule_flag;
+
+				rule_flag = r->rule_flag;
+				if (((rule_flag & PFRULE_EXPIRED) == 0) &&
+				    atomic_cas_uint(&r->rule_flag, rule_flag,
+				    rule_flag | PFRULE_EXPIRED) == rule_flag)
+					r->exptime = gettime();
+				else
+					goto retry;
+			}
+
 			if (r->action == PF_MATCH) {
 				if ((ctx->ri = pool_get(&pf_rule_item_pl,
 				    PR_NOWAIT)) == NULL) {
@@ -3962,13 +4287,6 @@ pf_test_rule(struct pf_pdesc *pd, struct pf_rule **rm, struct pf_state **sm,
 	if (r->action == PF_DROP)
 		goto cleanup;
 
-	/*
-	 * If an expired "once" rule has not been purged, drop any new matching
-	 * packets.
-	 */
-	if (r->rule_flag & PFRULE_EXPIRED)
-		goto cleanup;
-
 	pf_tag_packet(pd->m, ctx.tag, ctx.act.rtableid);
 	if (ctx.act.rtableid >= 0 &&
 	    rtable_l2(ctx.act.rtableid) != pd->rdomain)
@@ -4039,25 +4357,9 @@ pf_test_rule(struct pf_pdesc *pd, struct pf_rule **rm, struct pf_state **sm,
 		m_copyback(pd->m, pd->off, pd->hdrlen, &pd->hdr, M_NOWAIT);
 	}
 
-	if (r->rule_flag & PFRULE_ONCE) {
-		u_int32_t	rule_flag;
-
-		/*
-		 * Use atomic_cas() to determine a clear winner, which will
-		 * insert an expired rule to gcl.
-		 */
-		rule_flag = r->rule_flag;
-		if (((rule_flag & PFRULE_EXPIRED) == 0) &&
-		    atomic_cas_uint(&r->rule_flag, rule_flag,
-			rule_flag | PFRULE_EXPIRED) == rule_flag) {
-			r->exptime = gettime();
-			SLIST_INSERT_HEAD(&pf_rule_gcl, r, gcle);
-		}
-	}
-
 #if NPFSYNC > 0
 	if (*sm != NULL && !ISSET((*sm)->state_flags, PFSTATE_NOSYNC) &&
-	    pd->dir == PF_OUT && pfsync_up()) {
+	    pd->dir == PF_OUT && pfsync_is_up()) {
 		/*
 		 * We want the state created, but we dont
 		 * want to send this in case a partner
@@ -4129,6 +4431,7 @@ pf_create_state(struct pf_pdesc *pd, struct pf_rule *r, struct pf_rule *a,
 	 * pf_state_inserts() grabs reference for pfsync!
 	 */
 	refcnt_init(&s->refcnt);
+	mtx_init(&s->mtx, IPL_NET);
 
 	switch (pd->proto) {
 	case IPPROTO_TCP:

@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.56 2022/11/04 23:52:59 tb Exp $ */
+/*	$OpenBSD: x509.c,v 1.58 2022/11/07 09:18:14 job Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
@@ -229,11 +229,18 @@ out:
 enum cert_purpose
 x509_get_purpose(X509 *x, const char *fn)
 {
+	BASIC_CONSTRAINTS		*bc = NULL;
 	EXTENDED_KEY_USAGE		*eku = NULL;
 	int				 crit;
 	enum cert_purpose		 purpose = CERT_PURPOSE_INVALID;
 
 	if (X509_check_ca(x) == 1) {
+		bc = X509_get_ext_d2i(x, NID_basic_constraints, &crit, NULL);
+		if (bc->pathlen != NULL) {
+			warnx("%s: RFC 6487 section 4.8.1: Path Length "
+			    "Constraint must be absent", fn);
+			goto out;
+		}
 		purpose = CERT_PURPOSE_CA;
 		goto out;
 	}
@@ -264,6 +271,7 @@ x509_get_purpose(X509 *x, const char *fn)
 	}
 
  out:
+	BASIC_CONSTRAINTS_free(bc);
 	EXTENDED_KEY_USAGE_free(eku);
 	return purpose;
 }
@@ -405,19 +413,24 @@ x509_get_sia(X509 *x, const char *fn, char **sia)
 		oid = ad->method;
 
 		/*
-		 * XXX: RFC 6487 4.8.8.2 disallows other accessMethods, however
-		 * they do exist in the wild.  Consider making this an error.
+		 * XXX: RFC 6487 4.8.8.2 states that the accessMethod MUST be
+		 * signedObject. However, rpkiNotify accessMethods currently
+		 * exist in the wild. Consider removing this special case.
 		 * See also https://www.rfc-editor.org/errata/eid7239.
 		 */
-		if (OBJ_cmp(oid, signedobj_oid) != 0) {
-			if (verbose > 1) {
-				char buf[128];
-
-				OBJ_obj2txt(buf, sizeof(buf), oid, 0);
-				warnx("%s: RFC 6487 section 4.8.8.2: unexpected"
-				    " accessMethod: %s", fn, buf);
-			}
+		if (OBJ_cmp(oid, notify_oid) == 0) {
+			if (verbose > 1)
+				warnx("%s: RFC 6487 section 4.8.8.2: SIA should"
+				    " not contain rpkiNotify accessMethod", fn);
 			continue;
+		}
+		if (OBJ_cmp(oid, signedobj_oid) != 0) {
+			char buf[128];
+
+			OBJ_obj2txt(buf, sizeof(buf), oid, 0);
+			warnx("%s: RFC 6487 section 4.8.8.2: unexpected"
+			    " accessMethod: %s", fn, buf);
+			goto out;
 		}
 
 		/* Don't fail on non-rsync URI, so check this afterward. */
@@ -437,9 +450,17 @@ x509_get_sia(X509 *x, const char *fn, char **sia)
 		*sia = NULL;
 	}
 
- out:
+	if (!rsync_found)
+		goto out;
+
 	AUTHORITY_INFO_ACCESS_free(info);
-	return rsync_found;
+	return 1;
+
+ out:
+	free(*sia);
+	*sia = NULL;
+	AUTHORITY_INFO_ACCESS_free(info);
+	return 0;
 }
 
 /*

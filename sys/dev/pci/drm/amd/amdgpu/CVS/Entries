@@ -364,7 +364,6 @@
 /amdgpu_gfx.c/1.6/Tue Jul 26 13:42:35 2022//
 /amdgpu_gmc.c/1.6/Tue Jul 26 13:42:35 2022//
 /amdgpu_irq.c/1.7/Tue Jul 26 13:42:35 2022//
-/amdgpu_kms.c/1.27/Tue Jul 26 13:42:35 2022//
 /amdgpu_object.h/1.5/Tue Jul 26 13:42:35 2022//
 /amdgpu_si.c/1.6/Tue Jul 26 13:42:35 2022//
 /amdgpu_ttm.c/1.10/Tue Jul 26 13:42:35 2022//
@@ -399,4 +398,5 @@
 /vega10_ih.c/1.4/Wed Oct  5 18:35:01 2022//
 /vega20_ih.c/1.2/Wed Oct  5 18:35:01 2022//
 /amdgpu_display.c/1.8/Sat Nov  5 22:12:19 2022//
+/amdgpu_kms.c/1.28/Fri Nov 11 20:28:26 2022//
 D

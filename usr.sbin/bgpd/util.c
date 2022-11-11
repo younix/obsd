@@ -1,4 +1,4 @@
-/*	$OpenBSD: util.c,v 1.71 2022/08/17 15:15:26 claudio Exp $ */
+/*	$OpenBSD: util.c,v 1.73 2022/11/09 14:23:53 claudio Exp $ */
 
 /*
  * Copyright (c) 2006 Claudio Jeker <claudio@openbsd.org>
@@ -131,7 +131,9 @@ log_rd(uint64_t rd)
 		snprintf(buf, sizeof(buf), "rd %s:%hu", inet_ntoa(addr), u16);
 		break;
 	default:
-		return ("rd ?");
+		snprintf(buf, sizeof(buf), "rd #%016llx",
+		    (unsigned long long)rd);
+		break;
 	}
 	return (buf);
 }
@@ -184,7 +186,7 @@ log_rtr_error(enum rtr_error err)
 	case UNSUPP_PDU_TYPE:
 		return "Unsupported PDU Type";
 	case UNK_REC_WDRAWL:
-		return "Withdrawl of Unknown Record";
+		return "Withdrawal of Unknown Record";
 	case DUP_REC_RECV:
 		return "Duplicate Announcement Received";
 	case UNEXP_PROTOCOL_VERS:
@@ -596,6 +598,7 @@ nlri_get_vpn4(u_char *p, uint16_t len, struct bgpd_addr *prefix,
 			return (-1);
 		if (withdraw) {
 			/* on withdraw ignore the labelstack all together */
+			p += 3;
 			plen += 3;
 			pfxlen -= 3 * 8;
 			break;
@@ -659,6 +662,7 @@ nlri_get_vpn6(u_char *p, uint16_t len, struct bgpd_addr *prefix,
 			return (-1);
 		if (withdraw) {
 			/* on withdraw ignore the labelstack all together */
+			p += 3;
 			plen += 3;
 			pfxlen -= 3 * 8;
 			break;

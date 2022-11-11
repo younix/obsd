@@ -51,13 +51,9 @@
 /acpitimer.c/1.16/Fri Sep  2 14:00:21 2022//
 /acpitz.c/1.59/Fri Sep  2 14:00:21 2022//
 /dwiic_acpi.c/1.20/Fri Sep  2 14:00:21 2022//
-/files.acpi/1.65/Fri Sep  2 14:00:21 2022//
 /acpi.c/1.418/Tue Sep 20 07:19:39 2022//
-/acpihpet.c/1.29/Tue Sep 20 07:19:39 2022//
 /acpivar.h/1.122/Tue Sep 20 07:19:39 2022//
 /amltypes.h/1.49/Tue Sep 20 07:19:39 2022//
-/qcgpio.c/1.6/Tue Sep 20 07:19:39 2022//
-/qciic.c/1.4/Tue Sep 20 07:19:39 2022//
 /acpisbs.c/1.11/Sat Nov  5 22:12:18 2022//
 /amdgpio.c/1.10/Sat Nov  5 22:12:18 2022//
 /aplgpio.c/1.6/Sat Nov  5 22:12:18 2022//
@@ -68,4 +64,8 @@
 /pchgpio.c/1.14/Sat Nov  5 22:12:18 2022//
 /sdhc_acpi.c/1.22/Sat Nov  5 22:12:18 2022//
 /xhci_acpi.c/1.11/Sat Nov  5 22:12:18 2022//
+/acpihpet.c/1.30/Fri Nov 11 20:28:25 2022//
+/files.acpi/1.67/Fri Nov 11 20:28:25 2022//
+/qcgpio.c/1.7/Fri Nov 11 20:28:25 2022//
+/qciic.c/1.5/Fri Nov 11 20:28:25 2022//
 D

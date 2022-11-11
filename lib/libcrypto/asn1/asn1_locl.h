@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_locl.h,v 1.39 2022/09/11 17:22:52 tb Exp $ */
+/* $OpenBSD: asn1_locl.h,v 1.41 2022/11/10 14:46:44 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -142,6 +142,15 @@ struct evp_pkey_asn1_method_st {
 	int (*pkey_check)(const EVP_PKEY *pk);
 	int (*pkey_public_check)(const EVP_PKEY *pk);
 	int (*pkey_param_check)(const EVP_PKEY *pk);
+
+	int (*set_priv_key)(EVP_PKEY *pk, const unsigned char *private_key,
+	    size_t len);
+	int (*set_pub_key)(EVP_PKEY *pk, const unsigned char *public_key,
+	    size_t len);
+	int (*get_priv_key)(const EVP_PKEY *pk, unsigned char *out_private_key,
+	    size_t *out_len);
+	int (*get_pub_key)(const EVP_PKEY *pk, unsigned char *out_public_key,
+	    size_t *out_len);
 } /* EVP_PKEY_ASN1_METHOD */;
 
 /* Method to handle CRL access.
@@ -233,5 +242,10 @@ ASN1_BIT_STRING *c2i_ASN1_BIT_STRING(ASN1_BIT_STRING **a,
 int i2c_ASN1_INTEGER(ASN1_INTEGER *a, unsigned char **pp);
 ASN1_INTEGER *c2i_ASN1_INTEGER(ASN1_INTEGER **a, const unsigned char **pp,
     long length);
+int OPENSSL_gmtime_adj(struct tm *tm, int offset_day, long offset_sec);
+int OPENSSL_gmtime_diff(int *pday, int *psec, const struct tm *from,
+    const struct tm *to);
+int asn1_time_time_t_to_tm(const time_t *time, struct tm *out_tm);
+int asn1_time_tm_to_time_t(const struct tm *tm, time_t *out);
 
 __END_HIDDEN_DECLS

@@ -1,4 +1,4 @@
-/*	$OpenBSD: output_json.c,v 1.24 2022/10/17 12:01:19 claudio Exp $ */
+/*	$OpenBSD: output_json.c,v 1.26 2022/11/09 14:20:11 claudio Exp $ */
 
 /*
  * Copyright (c) 2020 Claudio Jeker <claudio@openbsd.org>
@@ -385,6 +385,12 @@ json_fib(struct kroute_full *kf)
 	else
 		json_do_printf("nexthop", "%s", log_addr(&kf->nexthop));
 
+	if (kf->flags & F_MPLS) {
+		json_do_array("mplslabel");
+		json_do_uint("mplslabel", 
+		    ntohl(kf->mplslabel) >> MPLS_LABEL_OFFSET);
+		json_do_end();
+	}
 	json_do_end();
 }
 
@@ -587,7 +593,7 @@ json_attr(u_char *data, size_t len, int reqflags, int addpath)
 	int e4, e2, pos;
 
 	if (len < 3) {
-		warnx("Too short BGP attrbute");
+		warnx("Too short BGP attribute");
 		return;
 	}
 
@@ -595,7 +601,7 @@ json_attr(u_char *data, size_t len, int reqflags, int addpath)
 	type = data[1];
 	if (flags & ATTR_EXTLEN) {
 		if (len < 4) {
-			warnx("Too short BGP attrbute");
+			warnx("Too short BGP attribute");
 			return;
 		}
 		memcpy(&alen, data+2, sizeof(uint16_t));
@@ -610,7 +616,7 @@ json_attr(u_char *data, size_t len, int reqflags, int addpath)
 
 	/* bad imsg len how can that happen!? */
 	if (alen > len) {
-		warnx("Bad BGP attrbute length");
+		warnx("Bad BGP attribute length");
 		return;
 	}
 

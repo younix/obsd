@@ -26,9 +26,9 @@
 /in6_pcb.c/1.123/Tue Sep 20 07:19:42 2022//
 /ip6_mroute.c/1.135/Tue Sep 20 07:19:42 2022//
 /mld6.c/1.61/Tue Sep 20 07:19:42 2022//
-/nd6.c/1.248/Tue Sep 20 07:19:42 2022//
 /ip6_divert.c/1.88/Sat Nov  5 22:12:22 2022//
 /ip6_divert.h/1.22/Sat Nov  5 22:12:22 2022//
 /ip6_var.h/1.105/Sat Nov  5 22:12:22 2022//
 /raw_ip6.c/1.171/Sat Nov  5 22:12:22 2022//
+/nd6.c/1.250/Fri Nov 11 20:28:28 2022//
 D

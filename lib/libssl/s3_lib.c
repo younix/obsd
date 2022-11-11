@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.239 2022/10/02 16:36:41 jsing Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.241 2022/11/11 17:15:26 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -163,6 +163,7 @@
 #include "ssl_locl.h"
 #include "ssl_sigalgs.h"
 #include "ssl_tlsext.h"
+#include "tls_content.h"
 
 #define SSL3_NUM_CIPHERS	(sizeof(ssl3_ciphers) / sizeof(SSL_CIPHER))
 
@@ -1441,11 +1442,12 @@ ssl3_cipher_get_value(const SSL_CIPHER *c)
 int
 ssl3_pending(const SSL *s)
 {
-	if (s->rstate == SSL_ST_READ_BODY)
+	if (s->s3->rcontent == NULL)
+		return 0;
+	if (tls_content_type(s->s3->rcontent) != SSL3_RT_APPLICATION_DATA)
 		return 0;
 
-	return (s->s3->rrec.type == SSL3_RT_APPLICATION_DATA) ?
-	    s->s3->rrec.length : 0;
+	return tls_content_remaining(s->s3->rcontent);
 }
 
 int
@@ -1560,6 +1562,11 @@ ssl3_free(SSL *s)
 	ssl3_release_read_buffer(s);
 	ssl3_release_write_buffer(s);
 
+	tls_content_free(s->s3->rcontent);
+
+	tls_buffer_free(s->s3->alert_fragment);
+	tls_buffer_free(s->s3->handshake_fragment);
+
 	freezero(s->s3->hs.sigalgs, s->s3->hs.sigalgs_len);
 	sk_X509_pop_free(s->s3->hs.peer_certs, X509_free);
 	sk_X509_pop_free(s->s3->hs.peer_certs_no_leaf, X509_free);
@@ -1598,6 +1605,11 @@ ssl3_clear(SSL *s)
 	sk_X509_pop_free(s->verified_chain, X509_free);
 	s->verified_chain = NULL;
 
+	tls_buffer_free(s->s3->alert_fragment);
+	s->s3->alert_fragment = NULL;
+	tls_buffer_free(s->s3->handshake_fragment);
+	s->s3->handshake_fragment = NULL;
+
 	freezero(s->s3->hs.sigalgs, s->s3->hs.sigalgs_len);
 	s->s3->hs.sigalgs = NULL;
 	s->s3->hs.sigalgs_len = 0;
@@ -1628,6 +1640,9 @@ ssl3_clear(SSL *s)
 	wp = s->s3->wbuf.buf;
 	rlen = s->s3->rbuf.len;
 	wlen = s->s3->wbuf.len;
+
+	tls_content_free(s->s3->rcontent);
+	s->s3->rcontent = NULL;
 
 	tls1_transcript_free(s);
 	tls1_transcript_hash_free(s);

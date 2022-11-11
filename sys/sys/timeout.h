@@ -1,4 +1,4 @@
-/*	$OpenBSD: timeout.h,v 1.43 2021/07/13 17:50:19 mvs Exp $	*/
+/*	$OpenBSD: timeout.h,v 1.46 2022/11/11 18:09:58 cheloha Exp $	*/
 /*
  * Copyright (c) 2000-2001 Artur Grabowski <art@openbsd.org>
  * All rights reserved. 
@@ -54,7 +54,6 @@ struct timeout {
 #define TIMEOUT_ONQUEUE		0x02	/* on any timeout queue */
 #define TIMEOUT_INITIALIZED	0x04	/* initialized */
 #define TIMEOUT_TRIGGERED	0x08	/* running or ran */
-#define TIMEOUT_KCLOCK		0x10	/* clock-based timeout */
 
 struct timeoutstat {
 	uint64_t tos_added;		/* timeout_add*(9) calls */
@@ -88,7 +87,7 @@ int timeout_sysctl(void *, size_t *, void *, size_t);
 #define KCLOCK_UPTIME	0		/* uptime clock; time since boot */
 #define KCLOCK_MAX	1
 
-#define __TIMEOUT_INITIALIZER(_fn, _arg, _kclock, _flags) {		\
+#define TIMEOUT_INITIALIZER_FLAGS(_fn, _arg, _kclock, _flags) {		\
 	.to_list = { NULL, NULL },					\
 	.to_abstime = { .tv_sec = 0, .tv_nsec = 0 },			\
 	.to_func = (_fn),						\
@@ -98,18 +97,11 @@ int timeout_sysctl(void *, size_t *, void *, size_t);
 	.to_kclock = (_kclock)						\
 }
 
-#define TIMEOUT_INITIALIZER_KCLOCK(_fn, _arg, _kclock, _flags)		\
-    __TIMEOUT_INITIALIZER((_fn), (_arg), (_kclock), (_flags) | TIMEOUT_KCLOCK)
-
-#define TIMEOUT_INITIALIZER_FLAGS(_fn, _arg, _flags)			\
-    __TIMEOUT_INITIALIZER((_fn), (_arg), KCLOCK_NONE, (_flags))
-
 #define TIMEOUT_INITIALIZER(_f, _a)					\
-    __TIMEOUT_INITIALIZER((_f), (_a), KCLOCK_NONE, 0)
+    TIMEOUT_INITIALIZER_FLAGS((_f), (_a), KCLOCK_NONE, 0)
 
 void timeout_set(struct timeout *, void (*)(void *), void *);
-void timeout_set_flags(struct timeout *, void (*)(void *), void *, int);
-void timeout_set_kclock(struct timeout *, void (*)(void *), void *, int, int);
+void timeout_set_flags(struct timeout *, void (*)(void *), void *, int, int);
 void timeout_set_proc(struct timeout *, void (*)(void *), void *);
 
 int timeout_add(struct timeout *, int);
@@ -120,7 +112,6 @@ int timeout_add_usec(struct timeout *, int);
 int timeout_add_nsec(struct timeout *, int);
 
 int timeout_at_ts(struct timeout *, const struct timespec *);
-int timeout_in_nsec(struct timeout *, uint64_t);
 
 int timeout_del(struct timeout *);
 int timeout_del_barrier(struct timeout *);

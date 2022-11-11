@@ -198,7 +198,6 @@
 /getgrouplist.c/1.30/Fri Sep  2 14:00:04 2022//
 /getnetgrent.c/1.29/Fri Sep  2 14:00:04 2022//
 /getpwent.c/1.66/Fri Sep  2 14:00:04 2022//
-/pause.3/1.15/Fri Sep  2 14:00:04 2022//
 /user_from_uid.3/1.2/Fri Sep  2 14:00:04 2022//
 /frexp.3/1.14/Tue Sep 20 07:19:20 2022//
 /getgrent.3/1.26/Tue Sep 20 07:19:20 2022//
@@ -227,7 +226,8 @@
 /toupper.3/1.17/Tue Sep 20 07:19:20 2022//
 /uname.3/1.18/Tue Sep 20 07:19:20 2022//
 /utime.3/1.23/Tue Sep 20 07:19:20 2022//
-/disklabel.c/1.27/Sat Nov  5 22:11:43 2022//
 /signal.3/1.57/Sat Nov  5 22:11:43 2022//
 /ttyname.3/1.20/Sat Nov  5 22:11:43 2022//
+/disklabel.c/1.28/Fri Nov 11 20:28:04 2022//
+/pause.3/1.16/Fri Nov 11 20:28:04 2022//
 D

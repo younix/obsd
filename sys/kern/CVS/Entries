@@ -17,7 +17,6 @@
 /kern_srp.c/1.13/Sat May  1 08:41:52 2021//
 /uipc_mbuf2.c/1.45/Sat May  1 08:41:52 2021//
 /genassym.sh/1.14/Wed Sep  1 16:07:40 2021//
-/kern_timeout.c/1.85/Thu Sep  2 14:22:32 2021//
 /subr_prof.c/1.31/Tue Sep 14 08:17:37 2021//
 /vfs_biomem.c/1.51/Mon Nov 15 19:06:15 2021//
 /exec_conf.c/1.38/Mon Jan 24 14:35:16 2022//
@@ -26,7 +25,6 @@
 /subr_witness.c/1.48/Mon Jun 27 13:02:00 2022//
 /kern_lock.c/1.72/Tue Jul 26 13:42:36 2022//
 /kern_rwlock.c/1.48/Tue Jul 26 13:42:36 2022//
-/subr_autoconf.c/1.96/Tue Jul 26 13:42:36 2022//
 /subr_log.c/1.75/Tue Jul 26 13:42:36 2022//
 /tty_nmea.c/1.51/Tue Jul 26 13:42:36 2022//
 /vfs_default.c/1.51/Tue Jul 26 13:42:36 2022//
@@ -35,7 +33,6 @@
 /kern_bufq.c/1.34/Fri Sep  2 14:00:23 2022//
 /kern_clock.c/1.105/Fri Sep  2 14:00:23 2022//
 /kern_descrip.c/1.206/Fri Sep  2 14:00:23 2022//
-/kern_event.c/1.193/Fri Sep  2 14:00:23 2022//
 /kern_ktrace.c/1.108/Fri Sep  2 14:00:23 2022//
 /kern_malloc.c/1.148/Fri Sep  2 14:00:23 2022//
 /kern_proc.c/1.92/Fri Sep  2 14:00:23 2022//
@@ -48,9 +45,7 @@
 /kern_unveil.c/1.54/Fri Sep  2 14:00:23 2022//
 /kern_watchdog.c/1.16/Fri Sep  2 14:00:23 2022//
 /sched_bsd.c/1.72/Fri Sep  2 14:00:23 2022//
-/spec_vnops.c/1.109/Fri Sep  2 14:00:23 2022//
 /subr_blist.c/1.3/Fri Sep  2 14:00:23 2022//
-/subr_evcount.c/1.13/Fri Sep  2 14:00:23 2022//
 /subr_poison.c/1.15/Fri Sep  2 14:00:23 2022//
 /subr_pool.c/1.236/Fri Sep  2 14:00:23 2022//
 /subr_prf.c/1.106/Fri Sep  2 14:00:23 2022//
@@ -58,7 +53,6 @@
 /sys_futex.c/1.21/Fri Sep  2 14:00:23 2022//
 /sys_generic.c/1.150/Fri Sep  2 14:00:23 2022//
 /sys_pipe.c/1.142/Fri Sep  2 14:00:23 2022//
-/sys_socket.c/1.54/Fri Sep  2 14:00:23 2022//
 /sysv_shm.c/1.80/Fri Sep  2 14:00:23 2022//
 /tty.c/1.176/Fri Sep  2 14:00:23 2022//
 /tty_pty.c/1.114/Fri Sep  2 14:00:23 2022//
@@ -76,7 +70,6 @@
 /vfs_sync.c/1.68/Fri Sep  2 14:00:23 2022//
 /vfs_syscalls.c/1.360/Fri Sep  2 14:00:23 2022//
 /vfs_vnops.c/1.121/Fri Sep  2 14:00:23 2022//
-/kern_tc.c/1.78/Tue Sep 20 07:19:42 2022//
 /subr_hibernate.c/1.138/Tue Sep 20 07:19:42 2022//
 /sysv_msg.c/1.40/Tue Sep 20 07:19:42 2022//
 /uipc_syscalls.c/1.204/Tue Sep 20 07:19:42 2022//
@@ -88,21 +81,28 @@
 /uipc_socket2.c/1.129/Wed Oct  5 18:35:03 2022//
 /exec_elf.c/1.174/Sat Nov  5 22:12:21 2022//
 /exec_subr.c/1.62/Sat Nov  5 22:12:21 2022//
-/init_main.c/1.318/Sat Nov  5 22:12:21 2022//
-/init_sysent.c/1.251/Sat Nov  5 22:12:21 2022//
 /kern_clockintr.c/1.1/Sat Nov  5 19:29:46 2022//
 /kern_exec.c/1.238/Sat Nov  5 22:12:21 2022//
 /kern_exit.c/1.207/Sat Nov  5 22:12:21 2022//
-/kern_fork.c/1.243/Sat Nov  5 22:12:21 2022//
-/kern_pledge.c/1.296/Sat Nov  5 22:12:21 2022//
 /kern_resource.c/1.75/Sat Nov  5 22:12:21 2022//
 /kern_sig.c/1.301/Sat Nov  5 22:12:21 2022//
-/kern_sysctl.c/1.407/Sat Nov  5 22:12:21 2022//
 /kern_time.c/1.158/Sat Nov  5 22:12:21 2022//
 /kern_xxx.c/1.40/Sat Nov  5 22:12:21 2022//
-/subr_disk.c/1.265/Sat Nov  5 22:12:21 2022//
-/subr_suspend.c/1.13/Sat Nov  5 22:12:22 2022//
-/syscalls.c/1.249/Sat Nov  5 22:12:22 2022//
-/syscalls.master/1.234/Sat Nov  5 22:12:22 2022//
 /uipc_usrreq.c/1.191/Sat Nov  5 22:12:22 2022//
+/init_main.c/1.319/Fri Nov 11 20:28:27 2022//
+/init_sysent.c/1.253/Fri Nov 11 20:28:27 2022//
+/kern_event.c/1.194/Fri Nov 11 20:28:27 2022//
+/kern_fork.c/1.244/Fri Nov 11 20:28:27 2022//
+/kern_pledge.c/1.299/Fri Nov 11 20:28:27 2022//
+/kern_sysctl.c/1.408/Fri Nov 11 20:28:27 2022//
+/kern_tc.c/1.79/Fri Nov 11 20:28:27 2022//
+/kern_timeout.c/1.88/Fri Nov 11 20:28:27 2022//
+/spec_vnops.c/1.110/Fri Nov 11 20:28:27 2022//
+/subr_autoconf.c/1.97/Fri Nov 11 20:28:27 2022//
+/subr_disk.c/1.270/Fri Nov 11 20:28:27 2022//
+/subr_evcount.c/1.14/Fri Nov 11 20:28:27 2022//
+/subr_suspend.c/1.14/Fri Nov 11 20:28:27 2022//
+/sys_socket.c/1.55/Fri Nov 11 20:28:27 2022//
+/syscalls.c/1.251/Fri Nov 11 20:28:27 2022//
+/syscalls.master/1.236/Fri Nov 11 20:28:27 2022//
 D

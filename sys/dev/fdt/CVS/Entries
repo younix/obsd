@@ -63,7 +63,6 @@
 /sypwr.c/1.5/Mon Nov 15 19:06:15 2021//
 /syscon.c/1.7/Mon Nov 15 19:06:15 2021//
 /virtio_mmio.c/1.10/Mon Nov 15 19:06:15 2021//
-/gpiokeys.c/1.1/Sun Nov 21 20:15:22 2021//
 /mvspi.c/1.3/Sun Nov 21 20:15:22 2021//
 /simplepanel.c/1.6/Sun Nov 21 20:15:22 2021//
 /amlmmc.c/1.12/Mon Jan 24 14:35:14 2022//
@@ -95,7 +94,6 @@
 /ehci_fdt.c/1.9/Tue Jul 26 13:42:35 2022//
 /es8316ac.c/1.3/Tue Jul 26 13:42:35 2022//
 /exuart.c/1.11/Tue Jul 26 13:42:35 2022//
-/files.fdt/1.164/Tue Jul 26 13:42:35 2022//
 /gpiocharger.c/1.2/Tue Jul 26 13:42:35 2022//
 /gpioleds.c/1.4/Tue Jul 26 13:42:35 2022//
 /gpiorestart.c/1.1/Tue Jul 26 13:42:35 2022//
@@ -151,10 +149,8 @@
 /axppmic.c/1.16/Tue Sep 20 07:19:40 2022//
 /bcm2835_dwctwo.c/1.4/Tue Sep 20 07:19:40 2022//
 /tascodec.c/1.5/Tue Sep 20 07:19:40 2022//
-/simplefb.c/1.17/Wed Oct  5 18:35:01 2022//
 /acrtc.c/1.6/Sat Nov  5 22:12:18 2022//
 /dapmic.c/1.4/Sat Nov  5 22:12:18 2022//
-/dwpcie.c/1.37/Sat Nov  5 22:12:18 2022//
 /exrtc.c/1.5/Sat Nov  5 22:12:18 2022//
 /gfrtc.c/1.3/Sat Nov  5 22:12:18 2022//
 /graphaudio.c/1.5/Sat Nov  5 22:12:18 2022//
@@ -169,4 +165,19 @@
 /rktemp.c/1.11/Sat Nov  5 22:12:18 2022//
 /simpleaudio.c/1.7/Sat Nov  5 22:12:18 2022//
 /sxirtc.c/1.8/Sat Nov  5 22:12:18 2022//
+/dwpcie.c/1.38/Fri Nov 11 20:28:25 2022//
+/files.fdt/1.171/Fri Nov 11 20:28:25 2022//
+/gpiobl.c/1.2/Wed Nov  9 22:56:44 2022//
+/gpiokeys.c/1.2/Fri Nov 11 20:28:25 2022//
+/qcdwusb.c/1.1/Sun Nov  6 12:12:45 2022//
+/qcgpio_fdt.c/1.2/Tue Nov  8 11:51:34 2022//
+/qciic_fdt.c/1.1/Sun Nov  6 15:36:13 2022//
+/qcpdc.c/1.1/Thu Nov 10 12:12:53 2022//
+/qcpmic.c/1.1/Tue Nov  8 19:40:08 2022//
+/qcpmicgpio.c/1.3/Wed Nov  9 19:25:50 2022//
+/qcpon.c/1.2/Thu Nov 10 16:20:54 2022//
+/qcpwm.c/1.1/Wed Nov  9 19:59:38 2022//
+/qcrtc.c/1.1/Tue Nov  8 19:47:05 2022//
+/qcspmi.c/1.2/Thu Nov 10 12:16:06 2022//
+/simplefb.c/1.19/Fri Nov 11 20:28:26 2022//
 D

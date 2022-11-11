@@ -1,4 +1,4 @@
-/*	$OpenBSD: loader.c,v 1.196 2022/10/28 15:07:25 kettenis Exp $ */
+/*	$OpenBSD: loader.c,v 1.204 2022/11/09 19:50:25 deraadt Exp $ */
 
 /*
  * Copyright (c) 1998 Per Fogelstrom, Opsycon AB
@@ -219,9 +219,13 @@ _dl_clean_boot(void)
 	extern char boot_data_start[], boot_data_end[];
 #endif
 
-	_dl_munmap(boot_text_start, boot_text_end - boot_text_start);
+	_dl_mmap(boot_text_start, boot_text_end - boot_text_start,
+	    PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+	_dl_mimmutable(boot_text_start, boot_text_end - boot_text_start);
 #if 0	/* XXX breaks boehm-gc?!? */
-	_dl_munmap(boot_data_start, boot_data_end - boot_data_start);
+	_dl_mmap(boot_data_start, boot_data_end - boot_data_start,
+	    PROT_NONE, MAP_FIXED | MAP_PRIVATE | MAP_ANON, -1, 0);
+	_dl_mimmutable(boot_data_start, boot_data_end - boot_data_start);
 #endif
 }
 #endif /* DO_CLEAN_BOOT */
@@ -247,7 +251,7 @@ _dl_dopreload(char *paths)
 	dp = paths;
 	while ((cp = _dl_strsep(&dp, ":")) != NULL) {
 		shlib = _dl_load_shlib(cp, _dl_objects, OBJTYPE_LIB,
-		    _dl_objects->obj_flags);
+		    _dl_objects->obj_flags, 1);
 		if (shlib == NULL)
 			_dl_die("can't preload library '%s'", cp);
 		_dl_add_object(shlib);
@@ -316,7 +320,7 @@ _dl_load_dep_libs(elf_object_t *object, int flags, int booting)
 	Elf_Dyn *dynp;
 	unsigned int loop;
 	int libcount;
-	int depflags;
+	int depflags, nodelete = 0;
 
 	dynobj = object;
 	while (dynobj) {
@@ -325,6 +329,8 @@ _dl_load_dep_libs(elf_object_t *object, int flags, int booting)
 
 		/* propagate DF_1_NOW to deplibs (can be set by dynamic tags) */
 		depflags = flags | (dynobj->obj_flags & DF_1_NOW);
+		if (booting || object->nodelete)
+			nodelete = 1;
 
 		for (dynp = dynobj->load_dyn; dynp->d_tag; dynp++) {
 			if (dynp->d_tag == DT_NEEDED) {
@@ -375,7 +381,7 @@ _dl_load_dep_libs(elf_object_t *object, int flags, int booting)
 				DL_DEB(("loading: %s required by %s\n", libname,
 				    dynobj->load_name));
 				depobj = _dl_load_shlib(libname, dynobj,
-				    OBJTYPE_LIB, depflags);
+				    OBJTYPE_LIB, depflags, nodelete);
 				if (depobj == 0) {
 					if (booting) {
 						_dl_die(
@@ -432,6 +438,8 @@ _dl_self_relro(long loff)
 		case PT_GNU_RELRO:
 			_dl_mprotect((void *)(phdp->p_vaddr + loff),
 			    phdp->p_memsz, PROT_READ);
+			_dl_mimmutable((void *)(phdp->p_vaddr + loff),
+			    phdp->p_memsz);
 			break;
 		}
 	}
@@ -561,6 +569,7 @@ _dl_boot(const char **argv, char **envp, const long dyn_loff, long *dl_data)
 	}
 	exe_obj->load_list = load_list;
 	exe_obj->obj_flags |= DF_1_GLOBAL;
+	exe_obj->nodelete = 1;
 	exe_obj->load_size = maxva - minva;
 	exe_obj->relro_addr = relro_addr;
 	exe_obj->relro_size = relro_size;
@@ -751,6 +760,18 @@ _dl_rtld(elf_object_t *object)
 		}
 	}
 
+	/* 
+	 * TEXTREL binaries are loaded without immutable on un-writeable sections.
+	 * After text relocations are finished, these regions can become
+	 * immutable.  OPENBSD_MUTABLE section always overlaps writeable LOADs,
+	 * so don't be afraid.
+	 */
+	if (object->dyn.textrel) {
+		for (llist = object->load_list; llist != NULL; llist = llist->next)
+			if ((llist->prot & PROT_WRITE) == 0)
+				_dl_mimmutable(llist->start, llist->size);
+	}
+
 	if (fails == 0)
 		object->status |= STAT_RELOC_DONE;
 
@@ -791,6 +812,10 @@ _dl_relro(elf_object_t *object)
 		DL_DEB(("protect RELRO [0x%lx,0x%lx) in %s\n",
 		    addr, addr + object->relro_size, object->load_name));
 		_dl_mprotect((void *)addr, object->relro_size, PROT_READ);
+
+		/* if library will never be unloaded, RELRO can be immutable */
+		if (object->nodelete)
+			_dl_mimmutable((void *)addr, object->relro_size);
 	}
 }
 

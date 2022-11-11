@@ -9,7 +9,6 @@
 /mb89352reg.h/1.5/Wed Sep  1 16:07:38 2021//
 /sioreg.h/1.2/Wed Sep  1 16:07:38 2021//
 /siotty.c/1.25/Wed Sep  1 16:07:38 2021//
-/omrasops.c/1.17/Thu Sep  2 14:22:31 2021//
 /omrasops1.c/1.4/Thu Sep  2 14:22:31 2021//
 /omrasops.h/1.7/Wed Oct 20 17:29:09 2021//
 /lcd.c/1.11/Mon Nov 15 19:06:15 2021//
@@ -17,6 +16,7 @@
 /mb89352var.h/1.9/Tue Jul 26 13:42:34 2022//
 /spc.c/1.13/Tue Jul 26 13:42:34 2022//
 /timekeeper.c/1.11/Tue Jul 26 13:42:34 2022//
-/lunafb.c/1.30/Fri Sep  2 14:00:19 2022//
 /mb89352.c/1.34/Fri Sep  2 14:00:19 2022//
+/lunafb.c/1.31/Fri Nov 11 20:28:24 2022//
+/omrasops.c/1.18/Fri Nov 11 20:28:24 2022//
 D
