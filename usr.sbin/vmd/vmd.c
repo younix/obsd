@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmd.c,v 1.133 2022/10/31 14:02:11 dv Exp $	*/
+/*	$OpenBSD: vmd.c,v 1.135 2022/12/28 21:30:19 jmc Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -393,7 +393,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 			    imsg->hdr.type, vm->vm_peerid, -1,
 			    &vmr, sizeof(vmr)) == -1) {
 				errno = vmr.vmr_result;
-				log_warn("%s: failed to foward vm result",
+				log_warn("%s: failed to forward vm result",
 				    vcp->vcp_name);
 				vm_remove(vm, __func__);
 				return (-1);
@@ -1349,8 +1349,8 @@ vm_register(struct privsep *ps, struct vmop_create_params *vmc,
 		goto fail;
 	} else {
 		for (s = vcp->vcp_name; *s != '\0'; ++s) {
-			if (!(isalnum(*s) || *s == '.' || *s == '-' ||
-			    *s == '_')) {
+			if (!(isalnum((unsigned char)*s) || *s == '.' || \
+			    *s == '-' || *s == '_')) {
 				log_warnx("invalid VM name");
 				goto fail;
 			}
@@ -1671,7 +1671,7 @@ vm_checkperm(struct vmd_vm *vm, struct vmop_owner *vmo, uid_t uid)
 /*
  * vm_checkinsflag
  *
- * Checks wheter the non-root user is allowed to set an instance option.
+ * Checks whether the non-root user is allowed to set an instance option.
  *
  * Parameters:
  *  vmc: the VM create parameters
@@ -1896,7 +1896,7 @@ get_string(uint8_t *ptr, size_t len)
 	size_t	 i;
 
 	for (i = 0; i < len; i++)
-		if (!isprint(ptr[i]))
+		if (!isprint((unsigned char)ptr[i]))
 			break;
 
 	return strndup(ptr, i);

@@ -1,14 +1,11 @@
 /Makefile/1.6/Mon Oct 20 06:55:59 2014//
 /am_ops.c/1.8/Sat Dec  5 21:15:01 2015//
-/amq_subr.c/1.18/Wed Jan 21 09:50:25 2015//
 /clock.c/1.7/Sun Oct 26 03:08:21 2014//
 /efs_ops.c/1.4/Sun Oct 26 02:43:50 2014//
-/ifs_ops.c/1.6/Fri Jul 28 22:41:10 2017//
 /info_file.c/1.9/Sun Oct 26 03:03:34 2014//
 /info_ndbm.c/1.4/Mon Jun  2 23:36:51 2003//
 /info_nis.c/1.13/Sun Oct 26 03:28:41 2014//
 /info_union.c/1.9/Sun Oct 26 03:03:34 2014//
-/map.c/1.16/Sat Dec  5 21:15:01 2015//
 /misc_rpc.c/1.8/Sun Oct 26 03:28:41 2014//
 /mntfs.c/1.10/Sat Dec  5 21:15:01 2015//
 /mount_fs.c/1.14/Mon Oct 20 06:55:59 2014//
@@ -26,9 +23,7 @@
 /ufs_ops.c/1.10/Sun Oct 26 03:28:41 2014//
 /umount_fs.c/1.6/Mon Oct 20 00:20:04 2014//
 /util.c/1.16/Sat Dec 12 20:06:42 2015//
-/wire.c/1.13/Fri Oct 24 10:29:56 2014//
 /xutil.c/1.19/Sat Dec 12 20:06:42 2015//
-/afs_ops.c/1.20/Fri Oct 22 09:07:38 2021//
 /amd.c/1.24/Fri Oct 22 09:07:38 2021//
 /host_ops.c/1.20/Fri Oct 22 09:07:38 2021//
 /info_passwd.c/1.11/Fri Oct 22 09:07:38 2021//
@@ -37,4 +32,9 @@
 /opts.c/1.14/Fri Oct 22 09:07:38 2021//
 /get_args.c/1.16/Sun Nov 21 20:15:22 2021//
 /amd.8/1.27/Mon Aug  1 07:15:59 2022//
+/afs_ops.c/1.21/Tue Jan 10 10:06:01 2023//
+/amq_subr.c/1.19/Tue Jan 10 10:06:01 2023//
+/ifs_ops.c/1.7/Tue Jan 10 10:06:01 2023//
+/map.c/1.17/Tue Jan 10 10:06:01 2023//
+/wire.c/1.14/Tue Jan 10 10:06:01 2023//
 D

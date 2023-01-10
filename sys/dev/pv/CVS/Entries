@@ -4,7 +4,6 @@
 /hypervvar.h/1.13/Fri Jun 23 19:05:42 2017//
 /ndis.h/1.2/Fri Sep 23 11:32:13 2016//
 /pvreg.h/1.6/Mon May 13 15:40:34 2019//
-/pvvar.h/1.10/Thu Jun 22 06:21:12 2017//
 /vioblkreg.h/1.4/Sun Mar 24 18:22:36 2019//
 /vioscsireg.h/1.2/Sun Mar 24 18:21:12 2019//
 /virtioreg.h/1.4/Sun Mar 24 18:21:12 2019//
@@ -27,8 +26,9 @@
 /vioscsi.c/1.30/Tue Jul 26 13:42:35 2022//
 /xbf.c/1.52/Tue Jul 26 13:42:35 2022//
 /hyperv.c/1.50/Fri Sep  2 14:00:23 2022//
-/pvbus.c/1.25/Fri Sep  2 14:00:23 2022//
-/hypervic.c/1.17/Tue Sep 20 07:19:42 2022//
-/vmt.c/1.26/Tue Sep 20 07:19:42 2022//
-/xenstore.c/1.47/Fri Nov 11 20:28:27 2022//
+/hypervic.c/1.18/Tue Jan 10 10:05:58 2023//
+/pvbus.c/1.27/Tue Jan 10 10:05:58 2023//
+/pvvar.h/1.11/Tue Jan 10 10:05:58 2023//
+/vmt.c/1.30/Tue Jan 10 10:05:58 2023//
+/xenstore.c/1.48/Tue Jan 10 10:05:58 2023//
 D

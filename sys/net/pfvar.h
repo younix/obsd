@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfvar.h,v 1.520 2022/11/11 16:12:08 dlg Exp $ */
+/*	$OpenBSD: pfvar.h,v 1.528 2023/01/06 17:44:34 sashan Exp $ */
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -474,6 +474,7 @@ union pf_rule_ptr {
 	u_int32_t		 nr;
 };
 
+#define	PF_ANCHOR_STACK_MAX	 64
 #define	PF_ANCHOR_NAME_SIZE	 64
 #define	PF_ANCHOR_MAXPATH	(PATH_MAX - PF_ANCHOR_NAME_SIZE - 1)
 #define	PF_ANCHOR_HIWAT		 512
@@ -704,34 +705,10 @@ struct pf_state_key_cmp {
 	struct pf_addr	 addr[2];
 	u_int16_t	 port[2];
 	u_int16_t	 rdomain;
+	u_int16_t	 hash;
 	sa_family_t	 af;
 	u_int8_t	 proto;
 };
-
-struct pf_state_item {
-	TAILQ_ENTRY(pf_state_item)	 entry;
-	struct pf_state			*s;
-};
-
-TAILQ_HEAD(pf_statelisthead, pf_state_item);
-
-struct pf_state_key {
-	struct pf_addr	 addr[2];
-	u_int16_t	 port[2];
-	u_int16_t	 rdomain;
-	sa_family_t	 af;
-	u_int8_t	 proto;
-
-	RB_ENTRY(pf_state_key)	 entry;
-	struct pf_statelisthead	 states;
-	struct pf_state_key	*reverse;
-	struct inpcb		*inp;
-	pf_refcnt_t		 refcnt;
-	u_int8_t		 removed;
-};
-#define PF_REVERSED_KEY(key, family)				\
-	((key[PF_SK_WIRE]->af != key[PF_SK_STACK]->af) &&	\
-	 (key[PF_SK_WIRE]->af != (family)))
 
 /* keep synced with struct pf_state, used in RB_FIND */
 struct pf_state_cmp {
@@ -1056,9 +1033,6 @@ struct pfr_ktable {
 #define pfrkt_match	pfrkt_ts.pfrts_match
 #define pfrkt_nomatch	pfrkt_ts.pfrts_nomatch
 #define pfrkt_tzero	pfrkt_ts.pfrts_tzero
-
-RB_HEAD(pf_state_tree, pf_state_key);
-RB_PROTOTYPE(pf_state_tree, pf_state_key, entry, pf_state_compare_key)
 
 RB_HEAD(pf_state_tree_ext_gwy, pf_state_key);
 RB_PROTOTYPE(pf_state_tree_ext_gwy, pf_state_key,
@@ -1608,10 +1582,6 @@ RB_HEAD(pf_src_tree, pf_src_node);
 RB_PROTOTYPE(pf_src_tree, pf_src_node, entry, pf_src_compare);
 extern struct pf_src_tree tree_src_tracking;
 
-RB_HEAD(pf_state_tree_id, pf_state);
-RB_PROTOTYPE(pf_state_tree_id, pf_state,
-    entry_id, pf_state_compare_id);
-extern struct pf_state_tree_id tree_id;
 extern struct pf_state_list pf_state_list;
 
 TAILQ_HEAD(pf_queuehead, pf_queuespec);
@@ -1633,6 +1603,7 @@ extern void			 pf_tbladdr_remove(struct pf_addr_wrap *);
 extern void			 pf_tbladdr_copyout(struct pf_addr_wrap *);
 extern void			 pf_calc_skip_steps(struct pf_rulequeue *);
 extern void			 pf_purge_expired_src_nodes(void);
+extern void			 pf_purge_expired_states(u_int32_t);
 extern void			 pf_purge_expired_rules(void);
 extern void			 pf_remove_state(struct pf_state *);
 extern void			 pf_remove_divert_state(struct pf_state_key *);
@@ -1730,7 +1701,6 @@ void	pf_pkt_addr_changed(struct mbuf *);
 struct inpcb *pf_inp_lookup(struct mbuf *);
 void	pf_inp_link(struct mbuf *, struct inpcb *);
 void	pf_inp_unlink(struct inpcb *);
-int	pf_state_key_attach(struct pf_state_key *, struct pf_state *, int);
 int	pf_translate(struct pf_pdesc *, struct pf_addr *, u_int16_t,
 	    struct pf_addr *, u_int16_t, u_int16_t, int);
 int	pf_translate_af(struct pf_pdesc *);
@@ -1816,8 +1786,8 @@ void		 pf_tag2tagname(u_int16_t, char *);
 void		 pf_tag_ref(u_int16_t);
 void		 pf_tag_unref(u_int16_t);
 void		 pf_tag_packet(struct mbuf *, int, int);
-int		 pf_addr_compare(struct pf_addr *, struct pf_addr *,
-		    sa_family_t);
+int		 pf_addr_compare(const struct pf_addr *,
+		     const struct pf_addr *, sa_family_t);
 
 const struct pfq_ops
 		*pf_queue_manager(struct pf_queuespec *);

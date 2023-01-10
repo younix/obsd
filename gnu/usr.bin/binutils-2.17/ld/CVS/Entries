@@ -25,7 +25,6 @@
 /elf-hints-local.h/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /fdl.texi/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /gen-doc.texi/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/genscripts.sh/1.3/Sun Aug  7 20:00:39 2016//
 /h8-doc.texi/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /ld.h/1.3/Tue May 31 17:05:04 2016//
 /ld.texinfo/1.7/Mon Dec  3 02:59:51 2018//
@@ -43,7 +42,6 @@
 /ldlang.h/1.3/Tue Aug 25 02:24:50 2015//
 /ldlex.h/1.3/Tue Aug 25 02:24:50 2015//
 /ldlex.l/1.4/Sun Nov 22 19:36:07 2015//
-/ldmain.c/1.13/Mon Dec  3 02:59:51 2018//
 /ldmain.h/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /ldmisc.c/1.2/Wed Oct  9 19:13:18 2013//
 /ldmisc.h/1.1.1.1/Sun Apr 24 20:14:49 2011//
@@ -52,7 +50,6 @@
 /ldver.texi/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /ldwrite.c/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /ldwrite.h/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/lexsup.c/1.10/Sat Nov  4 22:53:57 2017//
 /mri.c/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /mri.h/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /pe-dll.c/1.1.1.1/Sun Apr 24 20:14:49 2011//
@@ -64,3 +61,6 @@ D/emultempl////
 D/po////
 D/scripttempl////
 /ldgram.y/1.7/Sat Nov  5 22:11:23 2022//
+/genscripts.sh/1.4/Tue Jan 10 10:05:15 2023//
+/ldmain.c/1.14/Tue Jan 10 10:05:15 2023//
+/lexsup.c/1.12/Tue Jan 10 10:05:15 2023//

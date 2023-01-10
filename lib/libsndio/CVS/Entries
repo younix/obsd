@@ -4,10 +4,8 @@
 /mio.c/1.23/Sat Jun 29 06:05:26 2019//
 /mio_aucat.c/1.12/Sat Jan  9 08:27:24 2016//
 /mio_open.3/1.18/Tue Dec 18 20:37:27 2018//
-/mio_priv.h/1.12/Sun Nov 22 12:01:23 2015//
 /mio_rmidi.c/1.28/Sat Jun 29 06:05:26 2019//
 /sioctl_aucat.c/1.1/Wed Feb 26 13:53:58 2020//
-/sioctl_priv.h/1.1/Wed Feb 26 13:53:58 2020//
 /sioctl_sun.c/1.2/Thu Apr 30 12:30:47 2020//
 /Makefile/1.15/Wed Sep  1 16:07:37 2021//
 /aucat.c/1.79/Sun Nov 21 20:15:22 2021//
@@ -19,8 +17,10 @@
 /sio.c/1.27/Tue Jul 26 13:42:32 2022//
 /sio_aucat.c/1.21/Tue Jul 26 13:42:32 2022//
 /sio_open.3/1.56/Tue Jul 26 13:42:32 2022//
-/sio_priv.h/1.10/Tue Jul 26 13:42:32 2022//
-/sio_sun.c/1.29/Tue Jul 26 13:42:32 2022//
 /sioctl_open.3/1.13/Tue Jul 26 13:42:32 2022//
 /sndio.pc/1.4/Tue Jul 26 13:42:32 2022//
+/mio_priv.h/1.13/Tue Jan 10 10:05:31 2023//
+/sio_priv.h/1.11/Tue Jan 10 10:05:31 2023//
+/sio_sun.c/1.30/Tue Jan 10 10:05:31 2023//
+/sioctl_priv.h/1.2/Tue Jan 10 10:05:31 2023//
 D

@@ -1,8 +1,5 @@
 /Makefile/1.21/Tue Oct 17 19:31:56 2017//
-/child.c/1.27/Fri Jun 28 13:35:03 2019//
 /client.c/1.37/Fri Jun 28 13:35:03 2019//
-/common.c/1.40/Fri Jun 28 13:35:03 2019//
-/config.h/1.13/Wed Jan 21 04:08:37 2015//
 /expand.c/1.18/Fri Jun 28 13:35:03 2019//
 /gram.y/1.12/Tue Jan 20 09:00:16 2015//
 /lookup.c/1.15/Tue Jan 20 09:00:16 2015//
@@ -14,7 +11,10 @@
 /defs.h/1.39/Thu Sep  2 14:22:33 2021//
 /distopt.c/1.14/Thu Sep  2 14:22:33 2021//
 /message.c/1.30/Thu Sep  2 14:22:33 2021//
-/rdist.c/1.32/Thu Sep  2 14:22:33 2021//
 /isexec.c/1.13/Mon Nov 15 19:06:15 2021//
 /docmd.c/1.35/Mon Jun 27 13:02:01 2022//
+/child.c/1.28/Tue Jan 10 10:06:00 2023//
+/common.c/1.41/Tue Jan 10 10:06:00 2023//
+/config.h/1.14/Tue Jan 10 10:06:00 2023//
+/rdist.c/1.33/Tue Jan 10 10:06:00 2023//
 D

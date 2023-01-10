@@ -1,4 +1,4 @@
-/* $OpenBSD: utf8.c,v 1.58 2021/06/10 07:56:47 nicm Exp $ */
+/* $OpenBSD: utf8.c,v 1.60 2023/01/08 22:15:30 nicm Exp $ */
 
 /*
  * Copyright (c) 2008 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -226,13 +226,19 @@ utf8_width(struct utf8_data *ud, int *width)
 	case 0:
 		return (UTF8_ERROR);
 	}
+	log_debug("UTF-8 %.*s is %08X", (int)ud->size, ud->data, (u_int)wc);
 	*width = wcwidth(wc);
-	if (*width < 0 || *width > 0xff) {
-		log_debug("UTF-8 %.*s, wcwidth() %d", (int)ud->size, ud->data,
-		    *width);
-		return (UTF8_ERROR);
+	log_debug("wcwidth(%08X) returned %d", (u_int)wc, *width);
+	if (*width < 0) {
+		/*
+		 * C1 control characters are nonprintable, so they are always
+		 * zero width.
+		 */
+		*width = (wc >= 0x80 && wc <= 0x9f) ? 0 : 1;
 	}
-	return (UTF8_DONE);
+	if (*width >= 0 && *width <= 0xff)
+		return (UTF8_DONE);
+	return (UTF8_ERROR);
 }
 
 /*

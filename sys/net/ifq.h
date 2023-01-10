@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifq.h,v 1.34 2022/01/28 07:11:15 guenther Exp $ */
+/*	$OpenBSD: ifq.h,v 1.37 2023/01/09 03:37:44 dlg Exp $ */
 
 /*
  * Copyright (c) 2015 David Gwynne <dlg@openbsd.org>
@@ -90,10 +90,16 @@ struct ifiqueue {
 	/* counters */
 	uint64_t		 ifiq_packets;
 	uint64_t		 ifiq_bytes;
+	uint64_t		 ifiq_fdrops;
 	uint64_t		 ifiq_qdrops;
 	uint64_t		 ifiq_errors;
 	uint64_t		 ifiq_mcasts;
 	uint64_t		 ifiq_noproto;
+
+	/* number of times a list of packets were put on ifiq_ml */
+	uint64_t		 ifiq_enqueues;
+	/* number of times a list of packets were pulled off ifiq_ml */
+	uint64_t		 ifiq_dequeues;
 
 	struct kstat		*ifiq_kstat;
 
@@ -278,7 +284,7 @@ struct ifiqueue {
  *		if_attach(ifp);
  *
  *		if_attach_queues(ifp, DRV_NUM_TX_RINGS);
- *		for (i = ; i < DRV_NUM_TX_RINGS; i++) {
+ *		for (i = 0; i < DRV_NUM_TX_RINGS; i++) {
  *			struct ifqueue *ifq = ifp->if_ifqs[i];
  *			struct drv_tx_ring *ring = &sc->sc_tx_rings[i];
  *

@@ -46,8 +46,6 @@
 /ctlreg.h/1.30/Thu Dec 17 19:39:58 2020//
 /vmparam.h/1.33/Thu Sep  2 14:22:31 2021//
 /conf.h/1.27/Tue Jul 26 13:42:35 2022//
-/pmap.h/1.32/Tue Sep 20 07:19:39 2022//
-/asm.h/1.16/Sat Nov  5 22:12:17 2022//
 /bus.h/1.36/Sat Nov  5 22:12:17 2022//
 /cpu.h/1.100/Sat Nov  5 22:12:17 2022//
 /db_machdep.h/1.23/Sat Nov  5 22:12:17 2022//
@@ -55,4 +53,6 @@
 /pcb.h/1.11/Sat Nov  5 22:12:17 2022//
 /proc.h/1.8/Sat Nov  5 22:12:17 2022//
 /reg.h/1.7/Sat Nov  5 22:12:17 2022//
+/asm.h/1.17/Tue Jan 10 10:05:52 2023//
+/pmap.h/1.33/Tue Jan 10 10:05:52 2023//
 D

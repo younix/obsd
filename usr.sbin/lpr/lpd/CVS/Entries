@@ -1,11 +1,11 @@
 /Makefile/1.6/Tue Sep 29 02:37:29 2015//
-/allowedhost.c/1.1/Tue Sep 29 09:51:42 2015//
 /extern.h/1.9/Tue Sep 29 02:37:29 2015//
 /key.c/1.8/Fri Jan 16 06:40:18 2015//
-/lpd.c/1.65/Thu Apr 26 12:42:51 2018//
 /lpdchar.c/1.8/Sun Feb 28 20:55:40 2016//
 /modes.c/1.8/Fri Jan 16 06:40:18 2015//
 /recvjob.c/1.26/Fri Jan 16 06:40:18 2015//
 /printjob.c/1.62/Mon Nov 15 19:06:15 2021//
 /lpd.8/1.32/Sat Nov  5 22:12:29 2022//
+/allowedhost.c/1.2/Tue Jan 10 10:06:02 2023//
+/lpd.c/1.66/Tue Jan 10 10:06:02 2023//
 D

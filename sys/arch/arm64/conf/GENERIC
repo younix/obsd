@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.248 2022/11/11 15:27:39 matthieu Exp $
+# $OpenBSD: GENERIC,v 1.252 2022/12/24 10:51:27 patrick Exp $
 #
 # GENERIC machine description file
 #
@@ -104,9 +104,10 @@ plgpio*		at fdt? early 1
 plrtc*		at fdt?
 pluart*		at fdt?
 psci*		at fdt? early 1
+pwmfan*		at fdt?
+pwmleds*	at fdt?
 pwmreg*		at fdt? early 1
 syscon*		at fdt? early 1
-pwmfan*		at fdt?
 
 virtio*		at fdt?
 virtio*		at pci?
@@ -156,6 +157,7 @@ apldcms*	at apldchidev?
 wsmouse*	at apldcms? mux 0
 apldma*		at fdt?
 apldog*		at fdt? early 1
+aplefuse*	at fdt? early 1
 apliic*		at fdt?
 iic*		at apliic?
 aplintc*	at fdt? early 1
@@ -168,6 +170,7 @@ aplpcie*	at fdt?
 pci*		at aplpcie?
 aplpinctrl*	at fdt? early 1
 aplpmgr*	at fdt? early 1
+aplpwm*		at fdt?
 aplrtk*		at fdt?
 aplsart*	at fdt?
 aplsmc*		at fdt?
@@ -540,6 +543,7 @@ islrtc*		at iic?			# ISL1208 RTC
 maxrtc*		at iic?			# DS1307 RTC
 mcprtc*		at iic?			# MCP794XX RTC
 mfokrtc*	at iic?			# M41T8X RTC
+pcagpio*	at iic?			# PCA9554 GPIO expander
 pcamux*		at iic?			# PCA9548 multiplexer
 iic*		at pcamux?
 pcfrtc*		at iic?			# PCF8523 RTC
@@ -549,6 +553,7 @@ rkpmic*		at iic?			# RK808 PMIC
 sypwr*		at iic?			# SY8106A regulator
 tascodec*	at iic?			# TAS2770 audio codec
 tcpci*		at iic?			# USB Type-C controller
+tipd*		at iic?			# TPS6598x Type-C controller
 pijuice*	at iic?			# PiJuice HAT
 
 # GPIO "pin bus" drivers

@@ -1,4 +1,4 @@
-/*	$OpenBSD: nd6.h,v 1.79 2022/08/08 17:47:59 kn Exp $	*/
+/*	$OpenBSD: nd6.h,v 1.95 2023/01/06 14:35:34 kn Exp $	*/
 /*	$KAME: nd6.h,v 1.95 2002/06/08 11:31:06 itojun Exp $	*/
 
 /*
@@ -43,12 +43,14 @@
 #define ND6_LLINFO_DELAY	3
 #define ND6_LLINFO_PROBE	4
 
+/*
+ *  Locks used to protect struct members in this file:
+ *	N	net lock
+ */
+
 struct nd_ifinfo {
-	u_int32_t basereachable;	/* BaseReachableTime */
-	u_int32_t reachable;		/* Reachable Time */
-	u_int32_t retrans;		/* Retrans Timer */
-	int recalctm;			/* BaseReacable re-calculation timer */
-	u_int8_t initialized; /* Flag to see the entry is initialized */
+	u_int32_t reachable;		/* [N] Reachable Time */
+	int recalctm;			/* [N] BaseReachable recalc timer */
 };
 
 struct in6_nbrinfo {
@@ -60,27 +62,10 @@ struct in6_nbrinfo {
 	int	state;		/* reachability state */
 };
 
-struct prf_ra {
-	u_int onlink : 1;
-	u_int autonomous : 1;
-	u_int router : 1;
-	u_int reserved : 5;
-};
-
 struct	in6_ndireq {
 	char ifname[IFNAMSIZ];
 	struct nd_ifinfo ndi;
 };
-
-struct	in6_ndifreq {
-	char ifname[IFNAMSIZ];
-	u_long ifindex;
-};
-
-/* Prefix status */
-#define NDPRF_ONLINK		0x1
-#define NDPRF_DETACHED		0x2
-#define NDPRF_HOME		0x4
 
 /* protocol constants */
 #define MAX_RTR_SOLICITATION_DELAY	1	/*1sec*/
@@ -92,12 +77,6 @@ struct	in6_ndifreq {
 #ifdef _KERNEL
 
 #include <sys/queue.h>
-
-#define ND_IFINFO(ifp) \
-	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->nd_ifinfo)
-
-#define RS_LHCOOKIE(ifp) \
-	((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->rs_lhcookie
 
 struct	llinfo_nd6 {
 	TAILQ_ENTRY(llinfo_nd6)	ln_list;
@@ -129,38 +108,16 @@ extern int nd6_debug;
 
 #define nd6log(x)	do { if (nd6_debug) log x; } while (0)
 
-union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[9];
-	struct {
-		struct nd_opt_hdr *zero;
-		struct nd_opt_hdr *src_lladdr;
-		struct nd_opt_hdr *tgt_lladdr;
-		struct nd_opt_prefix_info *pi_beg; /* multiple opts, start */
-		struct nd_opt_rd_hdr *rh;
-		struct nd_opt_mtu *mtu;
-		struct nd_opt_hdr *search;	/* multiple opts */
-		struct nd_opt_hdr *last;	/* multiple opts */
-		int done;
-		struct nd_opt_prefix_info *pi_end;/* multiple opts, end */
-	} nd_opt_each;
+struct nd_opts {
+	struct nd_opt_hdr *nd_opts_src_lladdr;
+	struct nd_opt_hdr *nd_opts_tgt_lladdr;
 };
-#define nd_opts_src_lladdr	nd_opt_each.src_lladdr
-#define nd_opts_tgt_lladdr	nd_opt_each.tgt_lladdr
-#define nd_opts_pi		nd_opt_each.pi_beg
-#define nd_opts_pi_end		nd_opt_each.pi_end
-#define nd_opts_rh		nd_opt_each.rh
-#define nd_opts_mtu		nd_opt_each.mtu
-#define nd_opts_search		nd_opt_each.search
-#define nd_opts_last		nd_opt_each.last
-#define nd_opts_done		nd_opt_each.done
 
 void nd6_init(void);
-struct nd_ifinfo *nd6_ifattach(struct ifnet *);
-void nd6_ifdetach(struct nd_ifinfo *);
+void nd6_ifattach(struct ifnet *);
+void nd6_ifdetach(struct ifnet *);
 int nd6_is_addr_neighbor(const struct sockaddr_in6 *, struct ifnet *);
-void nd6_option_init(void *, int, union nd_opts *);
-struct nd_opt_hdr *nd6_option(union nd_opts *);
-int nd6_options(union nd_opts *);
+int nd6_options(void *, int, struct nd_opts *);
 struct	rtentry *nd6_lookup(const struct in6_addr *, int, struct ifnet *,
     u_int);
 void nd6_llinfo_settimer(const struct llinfo_nd6 *, unsigned int);

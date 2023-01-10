@@ -1,4 +1,4 @@
-/*	$OpenBSD: aspa.c,v 1.7 2022/11/04 09:43:13 job Exp $ */
+/*	$OpenBSD: aspa.c,v 1.10 2022/12/15 12:02:29 claudio Exp $ */
 /*
  * Copyright (c) 2022 Job Snijders <job@fastly.com>
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
@@ -19,7 +19,6 @@
 
 #include <assert.h>
 #include <err.h>
-#include <stdarg.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -234,7 +233,7 @@ aspa_parse(X509 **x509, const char *fn, const unsigned char *der, size_t len)
 	}
 
 	if (x509_any_inherits(*x509)) {
-		warnx("%s: inherit elements not allowed", fn);
+		warnx("%s: inherit elements not allowed in EE cert", fn);
 		goto out;
 	}
 
@@ -352,9 +351,9 @@ aspa_read(struct ibuf *b)
  * Ensure there are no duplicates in the 'providers' array.
  * Always compare 'expires': use the soonest expiration moment.
  */
-static void
+static int
 insert_vap(struct vap_tree *tree, uint32_t cas, uint32_t pas, time_t expires,
-    enum afi afi)
+    enum afi afi, struct repo *rp)
 {
 	struct vap	*v, *found;
 	size_t		 i;
@@ -372,7 +371,8 @@ insert_vap(struct vap_tree *tree, uint32_t cas, uint32_t pas, time_t expires,
 		v->providers[0] = pas;
 		v->providersz = 1;
 
-		return;
+		repo_stat_inc(rp, RTYPE_ASPA, STYPE_UNIQUE);
+		return 1;
 	}
 
 	free(v);
@@ -382,7 +382,7 @@ insert_vap(struct vap_tree *tree, uint32_t cas, uint32_t pas, time_t expires,
 
 	for (i = 0; i < found->providersz; i++) {
 		if (found->providers[i] == pas)
-			return;
+			return 0;
 	}
 
 	found->providers = reallocarray(found->providers,
@@ -390,6 +390,7 @@ insert_vap(struct vap_tree *tree, uint32_t cas, uint32_t pas, time_t expires,
 	if (found->providers == NULL)
 		err(1, NULL);
 	found->providers[found->providersz++] = pas;
+	return 1;
 }
 
 /*
@@ -398,34 +399,36 @@ insert_vap(struct vap_tree *tree, uint32_t cas, uint32_t pas, time_t expires,
  * pre-'AFI explosion' deduplicated count.
  */
 void
-aspa_insert_vaps(struct vap_tree *tree, struct aspa *aspa, size_t *vaps,
-    size_t *uniqs)
+aspa_insert_vaps(struct vap_tree *tree, struct aspa *aspa, struct repo *rp)
 {
 	size_t		 i;
 	uint32_t	 cas, pas;
 	time_t		 expires;
+	int		 new;
 
 	cas = aspa->custasid;
 	expires = aspa->expires;
 
-	*uniqs += aspa->providersz;
+	repo_stat_inc(rp, RTYPE_ASPA, STYPE_TOTAL);
 
 	for (i = 0; i < aspa->providersz; i++) {
 		pas = aspa->providers[i].as;
 
 		switch (aspa->providers[i].afi) {
 		case AFI_IPV4:
-			insert_vap(tree, cas, pas, expires, AFI_IPV4);
-			(*vaps)++;
+			if (insert_vap(tree, cas, pas, expires, AFI_IPV4, rp))
+				repo_stat_inc(rp, RTYPE_ASPA, STYPE_ONLY_IPV4);
 			break;
 		case AFI_IPV6:
-			insert_vap(tree, cas, pas, expires, AFI_IPV6);
-			(*vaps)++;
+			if (insert_vap(tree, cas, pas, expires, AFI_IPV6, rp))
+				repo_stat_inc(rp, RTYPE_ASPA, STYPE_ONLY_IPV6);
 			break;
 		default:
-			insert_vap(tree, cas, pas, expires, AFI_IPV4);
-			insert_vap(tree, cas, pas, expires, AFI_IPV6);
-			*vaps += 2;
+			new = insert_vap(tree, cas, pas, expires, AFI_IPV4, rp);
+			new += insert_vap(tree, cas, pas, expires, AFI_IPV6,
+			    rp);
+			if (new != 0)
+				repo_stat_inc(rp, RTYPE_ASPA, STYPE_BOTH);
 			break;
 		}
 	}

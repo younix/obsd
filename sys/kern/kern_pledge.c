@@ -1,4 +1,4 @@
-/*	$OpenBSD: kern_pledge.c,v 1.299 2022/11/10 00:14:11 jsg Exp $	*/
+/*	$OpenBSD: kern_pledge.c,v 1.302 2023/01/07 05:24:58 guenther Exp $	*/
 
 /*
  * Copyright (c) 2015 Nicholas Marriott <nicm@openbsd.org>
@@ -280,6 +280,8 @@ const uint64_t pledge_syscalls[SYS_MAXSYSCALL] = {
 	[SYS___thrwakeup] = PLEDGE_STDIO,
 	[SYS___threxit] = PLEDGE_STDIO,
 	[SYS___thrsigdivert] = PLEDGE_STDIO,
+	[SYS_getthrname] = PLEDGE_STDIO,
+	[SYS_setthrname] = PLEDGE_STDIO,
 
 	[SYS_fork] = PLEDGE_PROC,
 	[SYS_vfork] = PLEDGE_PROC,
@@ -430,8 +432,7 @@ parsepledges(struct proc *p, const char *kname, const char *promises, u_int64_t 
 	int error;
 
 	rbuf = malloc(MAXPATHLEN, M_TEMP, M_WAITOK);
-	error = copyinstr(promises, rbuf, MAXPATHLEN,
-	    &rbuflen);
+	error = copyinstr(promises, rbuf, MAXPATHLEN, &rbuflen);
 	if (error) {
 		free(rbuf, M_TEMP, MAXPATHLEN);
 		return (error);
@@ -943,7 +944,7 @@ pledge_sysctl(struct proc *p, int miblen, int *mib, void *new)
 	if (miblen >= 3 &&			/* ntpd(8) to read sensors */
 	    mib[0] == CTL_HW && mib[1] == HW_SENSORS)
 		return (0);
-	
+
 	if (miblen == 6 &&		/* if_nameindex() */
 	    mib[0] == CTL_NET && mib[1] == PF_ROUTE &&
 	    mib[2] == 0 && mib[3] == 0 && mib[4] == NET_RT_IFNAMES)

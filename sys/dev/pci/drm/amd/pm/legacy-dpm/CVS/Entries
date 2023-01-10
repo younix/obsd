@@ -1,0 +1,13 @@
+/amdgpu_kv_dpm.c/1.1/Sun Jan  1 01:34:52 2023//
+/amdgpu_kv_smc.c/1.1/Sun Jan  1 01:34:52 2023//
+/amdgpu_si_dpm.c/1.1/Sun Jan  1 01:34:52 2023//
+/amdgpu_si_smc.c/1.1/Sun Jan  1 01:34:53 2023//
+/cik_dpm.h/1.1/Sun Jan  1 01:34:53 2023//
+/kv_dpm.h/1.1/Sun Jan  1 01:34:53 2023//
+/legacy_dpm.c/1.1/Sun Jan  1 01:34:53 2023//
+/legacy_dpm.h/1.1/Sun Jan  1 01:34:53 2023//
+/ppsmc.h/1.1/Sun Jan  1 01:34:53 2023//
+/r600_dpm.h/1.1/Sun Jan  1 01:34:53 2023//
+/si_dpm.h/1.1/Sun Jan  1 01:34:53 2023//
+/sislands_smc.h/1.1/Sun Jan  1 01:34:53 2023//
+D

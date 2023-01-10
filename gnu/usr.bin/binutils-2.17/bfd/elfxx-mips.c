@@ -557,6 +557,10 @@ static bfd *reldyn_sorting_bfd;
 #define MIPS_ELF_DYN_SIZE(abfd) \
   (get_elf_backend_data (abfd)->s->sizeof_dyn)
 
+/* The size of the rld_map pointer.  */
+#define MIPS_ELF_RLD_MAP_SIZE(abfd) \
+  (get_elf_backend_data (abfd)->s->arch_size / 8)
+
 /* The size of a GOT entry.  */
 #define MIPS_ELF_GOT_SIZE(abfd) \
   (get_elf_backend_data (abfd)->s->arch_size / 8)
@@ -7432,7 +7436,7 @@ _bfd_mips_elf_size_dynamic_sections (bfd *output_bfd,
 	{
 	  /* We add a room for __rld_map.  It will be filled in by the
 	     rtld to contain a pointer to the _r_debug structure.  */
-	  s->size += 4;
+	  s->size += MIPS_ELF_RLD_MAP_SIZE (output_bfd);
 	}
       else if (SGI_COMPAT (output_bfd)
 	       && strncmp (name, ".compact_rel", 12) == 0)
@@ -8710,8 +8714,17 @@ _bfd_mips_elf_finish_dynamic_sections (bfd *output_bfd,
 	      break;
 
 	    case DT_MIPS_RLD_MAP:
-	    case DT_MIPS_RLD_MAP_REL:
 	      dyn.d_un.d_ptr = mips_elf_hash_table (info)->rld_value;
+	      break;
+
+	    case DT_MIPS_RLD_MAP_REL:
+	      {
+		bfd_vma dt_addr;
+
+		dt_addr = (sdyn->output_section->vma + sdyn->output_offset
+			   + (b - sdyn->contents));
+	        dyn.d_un.d_val = mips_elf_hash_table (info)->rld_value - dt_addr;
+	      }
 	      break;
 
 	    case DT_MIPS_OPTIONS:

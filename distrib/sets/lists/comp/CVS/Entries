@@ -14,8 +14,6 @@
 /gcc.sparc64/1.19/Tue Jul 26 13:42:31 2022//
 /md.alpha/1.155/Tue Jul 26 13:42:31 2022//
 /md.amd64/1.114/Tue Jul 26 13:42:31 2022//
-/md.arm64/1.18/Tue Jul 26 13:42:31 2022//
-/md.hppa/1.100/Tue Jul 26 13:42:31 2022//
 /md.landisk/1.68/Tue Jul 26 13:42:31 2022//
 /md.loongson/1.52/Tue Jul 26 13:42:31 2022//
 /md.octeon/1.35/Tue Jul 26 13:42:31 2022//
@@ -33,5 +31,7 @@
 /md.armv7/1.31/Fri Sep  2 13:59:25 2022//
 /md.i386/1.203/Fri Sep  2 13:59:25 2022//
 /md.macppc/1.132/Tue Sep 20 07:18:36 2022//
-/mi/1.1612/Fri Nov 11 20:27:27 2022//
+/md.arm64/1.19/Tue Jan 10 10:04:54 2023//
+/md.hppa/1.101/Tue Jan 10 10:04:54 2023//
+/mi/1.1622/Tue Jan 10 10:04:54 2023//
 D

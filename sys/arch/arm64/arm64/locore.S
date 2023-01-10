@@ -1,4 +1,4 @@
-/* $OpenBSD: locore.S,v 1.40 2022/07/13 09:28:18 kettenis Exp $ */
+/* $OpenBSD: locore.S,v 1.42 2022/12/23 17:31:30 kettenis Exp $ */
 /*-
  * Copyright (c) 2012-2014 Andrew Turner
  * All rights reserved.
@@ -35,7 +35,6 @@
 #include <machine/param.h>
 
 #define	VIRT_BITS	39
-#define	NUM_L1_TTBR0	2
 
 /*
  * If we are started in EL2, configure the required hypervisor
@@ -273,40 +272,40 @@ abort:
 	b abort
 
 	.data
-	.global _C_LABEL(esym)
-_C_LABEL(esym): .xword   _C_LABEL(end)
+	.global esym
+esym:	.xword	end
 
 data_align_pad:
 	.space 32
 	.align 12 /* 4KiB aligned */
 	/*
-	 * 3 initial tables (in the following order):
+	 * 5 initial tables (in the following order):
 	 *           L2 for kernel (High addresses)
 	 *           L1 for kernel
-	 *           L1 for user   (Low addresses)
+	 *           L2 for identity map (Low addresses)
+	 *           L1 for identity map
+	 *           L0 for identity map
+	 *
+	 * The kernel L2 and identity map L1 and L2 tables contain two
+	 * pages each such that we can map a 64MB region that straddles
+	 * 1GB or 512GB (in the case of the identity map) boundary.
 	 */
 	.globl	pagetable
 pagetable:
-	.space	PAGE_SIZE * 2	// allocate 2 pages for pmapvp2
+pagetable_l2_ttbr1:
+	.space	PAGE_SIZE * 2
 pagetable_l1_ttbr1:
-	.space	PAGE_SIZE * 2	// allocate 2 pages for pmapvp1
-	.globl pagetable_l1_ttbr0
+	.space	PAGE_SIZE
+pagetable_l2_ttbr0:
+	.space	PAGE_SIZE * 2
 pagetable_l1_ttbr0:
-	.space	PAGE_SIZE * NUM_L1_TTBR0
+	.space	PAGE_SIZE * 2
 	.globl pagetable_l0_ttbr0
 pagetable_l0_ttbr0:
 	.space	PAGE_SIZE
 	.globl	pagetable_end
 pagetable_end:
-	.globl pagetable_l1_ttbr0_pa
-pagetable_l1_ttbr0_pa:
-	.xword	0
-	.globl pagetable_l1_ttbr0_num
-pagetable_l1_ttbr0_num:
-	.xword	NUM_L1_TTBR0
-	.globl pagetable_l1_ttbr0_idx
-pagetable_l1_ttbr0_idx: /* uint64_t[NUM_L1_TTBR0] */
-	.fill	NUM_L1_TTBR0 * 8, 1, 0xff
+
 	.bss
 	.align	4
 	.globl initstack
@@ -316,9 +315,9 @@ initstack:
 initstack_end:
 
 	.text
-	.globl	_C_LABEL(sigcode)
-	.type	_C_LABEL(sigcode),@function
-_C_LABEL(sigcode):
+	.globl	sigcode
+	.type	sigcode,@function
+sigcode:
 	sub	sp, sp, #17 * 32
 	mov	x3, sp
 	stp	q0, q1, [x3], #32
@@ -369,8 +368,8 @@ _C_LABEL(sigcode):
 	svc	0
 	dsb	nsh
 	isb
-	.globl  _C_LABEL(sigcoderet)
-_C_LABEL(sigcoderet):
+	.globl  sigcoderet
+sigcoderet:
 
 	/* sigreturn failed, exit */
 	mov	x8, #SYS_exit
@@ -378,8 +377,8 @@ _C_LABEL(sigcoderet):
 	dsb	nsh
 	isb
 END(sigcode)
-	.global _C_LABEL(esigcode)
-_C_LABEL(esigcode):
+	.global esigcode
+esigcode:
 
 	.globl	sigfill
 sigfill:

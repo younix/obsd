@@ -1,4 +1,4 @@
-/*	$OpenBSD: output_ometric.c,v 1.3 2022/11/07 11:33:24 mbuhl Exp $ */
+/*	$OpenBSD: output_ometric.c,v 1.10 2022/12/12 09:51:04 claudio Exp $ */
 
 /*
  * Copyright (c) 2022 Claudio Jeker <claudio@openbsd.org>
@@ -16,11 +16,14 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sys/time.h>
+
 #include <err.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include "bgpd.h"
@@ -36,7 +39,7 @@ struct ometric *bgpd_info, *bgpd_scrape_time;
 struct ometric *peer_info, *peer_state, *peer_state_raw, *peer_last_change,
 		    *peer_last_read, *peer_last_write;
 struct ometric *peer_prefixes_transmit, *peer_prefixes_receive;
-struct ometric *peer_message_transmit, *peer_message_recieve;
+struct ometric *peer_message_transmit, *peer_message_receive;
 struct ometric *peer_update_transmit, *peer_update_pending,
 		   *peer_update_receive;
 struct ometric *peer_withdraw_transmit, *peer_withdraw_pending,
@@ -47,7 +50,7 @@ struct ometric *peer_rr_eorr_transmit, *peer_rr_eorr_receive;
 struct ometric *rde_mem_size, *rde_mem_count, *rde_mem_ref_count;
 struct ometric *rde_set_size, *rde_set_count, *rde_table_count;
 
-struct timeval start_time, end_time;
+struct timespec start_time, end_time;
 
 static void
 ometric_head(struct parse_result *arg)
@@ -58,11 +61,11 @@ ometric_head(struct parse_result *arg)
 	char hostname[HOST_NAME_MAX + 1];
 	char *domainname;
 
-	bgpd_info = ometric_new(OMT_INFO, "bgpd_info", "bgpd information");
+	clock_gettime(CLOCK_MONOTONIC, &start_time);
+
+	bgpd_info = ometric_new(OMT_INFO, "bgpd", "bgpd information");
 	bgpd_scrape_time = ometric_new(OMT_GAUGE, "bgpd_scrape_seconds",
 	    "bgpd scrape time in seconds");
-
-	gettimeofday(&start_time, NULL);
 
 	if (gethostname(hostname, sizeof(hostname)))
 		err(1, "gethostname");
@@ -75,16 +78,14 @@ ometric_head(struct parse_result *arg)
 	values[3] = NULL;
 
 	ol = olabels_new(keys, values);
-
 	ometric_set_info(bgpd_info, NULL, NULL, ol);
-
 	olabels_free(ol);
 
 	/*
 	 * per neighbor stats: attrs will be remote_as, remote_addr,
 	 * description and group
 	 */
-	peer_info = ometric_new(OMT_INFO, "bgpd_peer_info",
+	peer_info = ometric_new(OMT_INFO, "bgpd_peer",
 	    "peer information");
 	peer_state = ometric_new_state(statenames,
 	    sizeof(statenames) / sizeof(statenames[0]), "bgpd_peer_state",
@@ -107,65 +108,65 @@ ometric_head(struct parse_result *arg)
 	    "number of prefixes received from peer");
 
 	peer_message_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_message_transmit_total",
+	    "bgpd_peer_message_transmit",
 	    "per message type count of transmitted messages");
-	peer_message_recieve = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_message_receive_total",
+	peer_message_receive = ometric_new(OMT_COUNTER,
+	    "bgpd_peer_message_receive",
 	    "per message type count of received messages");
 
 	peer_update_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_update_transmit_total",
+	    "bgpd_peer_update_transmit",
 	    "number of prefixes sent as update");
 	peer_update_pending = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_update_pending_total",
+	    "bgpd_peer_update_pending",
 	    "number of pending update prefixes");
 	peer_update_receive = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_update_receive_total",
+	    "bgpd_peer_update_receive",
 	    "number of prefixes received as update");
 
 	peer_withdraw_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_withdraw_transmit_total",
+	    "bgpd_peer_withdraw_transmit",
 	    "number of withdrawn prefixes sent to peer");
 	peer_withdraw_pending = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_withdraw_pending_total",
+	    "bgpd_peer_withdraw_pending",
 	    "number of pending withdrawn prefixes");
 	peer_withdraw_receive = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_withdraw_receive_total",
+	    "bgpd_peer_withdraw_receive",
 	    "number of withdrawn prefixes received from peer");
 
 	peer_rr_req_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_req_transmit_total",
+	    "bgpd_peer_route_refresh_req_transmit",
 	    "number of route-refresh request transmitted to peer");
 	peer_rr_req_receive = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_req_receive_total",
+	    "bgpd_peer_route_refresh_req_receive",
 	    "number of route-refresh request received from peer");
 	peer_rr_borr_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_borr_transmit_total",
+	    "bgpd_peer_route_refresh_borr_transmit",
 	    "number of ext. route-refresh BORR messages transmitted to peer");
 	peer_rr_borr_receive = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_borr_receive_total",
+	    "bgpd_peer_route_refresh_borr_receive",
 	    "number of ext. route-refresh BORR messages received from peer");
 	peer_rr_eorr_transmit = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_eorr_transmit_total",
+	    "bgpd_peer_route_refresh_eorr_transmit",
 	    "number of ext. route-refresh EORR messages transmitted to peer");
 	peer_rr_eorr_receive = ometric_new(OMT_COUNTER,
-	    "bgpd_peer_route_refresh_eorr_receive_total",
+	    "bgpd_peer_route_refresh_eorr_receive",
 	    "number of ext. route-refresh EORR messages received from peer");
 
 	/* RDE memory statistics */
 	rde_mem_size = ometric_new(OMT_GAUGE,
 	    "bgpd_rde_memory_usage_bytes", "memory usage in bytes");
 	rde_mem_count = ometric_new(OMT_GAUGE,
-	    "bgpd_rde_memory_count", "number of object in use");
+	    "bgpd_rde_memory_usage_objects", "number of object in use");
 	rde_mem_ref_count = ometric_new(OMT_GAUGE,
-	    "bgpd_rde_memory_reference_count", "number of references held");
+	    "bgpd_rde_memory_usage_references", "number of references held");
 
 	rde_set_size = ometric_new(OMT_GAUGE,
 	    "bgpd_rde_set_usage_bytes", "memory usage of set in bytes");
 	rde_set_count = ometric_new(OMT_GAUGE,
-	    "bgpd_rde_set_count", "number of object in set");
+	    "bgpd_rde_set_usage_objects", "number of object in set");
 	rde_table_count = ometric_new(OMT_GAUGE,
-	    "bgpd_rde_table_count", "number of as_set tables");
+	    "bgpd_rde_set_usage_tables", "number of as_set tables");
 }
 
 static void
@@ -205,27 +206,31 @@ ometric_neighbor_stats(struct peer *p, struct parse_result *arg)
 	ometric_set_int(peer_prefixes_transmit, p->stats.prefix_out_cnt, ol);
 	ometric_set_int(peer_prefixes_receive, p->stats.prefix_cnt, ol);
 
-	ometric_set_int_with_label(peer_message_transmit,
-	    p->stats.msg_sent_open, "message", "open", ol);
-	ometric_set_int_with_label(peer_message_transmit,
-	    p->stats.msg_sent_notification, "message", "notification", ol);
-	ometric_set_int_with_label(peer_message_transmit,
-	    p->stats.msg_sent_update, "message", "update", ol);
-	ometric_set_int_with_label(peer_message_transmit,
-	    p->stats.msg_sent_keepalive, "message", "keepalive", ol);
-	ometric_set_int_with_label(peer_message_transmit,
-	    p->stats.msg_sent_rrefresh, "message", "route_refresh", ol);
+	ometric_set_int_with_labels(peer_message_transmit,
+	    p->stats.msg_sent_open, OKV("messages"), OKV("open"), ol);
+	ometric_set_int_with_labels(peer_message_transmit,
+	    p->stats.msg_sent_notification, OKV("messages"),
+	    OKV("notification"), ol);
+	ometric_set_int_with_labels(peer_message_transmit,
+	    p->stats.msg_sent_update, OKV("messages"), OKV("update"), ol);
+	ometric_set_int_with_labels(peer_message_transmit,
+	    p->stats.msg_sent_keepalive, OKV("messages"), OKV("keepalive"), ol);
+	ometric_set_int_with_labels(peer_message_transmit,
+	    p->stats.msg_sent_rrefresh, OKV("messages"), OKV("route_refresh"),
+	    ol);
 
-	ometric_set_int_with_label(peer_message_recieve,
-	    p->stats.msg_rcvd_open, "message", "open", ol);
-	ometric_set_int_with_label(peer_message_recieve,
-	    p->stats.msg_rcvd_notification, "message", "notification", ol);
-	ometric_set_int_with_label(peer_message_recieve,
-	    p->stats.msg_rcvd_update, "message", "update", ol);
-	ometric_set_int_with_label(peer_message_recieve,
-	    p->stats.msg_rcvd_keepalive, "message", "keepalive", ol);
-	ometric_set_int_with_label(peer_message_recieve,
-	    p->stats.msg_rcvd_rrefresh, "message", "route_refresh", ol);
+	ometric_set_int_with_labels(peer_message_receive,
+	    p->stats.msg_rcvd_open, OKV("messages"), OKV("open"), ol);
+	ometric_set_int_with_labels(peer_message_receive,
+	    p->stats.msg_rcvd_notification, OKV("messages"),
+	    OKV("notification"), ol);
+	ometric_set_int_with_labels(peer_message_receive,
+	    p->stats.msg_rcvd_update, OKV("messages"), OKV("update"), ol);
+	ometric_set_int_with_labels(peer_message_receive,
+	    p->stats.msg_rcvd_keepalive, OKV("messages"), OKV("keepalive"), ol);
+	ometric_set_int_with_labels(peer_message_receive,
+	    p->stats.msg_rcvd_rrefresh, OKV("messages"), OKV("route_refresh"),
+	    ol);
 
 	ometric_set_int(peer_update_transmit, p->stats.prefix_sent_update, ol);
 	ometric_set_int(peer_update_pending, p->stats.pending_update, ol);
@@ -251,13 +256,14 @@ ometric_rib_mem_element(const char *v, uint64_t count, uint64_t size,
     uint64_t refs)
 {
 	if (count != UINT64_MAX)
-		ometric_set_int_with_label(rde_mem_count, count, "type", v,
-		    NULL);
+		ometric_set_int_with_labels(rde_mem_count, count,
+		    OKV("type"), OKV(v), NULL);
 	if (size != UINT64_MAX)
-		ometric_set_int_with_label(rde_mem_size, size, "type", v, NULL);
+		ometric_set_int_with_labels(rde_mem_size, size,
+		    OKV("type"), OKV(v), NULL);
 	if (refs != UINT64_MAX)
-		ometric_set_int_with_label(rde_mem_ref_count, refs, "type", v,
-		    NULL);
+		ometric_set_int_with_labels(rde_mem_ref_count, refs,
+		    OKV("type"), OKV(v), NULL);
 }
 
 static void
@@ -299,14 +305,15 @@ ometric_rib_mem(struct rde_memstats *stats)
 	    stats->attr_data, UINT64_MAX);
 
 	ometric_set_int(rde_table_count, stats->aset_cnt, NULL);
-	ometric_set_int_with_label(rde_set_size, stats->aset_size,
-	   "type", "as_set", NULL);
-	ometric_set_int_with_label(rde_set_count, stats->aset_nmemb,
-	   "type", "as_set", NULL);
-	ometric_set_int_with_label(rde_set_size, stats->pset_size,
-	   "type", "prefix_set", NULL);
-	ometric_set_int_with_label(rde_set_count, stats->pset_cnt,
-	   "type", "prefix_set", NULL);
+
+	ometric_set_int_with_labels(rde_set_size, stats->aset_size,
+	    OKV("type"), OKV("as_set"), NULL);
+	ometric_set_int_with_labels(rde_set_count, stats->aset_nmemb,
+	    OKV("type"), OKV("as_set"), NULL);
+	ometric_set_int_with_labels(rde_set_size, stats->pset_size,
+	    OKV("type"), OKV("prefix_set"), NULL);
+	ometric_set_int_with_labels(rde_set_count, stats->pset_cnt,
+	    OKV("type"), OKV("prefix_set"), NULL);
 	ometric_rib_mem_element("set_total", UINT64_MAX, 
 	    stats->aset_size + stats->pset_size, UINT64_MAX);
 }
@@ -314,17 +321,13 @@ ometric_rib_mem(struct rde_memstats *stats)
 static void
 ometric_tail(void)
 {
-	struct timeval elapsed_time;
-	double scrape;
+	struct timespec elapsed_time;
 
-	gettimeofday(&end_time, NULL);
-	timersub(&end_time, &start_time, &elapsed_time);
+	clock_gettime(CLOCK_MONOTONIC, &end_time);
+	timespecsub(&end_time, &start_time, &elapsed_time);
 
-	scrape = (double)elapsed_time.tv_sec +
-	    (double)elapsed_time.tv_usec / 1000000;
-
-	ometric_set_float(bgpd_scrape_time, scrape, NULL);
-	ometric_output_all();
+	ometric_set_timespec(bgpd_scrape_time, &elapsed_time, NULL);
+	ometric_output_all(stdout);
 
 	ometric_free_all();
 }

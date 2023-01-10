@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.h,v 1.96 2022/10/25 15:15:38 guenther Exp $	*/
+/*	$OpenBSD: cpu.h,v 1.98 2023/01/01 19:49:17 miod Exp $	*/
 
 /*
  * Copyright (c) 2000-2004 Michael Shalayeff
@@ -67,6 +67,7 @@
 
 #ifndef _LOCORE
 #ifdef _KERNEL
+#include <sys/clockintr.h>
 #include <sys/device.h>
 #include <sys/queue.h>
 #include <sys/sched.h>
@@ -101,7 +102,6 @@ struct cpu_info {
 	volatile u_long	ci_ipending;
 	volatile int	ci_in_intr;
 	int		ci_want_resched;
-	u_long		ci_itmr;
 
 	volatile u_long	ci_ipi;			/* IPIs pending. */
 	struct mutex	ci_ipi_mtx;
@@ -114,7 +114,7 @@ struct cpu_info {
 #ifdef GPROF
 	struct gmonparam *ci_gmon;
 #endif
-
+	struct clockintr_queue ci_queue;
 	char		ci_panicbuf[512];
 } __attribute__((__aligned__(64)));
 
@@ -191,7 +191,6 @@ extern int cpu_hvers;
  */
 
 #define	HPPA_PGALIAS	0x00400000
-#define	HPPA_PGAMASK	0xffc00000
 #define	HPPA_PGAOFF	0x003fffff
 
 #define	HPPA_IOBEGIN    0xf0000000
@@ -241,6 +240,7 @@ int	copy_on_fault(void);
 void	proc_trampoline(void);
 int	cpu_dumpsize(void);
 int	cpu_dump(void);
+void	cpu_startclock(void);
 
 static inline unsigned int
 cpu_rnd_messybits(void)

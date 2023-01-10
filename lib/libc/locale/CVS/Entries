@@ -18,7 +18,6 @@
 /isctype_l.c/1.1/Tue Sep  5 03:16:13 2017//
 /iswalnum.3/1.6/Tue Sep  5 03:16:13 2017//
 /iswctype.3/1.5/Tue Sep  5 03:16:13 2017//
-/localeconv.c/1.8/Mon May 23 00:05:15 2016//
 /mblen.c/1.2/Wed Dec  5 23:20:00 2012//
 /mbrlen.c/1.3/Sat Sep 12 16:23:14 2015//
 /mbrtowc.3/1.5/Mon Feb  8 09:56:16 2016//
@@ -81,4 +80,5 @@
 /setlocale.3/1.24/Fri Sep  2 14:00:04 2022//
 /wctoint.h/1.3/Fri Sep  2 14:00:04 2022//
 /localeconv.3/1.4/Tue Sep 20 07:19:20 2022//
+/localeconv.c/1.9/Tue Jan 10 10:05:29 2023//
 D

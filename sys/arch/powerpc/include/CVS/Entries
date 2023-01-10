@@ -1,5 +1,4 @@
 /_float.h/1.1/Tue Jun 26 16:12:44 2012//
-/_types.h/1.23/Mon Mar  5 01:15:25 2018//
 /bat.h/1.6/Tue Mar 31 16:00:38 2015//
 /cdefs.h/1.7/Thu Mar 28 17:30:45 2013//
 /endian.h/1.21/Wed Oct 22 23:56:47 2014//
@@ -32,8 +31,9 @@
 /mplock.h/1.5/Thu Sep  2 14:22:31 2021//
 /pmap.h/1.60/Thu Sep  2 14:22:31 2021//
 /db_machdep.h/1.32/Mon Jun 27 13:02:00 2022//
-/asm.h/1.17/Tue Jul 26 13:42:34 2022//
 /atomic.h/1.13/Fri Sep  2 14:00:20 2022//
-/cpu.h/1.73/Sat Nov  5 22:12:16 2022//
 /trap.h/1.9/Sat Nov  5 22:12:16 2022//
+/_types.h/1.24/Tue Jan 10 10:05:51 2023//
+/asm.h/1.18/Tue Jan 10 10:05:51 2023//
+/cpu.h/1.74/Tue Jan 10 10:05:51 2023//
 D

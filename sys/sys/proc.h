@@ -1,4 +1,4 @@
-/*	$OpenBSD: proc.h,v 1.334 2022/07/23 22:10:59 cheloha Exp $	*/
+/*	$OpenBSD: proc.h,v 1.338 2023/01/07 05:24:58 guenther Exp $	*/
 /*	$NetBSD: proc.h,v 1.44 1996/04/22 01:23:21 christos Exp $	*/
 
 /*-
@@ -215,6 +215,7 @@ struct process {
 	char	ps_comm[_MAXCOMLEN];	/* command name, incl NUL */
 
 	vaddr_t	ps_strings;		/* User pointers to argv/env */
+	vaddr_t	ps_auxinfo;		/* User pointer to auxinfo */
 	vaddr_t ps_timekeep; 		/* User pointer to timekeep */
 	vaddr_t	ps_sigcode;		/* [I] User pointer to signal code */
 	vaddr_t ps_sigcoderet;		/* [I] User ptr to sigreturn retPC */
@@ -302,6 +303,7 @@ struct p_inentry {
  *  Locks used to protect struct members in this file:
  *	I	immutable after creation
  *	S	scheduler lock
+ *	U	uidinfolk
  *	l	read only reference, see lim_read_enter()
  *	o	owned (read/modified only) by this thread
  */
@@ -365,6 +367,7 @@ struct proc {
 #define	p_startcopy	p_sigmask
 	sigset_t p_sigmask;		/* [a] Current signal mask */
 
+	char	p_name[_MAXCOMLEN];	/* thread name, incl NUL */
 	u_char	p_slppri;		/* [S] Sleeping priority */
 	u_char	p_usrpri;	/* [S] Priority based on p_estcpu & ps_nice */
 	u_int	p_estcpu;		/* [S] Time averaged val of p_cpticks */
@@ -432,10 +435,10 @@ struct proc {
 #ifdef _KERNEL
 
 struct uidinfo {
-	LIST_ENTRY(uidinfo) ui_hash;
-	uid_t   ui_uid;
-	long    ui_proccnt;	/* proc structs */
-	long	ui_lockcnt;	/* lockf structs */
+	LIST_ENTRY(uidinfo) ui_hash;	/* [U] */
+	uid_t   ui_uid;			/* [I] */
+	long    ui_proccnt;		/* [U] proc structs */
+	long	ui_lockcnt;		/* [U] lockf structs */
 };
 
 struct uidinfo *uid_find(uid_t);
@@ -522,6 +525,8 @@ struct process *prfind(pid_t);	/* Find process by id. */
 struct process *zombiefind(pid_t); /* Find zombie process by id. */
 struct proc *tfind(pid_t);	/* Find thread by id. */
 struct pgrp *pgfind(pid_t);	/* Find process group by id. */
+struct proc *tfind_user(pid_t, struct process *);
+				/* Find thread by userspace id. */
 void	proc_printit(struct proc *p, const char *modif,
     int (*pr)(const char *, ...));
 

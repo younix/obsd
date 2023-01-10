@@ -4,7 +4,6 @@
 /MAINTAINERS/1.1.1.1/Sun Apr 24 20:14:48 2011//
 /alloca-conf.h/1.1.1.1/Sun Apr 24 20:14:48 2011//
 /ansidecl.h/1.1.1.1/Sun Apr 24 20:14:48 2011//
-/bfdlink.h/1.7/Mon Dec  3 02:59:51 2018//
 /bin-bugs.h/1.1.1.1/Sun Apr 24 20:14:48 2011//
 /bout.h/1.1.1.1/Sun Apr 24 20:14:48 2011//
 /demangle.h/1.1.1.1/Sun Apr 24 20:14:48 2011//
@@ -45,3 +44,4 @@ D/coff////
 D/elf////
 D/nlm////
 D/opcode////
+/bfdlink.h/1.8/Tue Jan 10 10:05:15 2023//

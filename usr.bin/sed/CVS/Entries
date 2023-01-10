@@ -1,11 +1,11 @@
 /Makefile/1.5/Wed Dec 13 16:06:05 2017//
 /POSIX/1.2/Wed Jun 26 05:39:04 1996//
-/compile.c/1.50/Fri Dec  7 14:45:40 2018//
-/defs.h/1.9/Wed Dec 13 16:06:34 2017//
 /extern.h/1.14/Wed Nov 14 10:59:33 2018//
 /misc.c/1.12/Fri Jan 20 10:26:16 2017//
 D/TEST////
 D/USD.doc////
-/main.c/1.42/Wed Sep  1 16:07:40 2021//
 /process.c/1.35/Mon Jan 24 14:35:16 2022//
-/sed.1/1.62/Tue Sep 20 07:19:44 2022//
+/compile.c/1.51/Tue Jan 10 10:06:00 2023//
+/defs.h/1.10/Tue Jan 10 10:06:00 2023//
+/main.c/1.43/Tue Jan 10 10:06:00 2023//
+/sed.1/1.63/Tue Jan 10 10:06:00 2023//

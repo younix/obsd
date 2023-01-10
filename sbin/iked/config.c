@@ -1,4 +1,4 @@
-/*	$OpenBSD: config.c,v 1.88 2022/10/10 11:33:55 tobhe Exp $	*/
+/*	$OpenBSD: config.c,v 1.91 2022/12/03 22:34:35 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2019 Tobias Heider <tobias.heider@stusta.de>
@@ -950,11 +950,11 @@ config_setocsp(struct iked *env)
 int
 config_getocsp(struct iked *env, struct imsg *imsg)
 {
-	size_t			 have, need;
-	u_int8_t		*ptr;
+	size_t		 have, need;
+	uint8_t		*ptr;
 
 	free(env->sc_ocsp_url);
-	ptr = (u_int8_t *)imsg->data;
+	ptr = (uint8_t *)imsg->data;
 	have = IMSG_DATA_SIZE(imsg);
 
 	/* get tolerate */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifq.c,v 1.46 2022/04/30 21:13:57 bluhm Exp $ */
+/*	$OpenBSD: ifq.c,v 1.49 2023/01/09 03:39:14 dlg Exp $ */
 
 /*
  * Copyright (c) 2015 David Gwynne <dlg@openbsd.org>
@@ -579,9 +579,13 @@ ifq_mfreeml(struct ifqueue *ifq, struct mbuf_list *ml)
 struct ifiq_kstat_data {
 	struct kstat_kv kd_packets;
 	struct kstat_kv kd_bytes;
+	struct kstat_kv kd_fdrops;
 	struct kstat_kv kd_qdrops;
 	struct kstat_kv kd_errors;
 	struct kstat_kv kd_qlen;
+
+	struct kstat_kv kd_enqueues;
+	struct kstat_kv kd_dequeues;
 };
 
 static const struct ifiq_kstat_data ifiq_kstat_tpl = {
@@ -589,12 +593,19 @@ static const struct ifiq_kstat_data ifiq_kstat_tpl = {
 	    KSTAT_KV_T_COUNTER64, KSTAT_KV_U_PACKETS),
 	KSTAT_KV_UNIT_INITIALIZER("bytes",
 	    KSTAT_KV_T_COUNTER64, KSTAT_KV_U_BYTES),
+	KSTAT_KV_UNIT_INITIALIZER("fdrops",
+	    KSTAT_KV_T_COUNTER64, KSTAT_KV_U_PACKETS),
 	KSTAT_KV_UNIT_INITIALIZER("qdrops",
 	    KSTAT_KV_T_COUNTER64, KSTAT_KV_U_PACKETS),
 	KSTAT_KV_UNIT_INITIALIZER("errors",
 	    KSTAT_KV_T_COUNTER64, KSTAT_KV_U_PACKETS),
 	KSTAT_KV_UNIT_INITIALIZER("qlen",
 	    KSTAT_KV_T_UINT32, KSTAT_KV_U_PACKETS),
+
+	KSTAT_KV_INITIALIZER("enqueues",
+	    KSTAT_KV_T_COUNTER64),
+	KSTAT_KV_INITIALIZER("dequeues",
+	    KSTAT_KV_T_COUNTER64),
 };
 
 int
@@ -606,9 +617,13 @@ ifiq_kstat_copy(struct kstat *ks, void *dst)
 	*kd = ifiq_kstat_tpl;
 	kstat_kv_u64(&kd->kd_packets) = ifiq->ifiq_packets;
 	kstat_kv_u64(&kd->kd_bytes) = ifiq->ifiq_bytes;
+	kstat_kv_u64(&kd->kd_fdrops) = ifiq->ifiq_fdrops;
 	kstat_kv_u64(&kd->kd_qdrops) = ifiq->ifiq_qdrops;
 	kstat_kv_u64(&kd->kd_errors) = ifiq->ifiq_errors;
 	kstat_kv_u32(&kd->kd_qlen) = ml_len(&ifiq->ifiq_ml);
+
+	kstat_kv_u64(&kd->kd_enqueues) = ifiq->ifiq_enqueues;
+	kstat_kv_u64(&kd->kd_dequeues) = ifiq->ifiq_dequeues;
 
 	return (0);
 }
@@ -630,6 +645,7 @@ ifiq_init(struct ifiqueue *ifiq, struct ifnet *ifp, unsigned int idx)
 
 	ifiq->ifiq_packets = 0;
 	ifiq->ifiq_bytes = 0;
+	ifiq->ifiq_fdrops = 0;
 	ifiq->ifiq_qdrops = 0;
 	ifiq->ifiq_errors = 0;
 
@@ -673,6 +689,7 @@ ifiq_input(struct ifiqueue *ifiq, struct mbuf_list *ml)
 	struct mbuf *m;
 	uint64_t packets;
 	uint64_t bytes = 0;
+	uint64_t fdrops = 0;
 	unsigned int len;
 #if NBPFILTER > 0
 	caddr_t if_bpf;
@@ -696,9 +713,10 @@ ifiq_input(struct ifiqueue *ifiq, struct mbuf_list *ml)
 		ml_init(ml);
 
 		while ((m = ml_dequeue(&ml0)) != NULL) {
-			if ((*ifp->if_bpf_mtap)(if_bpf, m, BPF_DIRECTION_IN))
+			if ((*ifp->if_bpf_mtap)(if_bpf, m, BPF_DIRECTION_IN)) {
 				m_freem(m);
-			else
+				fdrops++;
+			} else
 				ml_enqueue(ml, m);
 		}
 
@@ -706,6 +724,7 @@ ifiq_input(struct ifiqueue *ifiq, struct mbuf_list *ml)
 			mtx_enter(&ifiq->ifiq_mtx);
 			ifiq->ifiq_packets += packets;
 			ifiq->ifiq_bytes += bytes;
+			ifiq->ifiq_fdrops += fdrops;
 			mtx_leave(&ifiq->ifiq_mtx);
 
 			return (0);
@@ -716,13 +735,16 @@ ifiq_input(struct ifiqueue *ifiq, struct mbuf_list *ml)
 	mtx_enter(&ifiq->ifiq_mtx);
 	ifiq->ifiq_packets += packets;
 	ifiq->ifiq_bytes += bytes;
+	ifiq->ifiq_fdrops += fdrops;
 
 	len = ml_len(&ifiq->ifiq_ml);
 	if (__predict_true(!ISSET(ifp->if_xflags, IFXF_MONITOR))) {
 		if (len > ifiq_maxlen_drop)
 			ifiq->ifiq_qdrops += ml_len(ml);
-		else
+		else {
+			ifiq->ifiq_enqueues++;
 			ml_enlist(&ifiq->ifiq_ml, ml);
+		}
 	}
 	mtx_leave(&ifiq->ifiq_mtx);
 
@@ -747,7 +769,34 @@ ifiq_add_data(struct ifiqueue *ifiq, struct if_data *data)
 int
 ifiq_enqueue(struct ifiqueue *ifiq, struct mbuf *m)
 {
+	struct ifnet *ifp = ifiq->ifiq_if;
+#if NBPFILTER > 0
+	caddr_t if_bpf = ifp->if_bpf;
+#endif
+
+	m->m_pkthdr.ph_ifidx = ifp->if_index;
+	m->m_pkthdr.ph_rtableid = ifp->if_rdomain;
+
+#if NBPFILTER > 0
+	if_bpf = ifp->if_bpf;
+	if (if_bpf) {
+		if ((*ifp->if_bpf_mtap)(if_bpf, m, BPF_DIRECTION_IN)) {
+			mtx_enter(&ifiq->ifiq_mtx);
+			ifiq->ifiq_packets++;
+			ifiq->ifiq_bytes += m->m_pkthdr.len;
+			ifiq->ifiq_fdrops++;
+			mtx_leave(&ifiq->ifiq_mtx);
+
+			m_freem(m);
+			return (0);
+		}
+	}
+#endif
+
 	mtx_enter(&ifiq->ifiq_mtx);
+	ifiq->ifiq_packets++;
+	ifiq->ifiq_bytes += m->m_pkthdr.len;
+	ifiq->ifiq_enqueues++;
 	ml_enqueue(&ifiq->ifiq_ml, m);
 	mtx_leave(&ifiq->ifiq_mtx);
 
@@ -766,6 +815,7 @@ ifiq_process(void *arg)
 		return;
 
 	mtx_enter(&ifiq->ifiq_mtx);
+	ifiq->ifiq_dequeues++;
 	ml = ifiq->ifiq_ml;
 	ml_init(&ifiq->ifiq_ml);
 	mtx_leave(&ifiq->ifiq_mtx);

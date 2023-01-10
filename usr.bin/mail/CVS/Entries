@@ -5,7 +5,6 @@
 /collect.c/1.34/Fri Jan 17 18:42:30 2014//
 /edit.c/1.21/Fri Jun 28 13:35:01 2019//
 /extern.h/1.29/Sun Sep 16 02:38:57 2018//
-/fio.c/1.38/Fri Jun 28 13:35:01 2019//
 /head.c/1.12/Fri Jan 17 18:42:30 2014//
 /list.c/1.20/Fri Oct 16 17:56:07 2015//
 /names.c/1.25/Fri Jun 28 13:35:02 2019//
@@ -23,9 +22,10 @@
 D/USD.doc////
 D/misc////
 /Makefile/1.13/Sat May  1 08:41:52 2021//
-/util.c/1.1/Sat May  1 08:41:52 2021//
 /glob.h/1.10/Wed Sep  1 16:07:40 2021//
 /main.c/1.35/Wed Sep  1 16:07:40 2021//
 /lex.c/1.42/Mon Nov 15 19:06:15 2021//
 /def.h/1.17/Mon Jun 27 13:02:01 2022//
 /mail.1/1.83/Tue Jul 26 13:42:36 2022//
+/fio.c/1.39/Tue Jan 10 10:05:59 2023//
+/util.c/1.2/Tue Jan 10 10:05:59 2023//

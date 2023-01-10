@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.658 2022/11/08 14:49:20 cheloha Exp $	*/
+/*	$OpenBSD: machdep.c,v 1.661 2023/01/10 01:09:14 dv Exp $	*/
 /*	$NetBSD: machdep.c,v 1.214 1996/11/10 03:16:17 thorpej Exp $	*/
 
 /*-
@@ -1038,6 +1038,7 @@ const struct cpu_cpuid_feature cpu_seff0_ecxfeatures[] = {
 	{ SEFF0ECX_UMIP,	"UMIP" },
 	{ SEFF0ECX_AVX512VBMI,	"AVX512VBMI" },
 	{ SEFF0ECX_PKU,		"PKU" },
+	{ SEFF0ECX_WAITPKG,	"WAITPKG" },
 };
 
 const struct cpu_cpuid_feature cpu_seff0_edxfeatures[] = {
@@ -1861,19 +1862,8 @@ identifycpu(struct cpu_info *ci)
 			}
 			break;
 		}
-		calibrate_cyclecounter();
-		if (cpuspeed > 994) {
-			int ghz, fr;
-
-			ghz = (cpuspeed + 9) / 1000;
-			fr = ((cpuspeed + 9) / 10 ) % 100;
-			if (fr)
-				printf(" %d.%02d GHz", ghz, fr);
-			else
-				printf(" %d GHz", ghz);
-		} else {
-			printf(" %d MHz", cpuspeed);
-		}
+		if (CPU_IS_PRIMARY(ci))
+			calibrate_cyclecounter();	/* set cpuspeed */
 	}
 
 	if (cpuid_level != -1)

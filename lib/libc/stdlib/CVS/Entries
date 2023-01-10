@@ -13,14 +13,12 @@
 /atoi.c/1.6/Sun Sep 13 08:31:47 2015//
 /atol.c/1.5/Mon Aug  8 08:05:36 2005//
 /bsearch.3/1.10/Mon Nov 30 17:03:05 2015//
-/div.c/1.6/Sun Sep 13 08:31:47 2015//
 /drand48.c/1.7/Mon Sep 14 13:30:17 2015//
 /ecvt.3/1.13/Fri Jan 25 00:19:25 2019//
 /ecvt.c/1.11/Fri Jan 25 00:19:25 2019//
 /erand48.c/1.5/Mon Sep 14 13:30:17 2015//
 /exit.3/1.16/Sun Nov 30 21:21:59 2014//
 /exit.c/1.14/Sat Aug 12 22:59:52 2017//
-/gcvt.c/1.14/Fri Jan 25 00:19:25 2019//
 /getenv.c/1.12/Sun Mar 13 18:34:21 2016//
 /getsubopt.c/1.4/Mon Aug  8 08:05:36 2005//
 /hcreate.3/1.8/Tue Jan 30 11:37:58 2018//
@@ -103,6 +101,8 @@
 /lldiv.3/1.9/Tue Sep 20 07:19:20 2022//
 /strtod.3/1.23/Tue Sep 20 07:19:21 2022//
 /strtonum.3/1.19/Tue Sep 20 07:19:21 2022//
-/atexit.c/1.28/Sat Nov  5 22:11:43 2022//
-/malloc.c/1.275/Sat Nov  5 22:11:43 2022//
+/atexit.c/1.29/Tue Jan 10 10:05:29 2023//
+/div.c/1.7/Tue Jan 10 10:05:29 2023//
+/gcvt.c/1.15/Tue Jan 10 10:05:29 2023//
+/malloc.c/1.276/Tue Jan 10 10:05:29 2023//
 D

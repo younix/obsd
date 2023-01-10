@@ -1,4 +1,4 @@
-/* $OpenBSD: by_dir.c,v 1.41 2021/11/10 14:34:21 schwarze Exp $ */
+/* $OpenBSD: by_dir.c,v 1.43 2022/11/26 16:08:54 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -70,7 +70,7 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 
-#include "x509_lcl.h"
+#include "x509_local.h"
 
 typedef struct lookup_dir_hashes_st {
 	unsigned long hash;
@@ -117,6 +117,7 @@ X509_LOOKUP_hash_dir(void)
 {
 	return &x509_dir_lookup;
 }
+LCRYPTO_ALIAS(X509_LOOKUP_hash_dir)
 
 static int
 dir_ctrl(X509_LOOKUP *ctx, int cmd, const char *argp, long argl,

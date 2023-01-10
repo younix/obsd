@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_curve.c,v 1.22 2022/06/30 11:14:47 tb Exp $ */
+/* $OpenBSD: ec_curve.c,v 1.25 2022/11/26 16:08:52 tb Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -76,7 +76,7 @@
 #include <openssl/err.h>
 #include <openssl/objects.h>
 
-#include "ec_lcl.h"
+#include "ec_local.h"
 
 typedef struct {
 	int field_type,		/* either NID_X9_62_prime_field or
@@ -3433,8 +3433,8 @@ EC_GROUP_new_by_curve_name(int nid)
 	return ret;
 }
 
-size_t 
-EC_get_builtin_curves(EC_builtin_curve * r, size_t nitems)
+size_t
+EC_get_builtin_curves(EC_builtin_curve *r, size_t nitems)
 {
 	size_t i, min;
 

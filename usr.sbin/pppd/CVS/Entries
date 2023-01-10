@@ -14,7 +14,6 @@
 /lcp.h/1.7/Mon Jul  1 19:31:37 2002//
 /magic.c/1.10/Sun Sep 29 16:24:22 2013//
 /magic.h/1.4/Mon Jul  1 19:31:37 2002//
-/options.c/1.29/Sun Dec  6 12:00:16 2015//
 /patchlevel.h/1.7/Fri May  8 04:52:30 1998//
 /pathnames.h/1.6/Mon Jun  4 14:59:45 2007//
 /pppd.h/1.22/Fri Nov 17 20:48:30 2017//
@@ -26,3 +25,4 @@ D/pppstats////
 /sys-bsd.c/1.32/Mon Nov 15 19:06:15 2021//
 /auth.c/1.40/Tue Jul 26 13:42:36 2022//
 /pppd.8/1.48/Tue Jul 26 13:42:36 2022//
+/options.c/1.30/Tue Jan 10 10:06:03 2023//

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmstat.c,v 1.94 2022/02/22 17:35:01 deraadt Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.96 2022/12/28 20:49:05 cheloha Exp $	*/
 /*	$NetBSD: vmstat.c,v 1.5 1996/05/10 23:16:40 thorpej Exp $	*/
 
 /*-
@@ -84,7 +84,7 @@ static	enum state { BOOT, TIME, RUN } state = TIME;
 static void allocinfo(struct Info *);
 static void copyinfo(struct Info *, struct Info *);
 static float cputime(int);
-static void dinfo(int, int);
+static void dinfo(int, int, double);
 static void getinfo(struct Info *);
 void putint(int, int, int, int);
 void putintmk(int, int, int, int);
@@ -98,7 +98,6 @@ int select_vm(void);
 int vm_keyboard_callback(int);
 
 static	time_t t;
-static	float hertz;
 static	int nintr;
 static	long *intrloc;
 static	char **intrname;
@@ -170,7 +169,6 @@ initvmstat(void)
 	int mib[4], i;
 	size_t size;
 
-	hertz = stathz;
 	if (!dkinit(1))
 		return(0);
 
@@ -323,7 +321,6 @@ labelkre(void)
 		Y(fld); \
 		putint((int)((float)s.fld/etime + 0.5), l, c, w); \
 	} while (0)
-#define MAXFAIL 5
 
 static	char cpuchar[] = { '|', '@', '=', '>', ' ' };
 static	char cpuorder[] = { CP_INTR, CP_SPIN, CP_SYS, CP_USER, CP_IDLE };
@@ -331,33 +328,27 @@ static	char cpuorder[] = { CP_INTR, CP_SPIN, CP_SYS, CP_USER, CP_IDLE };
 void
 showkre(void)
 {
+	static struct timespec prev;
+	struct timespec elapsed, now;
 	float f1, f2;
 	int psiz;
 	u_int64_t inttotal, intcnt;
 	int i, l, c;
-	static int failcnt = 0, first_run = 0;
+	static int first_run = 0;
 	double etime;
 
+	clock_gettime(CLOCK_UPTIME, &now);
+	timespecsub(&now, &prev, &elapsed);
+	prev = now;
 	if (state == TIME) {
 		if (!first_run) {
 			first_run = 1;
 			return;
 		}
 	}
-	etime = 0;
-	for (i = 0; i < CPUSTATES; i++) {
+	etime = elapsed.tv_sec + elapsed.tv_nsec / 1000000000.0;
+	for (i = 0; i < CPUSTATES; i++)
 		X(cpustats.cs_time);
-		etime += s.cpustats.cs_time[i];
-	}
-	if (etime < 5.0) {	/* < 5 ticks - ignore this trash */
-		if (failcnt++ >= MAXFAIL) {
-			error("The alternate system clock has died!");
-			failcnt = 0;
-		}
-		return;
-	}
-	failcnt = 0;
-	etime /= hertz;
 	inttotal = 0;
 	for (i = 0; i < nintr; i++) {
 		t = intcnt = s.intrcnt[i];
@@ -452,7 +443,7 @@ showkre(void)
 			mvprintw(DISKROW, DISKCOL + 5 + c,
 			    " %*s", l, dr_name[i]);
 			c += 1 + l;
-			dinfo(i, c);
+			dinfo(i, c, etime);
 		}
 	/* and pad the DRIVESPACE */
 	l = DRIVESPACE - c;
@@ -675,11 +666,9 @@ copyinfo(struct Info *from, struct Info *to)
 }
 
 static void
-dinfo(int dn, int c)
+dinfo(int dn, int c, double etime)
 {
-	double words, atime, etime;
-
-	etime = naptime;
+	double words, atime;
 
 	c += DISKCOL;
 

@@ -54,7 +54,7 @@ struct user_list {
 };
 
 /*
- * this is for chosing whether to ignore a login
+ * this is for choosing whether to ignore a login
  */
 struct tty_list {
 	struct tty_list *next;
@@ -223,7 +223,6 @@ main(int argc, char *argv[])
 		case 'w':
 			fp = file(optarg);
 			break;
-		case '?':
 		default:
 			usage();
 			break;

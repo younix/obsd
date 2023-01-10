@@ -1,7 +1,8 @@
-#	$OpenBSD: Makefile.inc,v 1.6 2022/01/31 05:43:22 guenther Exp $
+#	$OpenBSD: Makefile.inc,v 1.8 2023/01/09 13:52:42 kettenis Exp $
 
-CFLAGS += -fpic
+CFLAGS += -fpic -fno-jump-tables
 AFLAGS += -fpic
+LD_SCRIPT = ${.CURDIR}/${MACHINE_CPU}/ld.script
 
 # extract components from libgcc.a
 MDOBJ=	_dyncall.o _remU.o _remI.o _divI.o _divU.o _div_const.o

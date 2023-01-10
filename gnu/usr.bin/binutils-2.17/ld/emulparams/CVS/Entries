@@ -161,7 +161,6 @@
 /hppaelf.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /hppalinux.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /hppanbsd.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/hppaobsd.sh/1.6/Tue Dec 18 21:14:22 2018//
 /i386aout.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /i386beos.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /i386bsd.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
@@ -235,7 +234,6 @@
 /shelf_linux.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /shelf_nbsd.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /shelf_nto.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
-/shelf_obsd.sh/1.5/Tue Dec 18 21:14:22 2018//
 /shl.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /shlelf.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /shlelf32.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
@@ -274,4 +272,6 @@
 /z80.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /z8001.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /z8002.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
+/hppaobsd.sh/1.7/Tue Jan 10 10:05:15 2023//
+/shelf_obsd.sh/1.6/Tue Jan 10 10:05:15 2023//
 D

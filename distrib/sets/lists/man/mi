@@ -1,13 +1,3 @@
-./usr/share/man/man4/qcdwusb.4
-./usr/share/man/man4/qcgpio.4
-./usr/share/man/man4/qciic.4
-./usr/share/man/man4/qcpdc.4
-./usr/share/man/man4/qcpmic.4
-./usr/share/man/man4/qcpmicgpio.4
-./usr/share/man/man4/qcpon.4
-./usr/share/man/man4/qcpwm.4
-./usr/share/man/man4/qcrtc.4
-./usr/share/man/man4/qcspmi.4
 ./usr/share/doc/mg/tutorial
 ./usr/share/info/amdref.info
 ./usr/share/info/cvs.info
@@ -1251,6 +1241,7 @@
 ./usr/share/man/man4/arm64/apldart.4
 ./usr/share/man/man4/arm64/apldma.4
 ./usr/share/man/man4/arm64/apldog.4
+./usr/share/man/man4/arm64/aplefuse.4
 ./usr/share/man/man4/arm64/aplhidev.4
 ./usr/share/man/man4/arm64/apliic.4
 ./usr/share/man/man4/arm64/aplintc.4
@@ -1262,6 +1253,7 @@
 ./usr/share/man/man4/arm64/aplpinctrl.4
 ./usr/share/man/man4/arm64/aplpmgr.4
 ./usr/share/man/man4/arm64/aplpmu.4
+./usr/share/man/man4/arm64/aplpwm.4
 ./usr/share/man/man4/arm64/aplsart.4
 ./usr/share/man/man4/arm64/aplsmc.4
 ./usr/share/man/man4/arm64/aplspi.4
@@ -1825,7 +1817,18 @@
 ./usr/share/man/man4/pwdog.4
 ./usr/share/man/man4/pwmbl.4
 ./usr/share/man/man4/pwmfan.4
+./usr/share/man/man4/pwmleds.4
 ./usr/share/man/man4/pwmreg.4
+./usr/share/man/man4/qcdwusb.4
+./usr/share/man/man4/qcgpio.4
+./usr/share/man/man4/qciic.4
+./usr/share/man/man4/qcpdc.4
+./usr/share/man/man4/qcpmic.4
+./usr/share/man/man4/qcpmicgpio.4
+./usr/share/man/man4/qcpon.4
+./usr/share/man/man4/qcpwm.4
+./usr/share/man/man4/qcrtc.4
+./usr/share/man/man4/qcspmi.4
 ./usr/share/man/man4/qla.4
 ./usr/share/man/man4/qle.4
 ./usr/share/man/man4/qlw.4
@@ -2012,6 +2015,7 @@
 ./usr/share/man/man4/thmc.4
 ./usr/share/man/man4/tht.4
 ./usr/share/man/man4/ti.4
+./usr/share/man/man4/tipd.4
 ./usr/share/man/man4/tipmic.4
 ./usr/share/man/man4/titmp.4
 ./usr/share/man/man4/tl.4

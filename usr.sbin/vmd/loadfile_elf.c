@@ -1,5 +1,5 @@
 /* $NetBSD: loadfile.c,v 1.10 2000/12/03 02:53:04 tsutsui Exp $ */
-/* $OpenBSD: loadfile_elf.c,v 1.42 2022/01/28 06:33:27 guenther Exp $ */
+/* $OpenBSD: loadfile_elf.c,v 1.45 2022/12/28 21:30:19 jmc Exp $ */
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -186,7 +186,7 @@ push_gdt(void)
 	/*
 	 * Create three segment descriptors:
 	 *
-	 * GDT[0] : null desriptor. "Created" via memset above.
+	 * GDT[0] : null descriptor. "Created" via memset above.
 	 * GDT[1] (selector @ 0x8): Executable segment, for CS
 	 * GDT[2] (selector @ 0x10): RW Data segment, for DS/ES/SS
 	 */
@@ -334,38 +334,23 @@ loadfile_elf(gzFile fp, struct vm_create_params *vcp,
 static size_t
 create_bios_memmap(struct vm_create_params *vcp, bios_memmap_t *memmap)
 {
-	size_t i, n = 0, sz;
-	paddr_t gpa;
+	size_t i, n = 0;
 	struct vm_mem_range *vmr;
 
-	for (i = 0; i < vcp->vcp_nmemranges; i++) {
+	for (i = 0; i < vcp->vcp_nmemranges; i++, n++) {
 		vmr = &vcp->vcp_memranges[i];
-		gpa = vmr->vmr_gpa;
-		sz = vmr->vmr_size;
-
-		/*
-		 * Make sure that we do not mark the ROM/video RAM area in the
-		 * low memory as physcal memory available to the kernel.
-		 */
-		if (gpa < 0x100000 && gpa + sz > LOWMEM_KB * 1024) {
-			if (gpa >= LOWMEM_KB * 1024)
-				sz = 0;
-			else
-				sz = LOWMEM_KB * 1024 - gpa;
-		}
-
-		if (sz != 0) {
-			memmap[n].addr = gpa;
-			memmap[n].size = sz;
-			memmap[n].type = 0x1;	/* Type 1 : Normal memory */
-			n++;
-		}
+		memmap[n].addr = vmr->vmr_gpa;
+		memmap[n].size = vmr->vmr_size;
+		if (vmr->vmr_type == VM_MEM_RAM)
+			memmap[n].type = BIOS_MAP_FREE;
+		else
+			memmap[n].type = BIOS_MAP_RES;
 	}
 
 	/* Null mem map entry to denote the end of the ranges */
 	memmap[n].addr = 0x0;
 	memmap[n].size = 0x0;
-	memmap[n].type = 0x0;
+	memmap[n].type = BIOS_MAP_END;
 	n++;
 
 	return (n);
@@ -382,9 +367,10 @@ create_bios_memmap(struct vm_create_params *vcp, bios_memmap_t *memmap)
  * Parameters:
  *  memmap: the BIOS memory map
  *  n: number of entries in memmap
+ *  bootmac: optional PXE boot MAC address
  *
  * Return values:
- *  The size of the bootargs
+ *  The size of the bootargs in bytes
  */
 static uint32_t
 push_bootargs(bios_memmap_t *memmap, size_t n, bios_bootmac_t *bootmac)
@@ -393,40 +379,41 @@ push_bootargs(bios_memmap_t *memmap, size_t n, bios_bootmac_t *bootmac)
 	bios_consdev_t consdev;
 	uint32_t ba[1024];
 
-	memmap_sz = 3 * sizeof(int) + n * sizeof(bios_memmap_t);
-	ba[0] = 0x0;    /* memory map */
+	memmap_sz = 3 * sizeof(uint32_t) + n * sizeof(bios_memmap_t);
+	ba[0] = BOOTARG_MEMMAP;
 	ba[1] = memmap_sz;
-	ba[2] = memmap_sz;	/* next */
+	ba[2] = memmap_sz;
 	memcpy(&ba[3], memmap, n * sizeof(bios_memmap_t));
-	i = memmap_sz / sizeof(int);
+	i = memmap_sz / sizeof(uint32_t);
 
 	/* Serial console device, COM1 @ 0x3f8 */
-	consdev.consdev = makedev(8, 0);	/* com1 @ 0x3f8 */
+	memset(&consdev, 0, sizeof(consdev));
+	consdev.consdev = makedev(8, 0);
 	consdev.conspeed = 115200;
 	consdev.consaddr = 0x3f8;
-	consdev.consfreq = 0;
 
-	consdev_sz = 3 * sizeof(int) + sizeof(bios_consdev_t);
-	ba[i] = 0x5;   /* consdev */
+	consdev_sz = 3 * sizeof(uint32_t) + sizeof(bios_consdev_t);
+	ba[i] = BOOTARG_CONSDEV;
 	ba[i + 1] = consdev_sz;
 	ba[i + 2] = consdev_sz;
 	memcpy(&ba[i + 3], &consdev, sizeof(bios_consdev_t));
-	i += consdev_sz / sizeof(int);
+	i += consdev_sz / sizeof(uint32_t);
 
 	if (bootmac) {
-		bootmac_sz = 3 * sizeof(int) + (sizeof(bios_bootmac_t) + 3) & ~3;
-		ba[i] = 0x7;   /* bootmac */
+		bootmac_sz = 3 * sizeof(uint32_t) +
+		    (sizeof(bios_bootmac_t) + 3) & ~3;
+		ba[i] = BOOTARG_BOOTMAC;
 		ba[i + 1] = bootmac_sz;
 		ba[i + 2] = bootmac_sz;
 		memcpy(&ba[i + 3], bootmac, sizeof(bios_bootmac_t));
-		i += bootmac_sz / sizeof(int);
-	} 
+		i += bootmac_sz / sizeof(uint32_t);
+	}
 
 	ba[i++] = 0xFFFFFFFF; /* BOOTARG_END */
 
 	write_mem(BOOTARGS_PAGE, ba, PAGE_SIZE);
 
-	return (i * sizeof(int));
+	return (i * sizeof(uint32_t));
 }
 
 /*

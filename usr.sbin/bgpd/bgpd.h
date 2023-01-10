@@ -1,4 +1,4 @@
-/*	$OpenBSD: bgpd.h,v 1.454 2022/09/23 15:50:41 claudio Exp $ */
+/*	$OpenBSD: bgpd.h,v 1.456 2023/01/04 14:33:30 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -263,6 +263,7 @@ struct roa {
 };
 
 RB_HEAD(roa_tree, roa);
+RB_HEAD(aspa_tree, aspa_set);
 
 struct set_table;
 struct as_set;
@@ -284,6 +285,7 @@ struct bgpd_config {
 	struct prefixset_head			 prefixsets;
 	struct prefixset_head			 originsets;
 	struct roa_tree				 roa;
+	struct aspa_tree			 aspa;
 	struct rde_prefixset_head		 rde_prefixsets;
 	struct rde_prefixset_head		 rde_originsets;
 	struct as_set_head			 as_sets;
@@ -329,6 +331,15 @@ enum enforce_as {
 	ENFORCE_AS_UNDEF,
 	ENFORCE_AS_OFF,
 	ENFORCE_AS_ON
+};
+
+enum role {
+	ROLE_NONE,
+	ROLE_CUSTOMER,
+	ROLE_PROVIDER,
+	ROLE_RS,
+	ROLE_RS_CLIENT,
+	ROLE_PEER,
 };
 
 enum auth_method {
@@ -378,12 +389,12 @@ struct capabilities {
 		int8_t	flags[AID_MAX];	/* graceful restart per AID flags */
 		int8_t	restart;	/* graceful restart, RFC 4724 */
 	}	grestart;
+	enum role role;			/* Open Policy, RFC 9234 */
 	int8_t	mp[AID_MAX];		/* multiprotocol extensions, RFC 4760 */
+	int8_t	add_path[AID_MAX];	/* ADD_PATH, RFC 7911 */
 	int8_t	refresh;		/* route refresh, RFC 2918 */
 	int8_t	as4byte;		/* 4-byte ASnum, RFC 4893 */
 	int8_t	enhanced_rr;		/* enhanced route refresh, RFC 7313 */
-	int8_t	add_path[AID_MAX];	/* ADD_PATH, RFC 7911 */
-	uint8_t	role;			/* Open Policy, RFC 9234 */
 	int8_t	role_ena;		/* 1 for enable, 2 for enforce */
 };
 
@@ -430,6 +441,7 @@ struct peer_config {
 	enum export_type	 export_type;
 	enum enforce_as		 enforce_as;
 	enum enforce_as		 enforce_local_as;
+	enum role		 role;
 	uint16_t		 max_prefix_restart;
 	uint16_t		 max_out_prefix_restart;
 	uint16_t		 holdtime;
@@ -582,6 +594,10 @@ enum imsg_type {
 	IMSG_RECONF_ORIGIN_SET,
 	IMSG_RECONF_ROA_SET,
 	IMSG_RECONF_ROA_ITEM,
+	IMSG_RECONF_ASPA,
+	IMSG_RECONF_ASPA_TAS,
+	IMSG_RECONF_ASPA_TAS_AID,
+	IMSG_RECONF_ASPA_DONE,
 	IMSG_RECONF_RTR_CONFIG,
 	IMSG_RECONF_DRAIN,
 	IMSG_RECONF_DONE,
@@ -1149,6 +1165,15 @@ struct as_set {
 	int				 dirty;
 };
 
+struct aspa_set {
+	time_t				 expires;
+	uint32_t			 as;
+	uint32_t			 num;
+	uint32_t			 *tas;
+	uint8_t				 *tas_aid;
+	RB_ENTRY(aspa_set)		 entry;
+};
+
 struct l3vpn {
 	SIMPLEQ_ENTRY(l3vpn)		entry;
 	char				descr[PEER_DESCR_LEN];
@@ -1270,14 +1295,16 @@ void		free_prefixsets(struct prefixset_head *);
 void		free_rde_prefixsets(struct rde_prefixset_head *);
 void		free_prefixtree(struct prefixset_tree *);
 void		free_roatree(struct roa_tree *);
+void		free_aspa(struct aspa_set *);
+void		free_aspatree(struct aspa_tree *);
 void		free_rtrs(struct rtr_config_head *);
 void		filterlist_free(struct filter_head *);
 int		host(const char *, struct bgpd_addr *, uint8_t *);
 uint32_t	get_bgpid(void);
 void		expand_networks(struct bgpd_config *, struct network_head *);
 RB_PROTOTYPE(prefixset_tree, prefixset_item, entry, prefixset_cmp);
-int		roa_cmp(struct roa *, struct roa *);
 RB_PROTOTYPE(roa_tree, roa, entry, roa_cmp);
+RB_PROTOTYPE(aspa_tree, aspa_set, entry, aspa_cmp);
 
 /* kroute.c */
 int		 kr_init(int *, uint8_t);
@@ -1400,7 +1427,7 @@ const char	*log_rd(uint64_t);
 const char	*log_ext_subtype(int, uint8_t);
 const char	*log_reason(const char *);
 const char	*log_rtr_error(enum rtr_error);
-const char	*log_policy(uint8_t);
+const char	*log_policy(enum role);
 int		 aspath_snprint(char *, size_t, void *, uint16_t);
 int		 aspath_asprint(char **, void *, uint16_t);
 size_t		 aspath_strlen(void *, uint16_t);

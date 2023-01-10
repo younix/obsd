@@ -1,4 +1,4 @@
-/*	$OpenBSD: vm.c,v 1.76 2022/11/11 10:52:44 dv Exp $	*/
+/*	$OpenBSD: vm.c,v 1.81 2023/01/08 19:57:17 dv Exp $	*/
 
 /*
  * Copyright (c) 2015 Mike Larkin <mlarkin@openbsd.org>
@@ -16,7 +16,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sys/param.h>	/* PAGE_SIZE */
+#include <sys/param.h>	/* PAGE_SIZE, MAXCOMLEN */
 #include <sys/types.h>
 #include <sys/ioctl.h>
 #include <sys/queue.h>
@@ -46,6 +46,7 @@
 #include <limits.h>
 #include <poll.h>
 #include <pthread.h>
+#include <pthread_np.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -274,7 +275,7 @@ loadfile_bios(gzFile fp, off_t size, struct vcpu_reg_state *vrs)
  *
  * 1. validates and create the new VM
  * 2. opens the imsg control channel to the parent and drops more privilege
- * 3. drops additional privleges by calling pledge(2)
+ * 3. drops additional privileges by calling pledge(2)
  * 4. loads the kernel from the disk image or file descriptor
  * 5. runs the VM's VCPU loops.
  *
@@ -563,7 +564,7 @@ send_vm(int fd, struct vm_create_params *vcp)
 
 	vmc = calloc(1, sizeof(struct vmop_create_params));
 	if (vmc == NULL) {
-		log_warn("%s: calloc error geting vmc", __func__);
+		log_warn("%s: calloc error getting vmc", __func__);
 		ret = -1;
 		goto err;
 	}
@@ -899,6 +900,7 @@ create_memory_map(struct vm_create_params *vcp)
 	len = LOWMEM_KB * 1024;
 	vcp->vcp_memranges[0].vmr_gpa = 0x0;
 	vcp->vcp_memranges[0].vmr_size = len;
+	vcp->vcp_memranges[0].vmr_type = VM_MEM_RAM;
 	mem_bytes -= len;
 
 	/*
@@ -913,12 +915,14 @@ create_memory_map(struct vm_create_params *vcp)
 	len = MB(1) - (LOWMEM_KB * 1024);
 	vcp->vcp_memranges[1].vmr_gpa = LOWMEM_KB * 1024;
 	vcp->vcp_memranges[1].vmr_size = len;
+	vcp->vcp_memranges[1].vmr_type = VM_MEM_RESERVED;
 	mem_bytes -= len;
 
 	/* If we have less than 2MB remaining, still create a 2nd BIOS area. */
 	if (mem_bytes <= MB(2)) {
 		vcp->vcp_memranges[2].vmr_gpa = VMM_PCI_MMIO_BAR_END;
 		vcp->vcp_memranges[2].vmr_size = MB(2);
+		vcp->vcp_memranges[2].vmr_type = VM_MEM_RESERVED;
 		vcp->vcp_nmemranges = 3;
 		return;
 	}
@@ -939,18 +943,27 @@ create_memory_map(struct vm_create_params *vcp)
 	/* Third memory region: area above 1MB to MMIO region */
 	vcp->vcp_memranges[2].vmr_gpa = MB(1);
 	vcp->vcp_memranges[2].vmr_size = above_1m;
+	vcp->vcp_memranges[2].vmr_type = VM_MEM_RAM;
 
-	/* Fourth region: 2nd copy of BIOS above MMIO ending at 4GB */
-	vcp->vcp_memranges[3].vmr_gpa = VMM_PCI_MMIO_BAR_END + 1;
-	vcp->vcp_memranges[3].vmr_size = MB(2);
+	/* Fourth region: PCI MMIO range */
+	vcp->vcp_memranges[3].vmr_gpa = VMM_PCI_MMIO_BAR_BASE;
+	vcp->vcp_memranges[3].vmr_size = VMM_PCI_MMIO_BAR_END -
+	    VMM_PCI_MMIO_BAR_BASE + 1;
+	vcp->vcp_memranges[3].vmr_type = VM_MEM_MMIO;
 
-	/* Fifth region: any remainder above 4GB */
+	/* Fifth region: 2nd copy of BIOS above MMIO ending at 4GB */
+	vcp->vcp_memranges[4].vmr_gpa = VMM_PCI_MMIO_BAR_END + 1;
+	vcp->vcp_memranges[4].vmr_size = MB(2);
+	vcp->vcp_memranges[4].vmr_type = VM_MEM_RESERVED;
+
+	/* Sixth region: any remainder above 4GB */
 	if (above_4g > 0) {
-		vcp->vcp_memranges[4].vmr_gpa = GB(4);
-		vcp->vcp_memranges[4].vmr_size = above_4g;
-		vcp->vcp_nmemranges = 5;
+		vcp->vcp_memranges[5].vmr_gpa = GB(4);
+		vcp->vcp_memranges[5].vmr_size = above_4g;
+		vcp->vcp_memranges[5].vmr_type = VM_MEM_RAM;
+		vcp->vcp_nmemranges = 6;
 	} else
-		vcp->vcp_nmemranges = 4;
+		vcp->vcp_nmemranges = 5;
 }
 
 /*
@@ -1199,6 +1212,7 @@ run_vm(int child_cdrom, int child_disks[][VM_MAX_BASE_PER_DISK],
 	size_t i;
 	int ret;
 	pthread_t *tid, evtid;
+	char tname[MAXCOMLEN + 1];
 	struct vm_run_params **vrp;
 	void *exit_status;
 
@@ -1341,6 +1355,9 @@ run_vm(int child_cdrom, int child_disks[][VM_MAX_BASE_PER_DISK],
 			    __func__, i);
 			return (ret);
 		}
+
+		snprintf(tname, sizeof(tname), "vcpu-%zu", i);
+		pthread_set_name_np(tid[i], tname);
 	}
 
 	log_debug("%s: waiting on events for VM %s", __func__, vcp->vcp_name);
@@ -1350,6 +1367,7 @@ run_vm(int child_cdrom, int child_disks[][VM_MAX_BASE_PER_DISK],
 		log_warn("%s: could not create event thread", __func__);
 		return (ret);
 	}
+	pthread_set_name_np(evtid, "event");
 
 	for (;;) {
 		ret = pthread_cond_wait(&threadcond, &threadmutex);
@@ -1585,7 +1603,7 @@ vcpu_pic_intr(uint32_t vm_id, uint32_t vcpu_id, uint8_t intr)
  * Handle all I/O to the emulated PCI subsystem.
  *
  * Parameters:
- *  vrp: vcpu run paramters containing guest state for this exit
+ *  vrp: vcpu run parameters containing guest state for this exit
  *
  * Return value:
  *  Interrupt to inject to the guest VM, or 0xFF if no interrupt should
@@ -1651,7 +1669,8 @@ vcpu_exit_inout(struct vm_run_params *vrp)
 		    vei->vrs.vrs_gprs[VCPU_REGS_RDX],
 		    vei->vrs.vrs_gprs[VCPU_REGS_RSI]);
 #endif /* MMIO_DEBUG */
-		fatalx("%s: can't emulate rep refix'd IN(s)/OUT(s)", __func__);
+		fatalx("%s: can't emulate REP prefixed IN(S)/OUT(S)",
+		    __func__);
 	}
 
 	if (ioports_map[vei->vei.vei_port] != NULL)
@@ -1988,6 +2007,47 @@ read_mem(paddr_t src, void *buf, size_t len)
 	}
 
 	return (0);
+}
+
+/*
+ * hvaddr_mem
+ *
+ * Translate a guest physical address to a host virtual address, checking the
+ * provided memory range length to confirm it's contiguous within the same
+ * guest memory range (vm_mem_range).
+ *
+ * Parameters:
+ *  gpa: guest physical address to translate
+ *  len: number of bytes in the intended range
+ *
+ * Return values:
+ *  void* to host virtual memory on success
+ *  NULL on error, setting errno to:
+ *    EFAULT: gpa falls outside guest memory ranges
+ *    EINVAL: requested len extends beyond memory range
+ */
+void *
+hvaddr_mem(paddr_t gpa, size_t len)
+{
+	struct vm_mem_range *vmr;
+	size_t off;
+
+	vmr = find_gpa_range(&current_vm->vm_params.vmc_params, gpa, len);
+	if (vmr == NULL) {
+		log_warnx("%s: failed - invalid gpa: 0x%lx\n", __func__, gpa);
+		errno = EFAULT;
+		return (NULL);
+	}
+
+	off = gpa - vmr->vmr_gpa;
+	if (len > (vmr->vmr_size - off)) {
+		log_warnx("%s: failed - invalid memory range: gpa=0x%lx, "
+		    "len=%zu", __func__, gpa, len);
+		errno = EINVAL;
+		return (NULL);
+	}
+
+	return ((char *)vmr->vmr_va + off);
 }
 
 /*

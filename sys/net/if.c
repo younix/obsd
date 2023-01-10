@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.677 2022/11/10 17:17:47 dlg Exp $	*/
+/*	$OpenBSD: if.c,v 1.683 2022/11/23 16:57:37 kn Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -133,7 +133,6 @@
 #include <sys/device.h>
 
 void	if_attachsetup(struct ifnet *);
-void	if_attachdomain(struct ifnet *);
 void	if_attach_common(struct ifnet *);
 void	if_remove(struct ifnet *);
 int	if_createrdomain(int, struct ifnet *);
@@ -222,7 +221,8 @@ void	if_idxmap_alloc(struct ifnet *);
 void	if_idxmap_insert(struct ifnet *);
 void	if_idxmap_remove(struct ifnet *);
 
-TAILQ_HEAD(, ifg_group) ifg_head = TAILQ_HEAD_INITIALIZER(ifg_head);
+TAILQ_HEAD(, ifg_group) ifg_head =
+    TAILQ_HEAD_INITIALIZER(ifg_head);	/* [N] list of interface groups */
 
 LIST_HEAD(, if_clone) if_cloners =
     LIST_HEAD_INITIALIZER(if_cloners);	/* [I] list of clonable interfaces */
@@ -459,7 +459,10 @@ if_attachsetup(struct ifnet *ifp)
 
 	if_addgroup(ifp, IFG_ALL);
 
-	if_attachdomain(ifp);
+#ifdef INET6
+	nd6_ifattach(ifp);
+#endif
+
 #if NPF > 0
 	pfi_attach_ifnet(ifp);
 #endif
@@ -530,25 +533,6 @@ if_free_sadl(struct ifnet *ifp)
 
 	free(ifp->if_sadl, M_IFADDR, ifp->if_sadl->sdl_len);
 	ifp->if_sadl = NULL;
-}
-
-void
-if_attachdomain(struct ifnet *ifp)
-{
-	const struct domain *dp;
-	int i, s;
-
-	s = splnet();
-
-	/* address family dependent data region */
-	bzero(ifp->if_afdata, sizeof(ifp->if_afdata));
-	for (i = 0; (dp = domains[i]) != NULL; i++) {
-		if (dp->dom_ifattach)
-			ifp->if_afdata[dp->dom_family] =
-			    (*dp->dom_ifattach)(ifp);
-	}
-
-	splx(s);
 }
 
 void
@@ -1053,7 +1037,6 @@ if_detach(struct ifnet *ifp)
 {
 	struct ifaddr *ifa;
 	struct ifg_list *ifg;
-	const struct domain *dp;
 	int i, s;
 
 	/* Undo pseudo-driver changes. */
@@ -1121,11 +1104,9 @@ if_detach(struct ifnet *ifp)
 	KASSERT(TAILQ_EMPTY(&ifp->if_linkstatehooks));
 	KASSERT(TAILQ_EMPTY(&ifp->if_detachhooks));
 
-	for (i = 0; (dp = domains[i]) != NULL; i++) {
-		if (dp->dom_ifdetach && ifp->if_afdata[dp->dom_family])
-			(*dp->dom_ifdetach)(ifp,
-			    ifp->if_afdata[dp->dom_family]);
-	}
+#ifdef INET6
+	nd6_ifdetach(ifp);
+#endif
 
 	/* Announce that the interface is gone. */
 	rtm_ifannounce(ifp, IFAN_DEPARTURE);
@@ -2418,35 +2399,27 @@ ifioctl_get(u_long cmd, caddr_t data)
 
 	switch(cmd) {
 	case SIOCGIFCONF:
-		KERNEL_LOCK();
 		NET_LOCK_SHARED();
 		error = ifconf(data);
 		NET_UNLOCK_SHARED();
-		KERNEL_UNLOCK();
 		return (error);
 	case SIOCIFGCLONERS:
 		error = if_clone_list((struct if_clonereq *)data);
 		return (error);
 	case SIOCGIFGMEMB:
-		KERNEL_LOCK();
 		NET_LOCK_SHARED();
 		error = if_getgroupmembers(data);
 		NET_UNLOCK_SHARED();
-		KERNEL_UNLOCK();
 		return (error);
 	case SIOCGIFGATTR:
-		KERNEL_LOCK();
 		NET_LOCK_SHARED();
 		error = if_getgroupattribs(data);
 		NET_UNLOCK_SHARED();
-		KERNEL_UNLOCK();
 		return (error);
 	case SIOCGIFGLIST:
-		KERNEL_LOCK();
 		NET_LOCK_SHARED();
 		error = if_getgrouplist(data);
 		NET_UNLOCK_SHARED();
-		KERNEL_UNLOCK();
 		return (error);
 	}
 

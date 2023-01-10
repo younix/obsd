@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfvar_priv.h,v 1.21 2022/11/11 17:12:30 dlg Exp $	*/
+/*	$OpenBSD: pfvar_priv.h,v 1.30 2023/01/06 17:44:34 sashan Exp $	*/
 
 /*
  * Copyright (c) 2001 Daniel Hartmeier
@@ -39,10 +39,42 @@
 
 #include <sys/rwlock.h>
 #include <sys/mutex.h>
+#include <sys/percpu.h>
+
+struct pf_state_item {
+	TAILQ_ENTRY(pf_state_item)
+				 si_entry;
+	struct pf_state		*si_st;
+};
+
+TAILQ_HEAD(pf_statelisthead, pf_state_item);
+
+struct pf_state_key {
+	struct pf_addr	 addr[2];
+	u_int16_t	 port[2];
+	u_int16_t	 rdomain;
+	u_int16_t	 hash;
+	sa_family_t	 af;
+	u_int8_t	 proto;
+
+	RB_ENTRY(pf_state_key)	 sk_entry;
+	struct pf_statelisthead	 sk_states;
+	struct pf_state_key	*sk_reverse;
+	struct inpcb		*sk_inp;
+	pf_refcnt_t		 sk_refcnt;
+	u_int8_t		 sk_removed;
+};
+
+RBT_HEAD(pf_state_tree, pf_state_key);
+RBT_PROTOTYPE(pf_state_tree, pf_state_key, sk_entry, pf_state_compare_key);
+
+#define PF_REVERSED_KEY(key, family)				\
+	((key[PF_SK_WIRE]->af != key[PF_SK_STACK]->af) &&	\
+	 (key[PF_SK_WIRE]->af != (family)))
 
 /*
  * Protection/ownership of pf_state members:
- *	I	immutable after creation
+ *	I	immutable after pf_state_insert()
  *	M	pf_state mtx
  *	P	PF_STATE_LOCK
  *	S	pfsync mutex
@@ -69,7 +101,7 @@ struct pf_state {
 	union pf_rule_ptr	 natrule;	/* [I] */
 	struct pf_addr		 rt_addr;	/* [I] */
 	struct pf_sn_head	 src_nodes;	/* [I] */
-	struct pf_state_key	*key[2];	/* stack and wire  */
+	struct pf_state_key	*key[2];	/* [I] stack and wire  */
 	struct pfi_kif		*kif;		/* [I] */
 	struct mutex		 mtx;
 	pf_refcnt_t		 refcnt;
@@ -97,6 +129,10 @@ struct pf_state {
 	u_int8_t		 rt;		/* [I] */
 	u_int8_t		 snapped;	/* [S] */
 };
+
+RBT_HEAD(pf_state_tree_id, pf_state);
+RBT_PROTOTYPE(pf_state_tree_id, pf_state, entry_id, pf_state_compare_id);
+extern struct pf_state_tree_id tree_id;
 
 /*
  *
@@ -228,6 +264,7 @@ struct pf_pdesc {
 	u_int16_t	*dport;
 	u_int16_t	 osport;
 	u_int16_t	 odport;
+	u_int16_t	 hash;
 	u_int16_t	 nsport;	/* src port after NAT */
 	u_int16_t	 ndport;	/* dst port after NAT */
 
@@ -267,7 +304,24 @@ struct pf_pdesc {
 	} hdr;
 };
 
-extern struct timeout	pf_purge_states_to;
+struct pf_anchor_stackframe {
+	struct pf_ruleset	*sf_rs;
+	union {
+		struct pf_rule			*u_r;
+		struct pf_anchor_stackframe	*u_stack_top;
+	} u;
+	struct pf_anchor	*sf_child;
+	int			 sf_jump_target;
+};
+#define sf_r		u.u_r
+#define sf_stack_top	u.u_stack_top
+enum {
+	PF_NEXT_RULE,
+	PF_NEXT_CHILD
+};
+
+extern struct cpumem *pf_anchor_stack;
+
 extern struct task	pf_purge_task;
 extern struct timeout	pf_purge_to;
 
@@ -278,7 +332,6 @@ extern struct rwlock	pf_lock;
 extern struct rwlock	pf_state_lock;
 
 #define PF_LOCK()		do {			\
-		NET_ASSERT_LOCKED();			\
 		rw_enter_write(&pf_lock);		\
 	} while (0)
 
@@ -320,6 +373,9 @@ extern struct rwlock	pf_state_lock;
 			splassert_fail(RW_WRITE,	\
 			    rw_status(&pf_state_lock), __func__);\
 	} while (0)
+
+extern void			 pf_purge_timeout(void *);
+extern void			 pf_purge(void *);
 
 /* for copies to/from network byte order */
 void			pf_state_peer_hton(const struct pf_state_peer *,

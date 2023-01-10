@@ -1,4 +1,4 @@
-/*	$OpenBSD: tput.c,v 1.24 2019/01/25 00:19:27 millert Exp $	*/
+/*	$OpenBSD: tput.c,v 1.26 2022/12/22 19:53:24 kn Exp $	*/
 
 /*
  * Copyright (c) 1999 Todd C. Miller <millert@openbsd.org>
@@ -90,7 +90,6 @@ main(int argc, char *argv[])
 		case 'S':
 			Sflag = 1;
 			break;
-		case '?':
 		default:
 			usage();
 		}
@@ -391,7 +390,7 @@ usage(void)
 		(void)fprintf(stderr, "usage: %s [-T term]\n", __progname);
 	else
 		(void)fprintf(stderr,
-		    "usage: %s [-T term] attribute [attribute-args] ...\n"
+		    "usage: %s [-T term] attribute [attribute-arg ...] ...\n"
 		    "       %s [-T term] -S\n", __progname, __progname);
 	exit(1);
 }

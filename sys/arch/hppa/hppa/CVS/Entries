@@ -18,8 +18,8 @@
 /conf.c/1.75/Sat Nov  5 22:12:14 2022//
 /disksubr.c/1.91/Sat Nov  5 22:12:14 2022//
 /locore.S/1.204/Sat Nov  5 22:12:14 2022//
-/machdep.c/1.267/Sat Nov  5 22:12:14 2022//
-/pmap.c/1.179/Sat Nov  5 22:12:14 2022//
 /trap.c/1.159/Sat Nov  5 22:12:14 2022//
 /vm_machdep.c/1.85/Sat Nov  5 22:12:14 2022//
+/machdep.c/1.268/Tue Jan 10 10:05:50 2023//
+/pmap.c/1.180/Tue Jan 10 10:05:50 2023//
 D

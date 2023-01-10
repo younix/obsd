@@ -33,6 +33,7 @@
 ./usr/include/cbor/arrays.h
 ./usr/include/cbor/bytestrings.h
 ./usr/include/cbor/callbacks.h
+./usr/include/cbor/cbor_export.h
 ./usr/include/cbor/common.h
 ./usr/include/cbor/configuration.h
 ./usr/include/cbor/data.h
@@ -1216,8 +1217,6 @@
 ./usr/include/rpcsvc/nfs_prot.x
 ./usr/include/rpcsvc/nlm_prot.h
 ./usr/include/rpcsvc/nlm_prot.x
-./usr/include/rpcsvc/rex.h
-./usr/include/rpcsvc/rex.x
 ./usr/include/rpcsvc/rnusers.h
 ./usr/include/rpcsvc/rnusers.x
 ./usr/include/rpcsvc/rquota.h
@@ -1647,6 +1646,7 @@
 ./usr/share/man/man2/getsockname.2
 ./usr/share/man/man2/getsockopt.2
 ./usr/share/man/man2/getthrid.2
+./usr/share/man/man2/getthrname.2
 ./usr/share/man/man2/gettimeofday.2
 ./usr/share/man/man2/getuid.2
 ./usr/share/man/man2/i386/i386_get_fsbase.2
@@ -1741,6 +1741,7 @@
 ./usr/share/man/man2/utrace.2
 ./usr/share/man/man2/vfork.2
 ./usr/share/man/man2/wait.2
+./usr/share/man/man2/waitid.2
 ./usr/share/man/man2/write.2
 ./usr/share/man/man2/ypconnect.2
 ./usr/share/man/man3/ACCESS_DESCRIPTION_new.3
@@ -1759,6 +1760,7 @@
 ./usr/share/man/man3/ASN1_TYPE_get.3
 ./usr/share/man/man3/ASN1_UNIVERSALSTRING_to_string.3
 ./usr/share/man/man3/ASN1_bn_print.3
+./usr/share/man/man3/ASN1_buf_print.3
 ./usr/share/man/man3/ASN1_generate_nconf.3
 ./usr/share/man/man3/ASN1_get_object.3
 ./usr/share/man/man3/ASN1_item_d2i.3
@@ -1774,8 +1776,10 @@
 ./usr/share/man/man3/AUTHORITY_KEYID_new.3
 ./usr/share/man/man3/BASIC_CONSTRAINTS_new.3
 ./usr/share/man/man3/BF_set_key.3
+./usr/share/man/man3/BIO_accept.3
 ./usr/share/man/man3/BIO_ctrl.3
 ./usr/share/man/man3/BIO_dump.3
+./usr/share/man/man3/BIO_dup_chain.3
 ./usr/share/man/man3/BIO_f_asn1.3
 ./usr/share/man/man3/BIO_f_base64.3
 ./usr/share/man/man3/BIO_f_buffer.3
@@ -1796,6 +1800,7 @@
 ./usr/share/man/man3/BIO_s_accept.3
 ./usr/share/man/man3/BIO_s_bio.3
 ./usr/share/man/man3/BIO_s_connect.3
+./usr/share/man/man3/BIO_s_datagram.3
 ./usr/share/man/man3/BIO_s_fd.3
 ./usr/share/man/man3/BIO_s_file.3
 ./usr/share/man/man3/BIO_s_mem.3
@@ -1806,6 +1811,7 @@
 ./usr/share/man/man3/BN_BLINDING_new.3
 ./usr/share/man/man3/BN_CTX_new.3
 ./usr/share/man/man3/BN_CTX_start.3
+./usr/share/man/man3/BN_GF2m_add.3
 ./usr/share/man/man3/BN_add.3
 ./usr/share/man/man3/BN_add_word.3
 ./usr/share/man/man3/BN_bn2bin.3
@@ -1813,10 +1819,13 @@
 ./usr/share/man/man3/BN_copy.3
 ./usr/share/man/man3/BN_generate_prime.3
 ./usr/share/man/man3/BN_get0_nist_prime_521.3
+./usr/share/man/man3/BN_kronecker.3
 ./usr/share/man/man3/BN_mod_inverse.3
 ./usr/share/man/man3/BN_mod_mul_montgomery.3
 ./usr/share/man/man3/BN_mod_mul_reciprocal.3
+./usr/share/man/man3/BN_mod_sqrt.3
 ./usr/share/man/man3/BN_new.3
+./usr/share/man/man3/BN_nist_mod_521.3
 ./usr/share/man/man3/BN_num_bytes.3
 ./usr/share/man/man3/BN_rand.3
 ./usr/share/man/man3/BN_set_bit.3

@@ -20,7 +20,6 @@
 /tui-regs.h/1.1.1.1/Fri May 21 19:15:20 2004//
 /tui-source.c/1.1.1.1/Fri May 21 19:15:20 2004//
 /tui-source.h/1.1.1.1/Fri May 21 19:15:20 2004//
-/tui-stack.c/1.1.1.1/Fri May 21 19:15:20 2004//
 /tui-stack.h/1.1.1.1/Fri May 21 19:15:20 2004//
 /tui-win.c/1.1.1.2/Mon Dec 27 13:14:20 2004//
 /tui-win.h/1.1.1.1/Fri May 21 19:15:21 2004//
@@ -32,4 +31,5 @@
 /tui-winsource.h/1.1.1.1/Fri May 21 19:15:22 2004//
 /tui.c/1.1.1.2/Mon Dec 27 13:14:18 2004//
 /tui.h/1.1.1.1/Fri May 21 19:15:23 2004//
+/tui-stack.c/1.2/Tue Jan 10 10:05:14 2023//
 D

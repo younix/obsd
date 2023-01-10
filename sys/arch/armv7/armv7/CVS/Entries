@@ -4,8 +4,8 @@
 /armv7_machdep.h/1.14/Wed Sep  1 16:07:38 2021//
 /armv7var.h/1.18/Wed Sep  1 16:07:38 2021//
 /platform.c/1.27/Wed Sep  1 16:07:38 2021//
-/locore0.S/1.7/Mon Jan 24 14:35:14 2022//
 /intr.c/1.21/Mon Aug  1 07:15:50 2022//
-/autoconf.c/1.12/Tue Sep 20 07:19:37 2022//
 /armv7_machdep.c/1.65/Wed Oct  5 18:34:58 2022//
+/autoconf.c/1.13/Tue Jan 10 10:05:50 2023//
+/locore0.S/1.8/Tue Jan 10 10:05:50 2023//
 D

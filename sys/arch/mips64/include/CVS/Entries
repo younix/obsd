@@ -1,5 +1,4 @@
 /_float.h/1.1/Tue Jun 26 16:12:44 2012//
-/_types.h/1.23/Mon Mar  5 01:15:25 2018//
 /archtype.h/1.16/Wed Oct  3 21:44:51 2012//
 /atomic.h/1.12/Mon Oct 28 09:41:37 2019//
 /autoconf.h/1.2/Thu Jun  8 12:02:52 2017//
@@ -11,7 +10,6 @@
 /fpu.h/1.2/Tue Dec  4 05:00:40 2012//
 /ieee.h/1.4/Sat Jan 23 19:11:21 2010//
 /ieeefp.h/1.4/Wed Mar 23 16:54:36 2011//
-/kcore.h/1.2/Wed Mar 23 16:54:36 2011//
 /limits.h/1.8/Thu Apr 30 13:42:08 2015//
 /loongson2.h/1.4/Wed Jan 16 20:28:06 2013//
 /loongson3.h/1.3/Wed May 10 16:04:21 2017//
@@ -35,13 +33,15 @@
 /timetc.h/1.3/Fri Dec 11 17:58:22 2020//
 /asm.h/1.27/Wed Sep  1 16:07:38 2021//
 /frame.h/1.8/Wed Sep  1 16:07:38 2021//
-/mips_cpu.h/1.10/Wed Sep  1 16:07:38 2021//
 /pte.h/1.23/Wed Sep  1 16:07:38 2021//
 /db_machdep.h/1.21/Thu Sep  2 14:22:31 2021//
 /pcb.h/1.10/Wed Oct 20 17:29:10 2021//
 /reg.h/1.5/Wed Oct 20 17:29:10 2021//
 /trap.h/1.17/Mon Jun 27 13:02:00 2022//
-/cpu.h/1.139/Fri Sep  2 14:00:19 2022//
-/pmap.h/1.50/Tue Sep 20 07:19:38 2022//
 /exec.h/1.10/Sat Nov  5 22:12:15 2022//
+/_types.h/1.24/Tue Jan 10 10:05:51 2023//
+/cpu.h/1.140/Tue Jan 10 10:05:51 2023//
+/kcore.h/1.3/Tue Jan 10 10:05:51 2023//
+/mips_cpu.h/1.11/Tue Jan 10 10:05:51 2023//
+/pmap.h/1.51/Tue Jan 10 10:05:51 2023//
 D

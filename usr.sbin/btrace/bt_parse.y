@@ -1,4 +1,4 @@
-/*	$OpenBSD: bt_parse.y,v 1.46 2022/04/28 21:04:24 dv Exp $	*/
+/*	$OpenBSD: bt_parse.y,v 1.49 2022/12/28 21:30:16 jmc Exp $	*/
 
 /*
  * Copyright (c) 2019-2021 Martin Pieuchot <mpi@openbsd.org>
@@ -218,6 +218,7 @@ variable: lvar			{ $$ = bl_find($1); }
 factor : '(' expr ')'		{ $$ = $2; }
 	| NUMBER		{ $$ = ba_new($1, B_AT_LONG); }
 	| BUILTIN		{ $$ = ba_new(NULL, $1); }
+	| CSTRING		{ $$ = ba_new($1, B_AT_STR); }
 	| staticv
 	| variable
 	| mentry
@@ -263,7 +264,7 @@ stmtlist: stmtlist stmtblck		{ $$ = bs_append($1, $2); }
 	| stmt
 	;
 
-block	: '{' stmt ';' '}'			{ $$ = $2; }
+block	: action
 	| stmt ';'
 	;
 
@@ -650,12 +651,12 @@ bh_inc(const char *hname, struct bt_arg *hval, struct bt_arg *hrange)
 				min = (long)ba->ba_value;
 				if (min >= 0)
 					break;
-				yyerror("negative minium");
+				yyerror("negative minimum");
 			case 2:
 				max = (long)ba->ba_value;
 				if (max > min)
 					break;
-				yyerror("maximum smaller than minium (%d < %d)",
+				yyerror("maximum smaller than minimum (%d < %d)",
 				    max,  min);
 			case 3:
 				break;
@@ -876,7 +877,7 @@ again:
 				case 't':	c = '\t';	break;
 				case 'v':	c = '\v';	break;
 				default:
-					yyerror("'%c' unsuported escape", c);
+					yyerror("'%c' unsupported escape", c);
 					return ERROR;
 				}
 			}

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uhidpp.c,v 1.27 2022/08/11 07:32:57 anton Exp $	*/
+/*	$OpenBSD: uhidpp.c,v 1.43 2023/01/08 06:54:51 anton Exp $	*/
 
 /*
  * Copyright (c) 2021 Anton Lindqvist <anton@openbsd.org>
@@ -53,8 +53,6 @@ int uhidpp_debug = 1;
 
 #endif
 
-#define HIDPP_LINK_STATUS(x)	((x) & (1 << 7))
-
 #define HIDPP_REPORT_ID_SHORT			0x10
 #define HIDPP_REPORT_ID_LONG			0x11
 
@@ -74,21 +72,21 @@ int uhidpp_debug = 1;
 
 #define HIDPP_DEVICE_ID_RECEIVER		0xff
 
-#define HIDPP_FEAT_ROOT_IDX			0x00
+#define HIDPP_FEAT_ROOT_ID			0x00
 #define HIDPP_FEAT_ROOT_PING_FUNC		0x01
-#define HIDPP_FEAT_ROOT_PING_DATA		0x5a
+#define  HIDPP_PING_DATA			0x5a
 
 #define HIDPP_SET_REGISTER			0x80
 #define HIDPP_GET_REGISTER			0x81
 #define HIDPP_SET_LONG_REGISTER			0x82
 #define HIDPP_GET_LONG_REGISTER			0x83
 
-#define HIDPP_REG_ENABLE_REPORTS		0x00
-#define HIDPP_REG_PAIRING_INFORMATION		0xb5
+#define HIDPP_REG_ENABLE_REPORTS			0x00
+#define  HIDPP_ENABLE_REPORTS_DEVICE_BATTERY_STATUS	0x10
+#define  HIDPP_ENABLE_REPORTS_RECEIVER_WIRELESS		0x01
+#define  HIDPP_ENABLE_REPORTS_RECEIVER_SOFTWARE_PRESENT	0x08
 
-#define HIDPP_NOTIF_DEVICE_BATTERY_STATUS	(1 << 4)
-#define HIDPP_NOTIF_RECEIVER_WIRELESS		(1 << 0)
-#define HIDPP_NOTIF_RECEIVER_SOFTWARE_PRESENT	(1 << 3)
+#define HIDPP_REG_PAIRING_INFORMATION		0xb5
 
 /* HID++ 1.0 error codes. */
 #define HIDPP_ERROR				0x8f
@@ -110,8 +108,11 @@ int uhidpp_debug = 1;
  * The software ID is added to feature access reports (FAP) and used to
  * distinguish responses from notifications. Note, the software ID must be
  * greater than zero which is reserved for notifications.
+ * The effective software ID round robins within its allowed interval [1, 15]
+ * making it easier to correlate requests and responses.
  */
-#define HIDPP_SOFTWARE_ID			0x01
+#define HIDPP_SOFTWARE_ID_MIN			1
+#define HIDPP_SOFTWARE_ID_MAX			15
 #define HIDPP_SOFTWARE_ID_LEN			4
 
 #define HIDPP20_FEAT_ROOT_ID			0x0000
@@ -122,12 +123,19 @@ int uhidpp_debug = 1;
 #define HIDPP20_FEAT_FEATURE_ID_FUNC		0x0001
 
 #define HIDPP20_FEAT_BATTERY_ID			0x1000
-#define HIDPP20_FEAT_BATTERY_LEVEL_FUNC		0x0000
+#define HIDPP20_FEAT_BATTERY_LEVEL_STATUS_FUNC	0x0000
+#define  HIDPP20_LEVEL_STATUS_CHARGING_DONE	0x0003
 #define HIDPP20_FEAT_BATTERY_CAPABILITY_FUNC	0x0001
+#define  HIDPP20_CAPABILITY_RECHARGEABLE	0x0004
 
-#define HIDPP20_BATTERY_STATUS_CHARGING_DONE	0x0003
-
-#define HIDPP20_BATTERY_CAPABILITY_RECHARGEABLE	0x0004
+#define HIDPP20_FEAT_UNIFIED_BATTERY_ID			0x1004
+#define HIDPP20_FEAT_UNIFIED_BATTERY_CAPABILITIES_FUNC	0x0000
+#define  HIDPP20_CAPABILITES_RECHARGEABLE		0x0002
+#define HIDPP20_FEAT_UNIFIED_BATTERY_STATUS_FUNC	0x0001
+#define  HIDPP20_BATTERY_STATUS_CRITICAL		0x0001
+#define  HIDPP20_BATTERY_STATUS_LOW			0x0002
+#define  HIDPP20_BATTERY_STATUS_GOOD			0x0004
+#define  HIDPP20_BATTERY_STATUS_FULL			0x0008
 
 /* HID++ 2.0 error codes. */
 #define HIDPP20_ERROR				0xff
@@ -197,19 +205,20 @@ struct uhidpp_device {
 	uint8_t d_features;
 #define UHIDPP_DEVICE_FEATURE_ROOT		0x01
 #define UHIDPP_DEVICE_FEATURE_BATTERY		0x02
+#define UHIDPP_DEVICE_FEATURE_UNIFIED_BATTERY	0x04
 
 	struct {
 		struct ksensor sens[UHIDPP_NSENSORS];
 		uint8_t feature_idx;
-		uint8_t level;
-		uint8_t status;
 		uint8_t nlevels;
+		uint8_t unified_level_mask;
 		uint8_t rechargeable;
 	} d_battery;
 };
 
 /*
  * Locking:
+ *	[I]	immutable
  *	[m]	sc_mtx
  */
 struct uhidpp_softc {
@@ -232,6 +241,12 @@ struct uhidpp_softc {
 	struct uhidpp_report *sc_req;	/* [m] synchronous request buffer */
 	struct uhidpp_report *sc_resp;	/* [m] synchronous response buffer */
 	u_int sc_resp_state;		/* [m] synchronous response state */
+	u_int sc_swid;			/* [m] request software id */
+
+	enum {
+		UHIDPP_RECEIVER_UNIFYING,
+		UHIDPP_RECEIVER_BOLT,
+	} sc_receiver;			/* [I] */
 };
 
 int uhidpp_match(struct device *, void *, void *);
@@ -256,7 +271,6 @@ int hidpp_get_protocol_version(struct uhidpp_softc *, uint8_t, uint8_t *,
     uint8_t *);
 
 int hidpp10_get_name(struct uhidpp_softc *, uint8_t, char *, size_t);
-int hidpp10_get_serial(struct uhidpp_softc *, uint8_t, uint8_t *, size_t);
 int hidpp10_get_type(struct uhidpp_softc *, uint8_t, const char **);
 int hidpp10_enable_notifications(struct uhidpp_softc *, uint8_t);
 
@@ -266,11 +280,16 @@ int hidpp20_feature_get_count(struct uhidpp_softc *, uint8_t, uint8_t,
     uint8_t *);
 int hidpp20_feature_get_id(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
     uint16_t *, uint8_t *);
-int hidpp20_battery_get_level_status(struct uhidpp_softc *, uint8_t, uint8_t,
-    uint8_t *, uint8_t *);
-int hidpp20_battery_get_capability(struct uhidpp_softc *, uint8_t, uint8_t,
-    uint8_t *, uint8_t *);
+int hidpp20_battery_get_level_status(struct uhidpp_softc *,
+    struct uhidpp_device *);
+int hidpp20_battery_get_capability(struct uhidpp_softc *,
+    struct uhidpp_device *);
 int hidpp20_battery_status_is_charging(uint8_t);
+int hidpp20_unified_battery_get_capabilities(struct uhidpp_softc *,
+    struct uhidpp_device *);
+int hidpp20_unified_battery_get_status(struct uhidpp_softc *,
+    struct uhidpp_device *);
+int hidpp20_unified_battery_status_is_charging(uint8_t);
 
 int hidpp_send_validate(uint8_t, int);
 int hidpp_send_rap_report(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
@@ -279,6 +298,18 @@ int hidpp_send_fap_report(struct uhidpp_softc *, uint8_t, uint8_t, uint8_t,
     uint8_t, uint8_t *, int, struct uhidpp_report *);
 int hidpp_send_report(struct uhidpp_softc *, uint8_t, struct uhidpp_report *,
     struct uhidpp_report *);
+
+static uint8_t
+nlevels(uint8_t mask)
+{
+	uint8_t nbits = 0;
+
+	for (; mask > 0; mask >>= 1) {
+		if (mask & 1)
+			nbits++;
+	}
+	return nbits;
+}
 
 struct cfdriver uhidpp_cd = {
 	NULL, "uhidpp", DV_DULL
@@ -345,6 +376,7 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 
 	sc->sc_resp = NULL;
 	sc->sc_resp_state = UHIDPP_RESP_NONE;
+	sc->sc_swid = HIDPP_SOFTWARE_ID_MIN;
 
 	error = uhidev_open(&sc->sc_hdev);
 	if (error) {
@@ -376,18 +408,21 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 		return;
 	}
 
+	if (uaa->product == 0xc548)
+		sc->sc_receiver = UHIDPP_RECEIVER_BOLT;
+	else
+		sc->sc_receiver = UHIDPP_RECEIVER_UNIFYING;
+
 	/* Probe paired devices. */
 	for (i = 0; i < UHIDPP_NDEVICES; i++) {
 		char name[16];
-		uint8_t serial[4];
 		struct uhidpp_device *dev = &sc->sc_devices[i];
 		const char *type;
 		uint8_t device_id = i + 1;
 
 		dev->d_id = device_id;
 
-		if (hidpp10_get_serial(sc, device_id, serial, sizeof(serial)) ||
-		    hidpp10_get_type(sc, device_id, &type) ||
+		if (hidpp10_get_type(sc, device_id, &type) ||
 		    hidpp10_get_name(sc, device_id, name, sizeof(name)))
 			continue;
 
@@ -396,8 +431,6 @@ uhidpp_attach(struct device *parent, struct device *self, void *aux)
 		printf(" device %d", device_id);
 		printf(" %s", type);
 		printf(" \"%s\"", name);
-		printf(" serial %02x-%02x-%02x-%02x",
-		    serial[0], serial[1], serial[2], serial[3]);
 		npaired++;
 	}
 	if (npaired == 0)
@@ -531,13 +564,7 @@ uhidpp_task(void *arg)
 		case 0x4b:	/* pairing accepted */
 			break;
 		case 0x41:	/* connect */
-			/*
-			 * Do nothing if the link is reported to be out of
-			 * range. This happens when a device has been idle for a
-			 * while.
-			 */
-			if (HIDPP_LINK_STATUS(rep.rap.params[0]))
-				uhidpp_device_connect(sc, dev);
+			uhidpp_device_connect(sc, dev);
 			break;
 		}
 	}
@@ -555,7 +582,6 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 {
 	struct ksensor *sens;
 	int error;
-	uint8_t feature_type;
 
 	MUTEX_ASSERT_LOCKED(&sc->sc_mtx);
 
@@ -578,38 +604,26 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 		    __func__, dev->d_id, error);
 		return;
 	}
-
 	DPRINTF("%s: device_id=%d, version=%d.%d\n",
 	    __func__, dev->d_id, dev->d_major, dev->d_minor);
+	if (dev->d_major <= 1)
+		return;
 
-	if (dev->d_major >= 2) {
-		error = uhidpp_device_features(sc, dev);
-		if (error) {
-			DPRINTF("%s: features failure: device_id=%d, "
-			    "error=%d\n",
-			    __func__, dev->d_id, error);
-			return;
-		}
+	error = uhidpp_device_features(sc, dev);
+	if (error) {
+		DPRINTF("%s: features failure: device_id=%d, "
+		    "error=%d\n",
+		    __func__, dev->d_id, error);
+		return;
+	}
 
-		error = hidpp20_root_get_feature(sc, dev->d_id,
-		    HIDPP20_FEAT_BATTERY_ID,
-		    &dev->d_battery.feature_idx, &feature_type);
-		if (error) {
-			DPRINTF("%s: battery feature index failure: "
-			    "device_id=%d, error=%d\n",
-			    __func__, dev->d_id, error);
-			return;
-		}
-
-		error = hidpp20_battery_get_capability(sc,
-		    dev->d_id, dev->d_battery.feature_idx,
-		    &dev->d_battery.nlevels, &dev->d_battery.rechargeable);
-		if (error) {
-			DPRINTF("%s: battery capability failure: device_id=%d, "
-			    "error=%d\n", __func__, dev->d_id, error);
-			return;
-		}
-	} else {
+	if (dev->d_features & UHIDPP_DEVICE_FEATURE_BATTERY)
+		error = hidpp20_battery_get_capability(sc, dev);
+	else if (dev->d_features & UHIDPP_DEVICE_FEATURE_UNIFIED_BATTERY)
+		error = hidpp20_unified_battery_get_capabilities(sc, dev);
+	if (error) {
+		DPRINTF("%s: battery capability failure: device_id=%d, "
+		    "error=%d\n", __func__, dev->d_id, error);
 		return;
 	}
 
@@ -654,66 +668,29 @@ uhidpp_device_connect(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 	 */
 	KASSERT(sc->sc_senstsk == NULL);
 	mtx_leave(&sc->sc_mtx);
-	sc->sc_senstsk = sensor_task_register(sc, uhidpp_refresh, 30);
+	sc->sc_senstsk = sensor_task_register(sc, uhidpp_refresh, 60);
 	mtx_enter(&sc->sc_mtx);
 }
 
 void
 uhidpp_device_refresh(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 {
+	int error;
+
 	MUTEX_ASSERT_LOCKED(&sc->sc_mtx);
 
-	if (dev->d_major >= 2) {
-		int charging, error;
+	if (dev->d_major <= 1)
+		return;
 
-		error = hidpp20_battery_get_level_status(sc, dev->d_id,
-		    dev->d_battery.feature_idx,
-		    &dev->d_battery.level, &dev->d_battery.status);
-		if (error) {
-			DPRINTF("%s: battery status failure: device_id=%d, "
-			    "error=%d\n",
-			    __func__, dev->d_id, error);
-			return;
-		}
-
-		charging = hidpp20_battery_status_is_charging(
-		    dev->d_battery.status);
-
-		dev->d_battery.sens[0].value = dev->d_battery.level * 1000;
-		dev->d_battery.sens[0].flags &= ~SENSOR_FUNKNOWN;
-		if (dev->d_battery.nlevels < 10) {
-			/*
-			 * According to the HID++ 2.0 specification, less than
-			 * 10 levels should be mapped to the following 4 levels:
-			 *
-			 * [0, 10]   critical
-			 * [11, 30]  low
-			 * [31, 80]  good
-			 * [81, 100] full
-			 *
-			 * Since sensors are limited to 3 valid statuses, clamp
-			 * it even further. Unless the battery is charging in
-			 * which the level cannot be trusted.
-			 */
-			if (charging)
-				dev->d_battery.sens[0].status = SENSOR_S_UNKNOWN;
-			else if (dev->d_battery.level <= 10)
-				dev->d_battery.sens[0].status = SENSOR_S_CRIT;
-			else if (dev->d_battery.level <= 30)
-				dev->d_battery.sens[0].status = SENSOR_S_WARN;
-			else
-				dev->d_battery.sens[0].status = SENSOR_S_OK;
-		} else {
-			/*
-			 * XXX the device supports battery mileage. The current
-			 * level must be checked against resp.fap.params[3]
-			 * given by hidpp20_battery_get_capability().
-			 */
-			dev->d_battery.sens[0].status = SENSOR_S_UNKNOWN;
-		}
-
-		if (dev->d_battery.rechargeable)
-			dev->d_battery.sens[2].value = charging;
+	if (dev->d_features & UHIDPP_DEVICE_FEATURE_BATTERY)
+		error = hidpp20_battery_get_level_status(sc, dev);
+	else if (dev->d_features & UHIDPP_DEVICE_FEATURE_UNIFIED_BATTERY)
+		error = hidpp20_unified_battery_get_status(sc, dev);
+	else
+		error = -ENOTSUP;
+	if (error) {
+		DPRINTF("%s: battery status failure: device_id=%d, error=%d\n",
+		    __func__, dev->d_id, error);
 	}
 }
 
@@ -754,8 +731,13 @@ uhidpp_device_features(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 		if (error)
 			continue;
 
-		if (id == HIDPP20_FEAT_BATTERY_ID)
+		if (id == HIDPP20_FEAT_BATTERY_ID) {
 			dev->d_features |= UHIDPP_DEVICE_FEATURE_BATTERY;
+			dev->d_battery.feature_idx = i;
+		} else if (id == HIDPP20_FEAT_UNIFIED_BATTERY_ID) {
+			dev->d_features |= UHIDPP_DEVICE_FEATURE_UNIFIED_BATTERY;
+			dev->d_battery.feature_idx = i;
+		}
 
 		DPRINTF("%s: idx=%d, id=%x, type=%x device_id=%d\n",
 		    __func__, i, id, type, dev->d_id);
@@ -763,7 +745,7 @@ uhidpp_device_features(struct uhidpp_softc *sc, struct uhidpp_device *dev)
 	DPRINTF("%s: device_id=%d, count=%d, features=%x\n",
 	    __func__, dev->d_id, count, dev->d_features);
 
-	if ((dev->d_features & UHIDPP_DEVICE_FEATURE_BATTERY) == 0)
+	if ((dev->d_features & ~UHIDPP_DEVICE_FEATURE_ROOT) == 0)
 		return -ENODEV;
 	return 0;
 }
@@ -858,13 +840,13 @@ hidpp_get_protocol_version(struct uhidpp_softc *sc, uint8_t device_id,
     uint8_t *major, uint8_t *minor)
 {
 	struct uhidpp_report resp;
-	uint8_t params[3] = { 0, 0, HIDPP_FEAT_ROOT_PING_DATA };
+	uint8_t params[3] = { 0, 0, HIDPP_PING_DATA };
 	int error;
 
 	error = hidpp_send_fap_report(sc,
 	    HIDPP_REPORT_ID_SHORT,
 	    device_id,
-	    HIDPP_FEAT_ROOT_IDX,
+	    HIDPP_FEAT_ROOT_ID,
 	    HIDPP_FEAT_ROOT_PING_FUNC,
 	    params, sizeof(params), &resp);
 	if (error == HIDPP_ERROR_INVALID_SUBID) {
@@ -874,7 +856,7 @@ hidpp_get_protocol_version(struct uhidpp_softc *sc, uint8_t device_id,
 	}
 	if (error)
 		return error;
-	if (resp.rap.params[2] != HIDPP_FEAT_ROOT_PING_DATA)
+	if (resp.rap.params[2] != HIDPP_PING_DATA)
 		return -EPROTO;
 
 	*major = resp.fap.params[0];
@@ -888,90 +870,98 @@ hidpp10_get_name(struct uhidpp_softc *sc, uint8_t device_id,
 {
 	struct uhidpp_report resp;
 	int error;
-	uint8_t params[1] = { 0x40 + (device_id - 1) };
+	const uint8_t *name;
 	uint8_t len;
 
-	error = hidpp_send_rap_report(sc,
-	    HIDPP_REPORT_ID_SHORT,
-	    HIDPP_DEVICE_ID_RECEIVER,
-	    HIDPP_GET_LONG_REGISTER,
-	    HIDPP_REG_PAIRING_INFORMATION,
-	    params, sizeof(params), &resp);
-	if (error)
-		return error;
+	if (sc->sc_receiver == UHIDPP_RECEIVER_BOLT) {
+		uint8_t params[2] = { 0x60 + device_id, 0x01 };
 
-	len = resp.rap.params[1];
-	if (len + 2 > sizeof(resp.rap.params))
-		return -ENAMETOOLONG;
+		error = hidpp_send_rap_report(sc,
+		    HIDPP_REPORT_ID_SHORT,
+		    HIDPP_DEVICE_ID_RECEIVER,
+		    HIDPP_GET_LONG_REGISTER,
+		    HIDPP_REG_PAIRING_INFORMATION,
+		    params, sizeof(params), &resp);
+		if (error)
+			return error;
+		len = resp.rap.params[2];
+		name = &resp.rap.params[3];
+	} else {
+		uint8_t params[1] = { 0x40 + (device_id - 1) };
+
+		error = hidpp_send_rap_report(sc,
+		    HIDPP_REPORT_ID_SHORT,
+		    HIDPP_DEVICE_ID_RECEIVER,
+		    HIDPP_GET_LONG_REGISTER,
+		    HIDPP_REG_PAIRING_INFORMATION,
+		    params, sizeof(params), &resp);
+		if (error)
+			return error;
+		len = resp.rap.params[1];
+		name = &resp.rap.params[2];
+	}
+
 	if (len > bufsiz - 1)
 		len = bufsiz - 1;
-	memcpy(buf, &resp.rap.params[2], len);
+	memcpy(buf, name, len);
 	buf[len] = '\0';
 	return 0;
 }
 
 int
-hidpp10_get_serial(struct uhidpp_softc *sc, uint8_t device_id,
-    uint8_t *buf, size_t bufsiz)
+hidpp10_get_type(struct uhidpp_softc *sc, uint8_t device_id, const char **buf)
 {
 	struct uhidpp_report resp;
 	int error;
-	uint8_t params[1] = { 0x30 + (device_id - 1) };
-	uint8_t len;
+	uint8_t type;
 
-	error = hidpp_send_rap_report(sc,
-	    HIDPP_REPORT_ID_SHORT,
-	    HIDPP_DEVICE_ID_RECEIVER,
-	    HIDPP_GET_LONG_REGISTER,
-	    HIDPP_REG_PAIRING_INFORMATION,
-	    params, sizeof(params), &resp);
-	if (error)
-		return error;
+	if (sc->sc_receiver == UHIDPP_RECEIVER_BOLT) {
+		uint8_t params[1] = { 0x50 + device_id };
 
-	len = 4;
-	if (bufsiz < len)
-		len = bufsiz;
-	memcpy(buf, &resp.rap.params[1], len);
-	return 0;
-}
+		error = hidpp_send_rap_report(sc,
+		    HIDPP_REPORT_ID_SHORT,
+		    HIDPP_DEVICE_ID_RECEIVER,
+		    HIDPP_GET_LONG_REGISTER,
+		    HIDPP_REG_PAIRING_INFORMATION,
+		    params, sizeof(params), &resp);
+		if (error)
+			return error;
+		type = resp.rap.params[1] & 0xf;
+	} else {
+		uint8_t params[1] = { 0x20 + (device_id - 1) };
 
-int
-hidpp10_get_type(struct uhidpp_softc *sc, uint8_t device_id, const char **type)
-{
-	struct uhidpp_report resp;
-	int error;
-	uint8_t params[1] = { 0x20 + (device_id - 1) };
+		error = hidpp_send_rap_report(sc,
+		    HIDPP_REPORT_ID_SHORT,
+		    HIDPP_DEVICE_ID_RECEIVER,
+		    HIDPP_GET_LONG_REGISTER,
+		    HIDPP_REG_PAIRING_INFORMATION,
+		    params, sizeof(params), &resp);
+		if (error)
+			return error;
+		type = resp.rap.params[7];
+	}
 
-	error = hidpp_send_rap_report(sc,
-	    HIDPP_REPORT_ID_SHORT,
-	    HIDPP_DEVICE_ID_RECEIVER,
-	    HIDPP_GET_LONG_REGISTER,
-	    HIDPP_REG_PAIRING_INFORMATION,
-	    params, sizeof(params), &resp);
-	if (error)
-		return error;
-
-	switch (resp.rap.params[7]) {
+	switch (type) {
 	case 0x00:
-		*type = "unknown";
+		*buf = "unknown";
 		return 0;
 	case 0x01:
-		*type = "keyboard";
+		*buf = "keyboard";
 		return 0;
 	case 0x02:
-		*type = "mouse";
+		*buf = "mouse";
 		return 0;
 	case 0x03:
-		*type = "numpad";
+		*buf = "numpad";
 		return 0;
 	case 0x04:
-		*type = "presenter";
+		*buf = "presenter";
 		return 0;
 	case 0x08:
-		*type = "trackball";
+		*buf = "trackball";
 		return 0;
 	case 0x09:
-		*type = "touchpad";
+		*buf = "touchpad";
 		return 0;
 	}
 	return -ENOENT;
@@ -984,10 +974,10 @@ hidpp10_enable_notifications(struct uhidpp_softc *sc, uint8_t device_id)
 	uint8_t params[3];
 
 	/* Device reporting flags. */
-	params[0] = HIDPP_NOTIF_DEVICE_BATTERY_STATUS;
+	params[0] = HIDPP_ENABLE_REPORTS_DEVICE_BATTERY_STATUS;
 	/* Receiver reporting flags. */
-	params[1] = HIDPP_NOTIF_RECEIVER_WIRELESS |
-	    HIDPP_NOTIF_RECEIVER_SOFTWARE_PRESENT;
+	params[1] = HIDPP_ENABLE_REPORTS_RECEIVER_WIRELESS |
+	    HIDPP_ENABLE_REPORTS_RECEIVER_SOFTWARE_PRESENT;
 	/* Device reporting flags (continued). */
 	params[2] = 0;
 
@@ -1067,58 +1057,169 @@ hidpp20_feature_get_id(struct uhidpp_softc *sc, uint8_t device_id,
 }
 
 int
-hidpp20_battery_get_level_status(struct uhidpp_softc *sc, uint8_t device_id,
-    uint8_t feature_idx, uint8_t *level, uint8_t *status)
+hidpp20_battery_get_level_status(struct uhidpp_softc *sc,
+    struct uhidpp_device *dev)
 {
 	struct uhidpp_report resp;
-	int error;
+	int charging, error;
+	uint8_t level, status;
 
 	error = hidpp_send_fap_report(sc,
 	    HIDPP_REPORT_ID_LONG,
-	    device_id,
-	    feature_idx,
-	    HIDPP20_FEAT_BATTERY_LEVEL_FUNC,
+	    dev->d_id,
+	    dev->d_battery.feature_idx,
+	    HIDPP20_FEAT_BATTERY_LEVEL_STATUS_FUNC,
 	    NULL, 0, &resp);
 	if (error)
 		return error;
 
-	*level = resp.fap.params[0];
+	level = resp.fap.params[0];
 	/* next_level = resp.fap.params[1]; */
-	*status = resp.fap.params[2];
-
+	status = resp.fap.params[2];
 	/*
 	 * While charging, the reported level cannot be trusted. However, fake
 	 * the battery state once the charging is done.
 	 */
-	switch (hidpp20_battery_status_is_charging(*status)) {
-	case HIDPP20_BATTERY_STATUS_CHARGING_DONE:
-		*level = 100;
-		*status = 0;
-		break;
+	if (status == HIDPP20_LEVEL_STATUS_CHARGING_DONE) {
+		level = 100;
+		status = 0;
 	}
+
+	charging = hidpp20_battery_status_is_charging(status);
+
+	dev->d_battery.sens[0].value = level * 1000;
+	dev->d_battery.sens[0].flags &= ~SENSOR_FUNKNOWN;
+	if (dev->d_battery.nlevels < 10) {
+		/*
+		 * According to the HID++ 2.0 specification, less than
+		 * 10 levels should be mapped to the following 4 levels:
+		 *
+		 * [0, 10]   critical
+		 * [11, 30]  low
+		 * [31, 80]  good
+		 * [81, 100] full
+		 *
+		 * Since sensors are limited to 3 valid statuses, clamp
+		 * it even further. Unless the battery is charging in
+		 * which the level cannot be trusted.
+		 */
+		if (charging)
+			dev->d_battery.sens[0].status = SENSOR_S_UNKNOWN;
+		else if (level <= 10)
+			dev->d_battery.sens[0].status = SENSOR_S_CRIT;
+		else if (level <= 30)
+			dev->d_battery.sens[0].status = SENSOR_S_WARN;
+		else
+			dev->d_battery.sens[0].status = SENSOR_S_OK;
+	} else {
+		/*
+		 * XXX the device supports battery mileage. The current
+		 * level must be checked against resp.fap.params[3]
+		 * given by hidpp20_battery_get_capability().
+		 */
+		dev->d_battery.sens[0].status = SENSOR_S_UNKNOWN;
+	}
+
+	if (dev->d_battery.rechargeable)
+		dev->d_battery.sens[2].value = charging;
 
 	return 0;
 }
 
 int
-hidpp20_battery_get_capability(struct uhidpp_softc *sc, uint8_t device_id,
-    uint8_t feature_idx, uint8_t *nlevels, uint8_t *rechargeable)
+hidpp20_battery_get_capability(struct uhidpp_softc *sc,
+    struct uhidpp_device *dev)
 {
 	struct uhidpp_report resp;
 	int error;
 
 	error = hidpp_send_fap_report(sc,
 	    HIDPP_REPORT_ID_LONG,
-	    device_id,
-	    feature_idx,
+	    dev->d_id,
+	    dev->d_battery.feature_idx,
 	    HIDPP20_FEAT_BATTERY_CAPABILITY_FUNC,
 	    NULL, 0, &resp);
 	if (error)
 		return error;
-	*nlevels = resp.fap.params[0];
-	*rechargeable = resp.fap.params[1] &
-	    HIDPP20_BATTERY_CAPABILITY_RECHARGEABLE;
+	dev->d_battery.nlevels = resp.fap.params[0];
+	dev->d_battery.rechargeable = resp.fap.params[1] &
+	    HIDPP20_CAPABILITY_RECHARGEABLE;
 	return 0;
+}
+
+int
+hidpp20_unified_battery_get_capabilities(struct uhidpp_softc *sc,
+    struct uhidpp_device *dev)
+{
+	struct uhidpp_report resp;
+	int error;
+
+	error = hidpp_send_fap_report(sc,
+	    HIDPP_REPORT_ID_LONG,
+	    dev->d_id,
+	    dev->d_battery.feature_idx,
+	    HIDPP20_FEAT_UNIFIED_BATTERY_CAPABILITIES_FUNC,
+	    NULL, 0, &resp);
+	if (error)
+		return error;
+	dev->d_battery.nlevels = nlevels(resp.fap.params[0]);
+	dev->d_battery.unified_level_mask = resp.fap.params[0];
+	dev->d_battery.rechargeable = resp.fap.params[1] &
+	    HIDPP20_CAPABILITES_RECHARGEABLE;
+	return 0;
+}
+
+int
+hidpp20_unified_battery_get_status(struct uhidpp_softc *sc,
+    struct uhidpp_device *dev)
+{
+	struct uhidpp_report resp;
+	int charging, error;
+	uint8_t level, percentage, status;
+
+	error = hidpp_send_fap_report(sc,
+	    HIDPP_REPORT_ID_LONG,
+	    dev->d_id,
+	    dev->d_battery.feature_idx,
+	    HIDPP20_FEAT_UNIFIED_BATTERY_STATUS_FUNC,
+	    NULL, 0, &resp);
+	if (error)
+		return error;
+	percentage = resp.fap.params[0];
+	level = resp.fap.params[1] & dev->d_battery.unified_level_mask;
+	status = resp.fap.params[2];
+	/* external_power_status = resp.fap.params[3]; */
+
+	charging = hidpp20_unified_battery_status_is_charging(status);
+	dev->d_battery.sens[0].value = percentage * 1000;
+	dev->d_battery.sens[0].flags &= ~SENSOR_FUNKNOWN;
+	dev->d_battery.sens[0].status = SENSOR_S_UNKNOWN;
+	/* Do not trust the level while charging. */
+	if (!charging) {
+		if (level & HIDPP20_BATTERY_STATUS_CRITICAL)
+			dev->d_battery.sens[0].status = SENSOR_S_CRIT;
+		else if (level & HIDPP20_BATTERY_STATUS_LOW)
+			dev->d_battery.sens[0].status = SENSOR_S_WARN;
+		else if (level & HIDPP20_BATTERY_STATUS_GOOD)
+			dev->d_battery.sens[0].status = SENSOR_S_OK;
+		else if (level & HIDPP20_BATTERY_STATUS_FULL)
+			dev->d_battery.sens[0].status = SENSOR_S_OK;
+	}
+	if (dev->d_battery.rechargeable)
+		dev->d_battery.sens[2].value = charging;
+	return 0;
+}
+
+int
+hidpp20_unified_battery_status_is_charging(uint8_t status)
+{
+	switch (status) {
+	case 1: /* charging */
+	case 2: /* charging slow */
+		return 1;
+	default:
+		return 0;
+	}
 }
 
 int
@@ -1128,10 +1229,10 @@ hidpp20_battery_status_is_charging(uint8_t status)
 	case 1:	/* recharging */
 	case 2:	/* charge in final stage */
 	case 4:	/* recharging below optimal speed */
-		return status;
+		return 1;
 
 	case 3:	/* charge complete */
-		return status;
+		return 1;
 
 	case 0:	/* discharging */
 	case 5:	/* invalid battery type */
@@ -1159,7 +1260,7 @@ hidpp_send_validate(uint8_t report_id, int nparams)
 
 int
 hidpp_send_fap_report(struct uhidpp_softc *sc, uint8_t report_id,
-    uint8_t device_id, uint8_t feature_idx, uint8_t funcidx_swid,
+    uint8_t device_id, uint8_t feature_idx, uint8_t func_idx,
     uint8_t *params, int nparams, struct uhidpp_report *resp)
 {
 	struct uhidpp_report req;
@@ -1172,8 +1273,10 @@ hidpp_send_fap_report(struct uhidpp_softc *sc, uint8_t report_id,
 	memset(&req, 0, sizeof(req));
 	req.device_id = device_id;
 	req.fap.feature_idx = feature_idx;
+	sc->sc_swid = sc->sc_swid == HIDPP_SOFTWARE_ID_MAX ?
+	    HIDPP_SOFTWARE_ID_MIN : sc->sc_swid + 1;
 	req.fap.funcidx_swid =
-	    (funcidx_swid << HIDPP_SOFTWARE_ID_LEN) | HIDPP_SOFTWARE_ID;
+	    (func_idx << HIDPP_SOFTWARE_ID_LEN) | sc->sc_swid;
 	memcpy(req.fap.params, params, nparams);
 	return hidpp_send_report(sc, report_id, &req, resp);
 }

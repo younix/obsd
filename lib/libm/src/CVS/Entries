@@ -28,7 +28,6 @@
 /e_j1f.c/1.6/Mon Sep 12 19:47:02 2016//
 /e_jn.c/1.4/Tue Oct 27 23:59:29 2009//
 /e_jnf.c/1.5/Tue Oct 27 23:59:29 2009//
-/e_lgamma_r.c/1.6/Mon Sep 12 19:47:02 2016//
 /e_lgammaf_r.c/1.6/Mon Sep 12 19:47:02 2016//
 /e_log.c/1.12/Mon Sep 12 19:47:02 2016//
 /e_log10.c/1.10/Mon Sep 12 19:47:02 2016//
@@ -47,10 +46,8 @@
 /e_scalbf.c/1.6/Mon Sep 12 19:47:02 2016//
 /e_sinh.c/1.11/Mon Sep 12 19:47:02 2016//
 /e_sinhf.c/1.5/Mon Sep 12 19:47:02 2016//
-/e_sqrt.c/1.12/Mon Sep 12 19:47:02 2016//
 /e_sqrtf.c/1.5/Mon Sep 12 19:47:02 2016//
 /e_sqrtl.c/1.3/Mon Sep 12 19:47:02 2016//
-/k_rem_pio2.c/1.5/Tue Oct 27 23:59:29 2009//
 /k_rem_pio2f.c/1.3/Tue Oct 27 23:59:29 2009//
 /k_sincos.h/1.1/Sat Mar 10 20:52:58 2018//
 /k_sincosf.h/1.1/Sat Mar 10 20:52:58 2018//
@@ -87,8 +84,6 @@
 /s_catanhf.c/1.1/Sun Sep  7 20:36:09 2008//
 /s_catanhl.c/1.1/Fri Jul  8 19:25:31 2011//
 /s_catanl.c/1.4/Mon Sep 12 19:47:02 2016//
-/s_cbrt.c/1.9/Mon Sep 12 19:47:02 2016//
-/s_cbrtf.c/1.3/Tue Oct 27 23:59:30 2009//
 /s_ccos.c/1.7/Mon Sep 12 19:47:02 2016//
 /s_ccosf.c/1.2/Sun Jul 18 18:42:26 2010//
 /s_ccosh.c/1.7/Mon Sep 12 19:47:02 2016//
@@ -228,3 +223,8 @@ D/ld80////
 /s_sin.c/1.12/Mon Jan 24 14:35:14 2022//
 /s_sinf.c/1.5/Mon Jan 24 14:35:14 2022//
 /s_logb.c/1.5/Mon Jun 27 13:01:59 2022//
+/e_lgamma_r.c/1.7/Tue Jan 10 10:05:31 2023//
+/e_sqrt.c/1.13/Tue Jan 10 10:05:31 2023//
+/k_rem_pio2.c/1.6/Tue Jan 10 10:05:31 2023//
+/s_cbrt.c/1.10/Tue Jan 10 10:05:31 2023//
+/s_cbrtf.c/1.4/Tue Jan 10 10:05:31 2023//

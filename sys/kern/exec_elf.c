@@ -1,4 +1,4 @@
-/*	$OpenBSD: exec_elf.c,v 1.174 2022/11/05 10:31:16 deraadt Exp $	*/
+/*	$OpenBSD: exec_elf.c,v 1.178 2022/12/21 07:16:03 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996 Per Fogelstrom
@@ -571,7 +571,7 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 		 * Check if DYNAMIC contains DT_TEXTREL
 		 */
 		for (i = 0, pp = ph; i < eh->e_phnum; i++, pp++) {
-			Elf32_Dyn *dt;
+			Elf_Dyn *dt;
 			int j;
 
 			switch (pp->p_type) {
@@ -586,7 +586,7 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 					free(dt, M_TEMP, pp->p_filesz);
 					break;
 				}
-				for (j = 0; j * sizeof(*dt) < pp->p_filesz; j++) {
+				for (j = 0; j < pp->p_filesz / sizeof(*dt); j++) {
 					if (dt[j].d_tag == DT_TEXTREL) {
 						textrel = VMCMD_TEXTREL;
 						break;
@@ -621,9 +621,11 @@ exec_elf_makecmds(struct proc *p, struct exec_package *epp)
 			} else
 				addr = ELF_NO_ADDR;
 
-			/* Permit system calls in specific main-programs */
+			/*
+			 * Permit system calls in main-text static binaries.
+			 * Also block the ld.so syscall-grant
+			 */
 			if (interp == NULL) {
-				/* statics. Also block the ld.so syscall-grant */
 				syscall = VMCMD_SYSCALL;
 				p->p_vmspace->vm_map.flags |= VM_MAP_SYSCALL_ONCE;
 			}
@@ -882,11 +884,11 @@ elf_os_pt_note_name(Elf_Note *np)
 		/* verify name padding (after the NUL) is NUL */
 		for (j = namlen + 1; j < elfround(np->namesz); j++)
 			if (((char *)(np + 1))[j] != '\0')
-				continue;		
+				continue;
 		/* verify desc padding is NUL */
 		for (j = np->descsz; j < elfround(np->descsz); j++)
 			if (((char *)(np + 1))[j] != '\0')
-				continue;		
+				continue;
 		if (strcmp((char *)(np + 1), elf_note_names[i].name) == 0)
 			return elf_note_names[i].id;
 	}
@@ -1221,9 +1223,6 @@ coredump_walk_elf(vaddr_t start, vaddr_t realend, vaddr_t end, vm_prot_t prot,
 int
 coredump_notes_elf(struct proc *p, void *iocookie, size_t *sizep)
 {
-	struct ps_strings pss;
-	struct iovec iov;
-	struct uio uio;
 	struct elfcore_procinfo cpi;
 	Elf_Note nhdr;
 	struct process *pr = p->p_p;
@@ -1282,23 +1281,7 @@ coredump_notes_elf(struct proc *p, void *iocookie, size_t *sizep)
 	/* Second, write an NT_OPENBSD_AUXV note. */
 	notesize = sizeof(nhdr) + elfround(sizeof("OpenBSD")) +
 	    elfround(ELF_AUX_WORDS * sizeof(char *));
-	if (iocookie) {
-		iov.iov_base = &pss;
-		iov.iov_len = sizeof(pss);
-		uio.uio_iov = &iov;
-		uio.uio_iovcnt = 1;
-		uio.uio_offset = (off_t)pr->ps_strings;
-		uio.uio_resid = sizeof(pss);
-		uio.uio_segflg = UIO_SYSSPACE;
-		uio.uio_rw = UIO_READ;
-		uio.uio_procp = NULL;
-
-		error = uvm_io(&p->p_vmspace->vm_map, &uio, 0);
-		if (error)
-			return (error);
-
-		if (pss.ps_envstr == NULL)
-			return (EIO);
+	if (iocookie && pr->ps_auxinfo) {
 
 		nhdr.namesz = sizeof("OpenBSD");
 		nhdr.descsz = ELF_AUX_WORDS * sizeof(char *);
@@ -1315,7 +1298,7 @@ coredump_notes_elf(struct proc *p, void *iocookie, size_t *sizep)
 			return (error);
 
 		error = coredump_write(iocookie, UIO_USERSPACE,
-		    pss.ps_envstr + pss.ps_nenvstr + 1, nhdr.descsz);
+		    (caddr_t)pr->ps_auxinfo, nhdr.descsz);
 		if (error)
 			return (error);
 	}

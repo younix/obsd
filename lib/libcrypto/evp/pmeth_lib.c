@@ -1,4 +1,4 @@
-/* $OpenBSD: pmeth_lib.c,v 1.25 2022/11/10 16:37:52 jsing Exp $ */
+/* $OpenBSD: pmeth_lib.c,v 1.27 2022/12/26 07:18:52 jmc Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -72,8 +72,8 @@
 #include <openssl/engine.h>
 #endif
 
-#include "asn1_locl.h"
-#include "evp_locl.h"
+#include "asn1_local.h"
+#include "evp_local.h"
 
 DECLARE_STACK_OF(EVP_PKEY_METHOD)
 STACK_OF(EVP_PKEY_METHOD) *pkey_app_methods = NULL;
@@ -173,7 +173,7 @@ int_ctx_new(EVP_PKEY *pkey, ENGINE *e, int id)
 	} else
 		e = ENGINE_get_pkey_meth_engine(id);
 
-	/* If an ENGINE handled this method look it up. Othewise
+	/* If an ENGINE handled this method look it up. Otherwise
 	 * use internal tables.
 	 */
 

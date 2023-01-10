@@ -1,6 +1,5 @@
 /_atomic_lock.c/1.2/Thu May 17 20:28:32 2018//
 /fabs.c/1.10/Wed Nov 13 15:21:48 2013//
-/flt_rounds.c/1.5/Tue Oct 27 05:54:49 2015//
 /fpgetmask.c/1.1/Wed Feb 28 11:16:54 2018//
 /fpgetround.c/1.1/Wed Feb 28 11:16:54 2018//
 /fpgetsticky.c/1.1/Wed Feb 28 11:16:54 2018//
@@ -17,4 +16,5 @@
 /divsi3.S/1.6/Tue Jul 26 13:42:32 2022//
 /setjmp.S/1.8/Tue Jul 26 13:42:32 2022//
 /sigsetjmp.S/1.6/Tue Jul 26 13:42:32 2022//
+/flt_rounds.c/1.6/Tue Jan 10 10:05:28 2023//
 D

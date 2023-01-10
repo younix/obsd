@@ -1,7 +1,6 @@
 /README/1.1/Wed May 11 08:30:58 2016//
 /efi.h/1.1/Wed May 11 08:30:58 2016//
 /efi_nii.h/1.2/Fri Jan 20 01:59:09 2017//
-/efiapi.h/1.2/Fri Jan 20 01:59:09 2017//
 /eficon.h/1.2/Fri Jan 20 01:59:09 2017//
 /eficonsctl.h/1.1/Wed May 11 08:30:58 2016//
 /efidebug.h/1.1/Wed May 11 08:30:58 2016//
@@ -22,3 +21,4 @@ D/arm////
 D/arm64////
 D/i386////
 D/riscv64////
+/efiapi.h/1.4/Tue Jan 10 10:05:58 2023//

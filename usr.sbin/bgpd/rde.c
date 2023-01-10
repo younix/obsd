@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.c,v 1.579 2022/11/07 22:48:35 mbuhl Exp $ */
+/*	$OpenBSD: rde.c,v 1.582 2022/12/28 21:30:16 jmc Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -323,6 +323,11 @@ rde_main(int debug, int verbose)
 		close(ibuf_se_ctl->fd);
 		free(ibuf_se_ctl);
 	}
+	if (ibuf_rtr) {
+		msgbuf_clear(&ibuf_rtr->w);
+		close(ibuf_rtr->fd);
+		free(ibuf_rtr);
+	}
 	msgbuf_clear(&ibuf_main->w);
 	close(ibuf_main->fd);
 	free(ibuf_main);
@@ -518,7 +523,7 @@ rde_dispatch_imsg_session(struct imsgbuf *ibuf)
 				network_add(&netconf_s, &netconf_state);
 				break;
 			case 0:
-				/* something failed beforehands */
+				/* something failed beforehand */
 				break;
 			default:
 badnet:
@@ -845,7 +850,7 @@ rde_dispatch_imsg_parent(struct imsgbuf *ibuf)
 				/* no change to rib apart from filters */
 				rib->state = RECONF_KEEP;
 			} else {
-				/* reload rib because somehing changed */
+				/* reload rib because something changed */
 				rib->flags_tmp = rr.flags;
 				rib->rtableid_tmp = rr.rtableid;
 				rib->state = RECONF_RELOAD;
@@ -1297,7 +1302,7 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 	p += 2;
 
 	/* withdraw prefix */
-	while (len > 0) {
+	if (len > 0) {
 		if (peer->capa.mp[AID_INET] == 0) {
 			log_peer_warnx(&peer->conf,
 			    "bad withdraw, %s disabled", aid2str(AID_INET));
@@ -1305,7 +1310,8 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 			    NULL, 0);
 			goto done;
 		}
-
+	}
+	while (len > 0) {
 		if (peer_has_add_path(peer, AID_INET, CAPA_AP_RECV)) {
 			if (len <= sizeof(pathid)) {
 				log_peer_warnx(&peer->conf,
@@ -1442,7 +1448,7 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 	p += 2 + attrpath_len;
 
 	/* parse nlri prefix */
-	while (nlri_len > 0) {
+	if (nlri_len > 0) {
 		if (peer->capa.mp[AID_INET] == 0) {
 			log_peer_warnx(&peer->conf,
 			    "bad update, %s disabled", aid2str(AID_INET));
@@ -1450,7 +1456,8 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 			    NULL, 0);
 			goto done;
 		}
-
+	}
+	while (nlri_len > 0) {
 		if (peer_has_add_path(peer, AID_INET, CAPA_AP_RECV)) {
 			if (nlri_len <= sizeof(pathid)) {
 				log_peer_warnx(&peer->conf,
@@ -1730,7 +1737,7 @@ rde_update_withdraw(struct rde_peer *peer, uint32_t path_id,
  * BGP UPDATE parser functions
  */
 
-/* attribute parser specific makros */
+/* attribute parser specific macros */
 #define UPD_READ(t, p, plen, n) \
 	do { \
 		memcpy(t, p, n); \

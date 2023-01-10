@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_both.c,v 1.82 2022/10/02 16:36:41 jsing Exp $ */
+/* $OpenBSD: d1_both.c,v 1.84 2022/12/26 07:31:44 jmc Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -123,9 +123,9 @@
 #include <openssl/x509.h>
 
 #include "bytestring.h"
-#include "dtls_locl.h"
+#include "dtls_local.h"
 #include "pqueue.h"
-#include "ssl_locl.h"
+#include "ssl_local.h"
 
 #define RSMBLY_BITMASK_SIZE(msg_len) (((msg_len) + 7) / 8)
 
@@ -806,7 +806,7 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 			s->init_num = 0;
 			goto again;
 		}
-		else /* Incorrectly formated Hello request */
+		else /* Incorrectly formatted Hello request */
 		{
 			al = SSL_AD_UNEXPECTED_MESSAGE;
 			SSLerror(s, SSL_R_UNEXPECTED_MESSAGE);
@@ -817,7 +817,7 @@ dtls1_get_message_fragment(SSL *s, int st1, int stn, long max, int *ok)
 	if ((al = dtls1_preprocess_fragment(s, &msg_hdr, max)))
 		goto fatal_err;
 
-	/* XDTLS:  ressurect this when restart is in place */
+	/* XDTLS:  resurrect this when restart is in place */
 	s->s3->hs.state = stn;
 
 	if (frag_len > 0) {
@@ -942,7 +942,7 @@ dtls1_buffer_message(SSL *s, int is_ccs)
 	hm_fragment *frag;
 	unsigned char seq64be[8];
 
-	/* Buffer the messsage in order to handle DTLS retransmissions. */
+	/* Buffer the message in order to handle DTLS retransmissions. */
 
 	/*
 	 * This function is called immediately after a message has

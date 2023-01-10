@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_sqrt.c,v 1.11 2022/06/20 15:02:21 tb Exp $ */
+/* $OpenBSD: bn_sqrt.c,v 1.14 2022/11/26 16:08:51 tb Exp $ */
 /* Written by Lenka Fibikova <fibikova@exp-math.uni-essen.de>
  * and Bodo Moeller for the OpenSSL project. */
 /* ====================================================================
@@ -57,16 +57,18 @@
 
 #include <openssl/err.h>
 
-#include "bn_lcl.h"
+#include "bn_local.h"
+
+/*
+ * Returns 'ret' such that ret^2 == a (mod p), if it exists, using the
+ * Tonelli-Shanks algorithm following Henri Cohen, "A Course in Computational
+ * Algebraic Number Theory", algorithm 1.5.1, Springer, Berlin, 1996.
+ *
+ * Note: 'p' must be prime!
+ */
 
 BIGNUM *
 BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
-/* Returns 'ret' such that
- *      ret^2 == a (mod p),
- * using the Tonelli/Shanks algorithm (cf. Henri Cohen, "A Course
- * in Algebraic Computational Number Theory", algorithm 1.5.1).
- * 'p' must be prime!
- */
 {
 	BIGNUM *ret = in;
 	int err = 1;
@@ -85,7 +87,6 @@ BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 					BN_free(ret);
 				return NULL;
 			}
-			bn_check_top(ret);
 			return ret;
 		}
 
@@ -103,7 +104,6 @@ BN_mod_sqrt(BIGNUM *in, const BIGNUM *a, const BIGNUM *p, BN_CTX *ctx)
 				BN_free(ret);
 			return NULL;
 		}
-		bn_check_top(ret);
 		return ret;
 	}
 
@@ -405,6 +405,5 @@ end:
 		ret = NULL;
 	}
 	BN_CTX_end(ctx);
-	bn_check_top(ret);
 	return ret;
 }

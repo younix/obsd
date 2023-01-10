@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmmvar.h,v 1.84 2022/11/10 11:46:39 dv Exp $	*/
+/*	$OpenBSD: vmmvar.h,v 1.86 2023/01/10 01:09:14 dv Exp $	*/
 /*
  * Copyright (c) 2014 Mike Larkin <mlarkin@openbsd.org>
  *
@@ -451,6 +451,10 @@ struct vm_mem_range {
 	paddr_t	vmr_gpa;
 	vaddr_t	vmr_va;
 	size_t	vmr_size;
+	int	vmr_type;
+#define VM_MEM_RAM		0	/* Presented as usable system memory. */
+#define VM_MEM_RESERVED		1	/* Reserved for BIOS, etc. */
+#define VM_MEM_MMIO		2	/* Special region for device mmio. */
 };
 
 /*
@@ -668,7 +672,9 @@ struct vm_mprotect_ept_params {
     SEFF0EBX_AVX512IFMA | SEFF0EBX_AVX512PF | \
     SEFF0EBX_AVX512ER | SEFF0EBX_AVX512CD | \
     SEFF0EBX_AVX512BW | SEFF0EBX_AVX512VL)
-#define VMM_SEFF0ECX_MASK ~(SEFF0ECX_AVX512VBMI)
+
+/* ECX mask contains the bits to include */
+#define VMM_SEFF0ECX_MASK (SEFF0ECX_PREFETCHWT1 | SEFF0ECX_UMIP | SEFF0ECX_PKU)
 
 /* EDX mask contains the bits to include */
 #define VMM_SEFF0EDX_MASK (SEFF0EDX_MD_CLEAR)

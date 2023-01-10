@@ -1,7 +1,6 @@
-/*	$OpenBSD: statd.c,v 1.4 2017/01/21 08:33:51 krw Exp $	*/
+/*	$OpenBSD: statd.c,v 1.6 2023/01/04 14:42:46 jsg Exp $	*/
 
 /*
- * Copyright (c) 1997 Christos Zoulas. All rights reserved.
  * Copyright (c) 1995
  *	A.R. Gordon (andrew.gordon@net-tel.co.uk).  All rights reserved.
  *
@@ -16,7 +15,6 @@
  * 3. All advertising materials mentioning features or use of this software
  *    must display the following acknowledgement:
  *	This product includes software developed for the FreeBSD project
- *	This product includes software developed by Christos Zoulas.
  * 4. Neither the name of the author nor the names of any co-contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -97,7 +95,6 @@ main(int argc, char **argv)
 			debug = 1;
 			break;
 		default:
-		case '?':
 			fprintf(stderr, "usage: %s [-d]\n", __progname);
 			exit(1);
 			/* NOTREACHED */

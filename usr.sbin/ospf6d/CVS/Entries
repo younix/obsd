@@ -9,7 +9,6 @@
 /printconf.c/1.10/Tue Jan 21 20:38:52 2020//
 /rde.h/1.25/Mon Feb 17 08:12:22 2020//
 /rde_spf.c/1.28/Sun Apr  5 18:19:04 2020//
-/util.c/1.3/Sun Dec  9 14:56:24 2018//
 /interface.c/1.29/Mon Jun  1 06:23:34 2020//
 /hello.c/1.23/Fri Dec 11 17:58:25 2020//
 /rde_lsdb.c/1.47/Sat May  1 08:41:52 2021//
@@ -31,4 +30,5 @@
 /rde.c/1.90/Mon Jan 24 14:35:16 2022//
 /ospf6d.8/1.20/Tue Jul 26 13:42:36 2022//
 /ospf6d.conf.5/1.25/Tue Jul 26 13:42:36 2022//
+/util.c/1.4/Tue Jan 10 10:06:03 2023//
 D

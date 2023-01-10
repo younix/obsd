@@ -1,4 +1,4 @@
-/*	$OpenBSD: in.c,v 1.177 2022/09/08 10:22:06 kn Exp $	*/
+/*	$OpenBSD: in.c,v 1.179 2022/12/06 22:19:39 mvs Exp $	*/
 /*	$NetBSD: in.c,v 1.26 1996/02/13 23:41:39 christos Exp $	*/
 
 /*
@@ -210,11 +210,15 @@ in_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp)
 #ifdef MROUTING
 	case SIOCGETVIFCNT:
 	case SIOCGETSGCNT:
+		KERNEL_LOCK();
 		error = mrt_ioctl(so, cmd, data);
+		KERNEL_UNLOCK();
 		break;
 #endif /* MROUTING */
 	default:
+		KERNEL_LOCK();
 		error = in_ioctl(cmd, data, ifp, privileged);
+		KERNEL_UNLOCK();
 		break;
 	}
 
@@ -881,10 +885,13 @@ in_addmulti(struct in_addr *ap, struct ifnet *ifp)
 		 */
 		memset(&ifr, 0, sizeof(ifr));
 		memcpy(&ifr.ifr_addr, &inm->inm_sin, sizeof(inm->inm_sin));
+		KERNEL_LOCK();
 		if ((*ifp->if_ioctl)(ifp, SIOCADDMULTI,(caddr_t)&ifr) != 0) {
+			KERNEL_UNLOCK();
 			free(inm, M_IPMADDR, sizeof(*inm));
 			return (NULL);
 		}
+		KERNEL_UNLOCK();
 
 		TAILQ_INSERT_HEAD(&ifp->if_maddrlist, &inm->inm_ifma,
 		    ifma_list);

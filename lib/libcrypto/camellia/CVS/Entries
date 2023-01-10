@@ -1,10 +1,10 @@
-/camellia.c/1.11/Sun Sep  4 14:31:29 2016//
 /camellia.h/1.5/Thu Nov 13 20:01:58 2014//
 /cmll_cbc.c/1.4/Thu Nov 13 20:01:58 2014//
 /cmll_cfb.c/1.4/Thu Nov 13 20:01:58 2014//
 /cmll_ctr.c/1.4/Thu Nov 13 20:01:58 2014//
-/cmll_ecb.c/1.4/Thu Nov 13 20:01:58 2014//
-/cmll_locl.h/1.6/Wed Dec 21 15:49:29 2016//
-/cmll_misc.c/1.6/Thu Nov 13 20:01:58 2014//
 /cmll_ofb.c/1.4/Thu Nov 13 20:01:58 2014//
 D/asm////
+/camellia.c/1.12/Tue Jan 10 10:05:30 2023//
+/cmll_ecb.c/1.5/Tue Jan 10 10:05:30 2023//
+/cmll_local.h/1.2/Sat Nov 26 17:23:17 2022//
+/cmll_misc.c/1.7/Tue Jan 10 10:05:30 2023//

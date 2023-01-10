@@ -1,4 +1,4 @@
-/*	$OpenBSD: asr_utils.c,v 1.18 2017/09/23 20:55:06 jca Exp $	*/
+/*	$OpenBSD: asr_utils.c,v 1.20 2022/12/27 17:10:06 jmc Exp $	*/
 /*
  * Copyright (c) 2009-2012	Eric Faurot	<eric@faurot.net>
  *
@@ -384,7 +384,7 @@ static int
 pack_dname(struct asr_pack *p, const char *dname)
 {
 	/* dname compression would be nice to have here.
-	 * need additionnal context.
+	 * need additional context.
 	 */
 	return (pack_data(p, dname, strlen(dname) + 1));
 }
@@ -562,4 +562,23 @@ _asr_addr_as_fqdn(const char *addr, int family, char *dst, size_t max)
 		return (-1);
 	}
 	return (0);
+}
+
+int
+hnok_lenient(const char *dn)
+{
+	int pch = '\0', ch = *dn++;
+
+	while (ch != '\0') {
+		/* can't start with . or - */
+		if (pch == '\0' && (ch == '.' || ch == '-'))
+			return 0;
+		if (pch == '.' && ch == '.')
+			return 0;
+		if (!(isalpha((unsigned char)ch) || isdigit((unsigned char)ch) ||
+		    ch == '.' || ch == '-' || ch == '_'))
+			return 0;
+		pch = ch; ch = *dn++;
+	}
+	return 1;
 }

@@ -1,5 +1,4 @@
 /_float.h/1.1/Tue Jun 26 16:12:44 2012//
-/_types.h/1.23/Mon Mar  5 01:15:25 2018//
 /acpiapm.h/1.1/Sun Nov 25 15:45:17 2007//
 /amdmsr.h/1.4/Wed Mar 23 16:54:35 2011//
 /apicvar.h/1.6/Wed Mar 23 16:54:35 2011//
@@ -18,7 +17,6 @@
 /gdt.h/1.17/Wed Apr 11 15:44:08 2018//
 /hibernate.h/1.10/Thu Jun 21 07:33:30 2018//
 /hibernate_var.h/1.15/Fri Jan  9 03:43:52 2015//
-/i82093reg.h/1.5/Sun Jun  5 19:36:25 2011//
 /i82093var.h/1.11/Sat May 21 15:14:57 2011//
 /i82489reg.h/1.5/Fri Jul 26 04:35:38 2019//
 /i8259.h/1.7/Wed Sep  2 13:39:23 2015//
@@ -66,10 +64,12 @@
 /param.h/1.51/Mon Jun 27 13:02:00 2022//
 /pcb.h/1.25/Mon Jun 27 13:02:00 2022//
 /conf.h/1.20/Tue Jul 26 13:42:34 2022//
-/asm.h/1.18/Fri Sep  2 14:00:19 2022//
 /atomic.h/1.20/Fri Sep  2 14:00:19 2022//
 /cputypes.h/1.15/Fri Sep  2 14:00:19 2022//
 /pmap.h/1.91/Fri Sep  2 14:00:19 2022//
-/specialreg.h/1.80/Fri Sep  2 14:00:19 2022//
-/cpu.h/1.180/Fri Nov 11 20:28:24 2022//
+/_types.h/1.24/Tue Jan 10 10:05:50 2023//
+/asm.h/1.19/Tue Jan 10 10:05:50 2023//
+/cpu.h/1.181/Tue Jan 10 10:05:50 2023//
+/i82093reg.h/1.6/Tue Jan 10 10:05:50 2023//
+/specialreg.h/1.81/Tue Jan 10 10:05:50 2023//
 D

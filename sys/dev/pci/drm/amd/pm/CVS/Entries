@@ -1,5 +1,7 @@
 D/inc////
 D/powerplay////
 D/swsmu////
-/amdgpu_dpm.c/1.3/Tue Jul 26 13:42:35 2022//
-/amdgpu_pm.c/1.5/Tue Jul 26 13:42:35 2022//
+/amdgpu_dpm.c/1.4/Tue Jan 10 10:05:56 2023//
+/amdgpu_dpm_internal.c/1.1/Sun Jan  1 01:34:52 2023//
+/amdgpu_pm.c/1.6/Tue Jan 10 10:05:56 2023//
+D/legacy-dpm////

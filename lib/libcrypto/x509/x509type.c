@@ -1,4 +1,4 @@
-/* $OpenBSD: x509type.c,v 1.15 2021/12/12 21:30:14 tb Exp $ */
+/* $OpenBSD: x509type.c,v 1.17 2022/11/26 16:08:55 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -62,8 +62,8 @@
 #include <openssl/objects.h>
 #include <openssl/x509.h>
 
-#include "evp_locl.h"
-#include "x509_lcl.h"
+#include "evp_local.h"
+#include "x509_local.h"
 
 int
 X509_certificate_type(const X509 *x, const EVP_PKEY *pkey)
@@ -124,3 +124,4 @@ X509_certificate_type(const X509 *x, const EVP_PKEY *pkey)
 		ret |= EVP_PKT_EXP;
 	return (ret);
 }
+LCRYPTO_ALIAS(X509_certificate_type)

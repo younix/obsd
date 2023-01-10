@@ -1,4 +1,4 @@
-/*	$OpenBSD: gencat.c,v 1.20 2019/07/25 13:53:57 schwarze Exp $	*/
+/*	$OpenBSD: gencat.c,v 1.22 2022/12/26 19:16:01 jmc Exp $	*/
 /*	$NetBSD: gencat.c,v 1.9 1998/10/09 17:00:56 itohy Exp $	*/
 
 /*-
@@ -139,7 +139,6 @@ main(int argc, char *argv[])
 
 	while ((c = getopt(argc, argv, "")) != -1) {
 		switch (c) {
-		case '?':
 		default:
 			usage();
 			/* NOTREACHED */
@@ -389,7 +388,7 @@ getmsg(int fd, char *cptr, char quote)
 						++cptr;
 					}
 				} else {
-					warning(cptr, "unrecognized escape sequence; ignoring esacpe character");
+					warning(cptr, "unrecognized escape sequence; ignoring escape character");
 				}
 				break;
 			}
