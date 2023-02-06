@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap.h,v 1.60 2021/05/30 15:08:08 visa Exp $	*/
+/*	$OpenBSD: pmap.h,v 1.63 2023/01/31 15:18:55 deraadt Exp $	*/
 /*	$NetBSD: pmap.h,v 1.1 1996/09/30 16:34:29 ws Exp $	*/
 
 /*-
@@ -141,8 +141,11 @@ int pmap_test_attrs(struct vm_page *, unsigned int);
 void pmap_pinit(struct pmap *);
 void pmap_release(struct pmap *);
 
+#ifdef ALTIVEC
+int pmap_copyinsn(pmap_t, vaddr_t, uint32_t *);
+#endif
+
 void pmap_real_memory(vaddr_t *start, vsize_t *size);
-void switchexit(struct proc *);
 
 int pte_spill_v(struct pmap *pm, u_int32_t va, u_int32_t dsisr, int exec_fault);
 #define pmap_copy(dst_pmap, src_pmap, dst_addr, len, src_addr) ;
@@ -150,6 +153,8 @@ int reserve_dumppages(caddr_t p);
 
 #define pmap_unuse_final(p)		/* nothing */
 #define	pmap_remove_holes(vm)		do { /* nothing */ } while (0)
+
+#define PMAP_CHECK_COPYIN	(ppc_proc_is_64b == 0)
 
 #define	PMAP_STEAL_MEMORY
 

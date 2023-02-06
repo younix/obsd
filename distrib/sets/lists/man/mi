@@ -1489,7 +1489,6 @@
 ./usr/share/man/man4/i386/autoconf.4
 ./usr/share/man/man4/i386/bios.4
 ./usr/share/man/man4/i386/cpu.4
-./usr/share/man/man4/i386/elansc.4
 ./usr/share/man/man4/i386/esm.4
 ./usr/share/man/man4/i386/geodesc.4
 ./usr/share/man/man4/i386/glxpcib.4
@@ -1903,6 +1902,7 @@
 ./usr/share/man/man4/sk.4
 ./usr/share/man/man4/sm.4
 ./usr/share/man/man4/smsc.4
+./usr/share/man/man4/sncodec.4
 ./usr/share/man/man4/softraid.4
 ./usr/share/man/man4/sparc64/agten.4
 ./usr/share/man/man4/sparc64/apio.4
@@ -2048,6 +2048,7 @@
 ./usr/share/man/man4/udl.4
 ./usr/share/man/man4/udp.4
 ./usr/share/man/man4/udsbr.4
+./usr/share/man/man4/ufshci.4
 ./usr/share/man/man4/uftdi.4
 ./usr/share/man/man4/ugen.4
 ./usr/share/man/man4/ugl.4
@@ -2477,6 +2478,7 @@
 ./usr/share/man/man8/lpc.8
 ./usr/share/man/man8/lpd.8
 ./usr/share/man/man8/luna88k/MAKEDEV.8
+./usr/share/man/man8/luna88k/boot.8
 ./usr/share/man/man8/luna88k/boot_luna88k.8
 ./usr/share/man/man8/macppc/MAKEDEV.8
 ./usr/share/man/man8/macppc/boot.8

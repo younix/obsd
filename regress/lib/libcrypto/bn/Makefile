@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.18 2022/12/17 22:31:10 tb Exp $
+#	$OpenBSD: Makefile,v 1.21 2023/01/31 05:13:28 jsing Exp $
 
 PROGS +=	bn_add_sub
 PROGS +=	bn_cmp
@@ -8,6 +8,7 @@ PROGS +=	bn_mod_exp2_mont
 PROGS +=	bn_mod_exp_zero
 PROGS +=	bn_mod_sqrt
 PROGS +=	bn_mont
+PROGS +=	bn_mul_div
 PROGS +=	bn_primes
 PROGS +=	bn_rand_interval
 PROGS +=	bn_shift
@@ -28,6 +29,7 @@ DPADD =		${LIBCRYPTO}
 WARNINGS =	Yes
 CFLAGS +=	-Wall -Wundef -Werror
 CFLAGS +=	-I${.CURDIR}/../../../../lib/libcrypto/bn/
+CFLAGS +=	-I${.CURDIR}/../../../../lib/libcrypto/bn/arch/${MACHINE_CPU}/
 
 # Use default targets from bsd.regress.mk unless overridden below
 REGRESS_TARGETS = ${PROGS:S/^/run-regress-/}
@@ -60,7 +62,8 @@ run-bc: bn_test.out
 
 CLEANFILES +=	bn_test.out bc.out
 
-benchmark: bn_shift
+benchmark: bn_mul_div bn_shift
+	./bn_mul_div --benchmark
 	./bn_shift --benchmark
 .PHONY: benchmark
 

@@ -10,9 +10,9 @@
 /gost_local.h/1.2/Sat Nov 26 17:23:18 2022//
 /gostr341001.c/1.11/Tue Jan 10 10:05:30 2023//
 /gostr341001_ameth.c/1.20/Tue Jan 10 10:05:30 2023//
-/gostr341001_key.c/1.10/Tue Jan 10 10:05:30 2023//
 /gostr341001_params.c/1.5/Tue Jan 10 10:05:30 2023//
 /gostr341001_pmeth.c/1.17/Tue Jan 10 10:05:30 2023//
 /gostr341194.c/1.6/Tue Jan 10 10:05:30 2023//
 /streebog.c/1.8/Tue Jan 10 10:05:30 2023//
+/gostr341001_key.c/1.11/Mon Feb  6 19:36:33 2023//
 D

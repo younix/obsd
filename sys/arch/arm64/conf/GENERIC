@@ -1,4 +1,4 @@
-# $OpenBSD: GENERIC,v 1.252 2022/12/24 10:51:27 patrick Exp $
+# $OpenBSD: GENERIC,v 1.256 2023/02/04 23:11:59 mglocker Exp $
 #
 # GENERIC machine description file
 #
@@ -62,6 +62,7 @@ ipmi*		at acpi?
 ohci*		at acpi?
 pluart*		at acpi?
 sdhc*		at acpi?
+ufshci*		at acpi?
 xhci*		at acpi?
 simplebus*	at fdt?
 
@@ -316,6 +317,7 @@ qciic*		at acpi?
 qciic*		at fdt?
 iic*		at qciic?
 qcpdc*		at fdt?
+qcscm*		at fdt?
 qcspmi*		at fdt?
 qcpmic*		at qcspmi?
 qcpmicgpio*	at qcpmic?
@@ -377,6 +379,10 @@ mpi*		at pci?			# LSI Logic Fusion MPT Message Passing Interface
 mpii*		at pci?			# LSI Fusion MPT Message Passing Interface II
 mfi*		at pci?			# LSI MegaRAID SAS controllers
 mfii*		at pci?			# LSI MegaRAID SAS Fusion controller
+
+# PCI Audio
+azalia*		at pci?			# High Definition Audio
+audio*		at azalia?
 
 # USB Controllers
 ohci*		at pci?			# Open Host Controller
@@ -550,6 +556,7 @@ pcfrtc*		at iic?			# PCF8523 RTC
 pcxrtc*		at iic?			# PCF8563 RTC
 pcyrtc*		at iic?			# PCF85063A/TP RTC
 rkpmic*		at iic?			# RK808 PMIC
+sncodec*	at iic?			# TAS2764 audio codec
 sypwr*		at iic?			# SY8106A regulator
 tascodec*	at iic?			# TAS2770 audio codec
 tcpci*		at iic?			# USB Type-C controller

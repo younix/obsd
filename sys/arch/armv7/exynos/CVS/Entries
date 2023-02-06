@@ -1,7 +1,6 @@
 /crosecvar.h/1.2/Sun Jul 19 01:13:27 2015//
 /exclockvar.h/1.1/Mon Jan 26 02:48:24 2015//
 /exdisplayvar.h/1.1/Mon Jan 26 02:48:24 2015//
-/crosec_kbd.c/1.4/Wed Sep  1 16:07:38 2021//
 /ec_commands.h/1.3/Wed Sep  1 16:07:38 2021//
 /files.exynos/1.14/Wed Sep  1 16:07:38 2021//
 /crosec.c/1.5/Mon Nov 15 19:06:15 2021//
@@ -15,4 +14,5 @@
 /exmct.c/1.6/Mon Nov 15 19:06:15 2021//
 /expower.c/1.10/Mon Nov 15 19:06:15 2021//
 /tps65090.c/1.6/Mon Nov 15 19:06:15 2021//
+/crosec_kbd.c/1.5/Mon Feb  6 19:37:02 2023//
 D

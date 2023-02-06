@@ -152,11 +152,9 @@
 /amdgpu_cik.c/1.6/Tue Jul 26 13:42:35 2022//
 /amdgpu_si.c/1.6/Tue Jul 26 13:42:35 2022//
 /aldebaran.c/1.2/Tue Jan 10 10:05:53 2023//
-/amdgpu.h/1.13/Tue Jan 10 10:05:53 2023//
 /amdgpu_acp.c/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_acpi.c/1.9/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd.c/1.8/Tue Jan 10 10:05:53 2023//
-/amdgpu_amdkfd.h/1.8/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd_aldebaran.c/1.2/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd_arcturus.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd_arcturus.h/1.2/Tue Jan 10 10:05:53 2023//
@@ -168,7 +166,6 @@
 /amdgpu_amdkfd_gfx_v8.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd_gfx_v9.c/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_amdkfd_gfx_v9.h/1.4/Tue Jan 10 10:05:53 2023//
-/amdgpu_amdkfd_gpuvm.c/1.8/Tue Jan 10 10:05:53 2023//
 /amdgpu_atom.c/1.7/Tue Jan 10 10:05:53 2023//
 /amdgpu_atombios.c/1.7/Tue Jan 10 10:05:53 2023//
 /amdgpu_atombios.h/1.4/Tue Jan 10 10:05:53 2023//
@@ -189,16 +186,12 @@
 /amdgpu_ctx.h/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_debugfs.c/1.9/Tue Jan 10 10:05:53 2023//
 /amdgpu_debugfs.h/1.5/Tue Jan 10 10:05:53 2023//
-/amdgpu_device.c/1.37/Tue Jan 10 10:05:53 2023//
-/amdgpu_devlist.h/1.8/Tue Jan 10 10:05:53 2023//
 /amdgpu_df.h/1.4/Tue Jan 10 10:05:53 2023//
-/amdgpu_discovery.c/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_discovery.h/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_display.c/1.9/Tue Jan 10 10:05:53 2023//
 /amdgpu_display.h/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_dma_buf.c/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_doorbell.h/1.4/Tue Jan 10 10:05:53 2023//
-/amdgpu_drv.c/1.23/Tue Jan 10 10:05:53 2023//
 /amdgpu_drv.h/1.2/Tue Jan 10 10:05:53 2023//
 /amdgpu_encoders.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_fdinfo.c/1.2/Tue Jan 10 10:05:53 2023//
@@ -207,10 +200,8 @@
 /amdgpu_gart.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_gart.h/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_gem.c/1.9/Tue Jan 10 10:05:53 2023//
-/amdgpu_gfx.c/1.7/Tue Jan 10 10:05:53 2023//
 /amdgpu_gfx.h/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_gfxhub.h/1.3/Tue Jan 10 10:05:53 2023//
-/amdgpu_gmc.c/1.7/Tue Jan 10 10:05:53 2023//
 /amdgpu_gmc.h/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_gtt_mgr.c/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_hdp.h/1.2/Tue Jan 10 10:05:53 2023//
@@ -222,7 +213,6 @@
 /amdgpu_imu.h/1.1/Sun Jan  1 01:34:34 2023//
 /amdgpu_ioc32.c/1.3/Tue Jan 10 10:05:53 2023//
 /amdgpu_irq.c/1.8/Tue Jan 10 10:05:53 2023//
-/amdgpu_job.c/1.7/Tue Jan 10 10:05:53 2023//
 /amdgpu_job.h/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_jpeg.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_jpeg.h/1.3/Tue Jan 10 10:05:53 2023//
@@ -239,12 +229,10 @@
 /amdgpu_mode.h/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_nbio.c/1.3/Tue Jan 10 10:05:53 2023//
 /amdgpu_nbio.h/1.4/Tue Jan 10 10:05:53 2023//
-/amdgpu_object.c/1.12/Tue Jan 10 10:05:53 2023//
 /amdgpu_object.h/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_pll.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_pmu.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_preempt_mgr.c/1.2/Tue Jan 10 10:05:53 2023//
-/amdgpu_psp.c/1.16/Tue Jan 10 10:05:53 2023//
 /amdgpu_psp.h/1.5/Tue Jan 10 10:05:53 2023//
 /amdgpu_psp_ta.c/1.1/Sun Jan  1 01:34:34 2023//
 /amdgpu_psp_ta.h/1.1/Sun Jan  1 01:34:34 2023//
@@ -289,7 +277,6 @@
 /amdgpu_vm_cpu.c/1.4/Tue Jan 10 10:05:53 2023//
 /amdgpu_vm_pt.c/1.1/Sun Jan  1 01:34:35 2023//
 /amdgpu_vm_sdma.c/1.4/Tue Jan 10 10:05:53 2023//
-/amdgpu_vram_mgr.c/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_vram_mgr.h/1.1/Sun Jan  1 01:34:35 2023//
 /amdgpu_xgmi.c/1.6/Tue Jan 10 10:05:53 2023//
 /amdgpu_xgmi.h/1.4/Tue Jan 10 10:05:53 2023//
@@ -310,7 +297,6 @@
 /df_v1_7.c/1.4/Tue Jan 10 10:05:53 2023//
 /df_v3_6.c/1.6/Tue Jan 10 10:05:53 2023//
 /gfx_v10_0.c/1.7/Tue Jan 10 10:05:53 2023//
-/gfx_v11_0.c/1.1/Sun Jan  1 01:34:35 2023//
 /gfx_v11_0.h/1.1/Sun Jan  1 01:34:35 2023//
 /gfx_v6_0.c/1.5/Tue Jan 10 10:05:53 2023//
 /gfx_v7_0.c/1.5/Tue Jan 10 10:05:53 2023//
@@ -329,7 +315,6 @@
 /gfxhub_v3_0_3.c/1.1/Sun Jan  1 01:34:35 2023//
 /gfxhub_v3_0_3.h/1.1/Sun Jan  1 01:34:35 2023//
 /gmc_v10_0.c/1.9/Tue Jan 10 10:05:53 2023//
-/gmc_v11_0.c/1.1/Sun Jan  1 01:34:35 2023//
 /gmc_v11_0.h/1.1/Sun Jan  1 01:34:35 2023//
 /gmc_v6_0.c/1.6/Tue Jan 10 10:05:53 2023//
 /gmc_v7_0.c/1.7/Tue Jan 10 10:05:53 2023//
@@ -360,7 +345,6 @@
 /lsdma_v6_0.h/1.1/Sun Jan  1 01:34:35 2023//
 /mca_v3_0.c/1.2/Tue Jan 10 10:05:53 2023//
 /mes_v10_1.c/1.4/Tue Jan 10 10:05:53 2023//
-/mes_v11_0.c/1.2/Mon Jan  9 04:01:17 2023//
 /mes_v11_0.h/1.1/Sun Jan  1 01:34:35 2023//
 /mmhub_v1_0.c/1.8/Tue Jan 10 10:05:53 2023//
 /mmhub_v1_0.h/1.5/Tue Jan 10 10:05:53 2023//
@@ -398,7 +382,6 @@
 /psp_v10_0.c/1.8/Tue Jan 10 10:05:53 2023//
 /psp_v11_0.c/1.4/Tue Jan 10 10:05:53 2023//
 /psp_v12_0.c/1.6/Tue Jan 10 10:05:53 2023//
-/psp_v13_0.c/1.2/Tue Jan 10 10:05:53 2023//
 /psp_v13_0_4.c/1.1/Sun Jan  1 01:34:35 2023//
 /psp_v13_0_4.h/1.1/Sun Jan  1 01:34:35 2023//
 /psp_v3_1.c/1.6/Tue Jan 10 10:05:53 2023//
@@ -425,7 +408,6 @@
 /soc15.c/1.19/Tue Jan 10 10:05:53 2023//
 /soc15.h/1.5/Tue Jan 10 10:05:53 2023//
 /soc15_common.h/1.6/Tue Jan 10 10:05:53 2023//
-/soc21.c/1.1/Sun Jan  1 01:34:35 2023//
 /soc21.h/1.1/Sun Jan  1 01:34:35 2023//
 /ta_ras_if.h/1.4/Tue Jan 10 10:05:53 2023//
 /umc_v6_1.c/1.4/Tue Jan 10 10:05:53 2023//
@@ -453,4 +435,22 @@
 /vega10_ih.c/1.5/Tue Jan 10 10:05:53 2023//
 /vega20_ih.c/1.3/Tue Jan 10 10:05:53 2023//
 /vi.c/1.8/Tue Jan 10 10:05:53 2023//
+/amdgpu.h/1.14/Mon Feb  6 19:37:08 2023//
+/amdgpu_amdkfd.h/1.9/Mon Feb  6 19:37:08 2023//
+/amdgpu_amdkfd_gpuvm.c/1.10/Mon Feb  6 19:37:08 2023//
+/amdgpu_device.c/1.38/Mon Feb  6 19:37:08 2023//
+/amdgpu_devlist.h/1.9/Mon Feb  6 19:37:08 2023//
+/amdgpu_discovery.c/1.14/Mon Feb  6 19:37:08 2023//
+/amdgpu_drv.c/1.25/Mon Feb  6 19:37:08 2023//
+/amdgpu_gfx.c/1.9/Mon Feb  6 19:37:08 2023//
+/amdgpu_gmc.c/1.9/Mon Feb  6 19:37:08 2023//
+/amdgpu_job.c/1.8/Mon Feb  6 19:37:08 2023//
+/amdgpu_object.c/1.14/Mon Feb  6 19:37:08 2023//
+/amdgpu_psp.c/1.17/Mon Feb  6 19:37:08 2023//
+/amdgpu_vram_mgr.c/1.7/Mon Feb  6 19:37:08 2023//
+/gfx_v11_0.c/1.5/Mon Feb  6 19:37:08 2023//
+/gmc_v11_0.c/1.2/Mon Feb  6 19:37:08 2023//
+/mes_v11_0.c/1.3/Mon Feb  6 19:37:08 2023//
+/psp_v13_0.c/1.3/Mon Feb  6 19:37:08 2023//
+/soc21.c/1.7/Mon Feb  6 19:37:08 2023//
 D

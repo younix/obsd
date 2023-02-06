@@ -1,4 +1,4 @@
-/* $OpenBSD: tmux.h,v 1.1190 2023/01/06 07:09:27 nicm Exp $ */
+/* $OpenBSD: tmux.h,v 1.1194 2023/02/05 21:15:33 nicm Exp $ */
 
 /*
  * Copyright (c) 2007 Nicholas Marriott <nicholas.marriott@gmail.com>
@@ -131,13 +131,14 @@ struct winlink;
 #define KEYC_SHIFT           0x00400000000000ULL
 
 /* Key flag bits. */
-#define KEYC_LITERAL         0x01000000000000ULL
-#define KEYC_KEYPAD          0x02000000000000ULL
-#define KEYC_CURSOR          0x04000000000000ULL
+#define KEYC_LITERAL	     0x01000000000000ULL
+#define KEYC_KEYPAD	     0x02000000000000ULL
+#define KEYC_CURSOR	     0x04000000000000ULL
 #define KEYC_IMPLIED_META    0x08000000000000ULL
 #define KEYC_BUILD_MODIFIERS 0x10000000000000ULL
-#define KEYC_VI              0x20000000000000ULL
-#define KEYC_EXTENDED        0x40000000000000ULL
+#define KEYC_VI		     0x20000000000000ULL
+#define KEYC_EXTENDED	     0x40000000000000ULL
+#define KEYC_SENT	     0x80000000000000ULL
 
 /* Masks for key bits. */
 #define KEYC_MASK_MODIFIERS  0x00f00000000000ULL
@@ -1811,6 +1812,7 @@ struct client {
 #define CLIENT_CONTROL_WAITEXIT 0x200000000ULL
 #define CLIENT_WINDOWSIZECHANGED 0x400000000ULL
 #define CLIENT_CLIPBOARDBUFFER 0x800000000ULL
+#define CLIENT_BRACKETPASTING 0x1000000000ULL
 #define CLIENT_ALLREDRAWFLAGS		\
 	(CLIENT_REDRAWWINDOW|		\
 	 CLIENT_REDRAWSTATUS|		\
@@ -2676,6 +2678,7 @@ struct client_window *server_client_add_client_window(struct client *, u_int);
 struct window_pane *server_client_get_pane(struct client *);
 void	 server_client_set_pane(struct client *, struct window_pane *);
 void	 server_client_remove_pane(struct window_pane *);
+void	 server_client_print(struct client *, int, struct evbuffer *);
 
 /* server-fn.c */
 void	 server_redraw_client(struct client *);
@@ -3290,11 +3293,11 @@ void		 menu_add_item(struct menu *, const struct menu_item *,
 		    struct cmdq_item *, struct client *,
 		    struct cmd_find_state *);
 void		 menu_free(struct menu *);
-struct menu_data *menu_prepare(struct menu *, int, struct cmdq_item *, u_int,
-		    u_int, struct client *, struct cmd_find_state *,
+struct menu_data *menu_prepare(struct menu *, int, int, struct cmdq_item *,
+		    u_int, u_int, struct client *, struct cmd_find_state *,
 		    menu_choice_cb, void *);
-int		 menu_display(struct menu *, int, struct cmdq_item *, u_int,
-		    u_int, struct client *, struct cmd_find_state *,
+int		 menu_display(struct menu *, int, int, struct cmdq_item *,
+		    u_int, u_int, struct client *, struct cmd_find_state *,
 		    menu_choice_cb, void *);
 struct screen	*menu_mode_cb(struct client *, void *, u_int *, u_int *);
 void		 menu_check_cb(struct client *, void *, u_int, u_int, u_int,

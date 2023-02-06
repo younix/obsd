@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.134 2021/07/24 08:21:13 visa Exp $ */
+/*	$OpenBSD: machdep.c,v 1.136 2023/02/04 19:19:36 cheloha Exp $ */
 
 /*
  * Copyright (c) 2009, 2010 Miodrag Vallat.
@@ -149,7 +149,6 @@ u_int		ioclock_get_timecount(struct timecounter *);
 
 struct timecounter ioclock_timecounter = {
 	.tc_get_timecount = ioclock_get_timecount,
-	.tc_poll_pps = NULL,
 	.tc_counter_mask = 0xffffffff,	/* truncated to 32 bits */
 	.tc_frequency = 0,		/* determined at runtime */
 	.tc_name = "ioclock",
@@ -793,7 +792,7 @@ octeon_tlb_init(void)
 	pgrain |= PGRAIN_ELPA;
 #endif
 	if (cp0_get_config_3() & CONFIG3_RXI)
-		pgrain |= PGRAIN_XIE;
+		pgrain |= (PGRAIN_RIE | PGRAIN_XIE);
 	cp0_set_pagegrain(pgrain);
 
 	tlb_init(bootcpu_hwinfo.tlbsize);

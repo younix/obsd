@@ -1,4 +1,4 @@
-/*	$OpenBSD: trap.c,v 1.124 2023/01/09 11:18:44 miod Exp $	*/
+/*	$OpenBSD: trap.c,v 1.126 2023/01/31 15:18:54 deraadt Exp $	*/
 /*
  * Copyright (c) 2004, Miodrag Vallat.
  * Copyright (c) 1998 Steve Murphree, Jr.
@@ -535,7 +535,7 @@ user_fault:
 			vaddr_t pc = PC_REGS(&frame->tf_regs);
 
 			/* read break instruction */
-			copyin((caddr_t)pc, &instr, sizeof(u_int));
+			copyinsn(p, (u_int32_t *)pc, (u_int32_t *)&instr);
 
 			/* check and see if we got here by accident */
 			if ((p->p_md.md_bp0va != pc &&
@@ -668,8 +668,8 @@ m88110_trap(u_int type, struct trapframe *frame)
 				    (frame->tf_exip + 4) | 1, frame->tf_enip);
 		} else {
 			/* copyin here should not fail */
-			if (copyin((const void *)frame->tf_exip, &instr,
-			    sizeof instr) == 0 &&
+			if (copyinsn(p, (u_int32_t *)frame->tf_exip,
+			    (u_int32_t *)&instr) == 0 &&
 			    instr == 0xf400cc01) {
 				uprintf("mc88110 errata #16, exip 0x%lx enip 0x%lx",
 				    (frame->tf_exip + 4) | 1, frame->tf_enip);
@@ -1075,7 +1075,7 @@ m88110_user_fault:
 			vaddr_t pc = PC_REGS(&frame->tf_regs);
 
 			/* read break instruction */
-			copyin((caddr_t)pc, &instr, sizeof(u_int));
+			copyinsn(p, (u_int32_t *)pc, (u_int32_t *)&instr);
 
 			/* check and see if we got here by accident */
 			if ((p->p_md.md_bp0va != pc &&
@@ -1155,7 +1155,7 @@ m88100_syscall(register_t code, struct trapframe *tf)
 	int i, nap;
 	const struct sysent *callp;
 	struct proc *p = curproc;
-	int error;
+	int error, indirect = -1;
 	register_t args[8] __aligned(8);
 	register_t rval[2] __aligned(8);
 	register_t *ap;
@@ -1176,10 +1176,12 @@ m88100_syscall(register_t code, struct trapframe *tf)
 
 	switch (code) {
 	case SYS_syscall:
+		indirect = code;
 		code = *ap++;
 		nap--;
 		break;
 	case SYS___syscall:
+		indirect = code;
 		code = ap[_QUAD_LOWWORD];
 		ap += 2;
 		nap -= 2;
@@ -1206,7 +1208,7 @@ m88100_syscall(register_t code, struct trapframe *tf)
 	rval[0] = 0;
 	rval[1] = tf->tf_r[3];
 
-	error = mi_syscall(p, code, callp, args, rval);
+	error = mi_syscall(p, code, indirect, callp, args, rval);
 
 	/*
 	 * system call will look like:
@@ -1660,7 +1662,7 @@ double_reg_fixup(struct trapframe *frame, int fault)
 	 */
 
 	pc = PC_REGS(&frame->tf_regs);
-	if (copyin((void *)pc, &instr, sizeof(u_int32_t)) != 0)
+	if (copyinsn(NULL, (u_int32_t *)pc, (u_int32_t *)&instr) != 0)
 		return SIGSEGV;
 
 	switch (instr & 0xfc00ff00) {

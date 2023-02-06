@@ -40,7 +40,6 @@
 /getlogin.c/1.15/Sat Aug 12 22:59:52 2017//
 /getmntinfo.c/1.11/Fri Jun 28 13:32:41 2019//
 /getnetgrent.3/1.14/Wed Jun  5 03:39:22 2013//
-/getpagesize.3/1.11/Wed Jun  5 03:39:22 2013//
 /getpass.3/1.18/Sat Sep  3 12:47:28 2016//
 /getprogname.3/1.5/Tue May  5 14:37:20 2015//
 /getprogname.c/1.4/Sun Mar 13 18:34:20 2016//
@@ -204,7 +203,6 @@
 /isalpha.3/1.14/Tue Sep 20 07:19:20 2022//
 /isblank.3/1.14/Tue Sep 20 07:19:20 2022//
 /iscntrl.3/1.14/Tue Sep 20 07:19:20 2022//
-/isdigit.3/1.13/Tue Sep 20 07:19:20 2022//
 /isgraph.3/1.13/Tue Sep 20 07:19:20 2022//
 /islower.3/1.14/Tue Sep 20 07:19:20 2022//
 /isprint.3/1.13/Tue Sep 20 07:19:20 2022//
@@ -230,4 +228,6 @@
 /nlist.c/1.72/Tue Jan 10 10:05:29 2023//
 /pause.3/1.17/Tue Jan 10 10:05:29 2023//
 /pwcache.c/1.16/Tue Jan 10 10:05:29 2023//
+/getpagesize.3/1.12/Mon Feb  6 19:36:31 2023//
+/isdigit.3/1.14/Mon Feb  6 19:36:31 2023//
 D

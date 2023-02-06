@@ -66,7 +66,6 @@
 /vega10_hwmgr.h/1.2/Mon Jan 24 14:35:15 2022//
 /vega10_pptable.h/1.2/Mon Jan 24 14:35:15 2022//
 /vega10_processpptables.c/1.2/Mon Jan 24 14:35:15 2022//
-/vega10_thermal.c/1.2/Mon Jan 24 14:35:15 2022//
 /vega10_thermal.h/1.2/Mon Jan 24 14:35:15 2022//
 /vega12_hwmgr.c/1.2/Mon Jan 24 14:35:15 2022//
 /vega12_thermal.c/1.2/Mon Jan 24 14:35:15 2022//
@@ -81,4 +80,5 @@
 /vega10_hwmgr.c/1.5/Tue Jan 10 10:05:56 2023//
 /vega12_processpptables.c/1.3/Tue Jan 10 10:05:56 2023//
 /vega20_hwmgr.c/1.3/Tue Jan 10 10:05:56 2023//
+/vega10_thermal.c/1.3/Mon Feb  6 19:37:10 2023//
 D

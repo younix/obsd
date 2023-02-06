@@ -1,5 +1,4 @@
 /_float.h/1.1/Tue Jun 26 16:12:45 2012//
-/_types.h/1.23/Mon Mar  5 01:15:25 2018//
 /apmvar.h/1.7/Tue Jan 22 02:36:30 2019//
 /atomic.h/1.15/Tue Jul  4 09:00:12 2017//
 /autoconf.h/1.18/Thu Jun 26 05:42:13 2008//
@@ -47,12 +46,13 @@
 /vmparam.h/1.33/Thu Sep  2 14:22:31 2021//
 /conf.h/1.27/Tue Jul 26 13:42:35 2022//
 /bus.h/1.36/Sat Nov  5 22:12:17 2022//
-/cpu.h/1.100/Sat Nov  5 22:12:17 2022//
 /db_machdep.h/1.23/Sat Nov  5 22:12:17 2022//
 /frame.h/1.8/Sat Nov  5 22:12:17 2022//
 /pcb.h/1.11/Sat Nov  5 22:12:17 2022//
 /proc.h/1.8/Sat Nov  5 22:12:17 2022//
 /reg.h/1.7/Sat Nov  5 22:12:17 2022//
-/asm.h/1.17/Tue Jan 10 10:05:52 2023//
-/pmap.h/1.33/Tue Jan 10 10:05:52 2023//
+/_types.h/1.24/Mon Feb  6 19:37:06 2023//
+/asm.h/1.18/Mon Feb  6 19:37:06 2023//
+/cpu.h/1.101/Mon Feb  6 19:37:06 2023//
+/pmap.h/1.36/Mon Feb  6 19:37:06 2023//
 D

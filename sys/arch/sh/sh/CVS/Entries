@@ -20,8 +20,8 @@
 /sh_machdep.c/1.55/Sat Nov  5 22:12:16 2022//
 /clock.c/1.12/Tue Jan 10 10:05:52 2023//
 /locore_c.c/1.14/Tue Jan 10 10:05:52 2023//
-/locore_subr.S/1.14/Tue Jan 10 10:05:52 2023//
 /pmap.c/1.30/Tue Jan 10 10:05:52 2023//
-/trap.c/1.52/Tue Jan 10 10:05:52 2023//
 /vectors.S/1.9/Tue Jan 10 10:05:52 2023//
+/locore_subr.S/1.15/Mon Feb  6 19:37:05 2023//
+/trap.c/1.53/Mon Feb  6 19:37:05 2023//
 D

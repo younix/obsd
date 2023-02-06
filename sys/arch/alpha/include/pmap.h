@@ -1,4 +1,4 @@
-/* $OpenBSD: pmap.h,v 1.42 2022/09/12 19:35:20 miod Exp $ */
+/* $OpenBSD: pmap.h,v 1.44 2023/02/06 11:16:22 miod Exp $ */
 /* $NetBSD: pmap.h,v 1.37 2000/11/19 03:16:35 thorpej Exp $ */
 
 /*-
@@ -137,18 +137,6 @@ typedef struct pv_entry {
 #define	PG_PMAP_MOD		PG_PMAP0	/* modified */
 #define	PG_PMAP_REF		PG_PMAP1	/* referenced */
 
-#if defined(NEW_SCC_DRIVER)
-#if defined(DEC_KN8AE)
-#define	_PMAP_MAY_USE_PROM_CONSOLE
-#endif
-#else /* ! NEW_SCC_DRIVER */
-#if defined(DEC_3000_300)		\
- || defined(DEC_3000_500)		\
- || defined(DEC_KN8AE) 				/* XXX */
-#define _PMAP_MAY_USE_PROM_CONSOLE		/* XXX */
-#endif						/* XXX */
-#endif /* NEW_SCC_DRIVER */
-
 #if defined(MULTIPROCESSOR)
 void	pmap_tlb_shootdown(pmap_t, vaddr_t, pt_entry_t, u_long *);
 void	pmap_tlb_shootnow(u_long);
@@ -176,6 +164,8 @@ void	pmap_do_tlb_shootdown(struct cpu_info *, struct trapframe *);
 
 extern	pt_entry_t *VPT;		/* Virtual Page Table */
 
+#define PMAP_CHECK_COPYIN	1
+
 #define	PMAP_STEAL_MEMORY		/* enable pmap_steal_memory() */
 #define PMAP_GROWKERNEL			/* enable pmap_growkernel() */
 
@@ -193,9 +183,6 @@ paddr_t vtophys(vaddr_t);
 /* Machine-specific functions. */
 void	pmap_bootstrap(paddr_t ptaddr, u_int maxasn, u_long ncpuids);
 int	pmap_emulate_reference(struct proc *p, vaddr_t v, int user, int type);
-#ifdef _PMAP_MAY_USE_PROM_CONSOLE
-int	pmap_uses_prom_console(void);
-#endif
 
 #define	pmap_pte_pa(pte)	(PG_PFNUM(*(pte)) << PAGE_SHIFT)
 #define	pmap_pte_prot(pte)	(*(pte) & PG_PROT)

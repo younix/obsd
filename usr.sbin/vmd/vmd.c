@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmd.c,v 1.135 2022/12/28 21:30:19 jmc Exp $	*/
+/*	$OpenBSD: vmd.c,v 1.138 2023/01/28 14:40:53 dv Exp $	*/
 
 /*
  * Copyright (c) 2015 Reyk Floeter <reyk@openbsd.org>
@@ -66,6 +66,8 @@ int	 vm_instance(struct privsep *, struct vmd_vm **,
 int	 vm_checkinsflag(struct vmop_create_params *, unsigned int, uid_t);
 int	 vm_claimid(const char *, int, uint32_t *);
 void	 start_vm_batch(int, short, void*);
+
+static inline void vm_terminate(struct vmd_vm *, const char *);
 
 struct vmd	*env;
 
@@ -395,14 +397,14 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 				errno = vmr.vmr_result;
 				log_warn("%s: failed to forward vm result",
 				    vcp->vcp_name);
-				vm_remove(vm, __func__);
+				vm_terminate(vm, __func__);
 				return (-1);
 			}
 		}
 
 		if (vmr.vmr_result) {
 			log_warnx("%s: failed to start vm", vcp->vcp_name);
-			vm_remove(vm, __func__);
+			vm_terminate(vm, __func__);
 			errno = vmr.vmr_result;
 			break;
 		}
@@ -410,7 +412,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 		/* Now configure all the interfaces */
 		if (vm_priv_ifconfig(ps, vm) == -1) {
 			log_warn("%s: failed to configure vm", vcp->vcp_name);
-			vm_remove(vm, __func__);
+			vm_terminate(vm, __func__);
 			break;
 		}
 
@@ -441,10 +443,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 			log_info("%s: sent vm %d successfully.",
 			    vm->vm_params.vmc_params.vcp_name,
 			    vm->vm_vmid);
-			if (vm->vm_from_config)
-				vm_stop(vm, 0, __func__);
-			else
-				vm_remove(vm, __func__);
+			vm_terminate(vm, __func__);
 		}
 
 		/* Send a response if a control client is waiting for it */
@@ -470,10 +469,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 		}
 		if (vmr.vmr_result != EAGAIN ||
 		    vm->vm_params.vmc_bootdevice) {
-			if (vm->vm_from_config)
-				vm_stop(vm, 0, __func__);
-			else
-				vm_remove(vm, __func__);
+			vm_terminate(vm, __func__);
 		} else {
 			/* Stop VM instance but keep the tty open */
 			vm_stop(vm, 1, __func__);
@@ -509,7 +505,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 		    imsg->hdr.peerid, -1, &vir, sizeof(vir)) == -1) {
 			log_debug("%s: GET_INFO_VM failed for vm %d, removing",
 			    __func__, vm->vm_vmid);
-			vm_remove(vm, __func__);
+			vm_terminate(vm, __func__);
 			return (-1);
 		}
 		break;
@@ -545,7 +541,7 @@ vmd_dispatch_vmm(int fd, struct privsep_proc *p, struct imsg *imsg)
 				    sizeof(vir)) == -1) {
 					log_debug("%s: GET_INFO_VM_END failed",
 					    __func__);
-					vm_remove(vm, __func__);
+					vm_terminate(vm, __func__);
 					return (-1);
 				}
 			}
@@ -847,8 +843,8 @@ main(int argc, char **argv)
 	proc_priv->p_pw = &proc_privpw; /* initialized to all 0 */
 	proc_priv->p_chroot = ps->ps_pw->pw_dir; /* from VMD_USER */
 
-	/* Open /dev/vmm */
-	if (env->vmd_noaction == 0) {
+	/* Open /dev/vmm early. */
+	if (env->vmd_noaction == 0 && proc_id == PROC_PARENT) {
 		env->vmd_fd = open(VMM_NODE, O_RDWR);
 		if (env->vmd_fd == -1)
 			fatal("%s", VMM_NODE);
@@ -970,6 +966,10 @@ vmd_configure(void)
 		proc_kill(&env->vmd_ps);
 		exit(0);
 	}
+
+	/* Send VMM device fd to vmm proc. */
+	proc_compose_imsg(&env->vmd_ps, PROC_VMM, -1,
+	    IMSG_VMDOP_RECEIVE_VMM_FD, -1, env->vmd_fd, NULL, 0);
 
 	/* Send shared global configuration to all children */
 	if (config_setconfig(env) == -1)
@@ -1192,7 +1192,7 @@ vm_stop(struct vmd_vm *vm, int keeptty, const char *caller)
 		event_del(&vm->vm_iev.ev);
 		close(vm->vm_iev.ibuf.fd);
 	}
-	for (i = 0; i < VMM_MAX_DISKS_PER_VM; i++) {
+	for (i = 0; i < VM_MAX_DISKS_PER_VM; i++) {
 		for (j = 0; j < VM_MAX_BASE_PER_DISK; j++) {
 			if (vm->vm_disks[i][j] != -1) {
 				close(vm->vm_disks[i][j]);
@@ -1200,7 +1200,7 @@ vm_stop(struct vmd_vm *vm, int keeptty, const char *caller)
 			}
 		}
 	}
-	for (i = 0; i < VMM_MAX_NICS_PER_VM; i++) {
+	for (i = 0; i < VM_MAX_NICS_PER_VM; i++) {
 		if (vm->vm_ifs[i].vif_fd != -1) {
 			close(vm->vm_ifs[i].vif_fd);
 			vm->vm_ifs[i].vif_fd = -1;
@@ -1330,10 +1330,10 @@ vm_register(struct privsep *ps, struct vmop_create_params *vmc,
 	if (vcp->vcp_ncpus > VMM_MAX_VCPUS_PER_VM) {
 		log_warnx("invalid number of CPUs");
 		goto fail;
-	} else if (vcp->vcp_ndisks > VMM_MAX_DISKS_PER_VM) {
+	} else if (vcp->vcp_ndisks > VM_MAX_DISKS_PER_VM) {
 		log_warnx("invalid number of disks");
 		goto fail;
-	} else if (vcp->vcp_nnics > VMM_MAX_NICS_PER_VM) {
+	} else if (vcp->vcp_nnics > VM_MAX_NICS_PER_VM) {
 		log_warnx("invalid number of interfaces");
 		goto fail;
 	} else if (strlen(vcp->vcp_kernel) == 0 &&
@@ -1368,10 +1368,10 @@ vm_register(struct privsep *ps, struct vmop_create_params *vmc,
 	vm->vm_receive_fd = -1;
 	vm->vm_state &= ~VM_STATE_PAUSED;
 
-	for (i = 0; i < VMM_MAX_DISKS_PER_VM; i++)
+	for (i = 0; i < VM_MAX_DISKS_PER_VM; i++)
 		for (j = 0; j < VM_MAX_BASE_PER_DISK; j++)
 			vm->vm_disks[i][j] = -1;
-	for (i = 0; i < VMM_MAX_NICS_PER_VM; i++)
+	for (i = 0; i < VM_MAX_NICS_PER_VM; i++)
 		vm->vm_ifs[i].vif_fd = -1;
 	for (i = 0; i < vcp->vcp_nnics; i++) {
 		if ((sw = switch_getbyname(vmc->vmc_ifswitch[i])) != NULL) {
@@ -1943,3 +1943,15 @@ getmonotime(struct timeval *tv)
 
 	TIMESPEC_TO_TIMEVAL(tv, &ts);
 }
+
+static inline void
+vm_terminate(struct vmd_vm *vm, const char *caller)
+{
+	if (vm->vm_from_config)
+		vm_stop(vm, 0, caller);
+	else {
+		/* vm_remove calls vm_stop */
+		vm_remove(vm, caller);
+	}
+}
+

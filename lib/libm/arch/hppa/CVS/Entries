@@ -2,15 +2,13 @@
 /e_remainderf.c/1.6/Mon Sep 12 19:47:01 2016//
 /e_sqrt.c/1.12/Mon Sep 12 19:47:01 2016//
 /e_sqrtf.c/1.6/Mon Sep 12 19:47:01 2016//
-/s_ceil.c/1.10/Mon Sep 12 19:47:01 2016//
-/s_ceilf.c/1.8/Mon Sep 12 19:47:01 2016//
-/s_floor.c/1.12/Mon Sep 12 19:47:01 2016//
-/s_floorf.c/1.10/Mon Sep 12 19:47:01 2016//
 /s_rint.c/1.12/Mon Sep 12 19:47:01 2016//
 /s_rintf.c/1.6/Mon Sep 12 19:47:02 2016//
-/s_round.c/1.8/Mon Sep 12 19:47:02 2016//
-/s_roundf.c/1.5/Tue Jan 20 04:41:01 2015//
-/s_trunc.c/1.8/Mon Sep 12 19:47:02 2016//
-/s_truncf.c/1.5/Tue Jan 20 04:41:01 2015//
-/fenv.c/1.6/Tue Jan 10 10:05:31 2023//
+/fenv.c/1.7/Mon Feb  6 19:36:35 2023//
+/s_ceil.c/1.11/Mon Feb  6 19:36:35 2023//
+/s_ceilf.c/1.9/Mon Feb  6 19:36:35 2023//
+/s_floor.c/1.13/Mon Feb  6 19:36:35 2023//
+/s_floorf.c/1.11/Mon Feb  6 19:36:35 2023//
+/s_trunc.c/1.9/Mon Feb  6 19:36:35 2023//
+/s_truncf.c/1.6/Mon Feb  6 19:36:35 2023//
 D

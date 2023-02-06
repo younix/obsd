@@ -26,7 +26,6 @@
 /pcb.h/1.11/Tue May  5 02:13:46 2015//
 /proc.h/1.13/Thu Apr 13 03:52:25 2017//
 /profile.h/1.5/Fri Jan 24 19:57:17 1997//
-/prom.h/1.10/Thu Dec 18 10:45:29 2014//
 /pte.h/1.12/Sun Jan 26 17:40:11 2014//
 /ptrace.h/1.6/Mon Nov  7 03:30:58 2016//
 /reg.h/1.7/Mon Sep  8 01:47:05 2014//
@@ -44,8 +43,9 @@
 /db_machdep.h/1.28/Thu Sep  2 14:22:31 2021//
 /bus.h/1.33/Mon Jan 24 14:35:14 2022//
 /asm.h/1.15/Fri Sep  2 14:00:18 2022//
-/pmap.h/1.42/Tue Sep 20 07:19:36 2022//
 /_types.h/1.25/Tue Jan 10 10:05:49 2023//
-/cpu.h/1.68/Tue Jan 10 10:05:49 2023//
 /cpuconf.h/1.7/Tue Jan 10 10:05:49 2023//
+/cpu.h/1.69/Mon Feb  6 19:37:01 2023//
+/pmap.h/1.44/Mon Feb  6 19:37:01 2023//
+/prom.h/1.12/Mon Feb  6 19:37:01 2023//
 D

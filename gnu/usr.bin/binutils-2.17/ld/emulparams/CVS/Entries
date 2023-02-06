@@ -113,11 +113,9 @@
 /elf64alpha_obsd.sh/1.4/Mon Jun  1 19:03:46 2015//
 /elf64bmip.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf64btsmip.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/elf64btsmip_obsd.sh/1.5/Sat Jul  1 18:00:01 2017//
 /elf64hppa.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf64lppc.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf64ltsmip.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/elf64ltsmip_obsd.sh/1.5/Sat Jul  1 18:00:01 2017//
 /elf64mmix.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf64ppc.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf_fbsd.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
@@ -132,7 +130,6 @@
 /elf_s390.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf_x86_64.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /elf_x86_64_fbsd.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
-/elf_x86_64_obsd.sh/1.3/Sat Jul  1 18:00:01 2017//
 /gld960.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /gld960coff.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
 /h8300.sh/1.1.1.1/Sun Apr 24 20:14:49 2011//
@@ -274,4 +271,7 @@
 /z8002.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /hppaobsd.sh/1.7/Tue Jan 10 10:05:15 2023//
 /shelf_obsd.sh/1.6/Tue Jan 10 10:05:15 2023//
+/elf64btsmip_obsd.sh/1.6/Mon Feb  6 19:36:09 2023//
+/elf64ltsmip_obsd.sh/1.6/Mon Feb  6 19:36:09 2023//
+/elf_x86_64_obsd.sh/1.4/Mon Feb  6 19:36:09 2023//
 D

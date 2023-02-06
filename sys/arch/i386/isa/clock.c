@@ -1,4 +1,4 @@
-/*	$OpenBSD: clock.c,v 1.62 2022/12/06 01:56:44 cheloha Exp $	*/
+/*	$OpenBSD: clock.c,v 1.64 2023/02/04 19:19:36 cheloha Exp $	*/
 /*	$NetBSD: clock.c,v 1.39 1996/05/12 23:11:54 mycroft Exp $	*/
 
 /*-
@@ -90,13 +90,10 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/clockintr.h>
-#include <sys/device.h>
-#include <sys/stdint.h>
 #include <sys/timeout.h>
 #include <sys/timetc.h>
 #include <sys/mutex.h>
 
-#include <machine/cpu.h>
 #include <machine/intr.h>
 #include <machine/pio.h>
 #include <machine/cpufunc.h>
@@ -132,7 +129,6 @@ u_int i8254_simple_get_timecount(struct timecounter *tc);
 
 static struct timecounter i8254_timecounter = {
 	.tc_get_timecount = i8254_get_timecount,
-	.tc_poll_pps = NULL,
 	.tc_counter_mask = ~0u,
 	.tc_frequency = TIMER_FREQ,
 	.tc_name = "i8254",

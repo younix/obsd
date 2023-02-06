@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.438 2023/01/04 14:33:30 claudio Exp $ */
+/*	$OpenBSD: parse.y,v 1.441 2023/01/30 16:51:34 claudio Exp $ */
 
 /*
  * Copyright (c) 2002, 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -231,7 +231,7 @@ typedef struct {
 %token	COMMUNITY EXTCOMMUNITY LARGECOMMUNITY DELETE
 %token	MAXCOMMUNITIES MAXEXTCOMMUNITIES MAXLARGECOMMUNITIES
 %token	PREFIX PREFIXLEN PREFIXSET
-%token	ASPASET ROASET ORIGINSET OVS EXPIRES
+%token	ASPASET ROASET ORIGINSET OVS AVS EXPIRES
 %token	ASSET SOURCEAS TRANSITAS PEERAS PROVIDERAS CUSTOMERAS MAXASLEN MAXASSEQ
 %token	SET LOCALPREF MED METRIC NEXTHOP REJECT BLACKHOLE NOMODIFY SELF
 %token	PREPEND_SELF PREPEND_PEER PFTABLE WEIGHT RTLABEL ORIGIN PRIORITY
@@ -244,7 +244,8 @@ typedef struct {
 %token	<v.number>		NUMBER
 %type	<v.number>		asnumber as4number as4number_any optnumber
 %type	<v.number>		espah family safi restart origincode nettype
-%type	<v.number>		yesno inout restricted validity expires enforce
+%type	<v.number>		yesno inout restricted expires enforce
+%type	<v.number>		validity aspa_validity
 %type	<v.number>		addpathextra addpathmax
 %type	<v.string>		string
 %type	<v.addr>		address
@@ -636,11 +637,11 @@ aspa_tas	: as4number_any {
 			$$->aid = AID_UNSPEC;
 			$$->num = 1;
 		}
-		| as4number_any ALLOW family {
+		| as4number_any family {
 			if (($$ = calloc(1, sizeof(*$$))) == NULL)
 				fatal(NULL);
 			$$->as = $1;
-			$$->aid = $3;
+			$$->aid = $2;
 			$$->num = 1;
 		}
 		;
@@ -2622,6 +2623,14 @@ filter_elm	: filter_prefix_h	{
 			fmopts.m.ovs.validity = $2;
 			fmopts.m.ovs.is_set = 1;
 		}
+		| AVS aspa_validity		{
+			if (fmopts.m.avs.is_set) {
+				yyerror("avs filter already specified");
+				YYERROR;
+			}
+			fmopts.m.avs.validity = $2;
+			fmopts.m.avs.is_set = 1;
+		}
 		;
 
 prefixlenop	: /* empty */			{ memset(&$$, 0, sizeof($$)); }
@@ -3070,7 +3079,22 @@ validity	: STRING	{
 			else if (!strcmp($1, "valid"))
 				$$ = ROA_VALID;
 			else {
-				yyerror("unknown validity \"%s\"", $1);
+				yyerror("unknown roa validity \"%s\"", $1);
+				free($1);
+				YYERROR;
+			}
+			free($1);
+		};
+
+aspa_validity	: STRING	{
+			if (!strcmp($1, "unknown"))
+				$$ = ASPA_UNKNOWN;
+			else if (!strcmp($1, "invalid"))
+				$$ = ASPA_INVALID;
+			else if (!strcmp($1, "valid"))
+				$$ = ASPA_VALID;
+			else {
+				yyerror("unknown aspa validity \"%s\"", $1);
 				free($1);
 				YYERROR;
 			}
@@ -3149,6 +3173,7 @@ lookup(char *s)
 		{ "as-override",	ASOVERRIDE},
 		{ "as-set",		ASSET },
 		{ "aspa-set",		ASPASET},
+		{ "avs",		AVS},
 		{ "blackhole",		BLACKHOLE},
 		{ "capabilities",	CAPABILITIES},
 		{ "community",		COMMUNITY},
@@ -4058,11 +4083,11 @@ parseextvalue(int type, char *s, uint32_t *v, uint32_t *flag)
 	} else if (strcmp(s, "neighbor-as") == 0) {
 		*flag = COMMUNITY_NEIGHBOR_AS;
 		*v = 0;
-		return EXT_COMMUNITY_TRANS_FOUR_AS;
+		return EXT_COMMUNITY_TRANS_TWO_AS;
 	} else if (strcmp(s, "local-as") == 0) {
 		*flag = COMMUNITY_LOCAL_AS;
 		*v = 0;
-		return EXT_COMMUNITY_TRANS_FOUR_AS;
+		return EXT_COMMUNITY_TRANS_TWO_AS;
 	} else if ((p = strchr(s, '.')) == NULL) {
 		/* AS_PLAIN number (4 or 2 byte) */
 		strtonum(s, 0, USHRT_MAX, &errstr);

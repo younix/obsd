@@ -1,5 +1,5 @@
 #!/bin/ksh
-#	$OpenBSD: install.sub,v 1.1218 2022/12/23 00:40:58 afresh1 Exp $
+#	$OpenBSD: install.sub,v 1.1226 2023/02/03 15:28:04 kn Exp $
 #
 # Copyright (c) 1997-2015 Todd Miller, Theo de Raadt, Ken Westerback
 # Copyright (c) 2015, Robert Peichaer <rpe@openbsd.org>
@@ -311,6 +311,13 @@ scan_disknames() {
 	local IFS=, _disks=$(sysctl -n hw.disknames)
 
 	bsort $(for _n in $_disks; do echo "${_n%%:*} "; done | sed -n "$1")
+}
+
+# Return list of disks with softraid chunks, optionally limited to the volume $1.
+get_softraid_disks() {
+	local _device=${1:-softraid0}
+
+	bioctl $_device 2>/dev/null | sed -n 's/.*<\(.*\).>$/\1/p'
 }
 
 # Return disk devices found in hw.disknames.
@@ -765,7 +772,7 @@ _ask() {
 	else
 		case $resp in
 		!)	echo "Type 'exit' to return to install."
-			sh
+			ksh
 			_redo=1
 			;;
 		!*)	eval "${resp#?}"
@@ -1321,6 +1328,10 @@ configure_ifs() {
 
 	while :; do
 		set -sA _ifs -- $(get_ifs)
+
+                # Skip all interface configuration questions if there is no
+                # physical interface to begin with.
+                ((${#_ifs[*]} == 0)) && break
 
 		# Discover last configured vlan interface and increment its
 		# minor for the next offered vlan interface.
@@ -2110,6 +2121,8 @@ set_term() {
 	else
 		[[ -x /sbin/kbd ]] || return
 		_layouts=$(bsort $(kbd -l | egrep -v "^(user|tables|encoding)"))
+		# Ensure all connected keyboards get the same encoding
+		make_dev $(scan_dmesg '/^wskbd[0-9]* /s/ .*//p')
 		while :; do
 			ask "Choose your keyboard layout ('?' or 'L' for list)" default
 			case $resp in
@@ -2939,9 +2952,9 @@ finish_up() {
 		)
 	fi
 
-	# In case this is a softraid device, make sure all underlying
+	# In case root is on a softraid volume, make sure all underlying
 	# device nodes exist before installing boot-blocks on disk.
-	make_dev $(bioctl $ROOTDISK 2>/dev/null | sed -n 's/.*<\(.*\)>$/\1/p')
+	make_dev $(get_softraid_disks $ROOTDISK)
 	md_installboot $ROOTDISK
 
 	chmod og-rwx /mnt/bsd{,.mp,.rd} 2>/dev/null
@@ -3425,6 +3438,9 @@ start_watchdog() {
 	echo $! > /tmp/wdpid
 	set +m
 }
+
+# return if we only want internal functions
+[[ -n $FUNCS_ONLY ]] && return
 
 # ------------------------------------------------------------------------------
 # Initial actions common to both installs and upgrades.

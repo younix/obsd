@@ -3,8 +3,8 @@
 # THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
 # generated from:
 #
-#	OpenBSD: etc.amd64/MAKEDEV.md,v 1.81 2022/11/09 19:35:23 krw Exp 
-#	OpenBSD: MAKEDEV.common,v 1.118 2022/11/10 09:50:00 krw Exp 
+#	OpenBSD: etc.amd64/MAKEDEV.md,v 1.82 2023/01/14 12:15:12 kettenis Exp 
+#	OpenBSD: MAKEDEV.common,v 1.120 2023/01/28 11:04:47 phessler Exp 
 #	OpenBSD: MAKEDEV.mi,v 1.83 2016/09/11 03:06:31 deraadt Exp 
 #	OpenBSD: MAKEDEV.sub,v 1.14 2005/02/07 06:14:18 david Exp 
 #
@@ -75,6 +75,7 @@
 #	dt	Dynamic Tracer
 #	diskmap	Disk mapper
 #	dri	Direct Rendering Infrastructure
+#	efi	EFI runtime services
 #	fd	fd/* nodes
 #	fuse	Userland Filesystem
 #	gpio*	General Purpose Input/Output
@@ -358,6 +359,10 @@ fd)
 	MKlist[${#MKlist[*]}]=";chmod 555 fd"
 	;;
 
+efi)
+	M efi c 84 0 600
+	;;
+
 dri)
 	RMlist[${#RMlist[*]}]=";mkdir -p dri;rm -f"
 	n=0
@@ -473,8 +478,9 @@ wskbd[0-9]*)
 wscons)
 	R wsmouse0 wsmouse1 wsmouse2 wsmouse3 wsmouse4 wsmouse5
 	R wsmouse6 wsmouse7 wsmouse8 wsmouse9 wskbd0 wskbd1 wskbd2
-	R wskbd3 wsmux ttyCcfg ttyC0 ttyC1 ttyC2 ttyC3 ttyC4 ttyC5
-	R ttyC6 ttyC7 ttyC8 ttyC9 ttyCa ttyCb
+	R wskbd3 wskbd4 wskbd5 wskbd6 wskbd7 wskbd8 wskbd9 wsmux
+	R ttyCcfg ttyC0 ttyC1 ttyC2 ttyC3 ttyC4 ttyC5 ttyC6 ttyC7
+	R ttyC8 ttyC9 ttyCa ttyCb
 	;;
 
 tty[C-J]*)
@@ -593,7 +599,7 @@ local)
 	;;
 
 all)
-	R ipmi0 ttyVI00 ttyVI10 ttyVI20 ttyVI30 ttyVI40 dri nvram
+	R efi ipmi0 ttyVI00 ttyVI10 ttyVI20 ttyVI30 ttyVI40 dri nvram
 	R gpio0 gpio1 gpio2 bktr0 vnd0 vnd1 vnd2 vnd3 sd0 sd1 sd2 sd3
 	R sd4 sd5 sd6 sd7 sd8 sd9 cd0 cd1 rd0 tap0 tap1 tap2 tap3 tun0
 	R tun1 tun2 tun3 bio pty0 fd1 fd1B fd1C fd1D fd1E fd1F fd1G

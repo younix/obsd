@@ -1,4 +1,4 @@
-/*	$OpenBSD: cpu.c,v 1.78 2022/12/23 17:46:49 kettenis Exp $	*/
+/*	$OpenBSD: cpu.c,v 1.82 2023/01/30 20:05:31 kettenis Exp $	*/
 
 /*
  * Copyright (c) 2016 Dale Rahn <drahn@dalerahn.com>
@@ -932,6 +932,7 @@ cpu_clockspeed(int *freq)
 
 void cpu_boot_secondary(struct cpu_info *ci);
 void cpu_hatch_secondary(void);
+void cpu_hatch_secondary_spin(void);
 
 void
 cpu_boot_secondary_processors(void)
@@ -953,6 +954,11 @@ cpu_boot_secondary_processors(void)
 void
 cpu_start_spin_table(struct cpu_info *ci, uint64_t start, uint64_t data)
 {
+	extern paddr_t cpu_hatch_ci;
+
+	pmap_extract(pmap_kernel(), (vaddr_t)ci, &cpu_hatch_ci);
+	cpu_dcache_wb_range((vaddr_t)&cpu_hatch_ci, sizeof(paddr_t));
+
 	/* this reuses the zero page for the core */
 	vaddr_t start_pg = zero_page + (PAGE_SIZE * ci->ci_cpuid);
 	paddr_t pa = trunc_page(data);
@@ -970,40 +976,34 @@ cpu_start_spin_table(struct cpu_info *ci, uint64_t start, uint64_t data)
 int
 cpu_start_secondary(struct cpu_info *ci, int method, uint64_t data)
 {
-	extern uint64_t pmap_avail_kvo;
-	extern paddr_t cpu_hatch_ci;
-	paddr_t startaddr;
+	vaddr_t start_va;
+	paddr_t ci_pa, start_pa;
 	uint64_t ttbr1;
-	int rc = 0;
-
-	pmap_extract(pmap_kernel(), (vaddr_t)ci, &cpu_hatch_ci);
+	int32_t status;
 
 	__asm("mrs %x0, ttbr1_el1": "=r"(ttbr1));
 	ci->ci_ttbr1 = ttbr1;
-
-	cpu_dcache_wb_range((vaddr_t)&cpu_hatch_ci, sizeof(paddr_t));
 	cpu_dcache_wb_range((vaddr_t)ci, sizeof(*ci));
 
-	startaddr = (vaddr_t)cpu_hatch_secondary + pmap_avail_kvo;
-
 	switch (method) {
-	case 1:
-		/* psci  */
 #if NPSCI > 0
-		rc = (psci_cpu_on(ci->ci_mpidr, startaddr, 0) == PSCI_SUCCESS);
+	case 1:
+		/* psci */
+		start_va = (vaddr_t)cpu_hatch_secondary;
+		pmap_extract(pmap_kernel(), start_va, &start_pa);
+		pmap_extract(pmap_kernel(), (vaddr_t)ci, &ci_pa);
+		status = psci_cpu_on(ci->ci_mpidr, start_pa, ci_pa);
+		return (status == PSCI_SUCCESS);
 #endif
-		break;
 	case 2:
 		/* spin-table */
-		cpu_start_spin_table(ci, startaddr, data);
-		rc = 1;
-		break;
-	default:
-		/* no method to spin up CPU */
-		ci->ci_flags = 0;	/* mark cpu as not AP */
+		start_va = (vaddr_t)cpu_hatch_secondary_spin;
+		pmap_extract(pmap_kernel(), start_va, &start_pa);
+		cpu_start_spin_table(ci, start_pa, data);
+		return 1;
 	}
 
-	return rc;
+	return 0;
 }
 
 void
@@ -1012,6 +1012,12 @@ cpu_boot_secondary(struct cpu_info *ci)
 	atomic_setbits_int(&ci->ci_flags, CPUF_GO);
 	__asm volatile("dsb sy; sev" ::: "memory");
 
+	/*
+	 * Send an interrupt as well to make sure the CPU wakes up
+	 * regardless of whether it is in a WFE or a WFI loop.
+	 */
+	arm_send_ipi(ci, ARM_IPI_NOP);
+
 	while ((ci->ci_flags & CPUF_RUNNING) == 0)
 		__asm volatile("wfe");
 }
@@ -1019,6 +1025,10 @@ cpu_boot_secondary(struct cpu_info *ci)
 void
 cpu_init_secondary(struct cpu_info *ci)
 {
+	struct proc *p;
+	struct pcb *pcb;
+	struct trapframe *tf;
+	struct switchframe *sf;
 	int s;
 
 	ci->ci_flags |= CPUF_PRESENT;
@@ -1037,6 +1047,43 @@ cpu_init_secondary(struct cpu_info *ci)
 		__asm volatile("wfe");
 
 	cpu_init();
+
+	/*
+	 * Start from a clean slate regardless of whether this is the
+	 * initial power up or a wakeup of a suspended CPU.
+	 */
+
+	ci->ci_curproc = NULL;
+	ci->ci_curpcb = NULL;
+	ci->ci_curpm = NULL;
+	ci->ci_cpl = IPL_NONE;
+	ci->ci_ipending = 0;
+	ci->ci_idepth = 0;
+
+#ifdef DIAGNOSTIC
+	ci->ci_mutex_level = 0;
+#endif
+
+	/*
+	 * Re-create the switchframe for this CPUs idle process.
+	 */
+
+	p = ci->ci_schedstate.spc_idleproc;
+	pcb = &p->p_addr->u_pcb;
+
+	tf = (struct trapframe *)((u_long)p->p_addr
+	    + USPACE
+	    - sizeof(struct trapframe)
+	    - 0x10);
+
+	tf = (struct trapframe *)STACKALIGN(tf);
+	pcb->pcb_tf = tf;
+
+	sf = (struct switchframe *)tf - 1;
+	sf->sf_x19 = (uint64_t)sched_idle;
+	sf->sf_x20 = (uint64_t)ci;
+	sf->sf_lr = (uint64_t)proc_trampoline;
+	pcb->pcb_sp = (uint64_t)sf;
 
 	s = splhigh();
 	arm_intr_cpu_enable();
@@ -1058,17 +1105,19 @@ cpu_halt(void)
 {
 	struct cpu_info *ci = curcpu();
 	int count = 0;
+	u_long psw;
 
 	KERNEL_ASSERT_UNLOCKED();
 	SCHED_ASSERT_UNLOCKED();
 
-	intr_disable();
+	psw = intr_disable();
 
 	atomic_clearbits_int(&ci->ci_flags,
 	    CPUF_RUNNING | CPUF_PRESENT | CPUF_GO);
 
 #if NPSCI > 0
-	psci_cpu_off();
+	if (psci_can_suspend())
+		psci_cpu_off();
 #endif
 
 	/*
@@ -1084,14 +1133,14 @@ cpu_halt(void)
 	    READ_SPECIALREG(cntv_ctl_el0) | CNTV_CTL_IMASK);
 
 	while ((ci->ci_flags & CPUF_GO) == 0) {
-		__asm volatile("wfe");
+		__asm volatile("wfi");
 		count++;
 	}
 
 	atomic_setbits_int(&ci->ci_flags, CPUF_RUNNING);
 	__asm volatile("dsb sy; sev" ::: "memory");
 
-	intr_enable();
+	intr_restore(psw);
 
 	/* Unmask clock interrupts. */
 	WRITE_SPECIALREG(cntv_ctl_el0,
@@ -1143,9 +1192,9 @@ cpu_init_primary(void)
 int
 cpu_suspend_primary(void)
 {
-	extern uint64_t pmap_avail_kvo;
 	struct cpu_info *ci = curcpu();
-	paddr_t startaddr, data;
+	vaddr_t start_va;
+	paddr_t ci_pa, start_pa;
 	uint64_t ttbr1;
 
 	if (!psci_can_suspend()) {
@@ -1196,18 +1245,16 @@ cpu_suspend_primary(void)
 		return 0;
 	}
 
-	pmap_extract(pmap_kernel(), (vaddr_t)ci, &data);
-
 	__asm("mrs %x0, ttbr1_el1": "=r"(ttbr1));
 	ci->ci_ttbr1 = ttbr1;
-
-	cpu_dcache_wb_range((vaddr_t)&data, sizeof(paddr_t));
 	cpu_dcache_wb_range((vaddr_t)ci, sizeof(*ci));
 
-	startaddr = (vaddr_t)cpu_hatch_primary + pmap_avail_kvo;
+	start_va = (vaddr_t)cpu_hatch_primary;
+	pmap_extract(pmap_kernel(), start_va, &start_pa);
+	pmap_extract(pmap_kernel(), (vaddr_t)ci, &ci_pa);
 
 #if NPSCI > 0
-	psci_system_suspend(startaddr, data);
+	psci_system_suspend(start_pa, ci_pa);
 #endif
 
 	return EOPNOTSUPP;
@@ -1218,43 +1265,10 @@ cpu_suspend_primary(void)
 void
 cpu_resume_secondary(struct cpu_info *ci)
 {
-	struct proc *p;
-	struct pcb *pcb;
-	struct trapframe *tf;
-	struct switchframe *sf;
 	int timeout = 10000;
 
 	if (ci->ci_flags & CPUF_PRESENT)
 		return;
-
-	ci->ci_curproc = NULL;
-	ci->ci_curpcb = NULL;
-	ci->ci_curpm = NULL;
-	ci->ci_cpl = IPL_NONE;
-	ci->ci_ipending = 0;
-	ci->ci_idepth = 0;
-
-#ifdef DIAGNOSTIC
-	ci->ci_mutex_level = 0;
-#endif
-	ci->ci_ttbr1 = 0;
-
-	p = ci->ci_schedstate.spc_idleproc;
-	pcb = &p->p_addr->u_pcb;
-
-	tf = (struct trapframe *)((u_long)p->p_addr
-	    + USPACE
-	    - sizeof(struct trapframe)
-	    - 0x10);
-
-	tf = (struct trapframe *)STACKALIGN(tf);
-	pcb->pcb_tf = tf;
-
-	sf = (struct switchframe *)tf - 1;
-	sf->sf_x19 = (uint64_t)sched_idle;
-	sf->sf_x20 = (uint64_t)ci;
-	sf->sf_lr = (uint64_t)proc_trampoline;
-	pcb->pcb_sp = (uint64_t)sf;
 
 	cpu_start_secondary(ci, 1, 0);
 	while ((ci->ci_flags & CPUF_PRESENT) == 0 && --timeout)

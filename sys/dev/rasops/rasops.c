@@ -1,4 +1,4 @@
-/*	$OpenBSD: rasops.c,v 1.66 2020/07/23 09:17:03 tim Exp $	*/
+/*	$OpenBSD: rasops.c,v 1.70 2023/02/03 18:34:24 miod Exp $	*/
 /*	$NetBSD: rasops.c,v 1.35 2001/02/02 06:01:01 marcus Exp $	*/
 
 /*-
@@ -120,14 +120,6 @@ const u_char rasops_cmap[256 * 3] = {
 	_C(~NORMAL_BLACK),
 
 #undef	_C
-};
-
-/* True if color is gray */
-const u_char rasops_isgray[16] = {
-	1, 0, 0, 0,
-	0, 0, 0, 1,
-	1, 0, 0, 0,
-	0, 0, 0, 1
 };
 
 struct rasops_screen {
@@ -547,10 +539,6 @@ rasops_pack_cattr(void *cookie, int fg, int bg, int flg, uint32_t *attr)
 {
 	int swap;
 
-#ifdef RASOPS_CLIPPING
-	fg &= 7;
-	bg &= 7;
-#endif
 	if ((flg & WSATTR_BLINK) != 0)
 		return (EINVAL);
 
@@ -565,18 +553,11 @@ rasops_pack_cattr(void *cookie, int fg, int bg, int flg, uint32_t *attr)
 		bg = swap;
 	}
 
-	if ((flg & WSATTR_HILIT) != 0)
+	/* Bold is only supported for ANSI colors 0 - 7. */
+	if ((flg & WSATTR_HILIT) != 0 && fg < 8)
 		fg += 8;
 
-	flg = ((flg & WSATTR_UNDERLINE) ? 1 : 0);
-
-	if (rasops_isgray[fg])
-		flg |= 2;
-
-	if (rasops_isgray[bg])
-		flg |= 4;
-
-	*attr = (bg << 16) | (fg << 24) | flg;
+	*attr = (bg << 16) | (fg << 24) | (flg & WSATTR_UNDERLINE);
 	return (0);
 }
 
@@ -600,7 +581,7 @@ rasops_pack_mattr(void *cookie, int fg, int bg, int flg, uint32_t *attr)
 		bg = swap;
 	}
 
-	*attr = (bg << 16) | (fg << 24) | ((flg & WSATTR_UNDERLINE) ? 7 : 6);
+	*attr = (bg << 16) | (fg << 24) | (flg & WSATTR_UNDERLINE);
 	return (0);
 }
 
@@ -894,7 +875,7 @@ rasops_unpack_attr(void *cookie, uint32_t attr, int *fg, int *bg, int *underline
 	*fg = ((u_int)attr >> 24) & 0xf;
 	*bg = ((u_int)attr >> 16) & 0xf;
 	if (underline != NULL)
-		*underline = (u_int)attr & 1;
+		*underline = (u_int)attr & WSATTR_UNDERLINE;
 }
 
 /*
@@ -1265,7 +1246,8 @@ rasops_putchar_rotated(void *cookie, int row, int col, u_int uc, uint32_t attr)
 		col = ri->ri_cols - col - 1;
 
 	/* Do rotated char sans (side)underline */
-	rc = ri->ri_real_ops.putchar(cookie, col, row, uc, attr & ~1);
+	rc = ri->ri_real_ops.putchar(cookie, col, row, uc,
+	    attr & ~WSATTR_UNDERLINE);
 	if (rc != 0)
 		return rc;
 
@@ -1276,7 +1258,7 @@ rasops_putchar_rotated(void *cookie, int row, int col, u_int uc, uint32_t attr)
 	height = ri->ri_font->fontheight;
 
 	/* XXX this assumes 16-bit color depth */
-	if ((attr & 1) != 0) {
+	if ((attr & WSATTR_UNDERLINE) != 0) {
 		int16_t c = (int16_t)ri->ri_devcmap[((u_int)attr >> 24) & 0xf];
 
 		while (height--) {
