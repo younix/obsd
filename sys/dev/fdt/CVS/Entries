@@ -20,7 +20,6 @@
 /bcm2835_temp.c/1.2/Mon Nov 15 19:06:15 2021//
 /ccp_fdt.c/1.2/Mon Nov 15 19:06:15 2021//
 /dwdog.c/1.3/Mon Nov 15 19:06:15 2021//
-/fanpwr.c/1.5/Mon Nov 15 19:06:15 2021//
 /fusbtc.c/1.2/Mon Nov 15 19:06:15 2021//
 /hidwusb.c/1.3/Mon Nov 15 19:06:15 2021//
 /hireset.c/1.2/Mon Nov 15 19:06:15 2021//
@@ -148,8 +147,6 @@
 /imxrtc.c/1.3/Sat Nov  5 22:12:18 2022//
 /mvrtc.c/1.3/Sat Nov  5 22:12:18 2022//
 /plrtc.c/1.4/Sat Nov  5 22:12:18 2022//
-/rkclock.c/1.63/Sat Nov  5 22:12:18 2022//
-/rkclock_clocks.h/1.39/Sat Nov  5 22:12:18 2022//
 /rkiis.c/1.4/Sat Nov  5 22:12:18 2022//
 /rkpinctrl.c/1.9/Sat Nov  5 22:12:18 2022//
 /rkpmic.c/1.12/Sat Nov  5 22:12:18 2022//
@@ -165,8 +162,6 @@
 /simplefb.c/1.19/Fri Nov 11 20:28:26 2022//
 /dwpcie.c/1.39/Tue Jan 10 10:05:52 2023//
 /gpiobl.c/1.3/Tue Jan 10 10:05:52 2023//
-/psci.c/1.12/Tue Jan 10 10:05:52 2023//
-/pscivar.h/1.5/Tue Jan 10 10:05:52 2023//
 /pwmbl.c/1.7/Tue Jan 10 10:05:52 2023//
 /pwmleds.c/1.1/Wed Nov 23 23:43:08 2022//
 /qcpdc.c/1.3/Tue Jan 10 10:05:52 2023//
@@ -178,10 +173,17 @@
 /rkvop.c/1.7/Tue Jan 10 10:05:52 2023//
 /tipd.c/1.1/Mon Dec 12 19:18:25 2022//
 /xhci_fdt.c/1.21/Tue Jan 10 10:05:52 2023//
-/files.fdt/1.176/Mon Feb  6 19:37:07 2023//
 /if_dwge.c/1.14/Mon Feb  6 19:37:07 2023//
 /qcrtc.c/1.2/Mon Feb  6 19:37:07 2023//
 /qcscm.c/1.2/Sat Jan 21 10:34:49 2023//
 /sncodec.c/1.2/Sat Feb  4 18:58:19 2023//
 /tascodec.c/1.6/Mon Feb  6 19:37:07 2023//
+/fanpwr.c/1.6/Mon Feb 27 08:42:00 2023//
+/files.fdt/1.179/Mon Feb 27 08:42:00 2023//
+/if_dwqe_fdt.c/1.1/Mon Feb 13 19:18:53 2023//
+/psci.c/1.13/Mon Feb 27 08:42:00 2023//
+/pscivar.h/1.6/Mon Feb 27 08:42:00 2023//
+/rkclock.c/1.64/Mon Feb 27 08:42:00 2023//
+/rkclock_clocks.h/1.40/Mon Feb 27 08:42:00 2023//
+/scmi.c/1.1/Mon Feb 13 19:26:15 2023//
 D

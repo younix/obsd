@@ -349,4 +349,7 @@
 /ufshci.c/1.1/Sat Feb  4 23:11:59 2023//
 /ufshcireg.h/1.1/Sat Feb  4 23:11:59 2023//
 /ufshcivar.h/1.1/Sat Feb  4 23:11:59 2023//
+/dwqe.c/1.1/Mon Feb 13 19:18:53 2023//
+/dwqereg.h/1.1/Mon Feb 13 19:18:53 2023//
+/dwqevar.h/1.1/Mon Feb 13 19:18:53 2023//
 D

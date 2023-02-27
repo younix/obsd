@@ -61,8 +61,8 @@
 /lapic.c/1.66/Mon Feb  6 19:37:01 2023//
 /locore.S/1.132/Mon Feb  6 19:37:01 2023//
 /pmap.c/1.162/Mon Feb  6 19:37:01 2023//
-/trap.c/1.96/Mon Feb  6 19:37:01 2023//
 /tsc.c/1.31/Mon Feb  6 19:37:01 2023//
 /vector.S/1.88/Mon Feb  6 19:37:01 2023//
 /vmm.c/1.337/Mon Feb  6 19:37:01 2023//
+/trap.c/1.97/Mon Feb 27 08:41:56 2023//
 D

@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.2020 2023/02/05 01:57:59 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.2023 2023/02/13 08:01:52 kettenis Exp 
  */
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
 
@@ -232,6 +232,7 @@
 #define	PCI_VENDOR_PE	0x1318		/* Packet Engines */
 #define	PCI_VENDOR_FORTEMEDIA	0x1319		/* Forte Media */
 #define	PCI_VENDOR_SIIG	0x131f		/* SIIG */
+#define	PCI_VENDOR_MICRON	0x1344		/* Micron Technology */
 #define	PCI_VENDOR_DTCTECH	0x134a		/* DTC Tech */
 #define	PCI_VENDOR_PCTEL	0x134d		/* PCTEL */
 #define	PCI_VENDOR_BRAINBOXES	0x135a		/* Brainboxes */
@@ -1190,6 +1191,7 @@
 #define	PCI_PRODUCT_ASMEDIA_ASM1184E	0x1184		/* ASM1184e */
 #define	PCI_PRODUCT_ASMEDIA_ASM1042AE	0x1242		/* ASM1042AE xHCI */
 #define	PCI_PRODUCT_ASMEDIA_ASM1143	0x1343		/* ASM1143 xHCI */
+#define	PCI_PRODUCT_ASMEDIA_ASM2142	0x2142		/* ASM2142 xHCI */
 #define	PCI_PRODUCT_ASMEDIA_ASM2824	0x2824		/* ASM2824 */
 
 /* ASPEED Technology products */
@@ -7266,6 +7268,9 @@
 #define	PCI_PRODUCT_MICREL_KSZ8841	0x8841		/* KSZ8841 */
 #define	PCI_PRODUCT_MICREL_KSZ8842	0x8842		/* KSZ8842 */
 
+/* Micron Technology products */
+#define	PCI_PRODUCT_MICRON_MTFDKBA512QFM	0x5413		/* NVMe */
+
 /* Microsoft products */
 #define	PCI_PRODUCT_MICROSOFT_MN120	0x0001		/* MN-120 */
 #define	PCI_PRODUCT_MICROSOFT_MN130	0x0002		/* MN-130 */
@@ -8523,7 +8528,8 @@
 #define	PCI_PRODUCT_RICOH_R5U852	0xe852		/* 5U852 SD/MMC */
 
 /* Rockchip products */
-#define	PCI_PRODUCT_ROCKCHIP_RK3399_RC	0x0100		/* RK3399 Root Complex */
+#define	PCI_PRODUCT_ROCKCHIP_RK3399	0x0100		/* RK3399 */
+#define	PCI_PRODUCT_ROCKCHIP_RK3566	0x3566		/* RK3566 */
 
 /* Rockwell products */
 #define	PCI_PRODUCT_ROCKWELL_RS56SP_PCI11P1	0x2005		/* RS56/SP-PCI11P1 Modem */

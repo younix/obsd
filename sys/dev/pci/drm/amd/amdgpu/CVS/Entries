@@ -367,7 +367,6 @@
 /mxgpu_vi.c/1.3/Tue Jan 10 10:05:53 2023//
 /navi10_ih.c/1.4/Tue Jan 10 10:05:53 2023//
 /nbio_v2_3.c/1.5/Tue Jan 10 10:05:53 2023//
-/nbio_v4_3.c/1.1/Sun Jan  1 01:34:35 2023//
 /nbio_v4_3.h/1.1/Sun Jan  1 01:34:35 2023//
 /nbio_v6_1.c/1.6/Tue Jan 10 10:05:53 2023//
 /nbio_v7_0.c/1.5/Tue Jan 10 10:05:53 2023//
@@ -441,16 +440,17 @@
 /amdgpu_device.c/1.38/Mon Feb  6 19:37:08 2023//
 /amdgpu_devlist.h/1.9/Mon Feb  6 19:37:08 2023//
 /amdgpu_discovery.c/1.14/Mon Feb  6 19:37:08 2023//
-/amdgpu_drv.c/1.25/Mon Feb  6 19:37:08 2023//
 /amdgpu_gfx.c/1.9/Mon Feb  6 19:37:08 2023//
 /amdgpu_gmc.c/1.9/Mon Feb  6 19:37:08 2023//
 /amdgpu_job.c/1.8/Mon Feb  6 19:37:08 2023//
 /amdgpu_object.c/1.14/Mon Feb  6 19:37:08 2023//
 /amdgpu_psp.c/1.17/Mon Feb  6 19:37:08 2023//
 /amdgpu_vram_mgr.c/1.7/Mon Feb  6 19:37:08 2023//
-/gfx_v11_0.c/1.5/Mon Feb  6 19:37:08 2023//
 /gmc_v11_0.c/1.2/Mon Feb  6 19:37:08 2023//
 /mes_v11_0.c/1.3/Mon Feb  6 19:37:08 2023//
 /psp_v13_0.c/1.3/Mon Feb  6 19:37:08 2023//
 /soc21.c/1.7/Mon Feb  6 19:37:08 2023//
+/amdgpu_drv.c/1.27/Mon Feb 27 08:42:00 2023//
+/gfx_v11_0.c/1.6/Mon Feb 27 08:42:00 2023//
+/nbio_v4_3.c/1.2/Mon Feb 27 08:42:00 2023//
 D

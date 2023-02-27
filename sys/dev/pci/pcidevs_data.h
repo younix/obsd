@@ -2,7 +2,7 @@
  * THIS FILE AUTOMATICALLY GENERATED.  DO NOT EDIT.
  *
  * generated from:
- *	OpenBSD: pcidevs,v 1.2020 2023/02/05 01:57:59 jsg Exp 
+ *	OpenBSD: pcidevs,v 1.2023 2023/02/13 08:01:52 kettenis Exp 
  */
 
 /*	$NetBSD: pcidevs,v 1.30 1997/06/24 06:20:24 thorpej Exp $	*/
@@ -2930,6 +2930,10 @@ static const struct pci_known_product pci_known_products[] = {
 	{
 	    PCI_VENDOR_ASMEDIA, PCI_PRODUCT_ASMEDIA_ASM1143,
 	    "ASM1143 xHCI",
+	},
+	{
+	    PCI_VENDOR_ASMEDIA, PCI_PRODUCT_ASMEDIA_ASM2142,
+	    "ASM2142 xHCI",
 	},
 	{
 	    PCI_VENDOR_ASMEDIA, PCI_PRODUCT_ASMEDIA_ASM2824,
@@ -26188,6 +26192,10 @@ static const struct pci_known_product pci_known_products[] = {
 	    "KSZ8842",
 	},
 	{
+	    PCI_VENDOR_MICRON, PCI_PRODUCT_MICRON_MTFDKBA512QFM,
+	    "NVMe",
+	},
+	{
 	    PCI_VENDOR_MICROSOFT, PCI_PRODUCT_MICROSOFT_MN120,
 	    "MN-120",
 	},
@@ -30660,8 +30668,12 @@ static const struct pci_known_product pci_known_products[] = {
 	    "5U852 SD/MMC",
 	},
 	{
-	    PCI_VENDOR_ROCKCHIP, PCI_PRODUCT_ROCKCHIP_RK3399_RC,
-	    "RK3399 Root Complex",
+	    PCI_VENDOR_ROCKCHIP, PCI_PRODUCT_ROCKCHIP_RK3399,
+	    "RK3399",
+	},
+	{
+	    PCI_VENDOR_ROCKCHIP, PCI_PRODUCT_ROCKCHIP_RK3566,
+	    "RK3566",
 	},
 	{
 	    PCI_VENDOR_ROCKWELL, PCI_PRODUCT_ROCKWELL_RS56SP_PCI11P1,
@@ -35442,6 +35454,10 @@ static const struct pci_known_vendor pci_known_vendors[] = {
 	{
 	    PCI_VENDOR_SIIG,
 	    "SIIG",
+	},
+	{
+	    PCI_VENDOR_MICRON,
+	    "Micron Technology",
 	},
 	{
 	    PCI_VENDOR_DTCTECH,

@@ -1,6 +1,5 @@
 /Makefile/1.13/Wed Mar 30 06:38:43 2016//
 /optr.c/1.40/Tue Jan 22 16:16:26 2019//
-/traverse.c/1.39/Thu Apr 26 17:40:48 2018//
 /dump.h/1.25/Wed Sep  1 16:07:38 2021//
 /dumprmt.c/1.31/Wed Sep  1 16:07:38 2021//
 /itime.c/1.25/Wed Sep  1 16:07:38 2021//
@@ -8,4 +7,5 @@
 /tape.c/1.47/Wed Sep  1 16:07:38 2021//
 /main.c/1.63/Tue Jul 26 13:42:33 2022//
 /dump.8/1.56/Sat Nov  5 22:12:10 2022//
+/traverse.c/1.40/Mon Feb 27 08:43:14 2023//
 D

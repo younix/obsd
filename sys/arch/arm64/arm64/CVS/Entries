@@ -34,8 +34,8 @@
 /trampoline.S/1.4/Tue Jan 10 10:05:50 2023//
 /aesv8-armx.S/1.2/Mon Feb  6 19:37:02 2023//
 /conf.c/1.21/Mon Feb  6 19:37:02 2023//
-/cpu.c/1.82/Mon Feb  6 19:37:02 2023//
 /locore.S/1.43/Mon Feb  6 19:37:02 2023//
 /pmap.c/1.92/Mon Feb  6 19:37:02 2023//
-/syscall.c/1.12/Mon Feb  6 19:37:02 2023//
+/cpu.c/1.84/Mon Feb 27 08:41:56 2023//
+/syscall.c/1.13/Mon Feb 27 08:41:56 2023//
 D
