@@ -1,4 +1,4 @@
-/*	$OpenBSD: control.c,v 1.34 2022/12/04 11:54:31 tobhe Exp $	*/
+/*	$OpenBSD: control.c,v 1.36 2023/03/05 22:17:22 tobhe Exp $	*/
 
 /*
  * Copyright (c) 2010-2013 Reyk Floeter <reyk@openbsd.org>
@@ -55,10 +55,10 @@ static struct privsep_proc procs[] = {
 	{ "ca",		PROC_CERT, control_dispatch_ca },
 };
 
-pid_t
+void
 control(struct privsep *ps, struct privsep_proc *p)
 {
-	return (proc_run(ps, p, procs, nitems(procs), control_run, NULL));
+	proc_run(ps, p, procs, nitems(procs), control_run, NULL);
 }
 
 void
@@ -69,14 +69,14 @@ control_run(struct privsep *ps, struct privsep_proc *p, void *arg)
 	 * stdio - for malloc and basic I/O including events.
 	 * unix - for the control socket.
 	 */
-	if (pledge("stdio unix", NULL) == -1)
+	if (pledge("stdio unix recvfd", NULL) == -1)
 		fatal("pledge");
 }
 
 int
 control_init(struct privsep *ps, struct control_sock *cs)
 {
-	struct iked		*env = ps->ps_env;
+	struct iked		*env = iked_env;
 	struct sockaddr_un	 s_un;
 	int			 fd;
 	mode_t			 old_umask, mode;

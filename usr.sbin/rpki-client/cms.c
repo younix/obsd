@@ -1,4 +1,4 @@
-/*	$OpenBSD: cms.c,v 1.26 2022/12/28 21:30:18 jmc Exp $ */
+/*	$OpenBSD: cms.c,v 1.29 2023/03/06 16:04:52 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -64,9 +64,10 @@ cms_extract_econtent(const char *fn, CMS_ContentInfo *cms, unsigned char **res,
 
 static int
 cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
-    size_t derlen, const ASN1_OBJECT *oid, BIO *bio, unsigned char **res,
+    size_t len, const ASN1_OBJECT *oid, BIO *bio, unsigned char **res,
     size_t *rsz)
 {
+	const unsigned char		*oder;
 	char				 buf[128], obuf[128];
 	const ASN1_OBJECT		*obj, *octype;
 	ASN1_OCTET_STRING		*kid = NULL;
@@ -75,6 +76,7 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 	STACK_OF(X509_CRL)		*crls;
 	STACK_OF(CMS_SignerInfo)	*sinfos;
 	CMS_SignerInfo			*si;
+	EVP_PKEY			*pkey;
 	X509_ALGOR			*pdig, *psig;
 	int				 i, nattrs, nid;
 	int				 has_ct = 0, has_md = 0, has_st = 0,
@@ -89,8 +91,13 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 	if (der == NULL)
 		return 0;
 
-	if ((cms = d2i_CMS_ContentInfo(NULL, &der, derlen)) == NULL) {
+	oder = der;
+	if ((cms = d2i_CMS_ContentInfo(NULL, &der, len)) == NULL) {
 		cryptowarnx("%s: RFC 6488: failed CMS parse", fn);
+		goto out;
+	}
+	if (der != oder + len) {
+		warnx("%s: %td bytes trailing garbage", fn, oder + len - der);
 		goto out;
 	}
 
@@ -177,8 +184,11 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 		goto out;
 	}
 
-	/* Check digest and signature algorithms */
-	CMS_SignerInfo_get0_algs(si, NULL, NULL, &pdig, &psig);
+	/* Check digest and signature algorithms (RFC 7935) */
+	CMS_SignerInfo_get0_algs(si, &pkey, NULL, &pdig, &psig);
+	if (!valid_ca_pkey(fn, pkey))
+		goto out;
+
 	X509_ALGOR_get0(&obj, NULL, NULL, pdig);
 	nid = OBJ_obj2nid(obj);
 	if (nid != NID_sha256) {
@@ -188,7 +198,7 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 	}
 	X509_ALGOR_get0(&obj, NULL, NULL, psig);
 	nid = OBJ_obj2nid(obj);
-	/* RFC7395 last paragraph of section 2 specifies the allowed psig */
+	/* RFC7935 last paragraph of section 2 specifies the allowed psig */
 	if (nid != NID_rsaEncryption && nid != NID_sha256WithRSAEncryption) {
 		warnx("%s: RFC 6488: wrong signature algorithm %s, want %s",
 		    fn, OBJ_nid2ln(nid), OBJ_nid2ln(NID_rsaEncryption));

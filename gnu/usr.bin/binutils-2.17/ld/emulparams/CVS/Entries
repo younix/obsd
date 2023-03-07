@@ -269,9 +269,9 @@
 /z80.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /z8001.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
 /z8002.sh/1.1.1.1/Sun Apr 24 20:14:50 2011//
-/hppaobsd.sh/1.7/Tue Jan 10 10:05:15 2023//
-/shelf_obsd.sh/1.6/Tue Jan 10 10:05:15 2023//
-/elf64btsmip_obsd.sh/1.6/Mon Feb  6 19:36:09 2023//
-/elf64ltsmip_obsd.sh/1.6/Mon Feb  6 19:36:09 2023//
-/elf_x86_64_obsd.sh/1.4/Mon Feb  6 19:36:09 2023//
+/elf64btsmip_obsd.sh/1.6/Mon Feb 27 09:09:54 2023//
+/elf64ltsmip_obsd.sh/1.6/Mon Feb 27 09:09:54 2023//
+/elf_x86_64_obsd.sh/1.4/Mon Feb 27 09:09:54 2023//
+/hppaobsd.sh/1.7/Mon Feb 27 09:09:54 2023//
+/shelf_obsd.sh/1.6/Mon Feb 27 09:09:54 2023//
 D

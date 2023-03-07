@@ -1,10 +1,10 @@
 /Basename.pm/1.14/Mon Nov 17 20:57:06 2014/-ko/
-/Basename.t/1.1.1.4/Mon Nov 17 20:53:08 2014/-ko/
-/Compare.pm/1.5/Mon Oct 12 18:24:40 2009/-ko/
-/Compare.t/1.1.1.6/Wed Feb 13 21:11:33 2019/-ko/
-/Copy.pm/1.20/Mon Dec 30 02:13:54 2019/-ko/
-/Copy.t/1.4/Wed Feb 13 21:15:25 2019/-ko/
 /stat-7896.t/1.1.1.1/Mon Mar 24 14:59:03 2014/-kb/
-/stat.pm/1.9/Wed Sep  1 16:07:37 2021/-ko/
-/stat.t/1.4/Wed Sep  1 16:07:37 2021/-ko/
+/Basename.t/1.1.1.5/Tue Mar  7 18:58:43 2023/-ko/
+/Compare.pm/1.6/Tue Mar  7 18:58:43 2023/-ko/
+/Compare.t/1.1.1.7/Tue Mar  7 18:58:43 2023/-ko/
+/Copy.pm/1.21/Tue Mar  7 18:58:43 2023/-ko/
+/Copy.t/1.5/Tue Mar  7 18:58:43 2023/-ko/
+/stat.pm/1.10/Tue Mar  7 18:58:43 2023/-ko/
+/stat.t/1.5/Tue Mar  7 18:58:43 2023/-ko/
 D

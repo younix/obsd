@@ -14,4 +14,6 @@
 /todo_and_facets.t/1.1.1.1/Wed Feb 13 21:11:22 2019/-ko/
 /812-todo.t/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
 /errors_facet.t/1.1.1.2/Wed Sep  1 16:07:36 2021/-ko/
+/862-intercept_tb_todo.t/1.1.1.1/Wed Feb 15 01:32:38 2023/-ko/
+/skip_reason_object_ipc.t/1.1.1.1/Wed Feb 15 01:32:38 2023/-ko/
 D

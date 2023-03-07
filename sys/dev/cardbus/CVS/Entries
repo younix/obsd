@@ -11,7 +11,6 @@
 /com_cardbus.c/1.44/Tue Jul 26 13:42:35 2022//
 /ehci_cardbus.c/1.23/Tue Jul 26 13:42:35 2022//
 /if_acx_cardbus.c/1.23/Tue Jul 26 13:42:35 2022//
-/if_athn_cardbus.c/1.18/Mon Aug  1 07:15:53 2022//
 /if_atw_cardbus.c/1.25/Tue Jul 26 13:42:35 2022//
 /if_bwi_cardbus.c/1.16/Tue Jul 26 13:42:35 2022//
 /if_dc_cardbus.c/1.41/Tue Jul 26 13:42:35 2022//
@@ -26,5 +25,6 @@
 /ohci_cardbus.c/1.23/Tue Jul 26 13:42:35 2022//
 /puc_cardbus.c/1.9/Tue Jul 26 13:42:35 2022//
 /uhci_cardbus.c/1.16/Tue Jul 26 13:42:35 2022//
-/if_ath_cardbus.c/1.21/Tue Jan 10 10:05:52 2023//
+/if_ath_cardbus.c/1.21/Mon Feb 27 09:09:55 2023//
+/if_athn_cardbus.c/1.18/Mon Feb 27 09:09:55 2023//
 D

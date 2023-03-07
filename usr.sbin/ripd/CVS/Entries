@@ -9,8 +9,6 @@
 /rde.h/1.4/Wed Oct 24 20:38:03 2007//
 /rde_rib.c/1.5/Wed Oct 24 20:38:03 2007//
 /rip.h/1.4/Thu Oct 18 17:00:59 2007//
-/ripd.8/1.13/Thu Oct 13 15:20:40 2016//
-/ripd.conf.5/1.20/Sat May 16 16:58:12 2020//
 /control.c/1.27/Wed Sep  1 16:07:41 2021//
 /control.h/1.7/Wed Sep  1 16:07:41 2021//
 /interface.c/1.16/Wed Sep  1 16:07:41 2021//
@@ -24,4 +22,6 @@
 /parse.y/1.48/Wed Oct 20 17:29:20 2021//
 /log.h/1.7/Mon Jan 24 14:35:16 2022//
 /kroute.c/1.35/Tue Jul 26 13:42:36 2022//
+/ripd.8/1.14/Tue Mar  7 18:59:24 2023//
+/ripd.conf.5/1.21/Tue Mar  7 18:59:24 2023//
 D

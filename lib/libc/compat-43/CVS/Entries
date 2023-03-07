@@ -10,9 +10,9 @@
 /sethostid.c/1.10/Sat May  1 08:41:50 2021//
 /getwd.c/1.13/Mon Jan 24 14:35:13 2022//
 /getdtablesize.3/1.14/Tue Jul 26 13:42:32 2022//
-/sigvec.3/1.37/Sat Nov  5 22:11:43 2022//
-/creat.3/1.9/Tue Jan 10 10:05:29 2023//
-/sigblock.3/1.21/Tue Jan 10 10:05:29 2023//
-/sigpause.3/1.15/Tue Jan 10 10:05:29 2023//
-/sigsetmask.3/1.19/Tue Jan 10 10:05:29 2023//
+/creat.3/1.9/Mon Feb 27 09:09:54 2023//
+/sigblock.3/1.21/Mon Feb 27 09:09:54 2023//
+/sigpause.3/1.15/Mon Feb 27 09:09:54 2023//
+/sigsetmask.3/1.19/Mon Feb 27 09:09:54 2023//
+/sigvec.3/1.37/Mon Feb 27 09:09:54 2023//
 D

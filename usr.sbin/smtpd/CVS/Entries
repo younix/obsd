@@ -10,13 +10,11 @@
 /sendmail.8/1.4/Fri Oct 23 15:48:16 2015//
 /smtpd-api.h/1.36/Sun Dec 23 16:06:24 2018//
 /smtpd-defines.h/1.12/Mon Feb 24 16:16:08 2020//
-/smtpd.8/1.32/Tue Jan  3 22:11:39 2017//
 /tree.h/1.1/Sun Dec 23 16:06:24 2018//
 D/mail////
 D/smtp////
 D/smtpctl////
 D/smtpd////
-/smtpctl.8/1.65/Thu Dec 17 19:39:59 2020//
 /aliases.5/1.17/Wed Sep  1 16:07:41 2021//
 /forward.5/1.10/Wed Sep  1 16:07:41 2021//
 /mail.maildir.8/1.6/Wed Sep  1 16:07:41 2021//
@@ -98,12 +96,14 @@ D/smtpd////
 /ssl.c/1.98/Mon Jun 27 13:02:01 2022//
 /ssl.h/1.26/Mon Jun 27 13:02:01 2022//
 /smtpd-filters.7/1.9/Tue Jul 26 13:42:36 2022//
-/smtpd.conf.5/1.263/Tue Jul 26 13:42:36 2022//
-/mta_session.c/1.147/Wed Oct  5 18:35:08 2022//
-/smtp_session.c/1.433/Sat Nov  5 22:12:31 2022//
-/smtp_client.c/1.17/Tue Jan 10 10:06:03 2023//
-/envelope.c/1.51/Mon Feb  6 19:37:21 2023//
-/bounce.c/1.87/Mon Feb 27 08:43:26 2023//
-/ioev.c/1.49/Mon Feb 27 08:43:26 2023//
-/mda.c/1.144/Mon Feb 27 08:43:26 2023//
-/smtpd.c/1.344/Mon Feb 27 08:43:26 2023//
+/bounce.c/1.87/Mon Feb 27 09:09:58 2023//
+/envelope.c/1.51/Mon Feb 27 09:09:58 2023//
+/ioev.c/1.49/Mon Feb 27 09:09:58 2023//
+/mda.c/1.144/Mon Feb 27 09:09:58 2023//
+/mta_session.c/1.147/Mon Feb 27 09:09:58 2023//
+/smtp_client.c/1.17/Mon Feb 27 09:09:58 2023//
+/smtp_session.c/1.433/Mon Feb 27 09:09:58 2023//
+/smtpctl.8/1.66/Tue Mar  7 18:59:24 2023//
+/smtpd.8/1.33/Tue Mar  7 18:59:24 2023//
+/smtpd.c/1.344/Mon Feb 27 09:09:58 2023//
+/smtpd.conf.5/1.264/Tue Mar  7 18:59:24 2023//

@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.101 2022/11/30 09:12:34 job Exp $ */
+/*	$OpenBSD: cert.c,v 1.104 2023/03/06 16:58:41 job Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
@@ -641,13 +641,18 @@ cert_parse_ee_cert(const char *fn, X509 *x)
 struct cert *
 cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 {
-	int		 extsz;
-	int		 sia_present = 0;
-	size_t		 i;
-	X509		*x = NULL;
-	X509_EXTENSION	*ext = NULL;
-	ASN1_OBJECT	*obj;
-	struct parse	 p;
+	const unsigned char	*oder;
+	int			 extsz;
+	int			 sia_present = 0;
+	size_t			 i;
+	X509			*x = NULL;
+	X509_EXTENSION		*ext = NULL;
+	const X509_ALGOR	*palg;
+	const ASN1_OBJECT	*cobj;
+	ASN1_OBJECT		*obj;
+	EVP_PKEY		*pkey;
+	struct parse		 p;
+	int			 nid;
 
 	/* just fail for empty buffers, the warning was printed elsewhere */
 	if (der == NULL)
@@ -658,14 +663,32 @@ cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 	if ((p.res = calloc(1, sizeof(struct cert))) == NULL)
 		err(1, NULL);
 
+	oder = der;
 	if ((x = d2i_X509(NULL, &der, len)) == NULL) {
 		cryptowarnx("%s: d2i_X509", p.fn);
+		goto out;
+	}
+	if (der != oder + len) {
+		warnx("%s: %td bytes trailing garbage", fn, oder + len - der);
 		goto out;
 	}
 
 	/* Cache X509v3 extensions, see X509_check_ca(3). */
 	if (X509_check_purpose(x, -1, -1) <= 0) {
 		cryptowarnx("%s: could not cache X509v3 extensions", p.fn);
+		goto out;
+	}
+
+	X509_get0_signature(NULL, &palg, x);
+	if (palg == NULL) {
+		cryptowarnx("%s: X509_get0_signature", p.fn);
+		goto out;
+	}
+	X509_ALGOR_get0(&cobj, NULL, NULL, palg);
+	if ((nid = OBJ_obj2nid(cobj)) != NID_sha256WithRSAEncryption) {
+		warnx("%s: RFC 7935: wrong signature algorithm %s, want %s",
+		    fn, OBJ_nid2ln(nid),
+		    OBJ_nid2ln(NID_sha256WithRSAEncryption));
 		goto out;
 	}
 
@@ -741,6 +764,13 @@ cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 
 	switch (p.res->purpose) {
 	case CERT_PURPOSE_CA:
+		if ((pkey = X509_get0_pubkey(x)) == NULL) {
+			warnx("%s: X509_get0_pubkey failed", p.fn);
+			goto out;
+		}
+		if (!valid_ca_pkey(p.fn, pkey))
+			goto out;
+
 		if (X509_get_key_usage(x) != (KU_KEY_CERT_SIGN | KU_CRL_SIGN)) {
 			warnx("%s: RFC 6487 section 4.8.4: key usage violation",
 			    p.fn);

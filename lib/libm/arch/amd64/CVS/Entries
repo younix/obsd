@@ -38,8 +38,8 @@
 /s_sinf.S/1.4/Tue Jul  3 22:43:34 2018//
 /s_tan.S/1.4/Tue Jul  3 22:43:34 2018//
 /s_tanf.S/1.4/Tue Jul  3 22:43:34 2018//
-/e_scalb.S/1.6/Fri Sep  2 14:00:06 2022//
-/s_significand.S/1.6/Fri Sep  2 14:00:06 2022//
-/s_significandf.S/1.6/Fri Sep  2 14:00:06 2022//
-/fenv.c/1.6/Tue Jan 10 10:05:31 2023//
+/e_scalb.S/1.6/Mon Feb 27 09:09:54 2023//
+/fenv.c/1.6/Mon Feb 27 09:09:54 2023//
+/s_significand.S/1.6/Mon Feb 27 09:09:54 2023//
+/s_significandf.S/1.6/Mon Feb 27 09:09:54 2023//
 D

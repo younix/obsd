@@ -3,7 +3,6 @@
 /log.c/1.19/Wed Jul  3 05:04:19 2019//
 /ntp.h/1.14/Thu Jan 30 15:55:41 2020//
 /ntp_msg.c/1.22/Sat Sep  3 11:52:06 2016//
-/ntpctl.8/1.8/Wed Mar 11 19:38:48 2015//
 /sensors.c/1.54/Mon Nov 11 06:32:52 2019//
 /server.c/1.44/Sat Sep  3 11:52:06 2016//
 /util.c/1.25/Thu Jan 30 15:55:41 2020//
@@ -13,9 +12,10 @@
 /ntp_dns.c/1.27/Mon Nov 15 19:06:15 2021//
 /log.h/1.6/Mon Jan 24 14:35:16 2022//
 /client.c/1.117/Tue Jul 26 13:42:36 2022//
-/ntpd.conf.5/1.48/Tue Jul 26 13:42:36 2022//
-/ntpd.8/1.48/Fri Nov 11 20:28:32 2022//
-/constraint.c/1.54/Tue Jan 10 10:06:03 2023//
-/ntp.c/1.170/Tue Jan 10 10:06:03 2023//
-/ntpd.h/1.152/Tue Jan 10 10:06:03 2023//
+/constraint.c/1.54/Mon Feb 27 09:09:58 2023//
+/ntp.c/1.170/Mon Feb 27 09:09:58 2023//
+/ntpctl.8/1.9/Tue Mar  7 18:59:23 2023//
+/ntpd.8/1.49/Tue Mar  7 18:59:23 2023//
+/ntpd.conf.5/1.49/Tue Mar  7 18:59:23 2023//
+/ntpd.h/1.152/Mon Feb 27 09:09:58 2023//
 D

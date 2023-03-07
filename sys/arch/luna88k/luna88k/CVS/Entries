@@ -7,11 +7,11 @@
 /mainbus.c/1.17/Mon Nov 15 19:06:15 2021//
 /romcons.c/1.1/Mon Jun 27 13:02:00 2022//
 /m8820x.c/1.18/Tue Jul 26 13:42:34 2022//
-/conf.c/1.37/Sat Nov  5 22:12:15 2022//
-/disksubr.c/1.62/Sat Nov  5 22:12:15 2022//
-/autoconf.c/1.29/Tue Jan 10 10:05:50 2023//
-/clock.c/1.16/Tue Jan 10 10:05:50 2023//
-/locore.S/1.33/Tue Jan 10 10:05:50 2023//
-/locore0.S/1.7/Tue Jan 10 10:05:51 2023//
-/machdep.c/1.142/Tue Jan 10 10:05:51 2023//
+/autoconf.c/1.29/Mon Feb 27 09:09:55 2023//
+/clock.c/1.16/Mon Feb 27 09:09:55 2023//
+/conf.c/1.37/Mon Feb 27 09:09:55 2023//
+/disksubr.c/1.62/Mon Feb 27 09:09:55 2023//
+/locore.S/1.33/Mon Feb 27 09:09:55 2023//
+/locore0.S/1.7/Mon Feb 27 09:09:55 2023//
+/machdep.c/1.142/Mon Feb 27 09:09:55 2023//
 D

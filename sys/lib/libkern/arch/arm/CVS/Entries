@@ -3,9 +3,9 @@
 /memcpy.S/1.6/Mon Jun  8 14:22:05 2015//
 /memmove.S/1.2/Sun Feb  1 05:47:10 2004//
 /memset.S/1.4/Mon Jun  8 14:22:05 2015//
-/bcopy.S/1.5/Tue Jan 10 10:05:58 2023//
-/bzero.S/1.4/Tue Jan 10 10:05:58 2023//
-/divsi3.S/1.6/Tue Jan 10 10:05:58 2023//
-/htonl.S/1.4/Tue Jan 10 10:05:58 2023//
-/htons.S/1.4/Tue Jan 10 10:05:58 2023//
+/bcopy.S/1.5/Mon Feb 27 09:09:58 2023//
+/bzero.S/1.4/Mon Feb 27 09:09:58 2023//
+/divsi3.S/1.6/Mon Feb 27 09:09:58 2023//
+/htonl.S/1.4/Mon Feb 27 09:09:58 2023//
+/htons.S/1.4/Mon Feb 27 09:09:58 2023//
 D

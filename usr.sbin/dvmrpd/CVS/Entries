@@ -1,8 +1,6 @@
 /Makefile/1.5/Fri Sep  2 16:20:34 2016//
 /ask_nbrs2.c/1.5/Mon Dec  7 19:17:18 2015//
 /dvmrp.h/1.3/Sat Mar 14 15:32:55 2009//
-/dvmrpd.8/1.11/Sun Nov 10 20:51:53 2019//
-/dvmrpd.conf.5/1.11/Sat May 16 16:58:11 2020//
 /graft.c/1.5/Mon Dec  7 19:17:18 2015//
 /graft_ack.c/1.5/Mon Dec  7 19:17:18 2015//
 /group.c/1.4/Tue Nov 18 20:54:28 2014//
@@ -32,5 +30,7 @@
 /packet.c/1.7/Wed Sep  1 16:07:40 2021//
 /parse.y/1.40/Wed Oct 20 17:29:19 2021//
 /log.h/1.5/Mon Jan 24 14:35:16 2022//
-/rde.c/1.32/Tue Jan 10 10:06:02 2023//
+/dvmrpd.8/1.12/Tue Mar  7 18:59:22 2023//
+/dvmrpd.conf.5/1.12/Tue Mar  7 18:59:22 2023//
+/rde.c/1.32/Mon Feb 27 09:09:58 2023//
 D

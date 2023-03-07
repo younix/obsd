@@ -3,10 +3,10 @@ D/Base////
 D/Gzip////
 D/Zip////
 D/Zlib////
-/Base.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
-/Bzip2.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
-/Deflate.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
-/FAQ.pod/1.5/Wed Sep  1 16:07:36 2021/-ko/
-/Gzip.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
-/RawDeflate.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
-/Zip.pm/1.6/Wed Sep  1 16:07:36 2021/-ko/
+/Base.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/
+/Bzip2.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/
+/Deflate.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/
+/FAQ.pod/1.6/Tue Mar  7 18:58:39 2023/-ko/
+/Gzip.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/
+/RawDeflate.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/
+/Zip.pm/1.7/Tue Mar  7 18:58:39 2023/-ko/

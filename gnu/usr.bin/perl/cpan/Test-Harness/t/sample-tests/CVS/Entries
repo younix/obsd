@@ -26,7 +26,6 @@
 /out_of_order/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /schwern/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /schwern-todo-quiet/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
-/segfault/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /sequence_misparse/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /shbang_misparse/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /simple/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
@@ -56,4 +55,5 @@
 /with_comments/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
 /yaml_late_plan/1.1.1.1/Mon Mar 25 20:08:16 2013/-ko/
 /zero_valid/1.1.1.1/Fri Sep 24 14:49:00 2010/-ko/
+/segfault/1.1.1.2/Tue Mar  7 18:58:40 2023/-ko/
 D

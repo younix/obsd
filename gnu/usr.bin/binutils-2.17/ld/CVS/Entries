@@ -60,7 +60,7 @@ D/emulparams////
 D/emultempl////
 D/po////
 D/scripttempl////
-/ldgram.y/1.7/Sat Nov  5 22:11:23 2022//
-/genscripts.sh/1.4/Tue Jan 10 10:05:15 2023//
-/lexsup.c/1.12/Tue Jan 10 10:05:15 2023//
-/ldmain.c/1.17/Mon Feb  6 19:36:09 2023//
+/genscripts.sh/1.4/Mon Feb 27 09:09:54 2023//
+/ldgram.y/1.7/Mon Feb 27 09:09:54 2023//
+/ldmain.c/1.17/Mon Feb 27 09:09:54 2023//
+/lexsup.c/1.12/Mon Feb 27 09:09:54 2023//

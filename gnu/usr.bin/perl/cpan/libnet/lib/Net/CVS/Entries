@@ -1,11 +1,11 @@
-/Cmd.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/Config.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/Domain.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/FTP.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/NNTP.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/Netrc.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/POP3.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/SMTP.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/Time.pm/1.2/Wed Feb 13 21:15:18 2019/-ko/
-/libnetFAQ.pod/1.2/Wed Feb 13 21:15:18 2019/-ko/
 D/FTP////
+/Cmd.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/Config.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/Domain.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/FTP.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/NNTP.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/Netrc.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/POP3.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/SMTP.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/Time.pm/1.3/Tue Mar  7 18:58:41 2023/-ko/
+/libnetFAQ.pod/1.3/Tue Mar  7 18:58:41 2023/-ko/

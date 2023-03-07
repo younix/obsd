@@ -8,8 +8,8 @@
 /strcmp.S/1.5/Wed Nov 29 05:13:57 2017//
 /strcpy.S/1.10/Tue Nov 28 06:55:49 2017//
 /strrchr.S/1.8/Wed Nov 29 05:13:57 2017//
-/bcmp.S/1.6/Tue Jan 10 10:05:28 2023//
-/bzero.S/1.7/Tue Jan 10 10:05:28 2023//
-/memmove.S/1.8/Tue Jan 10 10:05:28 2023//
-/strncmp.S/1.7/Tue Jan 10 10:05:28 2023//
+/bcmp.S/1.6/Mon Feb 27 09:09:54 2023//
+/bzero.S/1.7/Mon Feb 27 09:09:54 2023//
+/memmove.S/1.8/Mon Feb 27 09:09:54 2023//
+/strncmp.S/1.7/Mon Feb 27 09:09:54 2023//
 D

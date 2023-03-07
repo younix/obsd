@@ -24,9 +24,11 @@
 /sysreg.4/1.2/Sat Oct  8 06:45:02 2016//
 /imxtemp.4/1.5/Fri Dec 11 17:58:22 2020//
 /sxits.4/1.3/Fri Dec 11 17:58:22 2020//
-/Makefile/1.30/Wed Sep  1 16:07:38 2021//
 /zqclock.4/1.2/Wed Sep  1 16:07:38 2021//
 /zqreset.4/1.2/Wed Sep  1 16:07:38 2021//
 /intro.4/1.5/Tue Jul 26 13:42:34 2022//
-/ampintc.4/1.2/Sat Nov  5 22:12:11 2022//
+/Makefile/1.31/Tue Mar  7 18:59:08 2023//
+/ampintc.4/1.2/Mon Feb 27 09:09:55 2023//
+/mvodog.4/1.2/Thu Mar  2 11:56:25 2023//
+/mvortc.4/1.2/Thu Mar  2 11:56:25 2023//
 D

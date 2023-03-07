@@ -1,4 +1,4 @@
-/* $OpenBSD: wycheproof.go,v 1.131 2022/11/18 18:32:14 tb Exp $ */
+/* $OpenBSD: wycheproof.go,v 1.135 2023/03/01 12:34:12 tb Exp $ */
 /*
  * Copyright (c) 2018 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2018,2019,2022 Theo Buehler <tb@openbsd.org>
@@ -529,15 +529,26 @@ var nids = map[string]int{
 	"brainpoolP320t1": C.NID_brainpoolP320t1,
 	"brainpoolP384t1": C.NID_brainpoolP384t1,
 	"brainpoolP512t1": C.NID_brainpoolP512t1,
+	"secp160k1":       C.NID_secp160k1,
+	"secp160r1":       C.NID_secp160r1,
+	"secp160r2":       C.NID_secp160r2,
+	"secp192k1":       C.NID_secp192k1,
+	"secp192r1":       C.NID_X9_62_prime192v1, // RFC 8422, Table 4, p.32
 	"secp224k1":       C.NID_secp224k1,
 	"secp224r1":       C.NID_secp224r1,
 	"secp256k1":       C.NID_secp256k1,
 	"P-256K":          C.NID_secp256k1,
 	"secp256r1":       C.NID_X9_62_prime256v1, // RFC 8422, Table 4, p.32
 	"P-256":           C.NID_X9_62_prime256v1,
+	"sect283k1":       C.NID_sect283k1,
+	"sect283r1":       C.NID_sect283r1,
 	"secp384r1":       C.NID_secp384r1,
 	"P-384":           C.NID_secp384r1,
+	"sect409k1":       C.NID_sect409k1,
+	"sect409r1":       C.NID_sect409r1,
 	"secp521r1":       C.NID_secp521r1,
+	"sect571k1":       C.NID_sect571k1,
+	"sect571r1":       C.NID_sect571r1,
 	"P-521":           C.NID_secp521r1,
 	"SHA-1":           C.NID_sha1,
 	"SHA-224":         C.NID_sha224,
@@ -1649,6 +1660,11 @@ func runECDHTest(nid int, variant testVariant, wt *wycheproofTestECDH) bool {
 }
 
 func runECDHTestGroup(algorithm string, variant testVariant, wtg *wycheproofTestGroupECDH) bool {
+	if wtg.Curve == "FRP256v1" {
+		fmt.Printf("INFO: Skipping %v test group %v with curve %v and %v encoding...\n", algorithm, wtg.Type, wtg.Curve, wtg.Encoding)
+		return true
+	}
+
 	fmt.Printf("Running %v test group %v with curve %v and %v encoding...\n",
 		algorithm, wtg.Type, wtg.Curve, wtg.Encoding)
 
@@ -3029,6 +3045,8 @@ func main() {
 		{"ED448", "ed448_test.json", Skip},
 		{"HKDF", "hkdf_sha*_test.json", Normal},
 		{"HMAC", "hmac_sha*_test.json", Normal},
+		// uncomment once package builds have caught up:
+		// {"JSON webcrypto", "json_web_*_test.json", Skip},
 		{"KW", "kw_test.json", Normal},
 		{"Primality test", "primality_test.json", Normal},
 		{"RSA", "rsa_*test.json", Normal},

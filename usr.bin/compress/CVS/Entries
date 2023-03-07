@@ -11,10 +11,10 @@
 /znew.1/1.4/Thu May 31 19:20:09 2007//
 /zopen.c/1.22/Mon May 29 14:41:16 2017//
 /gzopen.c/1.35/Tue Jul 26 13:42:36 2022//
-/Makefile/1.23/Sat Nov  5 22:12:23 2022//
-/compress.1/1.49/Sat Nov  5 22:12:23 2022//
-/gzip.1/1.16/Sat Nov  5 22:12:23 2022//
-/main.c/1.104/Sat Nov  5 22:12:23 2022//
-/zipopen.c/1.1/Sat Oct 22 14:41:27 2022//
-/compress.h/1.16/Tue Jan 10 10:05:59 2023//
+/Makefile/1.23/Mon Feb 27 09:09:58 2023//
+/compress.1/1.49/Mon Feb 27 09:09:58 2023//
+/compress.h/1.16/Mon Feb 27 09:09:58 2023//
+/gzip.1/1.16/Mon Feb 27 09:09:58 2023//
+/main.c/1.104/Mon Feb 27 09:09:58 2023//
+/zipopen.c/1.1/Mon Feb 27 09:09:58 2023//
 D

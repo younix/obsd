@@ -1,4 +1,4 @@
-# $OpenBSD: RAMDISK,v 1.188 2023/02/13 19:18:53 patrick Exp $
+# $OpenBSD: RAMDISK,v 1.191 2023/03/04 22:48:00 kettenis Exp $
 
 machine		arm64
 maxusers	4
@@ -68,7 +68,7 @@ ahci*		at fdt?
 dwge*		at fdt?
 dwpcie*		at fdt?
 pci*		at dwpcie?
-#dwqe*		at fdt?
+dwqe*		at fdt?
 ohci*		at fdt?
 ehci*		at fdt?
 pciecam*	at fdt?
@@ -91,8 +91,9 @@ plgpio*		at fdt? early 1
 plrtc*		at fdt?
 pluart*		at fdt?
 psci*		at fdt? early 1
-syscon*		at fdt? early 1
 pwmfan*		at fdt?
+scmi*		at fdt?
+syscon*		at fdt? early 1
 
 virtio*		at fdt?
 virtio*		at pci?
@@ -354,6 +355,7 @@ rgephy*		at mii?			# Realtek 8169S/8110S PHY
 rlphy*		at mii?			# Realtek 8139 internal PHYs
 ukphy*		at mii?			# "unknown" PHYs
 urlphy*		at mii?			# Realtek RTL8150L internal PHY
+ytphy*		at mii?			# MotorComm YT8511 PHY
 
 # I2C devices
 abcrtc*		at iic?			# Abracon x80x RTC

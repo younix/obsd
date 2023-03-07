@@ -14,9 +14,9 @@
 /tcsendbreak.c/1.10/Sun Sep 10 18:20:00 2017//
 /tcsetattr.c/1.6/Sun Sep 13 11:51:36 2015//
 /tcsetpgrp.c/1.8/Tue Dec 16 03:32:21 2014//
-/tcgetpgrp.3/1.11/Mon Feb  6 19:36:32 2023//
-/tcgetsid.3/1.3/Mon Feb  6 19:36:32 2023//
-/tcsendbreak.3/1.10/Mon Feb  6 19:36:32 2023//
-/tcsetattr.3/1.19/Mon Feb  6 19:36:32 2023//
-/tcsetpgrp.3/1.15/Mon Feb  6 19:36:32 2023//
+/tcgetpgrp.3/1.11/Mon Feb 27 09:09:54 2023//
+/tcgetsid.3/1.3/Mon Feb 27 09:09:54 2023//
+/tcsendbreak.3/1.10/Mon Feb 27 09:09:54 2023//
+/tcsetattr.3/1.19/Mon Feb 27 09:09:54 2023//
+/tcsetpgrp.3/1.15/Mon Feb 27 09:09:54 2023//
 D

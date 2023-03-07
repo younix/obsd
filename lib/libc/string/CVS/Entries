@@ -122,13 +122,13 @@
 /wmemmove.c/1.4/Sat Sep 12 16:23:14 2015//
 /wmemset.3/1.4/Wed Jun  5 03:39:23 2013//
 /wmemset.c/1.4/Sat Sep 12 16:23:14 2015//
-/strcat.3/1.19/Mon Aug  1 07:15:36 2022//
-/strcmp.3/1.15/Mon Aug  1 07:15:36 2022//
-/strcpy.3/1.22/Mon Aug  1 07:15:36 2022//
-/strlen.3/1.14/Mon Aug  1 07:15:36 2022//
-/memccpy.3/1.13/Tue Sep 20 07:19:21 2022//
-/memchr.3/1.13/Tue Sep 20 07:19:21 2022//
-/memcmp.3/1.10/Tue Sep 20 07:19:21 2022//
-/memset.3/1.9/Tue Sep 20 07:19:21 2022//
-/swab.3/1.10/Wed Oct  5 18:34:40 2022//
+/memccpy.3/1.13/Mon Feb 27 09:09:54 2023//
+/memchr.3/1.13/Mon Feb 27 09:09:54 2023//
+/memcmp.3/1.10/Mon Feb 27 09:09:54 2023//
+/memset.3/1.9/Mon Feb 27 09:09:54 2023//
+/strcat.3/1.19/Mon Feb 27 09:09:54 2023//
+/strcmp.3/1.15/Mon Feb 27 09:09:54 2023//
+/strcpy.3/1.22/Mon Feb 27 09:09:54 2023//
+/strlen.3/1.14/Mon Feb 27 09:09:54 2023//
+/swab.3/1.10/Mon Feb 27 09:09:54 2023//
 D
