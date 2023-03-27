@@ -1,7 +1,7 @@
 /sha.h/1.21/Sun Sep 13 21:09:56 2015//
-/sha1_one.c/1.12/Thu Sep 10 15:56:26 2015//
 D/asm////
-/sha256.c/1.11/Sun Nov 21 20:15:22 2021//
-/sha512.c/1.16/Sun Nov 21 20:15:22 2021//
-/sha1dgst.c/1.15/Mon Feb 27 09:09:54 2023//
 /sha_local.h/1.1/Mon Feb 27 09:09:54 2023//
+/sha1_one.c/1.14/Mon Mar 27 08:58:19 2023//
+/sha1dgst.c/1.22/Mon Mar 27 08:58:19 2023//
+/sha256.c/1.14/Mon Mar 27 08:58:19 2023//
+/sha512.c/1.20/Mon Mar 27 08:58:19 2023//

@@ -3,7 +3,6 @@
 /ufs_dirhash.c/1.42/Fri Mar 15 05:42:38 2019//
 /ufs_inode.c/1.44/Thu Feb 27 09:10:31 2020//
 /ufs_quota_stub.c/1.8/Sat Mar 14 03:38:53 2015//
-/ufs_vfsops.c/1.19/Sat Mar 14 03:38:53 2015//
 /ufsmount.h/1.13/Sat Feb 27 18:50:38 2016//
 /dinode.h/1.19/Mon Jun  1 06:23:28 2020//
 /inode.h/1.53/Fri Dec 11 17:58:24 2020//
@@ -13,5 +12,6 @@
 /ufs_bmap.c/1.37/Mon Jan 24 14:35:16 2022//
 /ufs_lookup.c/1.59/Mon Jan 24 14:35:16 2022//
 /ufs_extern.h/1.38/Tue Jul 26 13:42:36 2022//
-/ufs_vnops.c/1.156/Tue Jul 26 13:42:36 2022//
+/ufs_vfsops.c/1.20/Mon Mar 27 08:58:38 2023//
+/ufs_vnops.c/1.157/Mon Mar 27 08:58:38 2023//
 D

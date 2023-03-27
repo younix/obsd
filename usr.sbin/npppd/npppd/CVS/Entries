@@ -3,7 +3,6 @@
 /accept.h/1.2/Thu Jan 22 14:33:01 2015//
 /ccp.c/1.8/Wed Feb 27 04:52:19 2019//
 /chap_ms.h/1.4/Thu Nov 20 03:48:12 2014//
-/control.c/1.7/Mon Jan  9 14:04:31 2017//
 /fsm.c/1.10/Wed Feb 27 04:52:19 2019//
 /fsm.h/1.6/Tue May 30 17:22:00 2017//
 /ipcp.c/1.6/Wed Feb 27 04:52:19 2019//
@@ -48,4 +47,5 @@
 /npppd_pool.c/1.11/Mon Feb 27 09:09:58 2023//
 /parse.y/1.26/Mon Feb 27 09:09:58 2023//
 /ppp.h/1.24/Mon Feb 27 09:09:58 2023//
+/control.c/1.8/Mon Mar 27 08:58:43 2023//
 D

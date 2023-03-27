@@ -40,19 +40,15 @@
 /acpi_wakecode.S/1.49/Mon Feb 27 09:09:55 2023//
 /amd64errata.c/1.13/Mon Feb 27 09:09:55 2023//
 /autoconf.c/1.55/Mon Feb 27 09:09:55 2023//
-/bios.c/1.46/Mon Feb 27 09:09:55 2023//
 /bus_space.c/1.28/Mon Feb 27 09:09:55 2023//
 /conf.c/1.78/Tue Mar  7 18:59:09 2023//
 /copy.S/1.18/Mon Feb 27 09:09:55 2023//
-/cpu.c/1.164/Mon Feb 27 09:09:55 2023//
 /efi_machdep.c/1.5/Mon Feb 27 09:09:55 2023//
 /fpu.c/1.43/Mon Feb 27 09:09:55 2023//
 /genassym.cf/1.44/Mon Feb 27 09:09:55 2023//
 /hibernate_machdep.c/1.49/Mon Feb 27 09:09:55 2023//
-/identcpu.c/1.131/Mon Feb 27 09:09:55 2023//
 /ipi.c/1.18/Mon Feb 27 09:09:55 2023//
 /ipifuncs.c/1.37/Mon Feb 27 09:09:55 2023//
-/lapic.c/1.66/Mon Feb 27 09:09:55 2023//
 /locore.S/1.132/Mon Feb 27 09:09:55 2023//
 /locore0.S/1.21/Mon Feb 27 09:09:55 2023//
 /machdep.c/1.284/Mon Feb 27 09:09:55 2023//
@@ -65,4 +61,8 @@
 /vm_machdep.c/1.46/Mon Feb 27 09:09:55 2023//
 /vmm.c/1.337/Mon Feb 27 09:09:55 2023//
 /vmm_support.S/1.21/Mon Feb 27 09:09:55 2023//
+/bios.c/1.47/Mon Mar 27 08:58:32 2023//
+/cpu.c/1.165/Mon Mar 27 08:58:32 2023//
+/identcpu.c/1.132/Mon Mar 27 08:58:32 2023//
+/lapic.c/1.67/Mon Mar 27 08:58:32 2023//
 D

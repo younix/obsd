@@ -1,11 +1,9 @@
-#	$OpenBSD: Makefile,v 1.21 2023/01/31 05:13:28 jsing Exp $
+#	$OpenBSD: Makefile,v 1.26 2023/03/26 22:10:03 tb Exp $
 
 PROGS +=	bn_add_sub
 PROGS +=	bn_cmp
 PROGS +=	bn_isqrt
 PROGS +=	bn_mod_exp
-PROGS +=	bn_mod_exp2_mont
-PROGS +=	bn_mod_exp_zero
 PROGS +=	bn_mod_sqrt
 PROGS +=	bn_mont
 PROGS +=	bn_mul_div
@@ -15,11 +13,10 @@ PROGS +=	bn_shift
 PROGS +=	bn_test
 PROGS +=	bn_to_string
 PROGS +=	bn_unit
+PROGS +=	bn_word
 
 STATIC_LINK +=	bn_isqrt
 STATIC_LINK +=	bn_mod_exp
-STATIC_LINK +=	bn_mod_exp_zero
-STATIC_LINK +=	bn_primes
 STATIC_LINK +=	bn_rand_interval
 STATIC_LINK +=	bn_test
 STATIC_LINK +=	bn_to_string
@@ -70,5 +67,9 @@ benchmark: bn_mul_div bn_shift
 .for p in ${STATIC_LINK}
 LDADD_$p +=	${CRYPTO_INT}
 .endfor
+
+SRCS_bn_primes = bn_primes.c bn_small_primes.c
+
+.PATH: ${.CURDIR}/../../../../lib/libcrypto/bn
 
 .include <bsd.regress.mk>

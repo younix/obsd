@@ -1,4 +1,4 @@
-/*	$OpenBSD: x509.c,v 1.66 2023/03/06 21:00:41 job Exp $ */
+/*	$OpenBSD: x509.c,v 1.70 2023/03/14 07:09:11 tb Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Claudio Jeker <claudio@openbsd.org>
@@ -375,11 +375,18 @@ x509_get_aia(X509 *x, const char *fn, char **aia)
 	if (info == NULL)
 		return 1;
 
+	if ((X509_get_extension_flags(x) & EXFLAG_SS) != 0) {
+		warnx("%s: RFC 6487 section 4.8.7: AIA must be absent from "
+		    "a self-signed certificate", fn);
+		goto out;
+	}
+
 	if (crit != 0) {
 		warnx("%s: RFC 6487 section 4.8.7: "
 		    "AIA: extension not non-critical", fn);
 		goto out;
 	}
+
 	if (sk_ACCESS_DESCRIPTION_num(info) != 1) {
 		warnx("%s: RFC 6487 section 4.8.7: AIA: "
 		    "want 1 element, have %d", fn,
@@ -486,10 +493,30 @@ x509_get_sia(X509 *x, const char *fn, char **sia)
 }
 
 /*
- * Extract the expire time (not-after) of a certificate.
+ * Extract the notBefore of a certificate.
  */
 int
-x509_get_expire(X509 *x, const char *fn, time_t *tt)
+x509_get_notbefore(X509 *x, const char *fn, time_t *tt)
+{
+	const ASN1_TIME	*at;
+
+	at = X509_get0_notBefore(x);
+	if (at == NULL) {
+		warnx("%s: X509_get0_notBefore failed", fn);
+		return 0;
+	}
+	if (!x509_get_time(at, tt)) {
+		warnx("%s: ASN1_time_parse failed", fn);
+		return 0;
+	}
+	return 1;
+}
+
+/*
+ * Extract the notAfter from a certificate.
+ */
+int
+x509_get_notafter(X509 *x, const char *fn, time_t *tt)
 {
 	const ASN1_TIME	*at;
 
@@ -809,4 +836,26 @@ x509_convert_seqnum(const char *fn, const ASN1_INTEGER *i)
  out:
 	BN_free(seqnum);
 	return s;
+}
+
+/*
+ * Find the closest expiry moment by walking the chain of authorities.
+ */
+time_t
+x509_find_expires(time_t notafter, struct auth *a, struct crl_tree *crlt)
+{
+	struct crl	*crl;
+	time_t		 expires;
+
+	expires = notafter;
+
+	for (; a != NULL; a = a->parent) {
+		if (expires > a->cert->notafter)
+			expires = a->cert->notafter;
+		crl = crl_get(crlt, a);
+		if (crl != NULL && expires > crl->nextupdate)
+			expires = crl->nextupdate;
+	}
+
+	return expires;
 }

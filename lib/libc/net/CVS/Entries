@@ -43,7 +43,6 @@
 /rcmd.c/1.63/Sat Sep 12 14:56:50 2015//
 /rcmdsh.3/1.18/Sat May 28 15:48:30 2016//
 /rcmdsh.c/1.20/Fri Jun 28 13:32:42 2019//
-/recv.c/1.6/Sun Oct  4 07:17:27 2015//
 /res_data.c/1.4/Fri Jan 16 16:48:51 2015//
 /res_debug_syms.c/1.2/Mon Oct  5 02:57:16 2015//
 /rresvport.c/1.12/Fri Jun 28 13:32:42 2019//
@@ -67,8 +66,9 @@
 /inet_net_ntop.3/1.4/Mon Feb 27 09:09:54 2023//
 /inet_net_pton.c/1.14/Mon Feb 27 09:09:54 2023//
 /inet_ntop.3/1.6/Mon Feb 27 09:09:54 2023//
-/res_comp.c/1.22/Mon Feb 27 09:09:54 2023//
 /res_random.c/1.26/Mon Feb 27 09:09:54 2023//
 /rthdr.c/1.13/Mon Feb 27 09:09:54 2023//
 /ruserok.c/1.14/Mon Feb 27 09:09:54 2023//
+/recv.c/1.7/Mon Mar 27 08:58:18 2023//
+/res_comp.c/1.23/Mon Mar 27 08:58:18 2023//
 D

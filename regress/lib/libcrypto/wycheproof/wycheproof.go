@@ -1,4 +1,4 @@
-/* $OpenBSD: wycheproof.go,v 1.135 2023/03/01 12:34:12 tb Exp $ */
+/* $OpenBSD: wycheproof.go,v 1.141 2023/03/25 09:21:17 tb Exp $ */
 /*
  * Copyright (c) 2018 Joel Sing <jsing@openbsd.org>
  * Copyright (c) 2018,2019,2022 Theo Buehler <tb@openbsd.org>
@@ -81,7 +81,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
-	"flag"
 	"fmt"
 	"hash"
 	"io/ioutil"
@@ -89,8 +88,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
-	"sort"
+	"runtime"
 	"strings"
+	"sync"
 	"unsafe"
 )
 
@@ -123,9 +123,7 @@ func (variant testVariant) String() string {
 	return variants[variant]
 }
 
-var acceptableAudit = false
-var acceptableComments map[string]int
-var acceptableFlags map[string]int
+var testc *testCoordinator
 
 type wycheproofJWKPublic struct {
 	Crv string `json:"crv"`
@@ -529,6 +527,7 @@ var nids = map[string]int{
 	"brainpoolP320t1": C.NID_brainpoolP320t1,
 	"brainpoolP384t1": C.NID_brainpoolP384t1,
 	"brainpoolP512t1": C.NID_brainpoolP512t1,
+	"FRP256v1":        C.NID_FRP256v1,
 	"secp160k1":       C.NID_secp160k1,
 	"secp160r1":       C.NID_secp160r1,
 	"secp160r2":       C.NID_secp160r2,
@@ -555,51 +554,6 @@ var nids = map[string]int{
 	"SHA-256":         C.NID_sha256,
 	"SHA-384":         C.NID_sha384,
 	"SHA-512":         C.NID_sha512,
-}
-
-func gatherAcceptableStatistics(testcase int, comment string, flags []string) {
-	fmt.Printf("AUDIT: Test case %d (%q) %v\n", testcase, comment, flags)
-
-	if comment == "" {
-		acceptableComments["No comment"]++
-	} else {
-		acceptableComments[comment]++
-	}
-
-	if len(flags) == 0 {
-		acceptableFlags["NoFlag"]++
-	} else {
-		for _, flag := range flags {
-			acceptableFlags[flag]++
-		}
-	}
-}
-
-func printAcceptableStatistics() {
-	fmt.Printf("\nComment statistics:\n")
-
-	var comments []string
-	for comment := range acceptableComments {
-		comments = append(comments, comment)
-	}
-	sort.Strings(comments)
-	for _, comment := range comments {
-		prcomment := comment
-		if len(comment) > 45 {
-			prcomment = comment[0:42] + "..."
-		}
-		fmt.Printf("%-45v %5d\n", prcomment, acceptableComments[comment])
-	}
-
-	fmt.Printf("\nFlag statistics:\n")
-	var flags []string
-	for flag := range acceptableFlags {
-		flags = append(flags, flag)
-	}
-	sort.Strings(flags)
-	for _, flag := range flags {
-		fmt.Printf("%-45v %5d\n", flag, acceptableFlags[flag])
-	}
 }
 
 func nidFromString(ns string) (int, error) {
@@ -702,9 +656,6 @@ func checkAesCbcPkcs5(ctx *C.EVP_CIPHER_CTX, doEncrypt int, key []byte, keyLen i
 	success := false
 	if bytes.Equal(openedMsg, out) == (wt.Result != "invalid") {
 		success = true
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 	} else {
 		fmt.Printf("FAIL: Test case %d (%q) [%v] %v - msg match: %t; want %v\n",
 			wt.TCID, wt.Comment, action, wt.Flags, bytes.Equal(openedMsg, out), wt.Result)
@@ -932,9 +883,6 @@ func checkAesAead(algorithm string, ctx *C.EVP_CIPHER_CTX, doEncrypt int,
 			fmt.Printf("FAIL: Test case %d (%q) [%v] %v - expected and computed tag do not match - ret: %d, Result: %v\n",
 				wt.TCID, wt.Comment, action, wt.Flags, ret, wt.Result)
 			success = false
-		}
-		if acceptableAudit && bytes.Equal(tagOut, tag) && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
 		}
 	}
 	return success
@@ -1210,9 +1158,6 @@ func checkAeadOpen(ctx *C.EVP_AEAD_CTX, iv []byte, ivLen int, aad []byte, aadLen
 
 	success := false
 	if bytes.Equal(openedMsg, msg) == (wt.Result != "invalid") {
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 		success = true
 	} else {
 		fmt.Printf("FAIL: Test case %d (%q) %v - msg match: %t; want %v\n",
@@ -1256,9 +1201,6 @@ func checkAeadSeal(ctx *C.EVP_AEAD_CTX, iv []byte, ivLen int, aad []byte, aadLen
 
 	success := false
 	if (bytes.Equal(sealedCt, ct) && bytes.Equal(sealedTag, tag)) == (wt.Result != "invalid") {
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 		success = true
 	} else {
 		fmt.Printf("FAIL: Test case %d (%q) %v - EVP_AEAD_CTX_seal() = %d, ct match: %t, tag match: %t; want %v\n",
@@ -1312,12 +1254,6 @@ func runChaCha20Poly1305Test(algorithm string, wt *wycheproofTestAead) bool {
 	}
 	if msgLen == 0 {
 		msg = append(msg, 0)
-	}
-	if ctLen == 0 {
-		msg = append(ct, 0)
-	}
-	if tagLen == 0 {
-		msg = append(tag, 0)
 	}
 
 	ctx := C.EVP_AEAD_CTX_new()
@@ -1653,18 +1589,10 @@ func runECDHTest(nid int, variant testVariant, wt *wycheproofTestECDH) bool {
 			wt.TCID, wt.Comment, wt.Flags, wt.Result)
 		success = false
 	}
-	if acceptableAudit && success && wt.Result == "acceptable" {
-		gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-	}
 	return success
 }
 
 func runECDHTestGroup(algorithm string, variant testVariant, wtg *wycheproofTestGroupECDH) bool {
-	if wtg.Curve == "FRP256v1" {
-		fmt.Printf("INFO: Skipping %v test group %v with curve %v and %v encoding...\n", algorithm, wtg.Type, wtg.Curve, wtg.Encoding)
-		return true
-	}
-
 	fmt.Printf("Running %v test group %v with curve %v and %v encoding...\n",
 		algorithm, wtg.Type, wtg.Curve, wtg.Encoding)
 
@@ -1773,9 +1701,6 @@ func runECDHWebCryptoTest(nid int, wt *wycheproofTestECDHWebCrypto) bool {
 			wt.TCID, wt.Comment, wt.Flags, wt.Result)
 		success = false
 	}
-	if acceptableAudit && success && wt.Result == "acceptable" {
-		gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-	}
 	return success
 }
 
@@ -1843,9 +1768,6 @@ func runECDSATest(ecKey *C.EC_KEY, nid int, h hash.Hash, variant testVariant, wt
 		fmt.Printf("FAIL: Test case %d (%q) %v - ECDSA_verify() = %d, want %v\n",
 			wt.TCID, wt.Comment, wt.Flags, int(ret), wt.Result)
 		success = false
-	}
-	if acceptableAudit && ret == 1 && wt.Result == "acceptable" {
-		gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
 	}
 	return success
 }
@@ -2259,9 +2181,6 @@ func runKWTestWrap(keySize int, key []byte, keyLen int, msg []byte, msgLen int, 
 	ret = C.AES_wrap_key((*C.AES_KEY)(unsafe.Pointer(&aesKey)), nil, (*C.uchar)(unsafe.Pointer(&out[0])), (*C.uchar)(unsafe.Pointer(&out[0])), (C.uint)(msgLen))
 	success := false
 	if ret == C.int(len(out)) && bytes.Equal(out, ct) {
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 		if wt.Result != "invalid" {
 			success = true
 		}
@@ -2293,9 +2212,6 @@ func runKWTestUnWrap(keySize int, key []byte, keyLen int, msg []byte, msgLen int
 	ret = C.AES_unwrap_key((*C.AES_KEY)(unsafe.Pointer(&aesKey)), nil, (*C.uchar)(unsafe.Pointer(&out[0])), (*C.uchar)(unsafe.Pointer(&out[0])), (C.uint)(ctLen))
 	success := false
 	if ret == C.int(ctLen-8) && bytes.Equal(out[0:ret], msg[0:ret]) {
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 		if wt.Result != "invalid" {
 			success = true
 		}
@@ -2642,9 +2558,6 @@ func runRsassaTest(rsa *C.RSA, h hash.Hash, sha *C.EVP_MD, mgfSha *C.EVP_MD, sLe
 	if ret == 1 && (wt.Result == "valid" || wt.Result == "acceptable") {
 		// All acceptable cases that pass use SHA-1 and are flagged:
 		// "WeakHash" : "The key for this test vector uses a weak hash function."
-		if acceptableAudit && wt.Result == "acceptable" {
-			gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-		}
 		success = true
 	} else if ret == 0 && (wt.Result == "invalid" || wt.Result == "acceptable") {
 		success = true
@@ -2743,9 +2656,6 @@ func runRSATest(rsa *C.RSA, nid int, h hash.Hash, wt *wycheproofTestRSA) bool {
 			wt.TCID, wt.Comment, wt.Flags, int(ret), wt.Result)
 		success = false
 	}
-	if acceptableAudit && ret == 1 && wt.Result == "acceptable" {
-		gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-	}
 	return success
 }
 
@@ -2829,9 +2739,6 @@ func runX25519Test(wt *wycheproofTestX25519) bool {
 			wt.TCID, wt.Comment, wt.Flags, wt.Result)
 		success = false
 	}
-	if acceptableAudit && result && wt.Result == "acceptable" {
-		gatherAcceptableStatistics(wt.TCID, wt.Comment, wt.Flags)
-	}
 	return success
 }
 
@@ -2859,156 +2766,160 @@ func runTestVectors(path string, variant testVariant) bool {
 	fmt.Printf("Loaded Wycheproof test vectors for %v with %d tests from %q\n",
 		wtv.Algorithm, wtv.NumberOfTests, filepath.Base(path))
 
-	var wtg interface{}
-	switch wtv.Algorithm {
-	case "AES-CBC-PKCS5":
-		wtg = &wycheproofTestGroupAesCbcPkcs5{}
-	case "AES-CCM":
-		wtg = &wycheproofTestGroupAead{}
-	case "AES-CMAC":
-		wtg = &wycheproofTestGroupAesCmac{}
-	case "AES-GCM":
-		wtg = &wycheproofTestGroupAead{}
-	case "CHACHA20-POLY1305", "XCHACHA20-POLY1305":
-		wtg = &wycheproofTestGroupAead{}
-	case "DSA":
-		wtg = &wycheproofTestGroupDSA{}
-	case "ECDH":
-		switch variant {
-		case Webcrypto:
-			wtg = &wycheproofTestGroupECDHWebCrypto{}
-		default:
-			wtg = &wycheproofTestGroupECDH{}
-		}
-	case "ECDSA":
-		switch variant {
-		case Webcrypto:
-			wtg = &wycheproofTestGroupECDSAWebCrypto{}
-		default:
-			wtg = &wycheproofTestGroupECDSA{}
-		}
-	case "EDDSA":
-		wtg = &wycheproofTestGroupEdDSA{}
-	case "HKDF-SHA-1", "HKDF-SHA-256", "HKDF-SHA-384", "HKDF-SHA-512":
-		wtg = &wycheproofTestGroupHkdf{}
-	case "HMACSHA1", "HMACSHA224", "HMACSHA256", "HMACSHA384", "HMACSHA512":
-		wtg = &wycheproofTestGroupHmac{}
-	case "KW":
-		wtg = &wycheproofTestGroupKW{}
-	case "PrimalityTest":
-		wtg = &wycheproofTestGroupPrimality{}
-	case "RSAES-OAEP":
-		wtg = &wycheproofTestGroupRsaesOaep{}
-	case "RSAES-PKCS1-v1_5":
-		wtg = &wycheproofTestGroupRsaesPkcs1{}
-	case "RSASSA-PSS":
-		wtg = &wycheproofTestGroupRsassa{}
-	case "RSASSA-PKCS1-v1_5", "RSASig":
-		wtg = &wycheproofTestGroupRSA{}
-	case "XDH", "X25519":
-		wtg = &wycheproofTestGroupX25519{}
-	default:
-		log.Printf("INFO: Unknown test vector algorithm %q", wtv.Algorithm)
-		return false
-	}
-
 	success := true
-	for _, tg := range wtv.TestGroups {
-		if err := json.Unmarshal(tg, wtg); err != nil {
-			log.Fatalf("Failed to unmarshal test groups JSON: %v", err)
-		}
-		switch wtv.Algorithm {
-		case "AES-CBC-PKCS5":
-			if !runAesCbcPkcs5TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAesCbcPkcs5)) {
-				success = false
-			}
-		case "AES-CCM":
-			if !runAesAeadTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead)) {
-				success = false
-			}
-		case "AES-CMAC":
-			if !runAesCmacTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAesCmac)) {
-				success = false
-			}
-		case "AES-GCM":
-			if !runAesAeadTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead)) {
-				success = false
-			}
-		case "CHACHA20-POLY1305", "XCHACHA20-POLY1305":
-			if !runChaCha20Poly1305TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead)) {
-				success = false
-			}
-		case "DSA":
-			if !runDSATestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupDSA)) {
-				success = false
-			}
-		case "ECDH":
-			switch variant {
-			case Webcrypto:
-				if !runECDHWebCryptoTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupECDHWebCrypto)) {
-					success = false
+	for i := range wtv.TestGroups {
+		testc.runTest(func() bool {
+			var wtg interface{}
+			switch wtv.Algorithm {
+			case "AES-CBC-PKCS5":
+				wtg = &wycheproofTestGroupAesCbcPkcs5{}
+			case "AES-CCM":
+				wtg = &wycheproofTestGroupAead{}
+			case "AES-CMAC":
+				wtg = &wycheproofTestGroupAesCmac{}
+			case "AES-GCM":
+				wtg = &wycheproofTestGroupAead{}
+			case "CHACHA20-POLY1305", "XCHACHA20-POLY1305":
+				wtg = &wycheproofTestGroupAead{}
+			case "DSA":
+				wtg = &wycheproofTestGroupDSA{}
+			case "ECDH":
+				switch variant {
+				case Webcrypto:
+					wtg = &wycheproofTestGroupECDHWebCrypto{}
+				default:
+					wtg = &wycheproofTestGroupECDH{}
 				}
+			case "ECDSA":
+				switch variant {
+				case Webcrypto:
+					wtg = &wycheproofTestGroupECDSAWebCrypto{}
+				default:
+					wtg = &wycheproofTestGroupECDSA{}
+				}
+			case "EDDSA":
+				wtg = &wycheproofTestGroupEdDSA{}
+			case "HKDF-SHA-1", "HKDF-SHA-256", "HKDF-SHA-384", "HKDF-SHA-512":
+				wtg = &wycheproofTestGroupHkdf{}
+			case "HMACSHA1", "HMACSHA224", "HMACSHA256", "HMACSHA384", "HMACSHA512":
+				wtg = &wycheproofTestGroupHmac{}
+			case "KW":
+				wtg = &wycheproofTestGroupKW{}
+			case "PrimalityTest":
+				wtg = &wycheproofTestGroupPrimality{}
+			case "RSAES-OAEP":
+				wtg = &wycheproofTestGroupRsaesOaep{}
+			case "RSAES-PKCS1-v1_5":
+				wtg = &wycheproofTestGroupRsaesPkcs1{}
+			case "RSASSA-PSS":
+				wtg = &wycheproofTestGroupRsassa{}
+			case "RSASSA-PKCS1-v1_5", "RSASig":
+				wtg = &wycheproofTestGroupRSA{}
+			case "XDH", "X25519":
+				wtg = &wycheproofTestGroupX25519{}
 			default:
-				if !runECDHTestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupECDH)) {
-					success = false
-				}
+				log.Printf("INFO: Unknown test vector algorithm %q", wtv.Algorithm)
+				return false
 			}
-		case "ECDSA":
-			switch variant {
-			case Webcrypto:
-				if !runECDSAWebCryptoTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupECDSAWebCrypto)) {
-					success = false
+
+			if err := json.Unmarshal(wtv.TestGroups[i], wtg); err != nil {
+				log.Fatalf("Failed to unmarshal test groups JSON: %v", err)
+			}
+			switch wtv.Algorithm {
+			case "AES-CBC-PKCS5":
+				return runAesCbcPkcs5TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAesCbcPkcs5))
+			case "AES-CCM":
+				return runAesAeadTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead))
+			case "AES-CMAC":
+				return runAesCmacTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAesCmac))
+			case "AES-GCM":
+				return runAesAeadTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead))
+			case "CHACHA20-POLY1305", "XCHACHA20-POLY1305":
+				return runChaCha20Poly1305TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupAead))
+			case "DSA":
+				return runDSATestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupDSA))
+			case "ECDH":
+				switch variant {
+				case Webcrypto:
+					return runECDHWebCryptoTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupECDHWebCrypto))
+				default:
+					return runECDHTestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupECDH))
 				}
+			case "ECDSA":
+				switch variant {
+				case Webcrypto:
+					return runECDSAWebCryptoTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupECDSAWebCrypto))
+				default:
+					return runECDSATestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupECDSA))
+				}
+			case "EDDSA":
+				return runEdDSATestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupEdDSA))
+			case "HKDF-SHA-1", "HKDF-SHA-256", "HKDF-SHA-384", "HKDF-SHA-512":
+				return runHkdfTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupHkdf))
+			case "HMACSHA1", "HMACSHA224", "HMACSHA256", "HMACSHA384", "HMACSHA512":
+				return runHmacTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupHmac))
+			case "KW":
+				return runKWTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupKW))
+			case "PrimalityTest":
+				return runPrimalityTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupPrimality))
+			case "RSAES-OAEP":
+				return runRsaesOaepTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsaesOaep))
+			case "RSAES-PKCS1-v1_5":
+				return runRsaesPkcs1TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsaesPkcs1))
+			case "RSASSA-PSS":
+				return runRsassaTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsassa))
+			case "RSASSA-PKCS1-v1_5", "RSASig":
+				return runRSATestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRSA))
+			case "XDH", "X25519":
+				return runX25519TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupX25519))
 			default:
-				if !runECDSATestGroup(wtv.Algorithm, variant, wtg.(*wycheproofTestGroupECDSA)) {
-					success = false
-				}
+				log.Fatalf("Unknown test vector algorithm %q", wtv.Algorithm)
+				return false
 			}
-		case "EDDSA":
-			if !runEdDSATestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupEdDSA)) {
-				success = false
-			}
-		case "HKDF-SHA-1", "HKDF-SHA-256", "HKDF-SHA-384", "HKDF-SHA-512":
-			if !runHkdfTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupHkdf)) {
-				success = false
-			}
-		case "HMACSHA1", "HMACSHA224", "HMACSHA256", "HMACSHA384", "HMACSHA512":
-			if !runHmacTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupHmac)) {
-				success = false
-			}
-		case "KW":
-			if !runKWTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupKW)) {
-				success = false
-			}
-		case "PrimalityTest":
-			if !runPrimalityTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupPrimality)) {
-				success = false
-			}
-		case "RSAES-OAEP":
-			if !runRsaesOaepTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsaesOaep)) {
-				success = false
-			}
-		case "RSAES-PKCS1-v1_5":
-			if !runRsaesPkcs1TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsaesPkcs1)) {
-				success = false
-			}
-		case "RSASSA-PSS":
-			if !runRsassaTestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRsassa)) {
-				success = false
-			}
-		case "RSASSA-PKCS1-v1_5", "RSASig":
-			if !runRSATestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupRSA)) {
-				success = false
-			}
-		case "XDH", "X25519":
-			if !runX25519TestGroup(wtv.Algorithm, wtg.(*wycheproofTestGroupX25519)) {
-				success = false
-			}
-		default:
-			log.Fatalf("Unknown test vector algorithm %q", wtv.Algorithm)
+		})
+	}
+	for _ = range wtv.TestGroups {
+		result := <-testc.resultCh
+		if !result {
+			success = false
 		}
 	}
 	return success
+}
+
+type testCoordinator struct {
+	testFuncCh chan func() bool
+	resultCh   chan bool
+}
+
+func newTestCoordinator() *testCoordinator {
+	runnerCount := runtime.NumCPU()
+	tc := &testCoordinator{
+		testFuncCh: make(chan func() bool, runnerCount),
+		resultCh:   make(chan bool, 1024),
+	}
+	for i := 0; i < runnerCount; i++ {
+		go tc.testRunner(tc.testFuncCh, tc.resultCh)
+	}
+	return tc
+}
+
+func (tc *testCoordinator) testRunner(testFuncCh <-chan func() bool, resultCh chan<- bool) {
+	for testFunc := range testFuncCh {
+		select {
+		case resultCh <- testFunc():
+		default:
+			log.Fatal("result channel is full")
+		}
+	}
+}
+
+func (tc *testCoordinator) runTest(testFunc func() bool) {
+	tc.testFuncCh <- testFunc
+}
+
+func (tc *testCoordinator) shutdown() {
+	close(tc.testFuncCh)
 }
 
 func main() {
@@ -3017,12 +2928,6 @@ func main() {
 		fmt.Printf("SKIPPED\n")
 		os.Exit(0)
 	}
-
-	flag.BoolVar(&acceptableAudit, "v", false, "audit acceptable cases")
-	flag.Parse()
-
-	acceptableComments = make(map[string]int)
-	acceptableFlags = make(map[string]int)
 
 	tests := []struct {
 		name    string
@@ -3059,6 +2964,16 @@ func main() {
 
 	success := true
 
+	var wg sync.WaitGroup
+
+	vectorsRateLimitCh := make(chan bool, 4)
+	for i := 0; i < cap(vectorsRateLimitCh); i++ {
+		vectorsRateLimitCh <- true
+	}
+	resultCh := make(chan bool, 1024)
+
+	testc = newTestCoordinator()
+
 	skipNormal := regexp.MustCompile(`_(ecpoint|p1363|sha3|sha512_(224|256))_`)
 
 	for _, test := range tests {
@@ -3074,15 +2989,32 @@ func main() {
 				fmt.Printf("INFO: Skipping tests from \"%s\"\n", strings.TrimPrefix(tv, testVectorPath+"/"))
 				continue
 			}
-			if !runTestVectors(tv, test.variant) {
-				success = false
-			}
+			wg.Add(1)
+			<-vectorsRateLimitCh
+			go func(tv string, variant testVariant) {
+				select {
+				case resultCh <- runTestVectors(tv, variant):
+				default:
+					log.Fatal("result channel is full")
+				}
+				vectorsRateLimitCh <- true
+				wg.Done()
+			}(tv, test.variant)
 		}
 	}
 
-	if acceptableAudit {
-		printAcceptableStatistics()
+	wg.Wait()
+	close(resultCh)
+
+	for result := range resultCh {
+		if !result {
+			success = false
+		}
 	}
+
+	testc.shutdown()
+
+	C.OPENSSL_cleanup()
 
 	if !success {
 		os.Exit(1)

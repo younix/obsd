@@ -1,4 +1,4 @@
-/*	$OpenBSD: cms.c,v 1.29 2023/03/06 16:04:52 job Exp $ */
+/*	$OpenBSD: cms.c,v 1.33 2023/03/13 19:46:55 job Exp $ */
 /*
  * Copyright (c) 2019 Kristaps Dzonsons <kristaps@bsd.lv>
  *
@@ -63,9 +63,37 @@ cms_extract_econtent(const char *fn, CMS_ContentInfo *cms, unsigned char **res,
 }
 
 static int
+cms_get_signtime(const char *fn, X509_ATTRIBUTE *attr, time_t *signtime)
+{
+	const ASN1_TIME		*at;
+	const char		*time_str = "UTCtime";
+	int			 time_type = V_ASN1_UTCTIME;
+
+	*signtime = 0;
+	at = X509_ATTRIBUTE_get0_data(attr, 0, time_type, NULL);
+	if (at == NULL) {
+		time_str = "GeneralizedTime";
+		time_type = V_ASN1_GENERALIZEDTIME;
+		at = X509_ATTRIBUTE_get0_data(attr, 0, time_type, NULL);
+		if (at == NULL) {
+			warnx("%s: CMS signing-time issue", fn);
+			return 0;
+		}
+		warnx("%s: GeneralizedTime instead of UTCtime", fn);
+	}
+
+	if (!x509_get_time(at, signtime)) {
+		warnx("%s: failed to convert %s", fn, time_str);
+		return 0;
+	}
+
+	return 1;
+}
+
+static int
 cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
     size_t len, const ASN1_OBJECT *oid, BIO *bio, unsigned char **res,
-    size_t *rsz)
+    size_t *rsz, time_t *signtime)
 {
 	const unsigned char		*oder;
 	char				 buf[128], obuf[128];
@@ -81,11 +109,13 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 	int				 i, nattrs, nid;
 	int				 has_ct = 0, has_md = 0, has_st = 0,
 					 has_bst = 0;
+	time_t				 notafter;
 	int				 rc = 0;
 
 	*xp = NULL;
 	if (rsz != NULL)
 		*rsz = 0;
+	*signtime = 0;
 
 	/* just fail for empty buffers, the warning was printed elsewhere */
 	if (der == NULL)
@@ -160,6 +190,8 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 				    "signed attribute", fn);
 				goto out;
 			}
+			if (!cms_get_signtime(fn, attr, signtime))
+				goto out;
 		} else if (OBJ_cmp(obj, bin_sign_time_oid) == 0) {
 			if (has_bst++ != 0) {
 				cryptowarnx("%s: RFC 6488: duplicate "
@@ -174,11 +206,16 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 			goto out;
 		}
 	}
+
 	if (!has_ct || !has_md) {
 		cryptowarnx("%s: RFC 6488: CMS missing required "
 		    "signed attribute", fn);
 		goto out;
 	}
+
+	if (has_bst)
+		warnx("%s: unsupported CMS signing-time attribute", fn);
+
 	if (CMS_unsigned_get_attr_count(si) != -1) {
 		cryptowarnx("%s: RFC 6488: CMS has unsignedAttrs", fn);
 		goto out;
@@ -267,6 +304,14 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
 		goto out;
 	}
 
+	if (!x509_get_notafter(*xp, fn, &notafter))
+		goto out;
+	if (*signtime > notafter) {
+		warnx("%s: dating issue: CMS signing-time after X.509 notAfter",
+		    fn);
+		goto out;
+	}
+
 	if (CMS_SignerInfo_get0_signer_id(si, &kid, NULL, NULL) != 1 ||
 	    kid == NULL) {
 		warnx("%s: RFC 6488: could not extract SKI from SID", fn);
@@ -299,12 +344,12 @@ cms_parse_validate_internal(X509 **xp, const char *fn, const unsigned char *der,
  */
 unsigned char *
 cms_parse_validate(X509 **xp, const char *fn, const unsigned char *der,
-    size_t derlen, const ASN1_OBJECT *oid, size_t *rsz)
+    size_t derlen, const ASN1_OBJECT *oid, size_t *rsz, time_t *st)
 {
 	unsigned char *res = NULL;
 
 	if (!cms_parse_validate_internal(xp, fn, der, derlen, oid, NULL, &res,
-	    rsz))
+	    rsz, st))
 		return NULL;
 
 	return res;
@@ -317,8 +362,8 @@ cms_parse_validate(X509 **xp, const char *fn, const unsigned char *der,
  */
 int
 cms_parse_validate_detached(X509 **xp, const char *fn, const unsigned char *der,
-    size_t derlen, const ASN1_OBJECT *oid, BIO *bio)
+    size_t derlen, const ASN1_OBJECT *oid, BIO *bio, time_t *st)
 {
 	return cms_parse_validate_internal(xp, fn, der, derlen, oid, bio, NULL,
-	    NULL);
+	    NULL, st);
 }

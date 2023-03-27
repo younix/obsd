@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_local.h,v 1.9 2023/03/07 05:50:59 jsing Exp $ */
+/* $OpenBSD: ec_local.h,v 1.11 2023/03/08 05:45:31 jsing Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -86,22 +86,11 @@ __BEGIN_HIDDEN_DECLS
 # endif
 #endif
 
-/* Use default functions for poin2oct, oct2point and compressed coordinates */
-#define EC_FLAGS_DEFAULT_OCT	0x1
-
 struct ec_method_st {
-
-	/*
-	 * Methods and members exposed directly by the public API.
-	 */
-
-	int flags;
-
 	int field_type;
 
 	int (*group_init)(EC_GROUP *);
 	void (*group_finish)(EC_GROUP *);
-	void (*group_clear_finish)(EC_GROUP *);
 	int (*group_copy)(EC_GROUP *, const EC_GROUP *);
 
 	int (*group_set_curve)(EC_GROUP *, const BIGNUM *p, const BIGNUM *a,
@@ -115,7 +104,6 @@ struct ec_method_st {
 
 	int (*point_init)(EC_POINT *);
 	void (*point_finish)(EC_POINT *);
-	void (*point_clear_finish)(EC_POINT *);
 	int (*point_copy)(EC_POINT *, const EC_POINT *);
 
 	int (*point_set_to_infinity)(const EC_GROUP *, EC_POINT *);
@@ -327,7 +315,6 @@ int ec_wNAF_have_precompute_mult(const EC_GROUP *group);
 /* method functions in ecp_smpl.c */
 int ec_GFp_simple_group_init(EC_GROUP *);
 void ec_GFp_simple_group_finish(EC_GROUP *);
-void ec_GFp_simple_group_clear_finish(EC_GROUP *);
 int ec_GFp_simple_group_copy(EC_GROUP *, const EC_GROUP *);
 int ec_GFp_simple_group_set_curve(EC_GROUP *, const BIGNUM *p, const BIGNUM *a, const BIGNUM *b, BN_CTX *);
 int ec_GFp_simple_group_get_curve(const EC_GROUP *, BIGNUM *p, BIGNUM *a, BIGNUM *b, BN_CTX *);
@@ -335,7 +322,6 @@ int ec_GFp_simple_group_get_degree(const EC_GROUP *);
 int ec_GFp_simple_group_check_discriminant(const EC_GROUP *, BN_CTX *);
 int ec_GFp_simple_point_init(EC_POINT *);
 void ec_GFp_simple_point_finish(EC_POINT *);
-void ec_GFp_simple_point_clear_finish(EC_POINT *);
 int ec_GFp_simple_point_copy(EC_POINT *, const EC_POINT *);
 int ec_GFp_simple_point_set_to_infinity(const EC_GROUP *, EC_POINT *);
 int ec_GFp_simple_set_Jprojective_coordinates(const EC_GROUP *, EC_POINT *,

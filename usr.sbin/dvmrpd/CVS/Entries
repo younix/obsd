@@ -20,7 +20,6 @@
 /rde_mfc.c/1.10/Mon Dec  7 19:14:49 2015//
 /rde_srt.c/1.27/Fri Sep 21 01:33:55 2018//
 /report.c/1.11/Mon Dec  7 18:59:31 2015//
-/control.c/1.24/Wed Sep  1 16:07:40 2021//
 /control.h/1.6/Wed Sep  1 16:07:40 2021//
 /dvmrpd.c/1.27/Wed Sep  1 16:07:40 2021//
 /dvmrpd.h/1.24/Wed Sep  1 16:07:40 2021//
@@ -33,4 +32,5 @@
 /dvmrpd.8/1.12/Tue Mar  7 18:59:22 2023//
 /dvmrpd.conf.5/1.12/Tue Mar  7 18:59:22 2023//
 /rde.c/1.32/Mon Feb 27 09:09:58 2023//
+/control.c/1.25/Mon Mar 27 08:58:42 2023//
 D

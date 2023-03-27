@@ -15,7 +15,6 @@
 /cons.c/1.14/Sun May  9 15:30:28 2010//
 /cread.c/1.15/Sun Sep 18 15:14:52 2016//
 /ctime.c/1.6/Wed May 23 16:23:48 2018//
-/dev.c/1.4/Mon Aug 11 06:23:09 2003//
 /disklabel.c/1.5/Mon Aug 11 06:23:09 2003//
 /dkcksum.c/1.6/Wed Nov 19 20:28:56 2014//
 /ether.c/1.10/Wed Nov 19 20:28:56 2014//
@@ -94,4 +93,5 @@
 /hmac_sha1.h/1.2/Mon Feb 27 09:09:58 2023//
 /netif.c/1.14/Mon Feb 27 09:09:58 2023//
 /softraid.c/1.5/Mon Feb 27 09:09:58 2023//
+/dev.c/1.5/Mon Mar 27 08:58:38 2023//
 D

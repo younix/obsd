@@ -354,7 +354,7 @@ static int psp_init_sriov_microcode(struct psp_context *psp)
 		adev->virt.autoload_ucode_id = AMDGPU_UCODE_ID_CP_MES1_DATA;
 		break;
 	default:
-		BUG();
+		ret = -EINVAL;
 		break;
 	}
 	return ret;
@@ -1924,6 +1924,19 @@ static int psp_securedisplay_initialize(struct psp_context *psp)
 		dev_info(psp->adev->dev, "SECUREDISPLAY: securedisplay ta ucode is not available\n");
 		return 0;
 	}
+
+#ifdef __OpenBSD__
+	/*
+	 * with 20230117 or later firmware or later on renoir:
+	 *
+	 * [drm] psp gfx command LOAD_TA(0x1) failed and response status is (0x7)
+	 * [drm] psp gfx command INVOKE_CMD(0x3) failed and response status is (0x4)
+	 * psp_securedisplay_parse_resp_status *ERROR* Secure display: Generic Failure
+	 * psp_securedisplay_initialize *ERROR* SECUREDISPLAY: query
+	 *   securedisplay TA failed. ret 0x0
+	 */
+	return 0;
+#endif
 
 	psp->securedisplay_context.context.mem_context.shared_mem_size =
 		PSP_SECUREDISPLAY_SHARED_MEM_SIZE;

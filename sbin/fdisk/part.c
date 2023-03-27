@@ -1,4 +1,4 @@
-/*	$OpenBSD: part.c,v 1.132 2023/03/06 17:42:39 krw Exp $	*/
+/*	$OpenBSD: part.c,v 1.139 2023/03/26 16:23:58 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -32,10 +32,16 @@
 #include "gpt.h"
 
 struct mbr_type {
-	int	mt_type;
-	char	mt_sname[14];
+	int	 mt_type;
+	char	*mt_name;
 };
 
+/*
+* MBR type sources:
+*	OpenBSD Historical usage
+* 	https://en.wikipedia.org/wiki/Partition_type#List_of_partition_IDs
+*	https://www.win.tue.nl/~aeb/partitions/partition_types-1.html
+*/
 const struct mbr_type		mbr_types[] = {
 	{ 0x00, "unused"	},   /* unused */
 	{ 0x01, "DOS FAT-12"	},   /* Primary DOS with 12 bit FAT */
@@ -135,43 +141,58 @@ const struct mbr_type		mbr_types[] = {
 };
 
 struct gpt_type {
-	int	gt_type;
-	int	gt_attr;
+	int	 gt_type;
+	int	 gt_attr;
 #define	GTATTR_PROTECT		(1 << 0)
 #define	GTATTR_PROTECT_EFISYS	(1 << 1)
-	char	gt_sname[14];
-	char	gt_guid[UUID_STR_LEN + 1];
+	char	*gt_name;
+	char	 gt_guid[UUID_STR_LEN + 1];
 };
+
+/*
+ * GPT GUID sources:
+ *
+ * UEFI: UEFI Specification 2.9, March 2021, Section 5.3.3, Table 5.7
+ * Wikipedia: https://en.wikipedia.org/wiki/GUID_Partition_Table
+ * NetBSD: /usr/src/sys/sys/disklabel_gpt.h
+ * FreeBSD: /usr/src/sys/sys/disk/gpt.h.
+ * DragonFlyBSD: /usr/src/sys/sys/disk/gpt.h.
+ * Systemd:https://uapi-group.org/specifications/specs/discoverable_partitions_specification/
+ *         https://www.freedesktop.org/software/systemd/man/systemd-gpt-auto-generator.html
+ */
+
+#define	EFI_SYSTEM_PARTITION_GUID	"c12a7328-f81f-11d2-ba4b-00a0c93ec93b"
+#define	MICROSOFT_BASIC_DATA_GUID	"ebd0a0a2-b9e5-4433-87c0-68b6b72699c7"
 
 const struct gpt_type		gpt_types[] = {
 	{ 0x00, 0, "unused",
 	  "00000000-0000-0000-0000-000000000000" },
 	{ 0x01, 0, "FAT12",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x04, 0, "FAT16S",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x06, 0, "FAT16B",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x07, 0, "NTFS",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x0B, 0, "FAT32",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x0C, 0, "FAT32L",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x0D, GTATTR_PROTECT, "BIOS Boot",
 	  "21686148-6449-6e6f-744e-656564454649" },
 	{ 0x0E, 0, "FAT16L",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x11, 0, "OS/2 hidden",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x14, 0, "OS/2 hidden",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x16, 0, "OS/2 hidden",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x17, 0, "OS/2 hidden",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x1C, 0, "ThinkPad Rec",
-	  "ebd0a0a2-b9e5-4433-87c0-68b6b72699c7" },
+	  MICROSOFT_BASIC_DATA_GUID },
 	{ 0x27, 0, "Win Recovery",
 	  "de94bba4-06d1-4d40-a16a-bfd50179d6ac" },
 	{ 0x42, 0, "LinuxSwap DR",
@@ -213,11 +234,11 @@ const struct gpt_type		gpt_types[] = {
 	{ 0xEC, 0, "Legacy MBR",
 	  "024dee41-33e7-11d3-9d69-0008c781f39f" },
 	{ 0xEF, 0, "EFI Sys",
-	  "c12a7328-f81f-11d2-ba4b-00a0c93ec93b" },
+	  EFI_SYSTEM_PARTITION_GUID },
 };
 
 const struct gpt_type	*find_gpt_type(const struct uuid *);
-const char		*ascii_id(const int);
+const struct mbr_type	*find_mbr_type(const int);
 int			 uuid_attr(const struct uuid *);
 
 const struct gpt_type *
@@ -244,18 +265,17 @@ find_gpt_type(const struct uuid *uuid)
 		return NULL;
 }
 
-const char *
-ascii_id(const int id)
+const struct mbr_type *
+find_mbr_type(const int id)
 {
-	static char		unknown[] = "<Unknown ID>";
-	int			i;
+	unsigned int			i;
 
 	for (i = 0; i < nitems(mbr_types); i++) {
 		if (mbr_types[i].mt_type == id)
-			return mbr_types[i].mt_sname;
+			return &mbr_types[i];
 	}
 
-	return unknown;
+	return NULL;
 }
 
 int
@@ -280,7 +300,7 @@ PRT_protected_guid(const struct uuid *uuid)
 	if (gt && gt->gt_attr & GTATTR_PROTECT)
 		return 1;
 
-	if (gt && gt->gt_type == DOSPTYP_EFISYS) {
+	if (gt && strcasecmp(gt->gt_guid, EFI_SYSTEM_PARTITION_GUID) == 0) {
 		for (pn = 0; pn < gh.gh_part_num; pn++) {
 			if (uuid_attr(&gp[pn].gp_type) & GTATTR_PROTECT_EFISYS)
 				return 1;
@@ -291,7 +311,7 @@ PRT_protected_guid(const struct uuid *uuid)
 }
 
 void
-PRT_print_mbrtypes(void)
+PRT_print_mbrmenu(char *lbuf, size_t lbuflen)
 {
 	unsigned int		cidx, i, idrows;
 
@@ -300,19 +320,20 @@ PRT_print_mbrtypes(void)
 	printf("Choose from the following Partition id values:\n");
 	for (i = 0; i < idrows; i++) {
 		for (cidx = i; cidx < i + idrows * 3; cidx += idrows) {
-			printf("%02X %-*s", mbr_types[cidx].mt_type,
-			    (int)sizeof(mbr_types[cidx].mt_sname) + 1,
-			    mbr_types[cidx].mt_sname);
+			printf("%02X %-15s", mbr_types[cidx].mt_type,
+			    mbr_types[cidx].mt_name);
 		}
 		if (cidx < nitems(mbr_types))
 			printf("%02X %s", mbr_types[cidx].mt_type,
-			    mbr_types[cidx].mt_sname);
+			    mbr_types[cidx].mt_name);
 		printf("\n");
 	}
+
+	memset(lbuf, 0, lbuflen);	/* Just continue. */
 }
 
 void
-PRT_print_gpttypes(void)
+PRT_print_gptmenu(char *lbuf, size_t lbuflen)
 {
 	unsigned int		cidx, i, idrows;
 
@@ -321,15 +342,16 @@ PRT_print_gpttypes(void)
 	printf("Choose from the following Partition id values:\n");
 	for (i = 0; i < idrows; i++) {
 		for (cidx = i; cidx < i + idrows * 3; cidx += idrows) {
-			printf("%02X %-*s", gpt_types[cidx].gt_type,
-			    (int)sizeof(gpt_types[cidx].gt_sname) + 1,
-			    gpt_types[cidx].gt_sname);
+			printf("%02X %-15s", gpt_types[cidx].gt_type,
+			    gpt_types[cidx].gt_name);
 		}
 		if (cidx < nitems(gpt_types))
 			printf("%02X %s", gpt_types[cidx].gt_type,
-			    gpt_types[cidx].gt_sname);
+			    gpt_types[cidx].gt_name);
 		printf("\n");
 	}
+
+	memset(lbuf, 0, lbuflen);	/* Just continue. */
 }
 
 void
@@ -411,11 +433,13 @@ void
 PRT_print_part(const int num, const struct prt *prt, const char *units)
 {
 	const struct unit_type	*ut;
+	const struct mbr_type	*mt;
 	struct chs		 start, end;
 	double			 size;
 
 	size = units_size(units, prt->prt_ns, &ut);
 	PRT_lba_to_chs(prt, &start, &end);
+	mt = find_mbr_type(prt->prt_id);
 
 	printf("%c%1d: %.2X %6llu %3u %3u - %6llu %3u %3u "
 	    "[%12llu:%12.0f%s] %s\n",
@@ -423,7 +447,7 @@ PRT_print_part(const int num, const struct prt *prt, const char *units)
 	    num, prt->prt_id,
 	    start.chs_cyl, start.chs_head, start.chs_sect,
 	    end.chs_cyl, end.chs_head, end.chs_sect,
-	    prt->prt_bs, size, ut->ut_abbr, ascii_id(prt->prt_id));
+	    prt->prt_bs, size, ut->ut_abbr, mt ? mt->mt_name : "<Unknown ID>");
 
 	if (prt->prt_bs >= DL_GETDSIZE(&dl))
 		printf("partition %d starts beyond the end of %s\n", num,
@@ -469,7 +493,7 @@ PRT_lba_to_chs(const struct prt *prt, struct chs *start, struct chs *end)
 }
 
 const char *
-PRT_uuid_to_sname(const struct uuid *uuid)
+PRT_uuid_to_name(const struct uuid *uuid)
 {
 	static char		 typename[UUID_STR_LEN + 1];
 	const uint8_t		 gpt_uuid_msdos[] = GPT_UUID_MSDOS;
@@ -484,7 +508,7 @@ PRT_uuid_to_sname(const struct uuid *uuid)
 
 	gt = find_gpt_type(uuid);
 	if (gt != NULL)
-		return gt->gt_sname;
+		return gt->gt_name;
 
 	uuid_to_string(uuid, &uuidstr, &status);
 	if (status == uuid_s_ok)

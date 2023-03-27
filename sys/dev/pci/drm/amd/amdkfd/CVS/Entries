@@ -5,7 +5,6 @@
 /cwsr_trap_handler.h/1.5/Mon Feb 27 09:09:56 2023//
 /cwsr_trap_handler_gfx10.asm/1.3/Mon Feb 27 09:09:56 2023//
 /cwsr_trap_handler_gfx9.asm/1.4/Mon Feb 27 09:09:56 2023//
-/kfd_chardev.c/1.6/Mon Feb 27 09:09:56 2023//
 /kfd_crat.c/1.7/Mon Feb 27 09:09:56 2023//
 /kfd_crat.h/1.3/Mon Feb 27 09:09:56 2023//
 /kfd_debugfs.c/1.4/Mon Feb 27 09:09:56 2023//
@@ -59,4 +58,5 @@
 /kfd_topology.c/1.6/Mon Feb 27 09:09:56 2023//
 /kfd_topology.h/1.5/Mon Feb 27 09:09:56 2023//
 /soc15_int.h/1.3/Mon Feb 27 09:09:56 2023//
+/kfd_chardev.c/1.7/Mon Mar 27 08:58:36 2023//
 D

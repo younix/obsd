@@ -1,4 +1,4 @@
-/* $OpenBSD: ecp_smpl.c,v 1.40 2023/03/07 09:27:10 jsing Exp $ */
+/* $OpenBSD: ecp_smpl.c,v 1.42 2023/03/08 05:45:31 jsing Exp $ */
 /* Includes code written by Lenka Fibikova <fibikova@exp-math.uni-essen.de>
  * for the OpenSSL project.
  * Includes code written by Bodo Moeller for the OpenSSL project.
@@ -93,14 +93,6 @@ ec_GFp_simple_group_init(EC_GROUP *group)
 
 void
 ec_GFp_simple_group_finish(EC_GROUP *group)
-{
-	BN_free(&group->field);
-	BN_free(&group->a);
-	BN_free(&group->b);
-}
-
-void
-ec_GFp_simple_group_clear_finish(EC_GROUP *group)
 {
 	BN_free(&group->field);
 	BN_free(&group->a);
@@ -315,14 +307,6 @@ ec_GFp_simple_point_init(EC_POINT * point)
 
 void
 ec_GFp_simple_point_finish(EC_POINT *point)
-{
-	BN_free(&point->X);
-	BN_free(&point->Y);
-	BN_free(&point->Z);
-}
-
-void
-ec_GFp_simple_point_clear_finish(EC_POINT *point)
 {
 	BN_free(&point->X);
 	BN_free(&point->Y);
@@ -1654,11 +1638,9 @@ ec_GFp_simple_mul_double_nonct(const EC_GROUP *group, EC_POINT *r,
 }
 
 static const EC_METHOD ec_GFp_simple_method = {
-	.flags = EC_FLAGS_DEFAULT_OCT,
 	.field_type = NID_X9_62_prime_field,
 	.group_init = ec_GFp_simple_group_init,
 	.group_finish = ec_GFp_simple_group_finish,
-	.group_clear_finish = ec_GFp_simple_group_clear_finish,
 	.group_copy = ec_GFp_simple_group_copy,
 	.group_set_curve = ec_GFp_simple_group_set_curve,
 	.group_get_curve = ec_GFp_simple_group_get_curve,
@@ -1667,7 +1649,6 @@ static const EC_METHOD ec_GFp_simple_method = {
 	.group_check_discriminant = ec_GFp_simple_group_check_discriminant,
 	.point_init = ec_GFp_simple_point_init,
 	.point_finish = ec_GFp_simple_point_finish,
-	.point_clear_finish = ec_GFp_simple_point_clear_finish,
 	.point_copy = ec_GFp_simple_point_copy,
 	.point_set_to_infinity = ec_GFp_simple_point_set_to_infinity,
 	.point_set_Jprojective_coordinates =
@@ -1678,6 +1659,10 @@ static const EC_METHOD ec_GFp_simple_method = {
 	    ec_GFp_simple_point_set_affine_coordinates,
 	.point_get_affine_coordinates =
 	    ec_GFp_simple_point_get_affine_coordinates,
+	.point_set_compressed_coordinates =
+	    ec_GFp_simple_set_compressed_coordinates,
+	.point2oct = ec_GFp_simple_point2oct,
+	.oct2point = ec_GFp_simple_oct2point,
 	.add = ec_GFp_simple_add,
 	.dbl = ec_GFp_simple_dbl,
 	.invert = ec_GFp_simple_invert,

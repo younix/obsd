@@ -1,10 +1,8 @@
 /connection.c/1.21/Sat Dec  5 06:38:18 2015//
-/control.c/1.10/Sat Sep 10 05:42:12 2016//
 /initiator.c/1.15/Fri Jan 16 15:57:06 2015//
 /iscsid.8/1.10/Mon Jul 27 17:28:39 2015//
 /log.c/1.10/Thu Apr  6 12:20:48 2017//
 /logmsg.c/1.1/Fri Sep  2 16:22:31 2016//
-/session.c/1.8/Sat Dec  5 06:37:24 2015//
 /task.c/1.10/Sat May 10 11:28:02 2014//
 /Makefile/1.6/Wed Sep  1 16:07:40 2021//
 /iscsid.c/1.22/Wed Sep  1 16:07:40 2021//
@@ -14,4 +12,6 @@
 /log.h/1.6/Mon Jan 24 14:35:16 2022//
 /iscsid.h/1.18/Mon Feb 27 09:09:58 2023//
 /vscsi.c/1.18/Mon Feb 27 09:09:58 2023//
+/control.c/1.11/Mon Mar 27 08:58:43 2023//
+/session.c/1.9/Mon Mar 27 08:58:43 2023//
 D

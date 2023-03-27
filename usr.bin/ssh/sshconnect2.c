@@ -1,4 +1,4 @@
-/* $OpenBSD: sshconnect2.c,v 1.364 2023/03/06 12:14:48 dtucker Exp $ */
+/* $OpenBSD: sshconnect2.c,v 1.366 2023/03/09 07:11:05 dtucker Exp $ */
 /*
  * Copyright (c) 2000 Markus Friedl.  All rights reserved.
  * Copyright (c) 2008 Damien Miller.  All rights reserved.
@@ -217,7 +217,7 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 {
 	char *myproposal[PROPOSAL_MAX];
 	char *s, *all_key, *hkalgs = NULL;
-	int r;
+	int r, use_known_hosts_order = 0;
 
 	xxx_host = host;
 	xxx_hostaddr = hostaddr;
@@ -226,6 +226,16 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	if (options.rekey_limit || options.rekey_interval)
 		ssh_packet_set_rekey_limits(ssh, options.rekey_limit,
 		    options.rekey_interval);
+
+	/*
+	 * If the user has not specified HostkeyAlgorithms, or has only
+	 * appended or removed algorithms from that list then prefer algorithms
+	 * that are in the list that are supported by known_hosts keys.
+	 */
+	if (options.hostkeyalgorithms == NULL ||
+	    options.hostkeyalgorithms[0] == '-' ||
+	    options.hostkeyalgorithms[0] == '+')
+		use_known_hosts_order = 1;
 
 	/* Expand or fill in HostkeyAlgorithms */
 	all_key = sshkey_alg_list(0, 0, 1, ',');
@@ -237,14 +247,7 @@ ssh_kex2(struct ssh *ssh, char *host, struct sockaddr *hostaddr, u_short port,
 	if ((s = kex_names_cat(options.kex_algorithms, "ext-info-c")) == NULL)
 		fatal_f("kex_names_cat");
 
-	/*
-	 * If the user has not specified HostkeyAlgorithms, or has only
-	 * appended or removed algorithms from that list then prefer algorithms
-	 * that are in the list that are supported by known_hosts keys.
-	 */
-	if (options.hostkeyalgorithms == NULL ||
-	    options.hostkeyalgorithms[0] == '-' ||
-	    options.hostkeyalgorithms[0] == '+')
+	if (use_known_hosts_order)
 		hkalgs = order_hostkeyalgs(host, hostaddr, port, cinfo);
 
 	kex_proposal_populate_entries(ssh, myproposal, s, options.ciphers,
@@ -482,7 +485,6 @@ ssh_userauth2(struct ssh *ssh, const char *local_user,
 	}
 }
 
-/* ARGSUSED */
 static int
 input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -514,7 +516,6 @@ input_userauth_service_accept(int type, u_int32_t seq, struct ssh *ssh)
 	return r;
 }
 
-/* ARGSUSED */
 static int
 input_userauth_ext_info(int type, u_int32_t seqnr, struct ssh *ssh)
 {
@@ -559,7 +560,6 @@ userauth(struct ssh *ssh, char *authlist)
 	}
 }
 
-/* ARGSUSED */
 static int
 input_userauth_error(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -567,7 +567,6 @@ input_userauth_error(int type, u_int32_t seq, struct ssh *ssh)
 	return 0;
 }
 
-/* ARGSUSED */
 static int
 input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -587,7 +586,6 @@ input_userauth_banner(int type, u_int32_t seq, struct ssh *ssh)
 	return r;
 }
 
-/* ARGSUSED */
 static int
 input_userauth_success(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -620,7 +618,6 @@ input_userauth_success_unexpected(int type, u_int32_t seq, struct ssh *ssh)
 }
 #endif
 
-/* ARGSUSED */
 static int
 input_userauth_failure(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -681,7 +678,6 @@ format_identity(Identity *id)
 	return ret;
 }
 
-/* ARGSUSED */
 static int
 input_userauth_pk_ok(int type, u_int32_t seq, struct ssh *ssh)
 {
@@ -889,7 +885,6 @@ process_gssapi_token(struct ssh *ssh, gss_buffer_t recv_tok)
 	return status;
 }
 
-/* ARGSUSED */
 static int
 input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 {
@@ -934,7 +929,6 @@ input_gssapi_response(int type, u_int32_t plen, struct ssh *ssh)
 	return r;
 }
 
-/* ARGSUSED */
 static int
 input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 {
@@ -967,7 +961,6 @@ input_gssapi_token(int type, u_int32_t plen, struct ssh *ssh)
 	return r;
 }
 
-/* ARGSUSED */
 static int
 input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 {
@@ -1002,7 +995,6 @@ input_gssapi_errtok(int type, u_int32_t plen, struct ssh *ssh)
 	return 0;
 }
 
-/* ARGSUSED */
 static int
 input_gssapi_error(int type, u_int32_t plen, struct ssh *ssh)
 {
@@ -1080,7 +1072,6 @@ userauth_passwd(struct ssh *ssh)
 /*
  * parse PASSWD_CHANGEREQ, prompt user and send SSH2_MSG_USERAUTH_REQUEST
  */
-/* ARGSUSED */
 static int
 input_userauth_passwd_changereq(int type, u_int32_t seqnr, struct ssh *ssh)
 {

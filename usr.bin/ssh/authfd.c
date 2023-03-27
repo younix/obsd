@@ -1,4 +1,4 @@
-/* $OpenBSD: authfd.c,v 1.131 2023/03/05 05:34:09 dtucker Exp $ */
+/* $OpenBSD: authfd.c,v 1.133 2023/03/09 21:06:24 jcs Exp $ */
 /*
  * Author: Tatu Ylonen <ylo@cs.hut.fi>
  * Copyright (c) 1995 Tatu Ylonen <ylo@cs.hut.fi>, Espoo, Finland
@@ -489,8 +489,8 @@ encode_dest_constraint(struct sshbuf *m, const struct dest_constraint *dc)
 
 	if ((b = sshbuf_new()) == NULL)
 		return SSH_ERR_ALLOC_FAIL;
-	if ((r = encode_dest_constraint_hop(b, &dc->from) != 0) ||
-	    (r = encode_dest_constraint_hop(b, &dc->to) != 0) ||
+	if ((r = encode_dest_constraint_hop(b, &dc->from)) != 0 ||
+	    (r = encode_dest_constraint_hop(b, &dc->to)) != 0 ||
 	    (r = sshbuf_put_string(b, NULL, 0)) != 0) /* reserved */
 		goto out;
 	if ((r = sshbuf_put_stringb(m, b)) != 0)
@@ -664,7 +664,7 @@ ssh_update_card(int sock, int add, const char *reader_id, const char *pin,
     struct dest_constraint **dest_constraints, size_t ndest_constraints)
 {
 	struct sshbuf *msg;
-	int r, constrained = (life || confirm);
+	int r, constrained = (life || confirm || dest_constraints);
 	u_char type;
 
 	if (add) {

@@ -1,6 +1,5 @@
 /Makefile/1.23/Thu Mar 12 19:19:37 2020//
 /cmd_hppa.c/1.12/Mon Dec  6 22:51:45 2010//
-/ct.c/1.9/Wed Apr  7 18:24:20 2004//
 /dev_hppa.c/1.17/Sun Jul 13 09:26:08 2014//
 /dev_hppa.h/1.9/Sun Mar 13 00:13:52 2011//
 /dk.c/1.15/Thu Oct  1 16:08:20 2015//
@@ -13,4 +12,5 @@
 /time.c/1.5/Wed Apr  7 18:24:20 2004//
 /libsa.h/1.17/Tue Mar  7 18:59:10 2023//
 /pdc.c/1.24/Mon Feb 27 09:09:55 2023//
+/ct.c/1.10/Mon Mar 27 08:58:33 2023//
 D

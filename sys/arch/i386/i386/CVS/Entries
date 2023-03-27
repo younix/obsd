@@ -24,7 +24,6 @@
 /apm.c/1.130/Mon Feb 27 09:09:55 2023//
 /apmcall.S/1.7/Mon Feb 27 09:09:55 2023//
 /autoconf.c/1.109/Mon Feb 27 09:09:55 2023//
-/bios.c/1.128/Mon Feb 27 09:09:55 2023//
 /bus_dma.c/1.36/Mon Feb 27 09:09:55 2023//
 /bus_space.c/1.10/Mon Feb 27 09:09:55 2023//
 /conf.c/1.176/Tue Mar  7 18:59:10 2023//
@@ -48,7 +47,6 @@
 /longrun.c/1.18/Mon Feb 27 09:09:55 2023//
 /machdep.c/1.663/Mon Feb 27 09:09:55 2023//
 /mainbus.c/1.61/Mon Feb 27 09:09:55 2023//
-/mem.c/1.55/Mon Feb 27 09:09:55 2023//
 /mpbios.c/1.45/Mon Feb 27 09:09:55 2023//
 /mptramp.s/1.27/Mon Feb 27 09:09:55 2023//
 /nvram.c/1.7/Mon Feb 27 09:09:55 2023//
@@ -60,8 +58,10 @@
 /process_machdep.c/1.30/Mon Feb 27 09:09:55 2023//
 /rbus_machdep.c/1.28/Mon Feb 27 09:09:55 2023//
 /sys_machdep.c/1.41/Mon Feb 27 09:09:55 2023//
-/trap.c/1.160/Mon Feb 27 09:09:55 2023//
 /vector.s/1.24/Mon Feb 27 09:09:55 2023//
 /vm_machdep.c/1.73/Mon Feb 27 09:09:55 2023//
 /wscons_machdep.c/1.20/Mon Feb 27 09:09:55 2023//
+/bios.c/1.129/Mon Mar 27 08:58:33 2023//
+/mem.c/1.56/Mon Mar 27 08:58:33 2023//
+/trap.c/1.161/Mon Mar 27 08:58:33 2023//
 D

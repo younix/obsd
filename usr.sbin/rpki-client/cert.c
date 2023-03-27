@@ -1,4 +1,4 @@
-/*	$OpenBSD: cert.c,v 1.104 2023/03/06 16:58:41 job Exp $ */
+/*	$OpenBSD: cert.c,v 1.106 2023/03/10 12:44:56 job Exp $ */
 /*
  * Copyright (c) 2022 Theo Buehler <tb@openbsd.org>
  * Copyright (c) 2021 Job Snijders <job@openbsd.org>
@@ -756,7 +756,9 @@ cert_parse_pre(const char *fn, const unsigned char *der, size_t len)
 		goto out;
 	if (!x509_get_crl(x, p.fn, &p.res->crl))
 		goto out;
-	if (!x509_get_expire(x, p.fn, &p.res->expires))
+	if (!x509_get_notbefore(x, p.fn, &p.res->notbefore))
+		goto out;
+	if (!x509_get_notafter(x, p.fn, &p.res->notafter))
 		goto out;
 	p.res->purpose = x509_get_purpose(x, p.fn);
 
@@ -974,7 +976,7 @@ cert_free(struct cert *p)
 void
 cert_buffer(struct ibuf *b, const struct cert *p)
 {
-	io_simple_buffer(b, &p->expires, sizeof(p->expires));
+	io_simple_buffer(b, &p->notafter, sizeof(p->notafter));
 	io_simple_buffer(b, &p->purpose, sizeof(p->purpose));
 	io_simple_buffer(b, &p->talid, sizeof(p->talid));
 	io_simple_buffer(b, &p->repoid, sizeof(p->repoid));
@@ -1007,7 +1009,7 @@ cert_read(struct ibuf *b)
 	if ((p = calloc(1, sizeof(struct cert))) == NULL)
 		err(1, NULL);
 
-	io_read_buf(b, &p->expires, sizeof(p->expires));
+	io_read_buf(b, &p->notafter, sizeof(p->notafter));
 	io_read_buf(b, &p->purpose, sizeof(p->purpose));
 	io_read_buf(b, &p->talid, sizeof(p->talid));
 	io_read_buf(b, &p->repoid, sizeof(p->repoid));
@@ -1098,7 +1100,7 @@ insert_brk(struct brk_tree *tree, struct cert *cert, int asid)
 		err(1, NULL);
 
 	b->asid = asid;
-	b->expires = cert->expires;
+	b->expires = cert->notafter;
 	b->talid = cert->talid;
 	if ((b->ski = strdup(cert->ski)) == NULL)
 		err(1, NULL);

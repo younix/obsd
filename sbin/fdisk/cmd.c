@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmd.c,v 1.167 2023/03/04 21:22:51 krw Exp $	*/
+/*	$OpenBSD: cmd.c,v 1.170 2023/03/26 16:23:58 krw Exp $	*/
 
 /*
  * Copyright (c) 1997 Tobias Weingartner
@@ -266,14 +266,14 @@ gsetpid(const int pn)
 
 	if (PRT_protected_guid(&gp[pn].gp_type)) {
 		printf("can't edit partition type %s\n",
-		    PRT_uuid_to_sname(&gp[pn].gp_type));
+		    PRT_uuid_to_name(&gp[pn].gp_type));
 		return -1;
 	}
 
 	gp[pn].gp_type = *ask_uuid(&gp[pn].gp_type);
 	if (PRT_protected_guid(&gp[pn].gp_type)) {
 		printf("can't change partition type to %s\n",
-		    PRT_uuid_to_sname(&gp[pn].gp_type));
+		    PRT_uuid_to_name(&gp[pn].gp_type));
 		return -1;
 	}
 
@@ -574,8 +574,9 @@ ask_pid(const int dflt)
 		if (strlen(lbuf) == 0)
 			return dflt;
 		if (strcmp(lbuf, "?") == 0) {
-			PRT_print_mbrtypes();
-			continue;
+			PRT_print_mbrmenu(lbuf, sizeof(lbuf));
+			if (strlen(lbuf) == 0)
+				continue;
 		}
 
 		num = hex_octet(lbuf);
@@ -620,8 +621,9 @@ ask_uuid(const struct uuid *olduuid)
 		string_from_line(lbuf, sizeof(lbuf), TRIMMED);
 
 		if (strcmp(lbuf, "?") == 0) {
-			PRT_print_gpttypes();
-			continue;
+			PRT_print_gptmenu(lbuf, sizeof(lbuf));
+			if (strlen(lbuf) == 0)
+				continue;
 		} else if (strlen(lbuf) == 0) {
 			uuid = *olduuid;
 			goto done;

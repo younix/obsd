@@ -1,4 +1,4 @@
-/* $OpenBSD: bio_asn1.c,v 1.18 2023/03/04 11:58:29 tb Exp $ */
+/* $OpenBSD: bio_asn1.c,v 1.21 2023/03/25 10:45:20 tb Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -163,7 +163,7 @@ asn1_bio_new(BIO *b)
 	ctx->state = ASN1_STATE_START;
 
 	b->init = 1;
-	b->ptr = (char *)ctx;
+	b->ptr = ctx;
 	b->flags = 0;
 
 	return 1;
@@ -172,11 +172,16 @@ asn1_bio_new(BIO *b)
 static int
 asn1_bio_free(BIO *b)
 {
-	BIO_ASN1_BUF_CTX *ctx;
+	BIO_ASN1_BUF_CTX *ctx = b->ptr;
 
-	ctx = (BIO_ASN1_BUF_CTX *) b->ptr;
 	if (ctx == NULL)
 		return 0;
+
+	if (ctx->prefix_free != NULL)
+		ctx->prefix_free(b, &ctx->ex_buf, &ctx->ex_len, &ctx->ex_arg);
+	if (ctx->suffix_free != NULL)
+		ctx->suffix_free(b, &ctx->ex_buf, &ctx->ex_len, &ctx->ex_arg);
+
 	free(ctx->buf);
 	free(ctx);
 	b->init = 0;
@@ -194,8 +199,8 @@ asn1_bio_write(BIO *b, const char *in , int inl)
 
 	if (!in || (inl < 0) || (b->next_bio == NULL))
 		return 0;
-	ctx = (BIO_ASN1_BUF_CTX *) b->ptr;
-	if (ctx == NULL)
+
+	if ((ctx = b->ptr) == NULL)
 		return 0;
 
 	wrlen = 0;
@@ -360,8 +365,7 @@ asn1_bio_ctrl(BIO *b, int cmd, long arg1, void *arg2)
 	BIO_ASN1_EX_FUNCS *ex_func;
 	long ret = 1;
 
-	ctx = (BIO_ASN1_BUF_CTX *) b->ptr;
-	if (ctx == NULL)
+	if ((ctx = b->ptr) == NULL)
 		return 0;
 	switch (cmd) {
 
@@ -452,11 +456,12 @@ asn1_bio_get_ex(BIO *b, int cmd, asn1_ps_func **ex_func,
 	BIO_ASN1_EX_FUNCS extmp;
 	int ret;
 
-	ret = BIO_ctrl(b, cmd, 0, &extmp);
-	if (ret > 0) {
-		*ex_func = extmp.ex_func;
-		*ex_free_func = extmp.ex_free_func;
-	}
+	if ((ret = BIO_ctrl(b, cmd, 0, &extmp)) <= 0)
+		return ret;
+
+	*ex_func = extmp.ex_func;
+	*ex_free_func = extmp.ex_free_func;
+
 	return ret;
 }
 
