@@ -1,4 +1,3 @@
-/armv4-gf2m.pl/1.2/Wed Jan  4 16:52:26 2017//
 /armv4-mont.pl/1.1.1.3/Sat Oct 13 21:23:37 2012//
 /mips-mont.pl/1.1.1.2/Sun Apr 13 15:16:33 2014//
 /alpha-mont.pl/1.3/Mon Feb 27 09:09:54 2023//
@@ -10,9 +9,7 @@
 /ppc-mont.pl/1.2/Mon Feb 27 09:09:54 2023//
 /ppc.pl/1.3/Mon Feb 27 09:09:54 2023//
 /ppc64-mont.pl/1.2/Mon Feb 27 09:09:54 2023//
-/x86-gf2m.pl/1.4/Mon Feb 27 09:09:54 2023//
 /x86-mont.pl/1.4/Mon Feb 27 09:09:54 2023//
-/x86_64-gf2m.pl/1.5/Mon Feb 27 09:09:54 2023//
 /x86_64-mont.pl/1.4/Mon Feb 27 09:09:54 2023//
 /x86_64-mont5.pl/1.7/Tue Mar  7 18:58:48 2023//
 D

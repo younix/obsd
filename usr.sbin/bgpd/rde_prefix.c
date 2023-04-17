@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde_prefix.c,v 1.42 2022/08/17 15:15:26 claudio Exp $ */
+/*	$OpenBSD: rde_prefix.c,v 1.48 2023/03/30 13:25:23 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Claudio Jeker <claudio@openbsd.org>
@@ -21,6 +21,7 @@
 
 #include <endian.h>
 #include <errno.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -45,10 +46,55 @@
  */
 
 /* internal prototypes */
-static struct pt_entry	*pt_alloc(struct pt_entry *);
+static struct pt_entry	*pt_alloc(struct pt_entry *, int len);
 static void		 pt_free(struct pt_entry *);
 
-size_t	pt_sizes[AID_MAX] = AID_PTSIZE;
+struct pt_entry4 {
+	RB_ENTRY(pt_entry)		pt_e;
+	uint8_t				aid;
+	uint8_t				prefixlen;
+	uint16_t			len;
+	uint32_t			refcnt;
+	struct in_addr			prefix4;
+};
+
+struct pt_entry6 {
+	RB_ENTRY(pt_entry)		pt_e;
+	uint8_t				aid;
+	uint8_t				prefixlen;
+	uint16_t			len;
+	uint32_t			refcnt;
+	struct in6_addr			prefix6;
+};
+
+struct pt_entry_vpn4 {
+	RB_ENTRY(pt_entry)		pt_e;
+	uint8_t				aid;
+	uint8_t				prefixlen;
+	uint16_t			len;
+	uint32_t			refcnt;
+	uint64_t			rd;
+	struct in_addr			prefix4;
+	uint8_t				labelstack[21];
+	uint8_t				labellen;
+	uint8_t				pad1;
+	uint8_t				pad2;
+};
+
+struct pt_entry_vpn6 {
+	RB_ENTRY(pt_entry)		pt_e;
+	uint8_t				aid;
+	uint8_t				prefixlen;
+	uint16_t			len;
+	uint32_t			refcnt;
+	uint64_t			rd;
+	struct in6_addr			prefix6;
+	uint8_t				labelstack[21];
+	uint8_t				labellen;
+	uint8_t				pad1;
+	uint8_t				pad2;
+};
+
 
 RB_HEAD(pt_tree, pt_entry);
 RB_PROTOTYPE(pt_tree, pt_entry, pt_e, pt_prefix_cmp);
@@ -114,6 +160,8 @@ pt_fill(struct bgpd_addr *prefix, int prefixlen)
 	switch (prefix->aid) {
 	case AID_INET:
 		memset(&pte4, 0, sizeof(pte4));
+		pte4.len = sizeof(pte4);
+		pte4.refcnt = UINT32_MAX;
 		pte4.aid = prefix->aid;
 		if (prefixlen > 32)
 			fatalx("pt_fill: bad IPv4 prefixlen");
@@ -122,6 +170,8 @@ pt_fill(struct bgpd_addr *prefix, int prefixlen)
 		return ((struct pt_entry *)&pte4);
 	case AID_INET6:
 		memset(&pte6, 0, sizeof(pte6));
+		pte6.len = sizeof(pte6);
+		pte6.refcnt = UINT32_MAX;
 		pte6.aid = prefix->aid;
 		if (prefixlen > 128)
 			fatalx("pt_fill: bad IPv6 prefixlen");
@@ -130,6 +180,8 @@ pt_fill(struct bgpd_addr *prefix, int prefixlen)
 		return ((struct pt_entry *)&pte6);
 	case AID_VPN_IPv4:
 		memset(&pte_vpn4, 0, sizeof(pte_vpn4));
+		pte_vpn4.len = sizeof(pte_vpn4);
+		pte_vpn4.refcnt = UINT32_MAX;
 		pte_vpn4.aid = prefix->aid;
 		if (prefixlen > 32)
 			fatalx("pt_fill: bad IPv4 prefixlen");
@@ -142,6 +194,8 @@ pt_fill(struct bgpd_addr *prefix, int prefixlen)
 		return ((struct pt_entry *)&pte_vpn4);
 	case AID_VPN_IPv6:
 		memset(&pte_vpn6, 0, sizeof(pte_vpn6));
+		pte_vpn6.len = sizeof(pte_vpn6);
+		pte_vpn6.refcnt = UINT32_MAX;
 		pte_vpn6.aid = prefix->aid;
 		if (prefixlen > 128)
 			fatalx("pt_get: bad IPv6 prefixlen");
@@ -171,7 +225,8 @@ pt_add(struct bgpd_addr *prefix, int prefixlen)
 {
 	struct pt_entry		*p = NULL;
 
-	p = pt_alloc(pt_fill(prefix, prefixlen));
+	p = pt_fill(prefix, prefixlen);
+	p = pt_alloc(p, p->len);
 
 	if (RB_INSERT(pt_tree, &pttable, p) != NULL)
 		fatalx("pt_add: insert failed");
@@ -302,15 +357,17 @@ pt_prefix_cmp(const struct pt_entry *a, const struct pt_entry *b)
  * Function may not return on failure.
  */
 static struct pt_entry *
-pt_alloc(struct pt_entry *op)
+pt_alloc(struct pt_entry *op, int len)
 {
 	struct pt_entry		*p;
 
-	p = malloc(pt_sizes[op->aid]);
+	p = malloc(len);
 	if (p == NULL)
 		fatal("pt_alloc");
 	rdemem.pt_cnt[op->aid]++;
-	memcpy(p, op, pt_sizes[op->aid]);
+	rdemem.pt_size[op->aid] += len;
+	memcpy(p, op, len);
+	p->refcnt = 0;
 
 	return (p);
 }
@@ -319,5 +376,124 @@ static void
 pt_free(struct pt_entry *pte)
 {
 	rdemem.pt_cnt[pte->aid]--;
+	rdemem.pt_size[pte->aid] -= pte->len;
 	free(pte);
+}
+
+/* dump a prefix into specified buffer */
+int
+pt_write(u_char *buf, int len, struct pt_entry *pte, int withdraw)
+{
+	struct pt_entry_vpn4	*pvpn4 = (struct pt_entry_vpn4 *)pte;
+	struct pt_entry_vpn6	*pvpn6 = (struct pt_entry_vpn6 *)pte;
+	int			 totlen, psize;
+	uint8_t			 plen;
+
+	switch (pte->aid) {
+	case AID_INET:
+	case AID_INET6:
+		plen = pte->prefixlen;
+		totlen = PREFIX_SIZE(plen);
+
+		if (totlen > len)
+			return (-1);
+		*buf++ = plen;
+		memcpy(buf, pte->data, totlen - 1);
+		return (totlen);
+	case AID_VPN_IPv4:
+		plen = pvpn4->prefixlen;
+		totlen = PREFIX_SIZE(plen) + sizeof(pvpn4->rd);
+		psize = PREFIX_SIZE(plen) - 1;
+		plen += sizeof(pvpn4->rd) * 8;
+		if (withdraw) {
+			/* withdraw have one compat label as placeholder */
+			totlen += 3;
+			plen += 3 * 8;
+		} else {
+			totlen += pvpn4->labellen;
+			plen += pvpn4->labellen * 8;
+		}
+
+		if (totlen > len)
+			return (-1);
+		*buf++ = plen;
+		if (withdraw) {
+			/* magic compatibility label as per rfc8277 */
+			*buf++ = 0x80;
+			*buf++ = 0x0;
+			*buf++ = 0x0;
+		} else {
+			memcpy(buf, &pvpn4->labelstack, pvpn4->labellen);
+			buf += pvpn4->labellen;
+		}
+		memcpy(buf, &pvpn4->rd, sizeof(pvpn4->rd));
+		buf += sizeof(pvpn4->rd);
+		memcpy(buf, &pvpn4->prefix4, psize);
+		return (totlen);
+	case AID_VPN_IPv6:
+		plen = pvpn6->prefixlen;
+		totlen = PREFIX_SIZE(plen) + sizeof(pvpn6->rd);
+		psize = PREFIX_SIZE(plen) - 1;
+		plen += sizeof(pvpn6->rd) * 8;
+		if (withdraw) {
+			/* withdraw have one compat label as placeholder */
+			totlen += 3;
+			plen += 3 * 8;
+		} else {
+			totlen += pvpn6->labellen;
+			plen += pvpn6->labellen * 8;
+		}
+
+		if (totlen > len)
+			return (-1);
+		*buf++ = plen;
+		if (withdraw) {
+			/* magic compatibility label as per rfc8277 */
+			*buf++ = 0x80;
+			*buf++ = 0x0;
+			*buf++ = 0x0;
+		} else {
+			memcpy(buf, &pvpn6->labelstack, pvpn6->labellen);
+			buf += pvpn6->labellen;
+		}
+		memcpy(buf, &pvpn6->rd, sizeof(pvpn6->rd));
+		buf += sizeof(pvpn6->rd);
+		memcpy(buf, &pvpn6->prefix6, psize);
+		return (totlen);
+	default:
+		return (-1);
+	}
+}
+
+/* dump a prefix into specified ibuf, allocating space for it if needed */
+int
+pt_writebuf(struct ibuf *buf, struct pt_entry *pte)
+{
+	struct pt_entry_vpn4	*pvpn4 = (struct pt_entry_vpn4 *)pte;
+	struct pt_entry_vpn6	*pvpn6 = (struct pt_entry_vpn6 *)pte;
+	int	 		 totlen;
+	void			*bptr;
+
+	switch (pte->aid) {
+	case AID_INET:
+	case AID_INET6:
+		totlen = PREFIX_SIZE(pte->prefixlen);
+		break;
+	case AID_VPN_IPv4:
+		totlen = PREFIX_SIZE(pte->prefixlen) + sizeof(pvpn4->rd) +
+		    pvpn4->labellen;
+		break;
+	case AID_VPN_IPv6:
+		totlen = PREFIX_SIZE(pte->prefixlen) + sizeof(pvpn6->rd) +
+		    pvpn6->labellen;
+		break;
+	default:
+		return (-1);
+	}
+
+	if ((bptr = ibuf_reserve(buf, totlen)) == NULL)
+		return (-1);
+	if (pt_write(bptr, totlen, pte, 0) == -1)
+		return (-1);
+	return (0);
 }

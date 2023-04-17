@@ -1,4 +1,4 @@
-/* $OpenBSD: kern_clockintr.c,v 1.5 2023/03/14 00:11:58 cheloha Exp $ */
+/* $OpenBSD: kern_clockintr.c,v 1.10 2023/04/16 21:19:26 cheloha Exp $ */
 /*
  * Copyright (c) 2003 Dale Rahn <drahn@openbsd.org>
  * Copyright (c) 2020 Mark Kettenis <kettenis@openbsd.org>
@@ -54,6 +54,8 @@ uint32_t prof_min;			/* [I] minimum profhz period (ns) */
 uint32_t prof_mask;			/* [I] set of allowed offsets */
 
 uint64_t clockintr_advance(struct clockintr *, uint64_t);
+void clockintr_cancel(struct clockintr *);
+void clockintr_cancel_locked(struct clockintr *);
 struct clockintr *clockintr_establish(struct clockintr_queue *,
     void (*)(struct clockintr *, void *));
 uint64_t clockintr_expiration(const struct clockintr *);
@@ -61,6 +63,7 @@ void clockintr_hardclock(struct clockintr *, void *);
 uint64_t clockintr_nsecuptime(const struct clockintr *);
 void clockintr_schedclock(struct clockintr *, void *);
 void clockintr_schedule(struct clockintr *, uint64_t);
+void clockintr_schedule_locked(struct clockintr *, uint64_t);
 void clockintr_statclock(struct clockintr *, void *);
 void clockintr_statvar_init(int, uint32_t *, uint32_t *, uint32_t *);
 uint64_t clockqueue_next(const struct clockintr_queue *);
@@ -111,8 +114,17 @@ clockintr_cpu_init(const struct intrclock *ic)
 	KASSERT(ISSET(clockintr_flags, CL_INIT));
 
 	if (!ISSET(cq->cq_flags, CL_CPU_INIT)) {
+		cq->cq_shadow.cl_queue = cq;
+		mtx_init(&cq->cq_mtx, IPL_CLOCK);
 		TAILQ_INIT(&cq->cq_est);
 		TAILQ_INIT(&cq->cq_pend);
+		if (ic != NULL) {
+			cq->cq_intrclock = *ic;
+			SET(cq->cq_flags, CL_CPU_INTRCLOCK);
+		}
+		cq->cq_gen = 1;
+
+		/* TODO: Remove these from struct clockintr_queue. */
 		cq->cq_hardclock = clockintr_establish(cq, clockintr_hardclock);
 		if (cq->cq_hardclock == NULL)
 			panic("%s: failed to establish hardclock", __func__);
@@ -127,11 +139,6 @@ clockintr_cpu_init(const struct intrclock *ic)
 				    __func__);
 			}
 		}
-		if (ic != NULL) {
-			cq->cq_intrclock = *ic;
-			SET(cq->cq_flags, CL_CPU_INTRCLOCK);
-		}
-		cq->cq_gen = 1;
 	}
 
 	/*
@@ -205,6 +212,8 @@ clockintr_dispatch(void *frame)
 	splassert(IPL_CLOCK);
 	KASSERT(ISSET(cq->cq_flags, CL_CPU_INIT));
 
+	mtx_enter(&cq->cq_mtx);
+
 	/*
 	 * If nothing is scheduled or we arrived too early, we have
 	 * nothing to do.
@@ -230,13 +239,24 @@ clockintr_dispatch(void *frame)
 			if (cq->cq_uptime < cl->cl_expiration)
 				break;
 		}
-		TAILQ_REMOVE(&cq->cq_pend, cl, cl_plink);
-		CLR(cl->cl_flags, CLST_PENDING);
+		clockintr_cancel_locked(cl);
+		cq->cq_shadow.cl_expiration = cl->cl_expiration;
 		cq->cq_running = cl;
+		mtx_leave(&cq->cq_mtx);
 
-		cl->cl_func(cl, frame);
+		cl->cl_func(&cq->cq_shadow, frame);
 
+		mtx_enter(&cq->cq_mtx);
 		cq->cq_running = NULL;
+		if (ISSET(cl->cl_flags, CLST_IGNORE_SHADOW)) {
+			CLR(cl->cl_flags, CLST_IGNORE_SHADOW);
+			CLR(cq->cq_shadow.cl_flags, CLST_SHADOW_PENDING);
+		}
+		if (ISSET(cq->cq_shadow.cl_flags, CLST_SHADOW_PENDING)) {
+			CLR(cq->cq_shadow.cl_flags, CLST_SHADOW_PENDING);
+			clockintr_schedule_locked(cl,
+			    cq->cq_shadow.cl_expiration);
+		}
 		run++;
 	}
 
@@ -269,6 +289,8 @@ stats:
 	membar_producer();
 	cq->cq_gen = MAX(1, ogen + 1);
 
+	mtx_leave(&cq->cq_mtx);
+
 	if (cq->cq_dispatch != 1)
 		panic("%s: unexpected value: %u", __func__, cq->cq_dispatch);
 	cq->cq_dispatch = 0;
@@ -280,11 +302,54 @@ uint64_t
 clockintr_advance(struct clockintr *cl, uint64_t period)
 {
 	uint64_t count, expiration;
+	struct clockintr_queue *cq = cl->cl_queue;
 
+	if (cl == &cq->cq_shadow) {
+		count = nsec_advance(&cl->cl_expiration, period, cq->cq_uptime);
+		SET(cl->cl_flags, CLST_SHADOW_PENDING);
+		return count;
+	}
+
+	mtx_enter(&cq->cq_mtx);
 	expiration = cl->cl_expiration;
-	count = nsec_advance(&expiration, period, cl->cl_queue->cq_uptime);
-	clockintr_schedule(cl, expiration);
+	count = nsec_advance(&expiration, period, cq->cq_uptime);
+	if (ISSET(cl->cl_flags, CLST_PENDING))
+		clockintr_cancel_locked(cl);
+	clockintr_schedule_locked(cl, expiration);
+	if (cl == cq->cq_running)
+		SET(cl->cl_flags, CLST_IGNORE_SHADOW);
+	mtx_leave(&cq->cq_mtx);
 	return count;
+}
+
+void
+clockintr_cancel(struct clockintr *cl)
+{
+	struct clockintr_queue *cq = cl->cl_queue;
+
+	if (cl == &cq->cq_shadow) {
+		CLR(cl->cl_flags, CLST_SHADOW_PENDING);
+		return;
+	}
+
+	mtx_enter(&cq->cq_mtx);
+	if (ISSET(cl->cl_flags, CLST_PENDING))
+		clockintr_cancel_locked(cl);
+	if (cl == cq->cq_running)
+		SET(cl->cl_flags, CLST_IGNORE_SHADOW);
+	mtx_leave(&cq->cq_mtx);
+}
+
+void
+clockintr_cancel_locked(struct clockintr *cl)
+{
+	struct clockintr_queue *cq = cl->cl_queue;
+
+	MUTEX_ASSERT_LOCKED(&cq->cq_mtx);
+	KASSERT(ISSET(cl->cl_flags, CLST_PENDING));
+
+	TAILQ_REMOVE(&cq->cq_pend, cl, cl_plink);
+	CLR(cl->cl_flags, CLST_PENDING);
 }
 
 struct clockintr *
@@ -298,26 +363,56 @@ clockintr_establish(struct clockintr_queue *cq,
 		return NULL;
 	cl->cl_func = func;
 	cl->cl_queue = cq;
+
+	mtx_enter(&cq->cq_mtx);
 	TAILQ_INSERT_TAIL(&cq->cq_est, cl, cl_elink);
+	mtx_leave(&cq->cq_mtx);
 	return cl;
 }
 
 uint64_t
 clockintr_expiration(const struct clockintr *cl)
 {
-	return cl->cl_expiration;
+	uint64_t expiration;
+	struct clockintr_queue *cq = cl->cl_queue;
+
+	if (cl == &cq->cq_shadow)
+		return cl->cl_expiration;
+
+	mtx_enter(&cq->cq_mtx);
+	expiration = cl->cl_expiration;
+	mtx_leave(&cq->cq_mtx);
+	return expiration;
 }
 
 void
 clockintr_schedule(struct clockintr *cl, uint64_t expiration)
 {
+	struct clockintr_queue *cq = cl->cl_queue;
+
+	if (cl == &cq->cq_shadow) {
+		cl->cl_expiration = expiration;
+		SET(cl->cl_flags, CLST_SHADOW_PENDING);
+		return;
+	}
+
+	mtx_enter(&cq->cq_mtx);
+	if (ISSET(cl->cl_flags, CLST_PENDING))
+		clockintr_cancel_locked(cl);
+	clockintr_schedule_locked(cl, expiration);
+	if (cl == cq->cq_running)
+		SET(cl->cl_flags, CLST_IGNORE_SHADOW);
+	mtx_leave(&cq->cq_mtx);
+}
+
+void
+clockintr_schedule_locked(struct clockintr *cl, uint64_t expiration)
+{
 	struct clockintr *elm;
 	struct clockintr_queue *cq = cl->cl_queue;
 
-	if (ISSET(cl->cl_flags, CLST_PENDING)) {
-		TAILQ_REMOVE(&cq->cq_pend, cl, cl_plink);
-		CLR(cl->cl_flags, CLST_PENDING);
-	}
+	MUTEX_ASSERT_LOCKED(&cq->cq_mtx);
+	KASSERT(!ISSET(cl->cl_flags, CLST_PENDING));
 
 	cl->cl_expiration = expiration;
 	TAILQ_FOREACH(elm, &cq->cq_pend, cl_plink) {
@@ -398,6 +493,7 @@ clockintr_setstatclockrate(int freq)
 uint64_t
 clockintr_nsecuptime(const struct clockintr *cl)
 {
+	KASSERT(cl == &cl->cl_queue->cq_shadow);
 	return cl->cl_queue->cq_uptime;
 }
 
@@ -459,6 +555,7 @@ clockintr_statclock(struct clockintr *cl, void *frame)
 uint64_t
 clockqueue_next(const struct clockintr_queue *cq)
 {
+	MUTEX_ASSERT_LOCKED(&cq->cq_mtx);
 	return TAILQ_FIRST(&cq->cq_pend)->cl_expiration;
 }
 

@@ -3,7 +3,6 @@
 /rasops_masks.c/1.5/Thu Jun 23 16:31:16 2011//
 /rasops_masks.h/1.5/Fri Dec 19 22:44:59 2014//
 /rasops_bitops.h/1.9/Fri Dec 11 17:58:24 2020//
-/rasops.c/1.70/Mon Feb 27 09:09:58 2023//
 /rasops.h/1.26/Mon Feb 27 09:09:58 2023//
 /rasops1.c/1.13/Mon Feb 27 09:09:58 2023//
 /rasops15.c/1.10/Mon Feb 27 09:09:58 2023//
@@ -11,4 +10,5 @@
 /rasops32.c/1.13/Mon Feb 27 09:09:58 2023//
 /rasops4.c/1.13/Mon Feb 27 09:09:58 2023//
 /rasops8.c/1.12/Mon Feb 27 09:09:58 2023//
+/rasops.c/1.71/Mon Apr 17 19:48:53 2023//
 D

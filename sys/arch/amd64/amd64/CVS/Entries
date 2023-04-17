@@ -18,7 +18,6 @@
 /ucode.c/1.5/Fri Jun 28 21:54:05 2019//
 /wscons_machdep.c/1.14/Sat Oct 14 04:44:43 2017//
 /codepatch.c/1.9/Thu Dec 17 19:39:58 2020//
-/db_disasm.c/1.22/Thu Dec 17 19:39:58 2020//
 /softintr.c/1.10/Thu Dec 17 19:39:58 2020//
 /intr.c/1.55/Sun Aug 29 08:01:51 2021//
 /mem.c/1.35/Wed Sep  1 16:07:38 2021//
@@ -49,20 +48,21 @@
 /hibernate_machdep.c/1.49/Mon Feb 27 09:09:55 2023//
 /ipi.c/1.18/Mon Feb 27 09:09:55 2023//
 /ipifuncs.c/1.37/Mon Feb 27 09:09:55 2023//
-/locore.S/1.132/Mon Feb 27 09:09:55 2023//
 /locore0.S/1.21/Mon Feb 27 09:09:55 2023//
 /machdep.c/1.284/Mon Feb 27 09:09:55 2023//
 /mptramp.S/1.22/Mon Feb 27 09:09:55 2023//
-/pmap.c/1.162/Mon Feb 27 09:09:55 2023//
 /spl.S/1.19/Mon Feb 27 09:09:55 2023//
-/trap.c/1.97/Mon Feb 27 09:09:55 2023//
 /tsc.c/1.31/Mon Feb 27 09:09:55 2023//
-/vector.S/1.88/Mon Feb 27 09:09:55 2023//
-/vm_machdep.c/1.46/Mon Feb 27 09:09:55 2023//
-/vmm.c/1.337/Mon Feb 27 09:09:55 2023//
-/vmm_support.S/1.21/Mon Feb 27 09:09:55 2023//
 /bios.c/1.47/Mon Mar 27 08:58:32 2023//
-/cpu.c/1.165/Mon Mar 27 08:58:32 2023//
 /identcpu.c/1.132/Mon Mar 27 08:58:32 2023//
 /lapic.c/1.67/Mon Mar 27 08:58:32 2023//
+/cpu.c/1.166/Mon Apr 17 19:48:48 2023//
+/db_disasm.c/1.23/Mon Apr 17 19:48:48 2023//
+/locore.S/1.134/Mon Apr 17 19:48:48 2023//
+/pmap.c/1.164/Mon Apr 17 19:48:48 2023//
+/trap.c/1.100/Mon Apr 17 19:48:48 2023//
+/vector.S/1.92/Mon Apr 17 19:48:48 2023//
+/vm_machdep.c/1.47/Mon Apr 17 19:48:48 2023//
+/vmm.c/1.338/Mon Apr 17 19:48:48 2023//
+/vmm_support.S/1.23/Mon Apr 17 19:48:48 2023//
 D

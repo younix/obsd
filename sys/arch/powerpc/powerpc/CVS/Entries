@@ -6,12 +6,12 @@
 /process_machdep.c/1.13/Sun Sep  9 20:49:18 2007//
 /softintr.c/1.10/Thu Dec 17 19:39:58 2020//
 /sys_machdep.c/1.5/Thu Dec 17 19:39:58 2020//
-/lock_machdep.c/1.10/Thu Sep  2 14:22:31 2021//
 /in_cksum.c/1.11/Mon Jun 27 13:02:00 2022//
 /intr.c/1.10/Mon Feb 27 09:09:55 2023//
 /pmap.c/1.182/Tue Mar  7 18:59:11 2023//
 /setjmp.S/1.11/Mon Feb 27 09:09:55 2023//
 /trap.c/1.131/Mon Feb 27 09:09:55 2023//
 /vecast.S/1.1/Mon Feb 27 09:09:55 2023//
-/vm_machdep.c/1.54/Mon Feb 27 09:09:55 2023//
+/lock_machdep.c/1.11/Mon Apr 17 19:48:50 2023//
+/vm_machdep.c/1.55/Mon Apr 17 19:48:50 2023//
 D

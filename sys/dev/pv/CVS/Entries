@@ -25,10 +25,10 @@
 /vioscsi.c/1.30/Tue Jul 26 13:42:35 2022//
 /xbf.c/1.52/Tue Jul 26 13:42:35 2022//
 /hyperv.c/1.51/Mon Feb 27 09:09:58 2023//
-/hypervic.c/1.18/Mon Feb 27 09:09:58 2023//
 /pvbus.c/1.27/Mon Feb 27 09:09:58 2023//
 /pvclock.c/1.9/Mon Feb 27 09:09:58 2023//
 /pvvar.h/1.11/Mon Feb 27 09:09:58 2023//
 /vmt.c/1.30/Mon Feb 27 09:09:58 2023//
-/xenstore.c/1.48/Mon Feb 27 09:09:58 2023//
+/hypervic.c/1.19/Mon Apr 17 19:48:53 2023//
+/xenstore.c/1.49/Mon Apr 17 19:48:53 2023//
 D

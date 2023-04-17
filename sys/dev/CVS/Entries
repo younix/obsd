@@ -1,6 +1,5 @@
 /bio.c/1.17/Wed Aug 26 22:28:57 2015//
 /cninit.c/1.15/Sat Dec 30 20:46:59 2017//
-/diskmap.c/1.26/Tue Aug  6 07:16:48 2019//
 /firmload.c/1.16/Mon Aug 13 23:12:39 2018//
 /ipmi.h/1.1/Fri Feb  5 06:29:01 2016//
 /mulaw.c/1.18/Thu Jun 25 06:43:46 2015//
@@ -79,3 +78,4 @@ D/efi////
 /softraidvar.h/1.176/Mon Feb 27 09:09:58 2023//
 /rnd.c/1.226/Mon Mar 27 08:58:35 2023//
 /vnd.c/1.180/Mon Mar 27 08:58:35 2023//
+/diskmap.c/1.27/Mon Apr 17 19:48:51 2023//

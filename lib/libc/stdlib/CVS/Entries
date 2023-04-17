@@ -81,7 +81,6 @@
 /bsearch.c/1.9/Mon Jan 24 14:35:13 2022//
 /lsearch.c/1.7/Mon Jan 24 14:35:13 2022//
 /atexit.3/1.13/Mon Jun 27 13:01:59 2022//
-/malloc.3/1.129/Tue Jul 26 13:42:32 2022//
 /rand.3/1.21/Tue Jul 26 13:42:32 2022//
 /system.c/1.13/Tue Jul 26 13:42:32 2022//
 /tsearch.3/1.22/Tue Jul 26 13:42:32 2022//
@@ -104,5 +103,6 @@
 /setenv.c/1.20/Mon Feb 27 09:09:54 2023//
 /strtod.3/1.23/Mon Feb 27 09:09:54 2023//
 /strtonum.3/1.19/Mon Feb 27 09:09:54 2023//
-/malloc.c/1.278/Mon Mar 27 08:58:18 2023//
+/malloc.3/1.132/Mon Apr 17 19:48:35 2023//
+/malloc.c/1.281/Mon Apr 17 19:48:35 2023//
 D

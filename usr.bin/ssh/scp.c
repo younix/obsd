@@ -1,4 +1,4 @@
-/* $OpenBSD: scp.c,v 1.254 2023/03/27 03:25:08 djm Exp $ */
+/* $OpenBSD: scp.c,v 1.256 2023/03/31 05:56:36 dtucker Exp $ */
 /*
  * scp - secure remote copy.  This is basically patched BSD rcp which
  * uses ssh to do the data transfer (instead of using rcmd).
@@ -166,11 +166,11 @@ killchild(int signo)
 {
 	if (do_cmd_pid > 1) {
 		kill(do_cmd_pid, signo ? signo : SIGTERM);
-		waitpid(do_cmd_pid, NULL, 0);
+		(void)waitpid(do_cmd_pid, NULL, 0);
 	}
 	if (do_cmd_pid2 > 1) {
 		kill(do_cmd_pid2, signo ? signo : SIGTERM);
-		waitpid(do_cmd_pid2, NULL, 0);
+		(void)waitpid(do_cmd_pid2, NULL, 0);
 	}
 
 	if (signo)
@@ -2182,8 +2182,8 @@ cleanup_exit(int i)
 	if (remout2 > 0)
 		close(remout2);
 	if (do_cmd_pid > 0)
-		waitpid(do_cmd_pid, NULL, 0);
+		(void)waitpid(do_cmd_pid, NULL, 0);
 	if (do_cmd_pid2 > 0)
-		waitpid(do_cmd_pid2, NULL, 0);
+		(void)waitpid(do_cmd_pid2, NULL, 0);
 	exit(i);
 }

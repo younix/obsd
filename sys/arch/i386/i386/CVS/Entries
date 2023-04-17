@@ -42,7 +42,6 @@
 /k1x-pstate.c/1.14/Mon Feb 27 09:09:55 2023//
 /k6_mem.c/1.14/Mon Feb 27 09:09:55 2023//
 /lapic.c/1.55/Mon Feb 27 09:09:55 2023//
-/locore.s/1.200/Mon Feb 27 09:09:55 2023//
 /locore0.S/1.10/Mon Feb 27 09:09:55 2023//
 /longrun.c/1.18/Mon Feb 27 09:09:55 2023//
 /machdep.c/1.663/Mon Feb 27 09:09:55 2023//
@@ -51,17 +50,18 @@
 /mptramp.s/1.27/Mon Feb 27 09:09:55 2023//
 /nvram.c/1.7/Mon Feb 27 09:09:55 2023//
 /pctr.c/1.31/Mon Feb 27 09:09:55 2023//
-/pmap.c/1.220/Mon Feb 27 09:09:55 2023//
-/pmapae.c/1.68/Mon Feb 27 09:09:55 2023//
 /powernow-k7.c/1.44/Mon Feb 27 09:09:55 2023//
 /powernow-k8.c/1.35/Mon Feb 27 09:09:55 2023//
 /process_machdep.c/1.30/Mon Feb 27 09:09:55 2023//
 /rbus_machdep.c/1.28/Mon Feb 27 09:09:55 2023//
 /sys_machdep.c/1.41/Mon Feb 27 09:09:55 2023//
 /vector.s/1.24/Mon Feb 27 09:09:55 2023//
-/vm_machdep.c/1.73/Mon Feb 27 09:09:55 2023//
 /wscons_machdep.c/1.20/Mon Feb 27 09:09:55 2023//
 /bios.c/1.129/Mon Mar 27 08:58:33 2023//
 /mem.c/1.56/Mon Mar 27 08:58:33 2023//
-/trap.c/1.161/Mon Mar 27 08:58:33 2023//
+/locore.s/1.201/Mon Apr 17 19:48:49 2023//
+/pmap.c/1.222/Mon Apr 17 19:48:49 2023//
+/pmapae.c/1.70/Mon Apr 17 19:48:49 2023//
+/trap.c/1.162/Mon Apr 17 19:48:49 2023//
+/vm_machdep.c/1.74/Mon Apr 17 19:48:49 2023//
 D

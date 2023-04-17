@@ -27,7 +27,6 @@
 /kcore.h/1.1/Sat Apr 30 15:33:18 2011//
 /limits.h/1.14/Thu Apr 30 13:42:08 2015//
 /loadfile_machdep.h/1.8/Wed Apr 10 04:17:35 2019//
-/mpbiosreg.h/1.5/Wed Mar 23 16:54:35 2011//
 /mpbiosvar.h/1.12/Wed May 18 03:45:11 2016//
 /mplock.h/1.4/Tue Oct 17 14:25:35 2017//
 /mutex.h/1.13/Thu Jan 25 15:06:29 2018//
@@ -70,6 +69,7 @@
 /cpu.h/1.181/Mon Feb 27 09:09:55 2023//
 /cputypes.h/1.15/Mon Feb 27 09:09:55 2023//
 /i82093reg.h/1.6/Mon Feb 27 09:09:55 2023//
-/pmap.h/1.92/Mon Feb 27 09:09:55 2023//
 /specialreg.h/1.81/Mon Feb 27 09:09:55 2023//
+/mpbiosreg.h/1.6/Mon Apr 17 19:48:49 2023//
+/pmap.h/1.93/Mon Apr 17 19:48:49 2023//
 D

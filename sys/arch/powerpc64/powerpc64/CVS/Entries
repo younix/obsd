@@ -12,7 +12,6 @@
 /trap_subr.S/1.19/Sun Aug 29 08:01:51 2021//
 /fpu.c/1.4/Wed Sep  1 16:07:38 2021//
 /process_machdep.c/1.5/Wed Sep  1 16:07:38 2021//
-/vm_machdep.c/1.8/Wed Sep  1 16:07:38 2021//
 /db_trace.c/1.8/Mon Jun 27 13:02:00 2022//
 /db_interface.c/1.6/Tue Jul 26 13:42:34 2022//
 /locore.S/1.44/Tue Jul 26 13:42:34 2022//
@@ -22,8 +21,9 @@
 /cpu.c/1.25/Mon Feb 27 09:09:55 2023//
 /intr.c/1.11/Mon Feb 27 09:09:55 2023//
 /machdep.c/1.74/Mon Feb 27 09:09:55 2023//
-/pmap.c/1.59/Mon Feb 27 09:09:55 2023//
 /syncicache.c/1.5/Mon Feb 27 09:09:55 2023//
 /syscall.c/1.11/Mon Feb 27 09:09:55 2023//
-/trap.c/1.52/Mon Feb 27 09:09:55 2023//
+/pmap.c/1.60/Mon Apr 17 19:48:50 2023//
+/trap.c/1.54/Mon Apr 17 19:48:50 2023//
+/vm_machdep.c/1.9/Mon Apr 17 19:48:50 2023//
 D

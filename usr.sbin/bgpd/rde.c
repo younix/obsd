@@ -1,4 +1,4 @@
-/*	$OpenBSD: rde.c,v 1.597 2023/03/21 14:52:36 claudio Exp $ */
+/*	$OpenBSD: rde.c,v 1.601 2023/04/13 15:51:16 claudio Exp $ */
 
 /*
  * Copyright (c) 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -1474,9 +1474,14 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 					goto done;
 				}
 				break;
+			case AID_FLOWSPECv4:
+			case AID_FLOWSPECv6:
+				/* ignore flowspec for now */
 			default:
 				/* ignore unsupported multiprotocol AF */
-				break;
+				mpp += mplen;
+				mplen = 0;
+				continue;
 			}
 
 			mpp += pos;
@@ -1674,9 +1679,14 @@ rde_update_dispatch(struct rde_peer *peer, struct imsg *imsg)
 					goto done;
 				}
 				break;
+			case AID_FLOWSPECv4:
+			case AID_FLOWSPECv6:
+				/* ignore flowspec for now */
 			default:
 				/* ignore unsupported multiprotocol AF */
-				break;
+				mpp += mplen;
+				mplen = 0;
+				continue;
 			}
 
 			mpp += pos;
@@ -1724,7 +1734,7 @@ pathid_assign(struct rde_peer *peer, uint32_t path_id,
 		return peer->path_id_tx;
 
 	/* peer uses add-path, therefore new path_ids need to be assigned */
-	re = rib_get(rib_byid(RIB_ADJ_IN), prefix, prefixlen);
+	re = rib_get_addr(rib_byid(RIB_ADJ_IN), prefix, prefixlen);
 	if (re != NULL) {
 		struct prefix *p;
 
@@ -2314,7 +2324,6 @@ rde_get_mp_nexthop(u_char *data, uint16_t len, uint8_t aid,
 		return (-1);
 
 	memset(&nexthop, 0, sizeof(nexthop));
-	nexthop.aid = aid;
 	switch (aid) {
 	case AID_INET6:
 		/*
@@ -2326,19 +2335,11 @@ rde_get_mp_nexthop(u_char *data, uint16_t len, uint8_t aid,
 		 * traffic.
 		 */
 		if (nhlen != 16 && nhlen != 32) {
-			log_warnx("bad multiprotocol nexthop, bad size");
-			return (-1);
-		}
-		memcpy(&nexthop.v6.s6_addr, data, 16);
-		break;
-	case AID_VPN_IPv6:
-		if (nhlen != 24) {
-			log_warnx("bad multiprotocol nexthop, bad size %d",
+			log_warnx("bad %s nexthop, bad size %d", aid2str(aid),
 			    nhlen);
 			return (-1);
 		}
-		memcpy(&nexthop.v6, data + sizeof(uint64_t),
-		    sizeof(nexthop.v6));
+		memcpy(&nexthop.v6.s6_addr, data, 16);
 		nexthop.aid = AID_INET6;
 		break;
 	case AID_VPN_IPv4:
@@ -2356,24 +2357,43 @@ rde_get_mp_nexthop(u_char *data, uint16_t len, uint8_t aid,
 		 * AID_VPN_IPv4 in nexthop and kroute.
 		 */
 		if (nhlen != 12) {
-			log_warnx("bad multiprotocol nexthop, bad size");
+			log_warnx("bad %s nexthop, bad size %d", aid2str(aid),
+			    nhlen);
 			return (-1);
 		}
 		nexthop.aid = AID_INET;
 		memcpy(&nexthop.v4, data + sizeof(uint64_t),
 		    sizeof(nexthop.v4));
 		break;
+	case AID_VPN_IPv6:
+		if (nhlen != 24) {
+			log_warnx("bad %s nexthop, bad size %d", aid2str(aid),
+			    nhlen);
+			return (-1);
+		}
+		memcpy(&nexthop.v6, data + sizeof(uint64_t),
+		    sizeof(nexthop.v6));
+		nexthop.aid = AID_INET6;
+		break;
+	case AID_FLOWSPECv4:
+	case AID_FLOWSPECv6:
+		/* nexthop must be 0 and ignored for flowspec */
+		if (nhlen != 0) {
+			log_warnx("bad %s nexthop, bad size %d", aid2str(aid),
+			    nhlen);
+			return (-1);
+		}
+		/* also ignore reserved (old SNPA) field as per RFC4760 */
+		return (totlen + 1);
 	default:
 		log_warnx("bad multiprotocol nexthop, bad AID");
 		return (-1);
 	}
 
-	nexthop_unref(state->nexthop);	/* just to be sure */
 	state->nexthop = nexthop_get(&nexthop);
 
 	/* ignore reserved (old SNPA) field as per RFC4760 */
 	totlen += nhlen + 1;
-	data += nhlen + 1;
 
 	return (totlen);
 }
@@ -2525,15 +2545,15 @@ rde_aspa_validity(struct rde_peer *peer, struct rde_aspath *asp, uint8_t aid)
 
 	switch (aid) {
 	case AID_INET:
-		if (peer->role != ROLE_CUSTOMER)
-			return asp->aspa_state.onlyup_v4;
-		else
+		if (peer->role == ROLE_CUSTOMER)
 			return asp->aspa_state.downup_v4;
-	case AID_INET6:
-		if (peer->role != ROLE_CUSTOMER)
-			return asp->aspa_state.onlyup_v6;
 		else
+			return asp->aspa_state.onlyup_v4;
+	case AID_INET6:
+		if (peer->role == ROLE_CUSTOMER)
 			return asp->aspa_state.downup_v6;
+		else
+			return asp->aspa_state.onlyup_v6;
 	default:
 		return ASPA_NEVER_KNOWN;	/* not reachable */
 	}
@@ -2710,16 +2730,10 @@ rde_dump_rib_as(struct prefix *p, struct rde_aspath *asp, pid_t pid, int flags,
 		struct rde_community *comm = prefix_communities(p);
 		size_t len = comm->nentries * sizeof(struct community);
 		if (comm->nentries > 0) {
-			if ((wbuf = imsg_create(ibuf_se_ctl,
-			    IMSG_CTL_SHOW_RIB_COMMUNITIES, 0, pid,
-			    len)) == NULL)
+			if (imsg_compose(ibuf_se_ctl,
+			    IMSG_CTL_SHOW_RIB_COMMUNITIES, 0, pid, -1,
+			    comm->communities, len) == -1)
 				return;
-			if ((bp = ibuf_reserve(wbuf, len)) == NULL) {
-				ibuf_free(wbuf);
-				return;
-			}
-			memcpy(bp, comm->communities, len);
-			imsg_close(ibuf_se_ctl, wbuf);
 		}
 		for (l = 0; l < asp->others_len; l++) {
 			if ((a = asp->others[l]) == NULL)
@@ -3032,14 +3046,15 @@ rde_dump_ctx_new(struct ctl_show_rib_request *req, pid_t pid,
 
 		if (req->flags & F_SHORTER) {
 			for (plen = 0; plen <= req->prefixlen; plen++) {
-				re = rib_get(rib_byid(rid), &req->prefix, plen);
+				re = rib_get_addr(rib_byid(rid), &req->prefix,
+				    plen);
 				rde_dump_upcall(re, ctx);
 			}
 		} else if (req->prefixlen == hostplen) {
 			re = rib_match(rib_byid(rid), &req->prefix);
 			rde_dump_upcall(re, ctx);
 		} else {
-			re = rib_get(rib_byid(rid), &req->prefix,
+			re = rib_get_addr(rib_byid(rid), &req->prefix,
 			    req->prefixlen);
 			rde_dump_upcall(re, ctx);
 		}

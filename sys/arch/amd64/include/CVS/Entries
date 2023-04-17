@@ -25,7 +25,6 @@
 /kcore.h/1.5/Tue Apr  3 07:13:37 2018//
 /limits.h/1.6/Thu Apr 30 13:42:08 2015//
 /loadfile_machdep.h/1.9/Tue May 28 04:51:26 2019//
-/mpbiosreg.h/1.4/Wed Mar 23 16:54:34 2011//
 /mpbiosvar.h/1.6/Sat Nov 22 18:31:46 2014//
 /mpconfig.h/1.8/Fri Oct 21 20:48:11 2011//
 /mplock.h/1.5/Tue Oct 17 14:25:35 2017//
@@ -49,10 +48,8 @@
 /tss.h/1.4/Wed Mar 23 16:54:34 2011//
 /vga_post.h/1.2/Wed Mar 23 16:54:34 2011//
 /bus.h/1.35/Sat May  1 08:41:51 2021//
-/frameasm.h/1.25/Sat May  1 08:41:51 2021//
 /pci_machdep.h/1.30/Sat May  1 08:41:51 2021//
 /setjmp.h/1.2/Sat May  1 08:41:51 2021//
-/trap.h/1.4/Sat May  1 08:41:51 2021//
 /smbiosvar.h/1.13/Wed Sep  1 16:07:38 2021//
 /db_machdep.h/1.19/Thu Sep  2 14:22:31 2021//
 /intrdefs.h/1.22/Thu Sep  2 14:22:31 2021//
@@ -60,7 +57,6 @@
 /intr.h/1.33/Mon Jan 24 14:35:14 2022//
 /conf.h/1.9/Tue Jul 26 13:42:34 2022//
 /_types.h/1.18/Mon Feb 27 09:09:55 2023//
-/asm.h/1.23/Mon Feb 27 09:09:55 2023//
 /atomic.h/1.22/Mon Feb 27 09:09:55 2023//
 /biosvar.h/1.31/Mon Feb 27 09:09:55 2023//
 /cpu.h/1.154/Mon Feb 27 09:09:55 2023//
@@ -68,10 +64,14 @@
 /cpuvar.h/1.12/Mon Feb 27 09:09:55 2023//
 /efivar.h/1.1/Mon Feb 27 09:09:55 2023//
 /i82093reg.h/1.8/Mon Feb 27 09:09:55 2023//
-/pmap.h/1.85/Mon Feb 27 09:09:55 2023//
 /pte.h/1.17/Mon Feb 27 09:09:55 2023//
 /timetc.h/1.3/Mon Feb 27 09:09:55 2023//
 /vmmvar.h/1.89/Mon Feb 27 09:09:55 2023//
-/specialreg.h/1.99/Mon Mar 27 08:58:32 2023//
 /vmparam.h/1.23/Mon Mar 27 08:58:32 2023//
+/asm.h/1.24/Mon Apr 17 19:48:48 2023//
+/frameasm.h/1.26/Mon Apr 17 19:48:48 2023//
+/mpbiosreg.h/1.5/Mon Apr 17 19:48:48 2023//
+/pmap.h/1.86/Mon Apr 17 19:48:48 2023//
+/specialreg.h/1.101/Mon Apr 17 19:48:48 2023//
+/trap.h/1.5/Mon Apr 17 19:48:48 2023//
 D

@@ -4,7 +4,6 @@
 /acpiutil.c/1.9/Fri Dec 11 17:58:22 2020//
 /acpials.c/1.4/Thu Dec 17 19:39:58 2020//
 /acpidmar.h/1.1/Sat May  1 08:41:51 2021//
-/dsdt.h/1.79/Wed Sep  1 16:07:39 2021//
 /amd_iommu.h/1.2/Mon Jan 24 14:35:14 2022//
 /dsdt.c/1.264/Mon Jan 24 14:35:14 2022//
 /acpi_x86.c/1.15/Mon Jun 27 13:02:00 2022//
@@ -12,11 +11,9 @@
 /acpiac.c/1.36/Tue Jul 26 13:42:35 2022//
 /acpiasus.c/1.20/Tue Jul 26 13:42:35 2022//
 /acpibat.c/1.70/Tue Jul 26 13:42:35 2022//
-/acpibtn.c/1.49/Tue Jul 26 13:42:35 2022//
 /acpicbkbd.c/1.3/Tue Jul 26 13:42:35 2022//
 /acpicmos.c/1.2/Tue Jul 26 13:42:35 2022//
 /acpicpu.c/1.92/Tue Jul 26 13:42:35 2022//
-/acpidmar.c/1.6/Tue Jul 26 13:42:35 2022//
 /acpige.c/1.2/Tue Jul 26 13:42:35 2022//
 /acpihid.c/1.4/Tue Jul 26 13:42:35 2022//
 /acpihve.c/1.4/Tue Jul 26 13:42:35 2022//
@@ -24,7 +21,6 @@
 /acpiprt.c/1.52/Tue Jul 26 13:42:35 2022//
 /acpisony.c/1.10/Tue Jul 26 13:42:35 2022//
 /acpisurface.c/1.2/Tue Jul 26 13:42:35 2022//
-/acpithinkpad.c/1.70/Tue Jul 26 13:42:35 2022//
 /acpitoshiba.c/1.16/Tue Jul 26 13:42:35 2022//
 /acpivideo.c/1.14/Tue Jul 26 13:42:35 2022//
 /acpivout.c/1.25/Tue Jul 26 13:42:35 2022//
@@ -32,7 +28,6 @@
 /atk0110.c/1.19/Tue Jul 26 13:42:35 2022//
 /ccp_acpi.c/1.4/Tue Jul 26 13:42:35 2022//
 /ccpmic.c/1.3/Tue Jul 26 13:42:35 2022//
-/com_acpi.c/1.10/Tue Jul 26 13:42:35 2022//
 /dwgpio.c/1.7/Tue Jul 26 13:42:35 2022//
 /ehci_acpi.c/1.3/Tue Jul 26 13:42:35 2022//
 /if_bse_acpi.c/1.6/Tue Jul 26 13:42:35 2022//
@@ -62,11 +57,16 @@
 /files.acpi/1.68/Mon Feb 27 09:09:55 2023//
 /glkgpio.c/1.6/Mon Feb 27 09:09:55 2023//
 /pchgpio.c/1.14/Mon Feb 27 09:09:55 2023//
-/qcgpio.c/1.8/Mon Feb 27 09:09:55 2023//
 /qciic.c/1.5/Mon Feb 27 09:09:55 2023//
 /sdhc_acpi.c/1.22/Mon Feb 27 09:09:55 2023//
 /tipmic.c/1.8/Tue Mar  7 18:59:12 2023//
 /ufshci_acpi.c/1.1/Mon Feb 27 09:09:55 2023//
 /xhci_acpi.c/1.11/Mon Feb 27 09:09:55 2023//
 /acpi.c/1.420/Mon Mar 27 08:58:35 2023//
+/acpibtn.c/1.50/Mon Apr 17 19:48:51 2023//
+/acpidmar.c/1.7/Mon Apr 17 19:48:51 2023//
+/acpithinkpad.c/1.71/Mon Apr 17 19:48:51 2023//
+/com_acpi.c/1.11/Mon Apr 17 19:48:51 2023//
+/dsdt.h/1.80/Mon Apr 17 19:48:51 2023//
+/qcgpio.c/1.9/Mon Apr 17 19:48:51 2023//
 D

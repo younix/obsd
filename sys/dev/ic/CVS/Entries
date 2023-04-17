@@ -106,7 +106,6 @@
 /osiopreg.h/1.5/Mon Nov 21 21:52:47 2005//
 /p9000.h/1.4/Tue May 22 04:14:03 2007//
 /pcdisplay.h/1.2/Fri Feb  2 20:25:39 2001//
-/pcdisplay_chars.c/1.5/Sat Aug 28 12:48:14 2010//
 /pcdisplay_subr.c/1.14/Mon May 25 09:55:48 2020//
 /pcdisplayvar.h/1.13/Mon May 25 09:55:48 2020//
 /pcf8584.c/1.11/Sun Aug  1 18:48:41 2010//
@@ -143,7 +142,6 @@
 /stireg.h/1.14/Sun Apr  5 23:25:57 2015//
 /tea5757.h/1.3/Mon Jan  7 18:32:19 2002//
 /tivar.h/1.2/Sat Aug 29 22:55:48 2009//
-/twereg.h/1.9/Mon Sep  1 17:30:56 2008//
 /uhareg.h/1.5/Wed Jun 30 19:06:16 2010//
 /vga_subr.c/1.5/Sat Jul 18 00:48:05 2015//
 /vgareg.h/1.5/Sun Feb  1 14:37:22 2009//
@@ -190,7 +188,6 @@
 /aic79xx_openbsd.h/1.21/Thu Dec 17 19:39:58 2020//
 /aic7xxx_openbsd.h/1.31/Thu Dec 17 19:39:58 2020//
 /rtsxreg.h/1.5/Thu Dec 17 19:39:59 2020//
-/elink3.c/1.98/Sat May  1 08:41:51 2021//
 /hme.c/1.83/Sat May  1 08:41:51 2021//
 /iha.c/1.52/Sat May  1 08:41:51 2021//
 /imxiic.c/1.1/Sat May  1 08:41:51 2021//
@@ -268,7 +265,6 @@
 /smc83c170reg.h/1.3/Mon Jan 24 14:35:14 2022//
 /smc83c170var.h/1.5/Mon Jan 24 14:35:14 2022//
 /smc91cxxreg.h/1.4/Mon Jan 24 14:35:14 2022//
-/tcic2reg.h/1.5/Mon Jan 24 14:35:14 2022//
 /tea5757.c/1.4/Mon Jan 24 14:35:14 2022//
 /ti.c/1.29/Mon Jan 24 14:35:14 2022//
 /tireg.h/1.6/Mon Jan 24 14:35:14 2022//
@@ -299,7 +295,6 @@
 /imxiicvar.h/1.2/Tue Jul 26 13:42:35 2022//
 /lm78.c/1.26/Tue Jul 26 13:42:35 2022//
 /lm78var.h/1.20/Tue Jul 26 13:42:35 2022//
-/malo.c/1.123/Tue Jul 26 13:42:35 2022//
 /mfi.c/1.188/Tue Jul 26 13:42:35 2022//
 /mpi.c/1.224/Tue Jul 26 13:42:35 2022//
 /mpuvar.h/1.7/Tue Jul 26 13:42:35 2022//
@@ -344,12 +339,17 @@
 /rtwn.c/1.54/Mon Feb 27 09:09:55 2023//
 /smc91cxx.c/1.52/Mon Feb 27 09:09:55 2023//
 /smc91cxxvar.h/1.9/Mon Feb 27 09:09:55 2023//
-/ufshci.c/1.1/Mon Feb 27 09:09:55 2023//
 /ufshcireg.h/1.2/Tue Mar  7 18:59:12 2023//
 /ufshcivar.h/1.1/Mon Feb 27 09:09:55 2023//
 /ath.c/1.124/Mon Mar 27 08:58:35 2023//
 /athvar.h/1.36/Mon Mar 27 08:58:35 2023//
-/bwfm.c/1.108/Mon Mar 27 08:58:36 2023//
-/dwqe.c/1.3/Mon Mar 27 08:58:36 2023//
-/dwqevar.h/1.2/Mon Mar 27 08:58:36 2023//
+/bwfm.c/1.109/Mon Apr 17 19:48:51 2023//
+/dwqe.c/1.4/Mon Apr 17 19:48:51 2023//
+/dwqevar.h/1.4/Mon Apr 17 19:48:51 2023//
+/elink3.c/1.99/Mon Apr 17 19:48:51 2023//
+/malo.c/1.124/Mon Apr 17 19:48:51 2023//
+/pcdisplay_chars.c/1.6/Mon Apr 17 19:48:51 2023//
+/tcic2reg.h/1.6/Mon Apr 17 19:48:51 2023//
+/twereg.h/1.10/Mon Apr 17 19:48:51 2023//
+/ufshci.c/1.3/Mon Apr 17 19:48:51 2023//
 D

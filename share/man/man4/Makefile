@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.834 2023/03/19 11:22:50 kettenis Exp $
+#	$OpenBSD: Makefile,v 1.837 2023/04/02 01:40:52 dlg Exp $
 
 MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	acpi.4 acpiac.4 acpials.4 acpiasus.4 acpibat.4 \
@@ -60,7 +60,7 @@ MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	multicast.4 mvclock.4 mvdog.4 mvgicp.4 mvgpio.4 mvicu.4 mviic.4 \
 	mvkpcie.4 mvneta.4 mvpinctrl.4 mvpp.4 mvrng.4 mvrtc.4 mvspi.4 \
 	mvtemp.4 mvsw.4 mvuart.4 myx.4 \
-	ne.4 neo.4 nep.4 netintro.4 nfe.4 nge.4 nmea.4 \
+	ne.4 neo.4 nep.4 netintro.4 nfe.4 ngbe.4 nge.4 nmea.4 \
 	nsclpcsio.4 nsgphy.4 nsphy.4 nsphyter.4 null.4 nviic.4 nvme.4 nvt.4 \
 	oce.4 ociic.4 ohci.4 onewire.4 oosiop.4 openprom.4 options.4 \
 	osiop.4 otus.4 owid.4 owctr.4 owsbm.4 owtemp.4 \
@@ -78,9 +78,9 @@ MAN=	aac.4 abcrtc.4 abl.4 ac97.4 acphy.4 acrtc.4 \
 	radio.4 ral.4 random.4 rdomain.4 rd.4 rdac.4 re.4 rdcphy.4 rgephy.4 \
 	rge.4 ricohrtc.4 rkanxdp.4 rkclock.4 rkcomphy.4 \
 	rkdrm.4 rkdwhdmi.4 rkdwusb.4 \
-	rkemmcphy.4 rkgpio.4 rkgrf.4 rkiic.4 rkiis.4 \
+	rkemmcphy.4 rkgpio.4 rkgrf.4 rkiic.4 rkiis.4 rkiovd.4 \
 	rkpcie.4 rkpciephy.4 rkpinctrl.4 rkpmic.4 rkpwm.4 \
-	rkrng.4 rktcphy.4 rktemp.4 rkvop.4 \
+	rkrng.4 rktcphy.4 rktemp.4 rkusbphy.4 rkvop.4 \
 	rl.4 rlphy.4 route.4 rsu.4 rtsx.4 rum.4 run.4 rtw.4 rtwn.4 \
 	safte.4 sbus.4 schsio.4 scmi.4 scsi.4 sd.4 \
 	sdmmc.4 sdhc.4 se.4 ses.4 sf.4 sili.4 \

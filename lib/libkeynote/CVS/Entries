@@ -3,7 +3,6 @@
 /Makefile/1.21/Sun Jul  2 18:11:28 2017//
 /README/1.10/Tue Sep 26 23:28:45 2000//
 /assertion.h/1.5/Thu Jun 26 23:19:53 2003//
-/base64.c/1.11/Tue Jun 29 11:35:56 2004//
 /environment.c/1.29/Wed Dec 23 20:28:15 2015//
 /keynote-keygen.c/1.22/Thu Nov 19 02:35:24 2015//
 /keynote-main.c/1.10/Fri Jun 25 05:06:49 2004//
@@ -27,3 +26,4 @@ D/testsuite////
 /keynote.y/1.19/Mon Feb 27 09:09:54 2023//
 /parse_assertion.c/1.17/Mon Feb 27 09:09:54 2023//
 /signature.c/1.30/Mon Feb 27 09:09:54 2023//
+/base64.c/1.12/Mon Apr 17 19:48:36 2023//

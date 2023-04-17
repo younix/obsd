@@ -3,7 +3,6 @@
 /ofw_gpio.c/1.3/Mon Aug 26 09:22:27 2019//
 /ofw_pci.h/1.4/Thu Jun 26 05:42:17 2008//
 /ofw_pinctrl.h/1.2/Sun Aug 21 14:41:51 2016//
-/ofw_regulator.h/1.7/Wed Feb 20 07:36:37 2019//
 /ofw_thermal.h/1.2/Thu Jan 23 23:10:04 2020//
 /fdt.h/1.6/Fri Dec 11 17:58:22 2020//
 /ofw_pinctrl.c/1.3/Fri Dec 11 17:58:22 2020//
@@ -13,8 +12,9 @@
 /ofw_power.c/1.2/Mon Jan 24 14:35:14 2022//
 /ofw_power.h/1.2/Mon Jan 24 14:35:14 2022//
 /ofw_clock.h/1.7/Mon Jun 27 13:02:00 2022//
-/ofw_regulator.c/1.16/Mon Jun 27 13:02:00 2022//
 /fdt.c/1.33/Mon Feb 27 09:09:55 2023//
-/ofw_misc.c/1.38/Mon Feb 27 09:09:55 2023//
-/ofw_misc.h/1.27/Mon Feb 27 09:09:55 2023//
+/ofw_misc.c/1.41/Mon Apr 17 19:48:51 2023//
+/ofw_misc.h/1.29/Mon Apr 17 19:48:51 2023//
+/ofw_regulator.c/1.19/Mon Apr 17 19:48:51 2023//
+/ofw_regulator.h/1.8/Mon Apr 17 19:48:51 2023//
 D

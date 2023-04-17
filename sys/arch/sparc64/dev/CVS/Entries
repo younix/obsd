@@ -88,7 +88,6 @@
 /radeonfb.c/1.8/Tue Jul 26 13:42:35 2022//
 /raptor.c/1.12/Tue Jul 26 13:42:35 2022//
 /vdsk.c/1.73/Tue Jul 26 13:42:35 2022//
-/vgafb.c/1.68/Tue Jul 26 13:42:35 2022//
 /auxio.c/1.10/Mon Feb 27 09:09:55 2023//
 /beep.c/1.11/Mon Feb 27 09:09:55 2023//
 /beeper.c/1.15/Mon Feb 27 09:09:55 2023//
@@ -103,9 +102,7 @@
 /pcons.c/1.27/Mon Feb 27 09:09:55 2023//
 /power.c/1.10/Mon Feb 27 09:09:55 2023//
 /prtc.c/1.7/Mon Feb 27 09:09:55 2023//
-/psycho.c/1.82/Mon Feb 27 09:09:55 2023//
 /rtc.c/1.13/Mon Feb 27 09:09:55 2023//
-/sab.c/1.40/Mon Feb 27 09:09:55 2023//
 /sbbc.c/1.15/Mon Feb 27 09:09:55 2023//
 /stp_sbus.c/1.13/Mon Feb 27 09:09:55 2023//
 /uperf.c/1.9/Mon Feb 27 09:09:55 2023//
@@ -113,4 +110,7 @@
 /vldcp.c/1.25/Mon Feb 27 09:09:55 2023//
 /vrtc.c/1.3/Mon Feb 27 09:09:55 2023//
 /vnet.c/1.67/Mon Mar 27 08:58:35 2023//
+/psycho.c/1.83/Mon Apr 17 19:48:51 2023//
+/sab.c/1.41/Mon Apr 17 19:48:51 2023//
+/vgafb.c/1.69/Mon Apr 17 19:48:51 2023//
 D

@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_mont.c,v 1.53 2023/03/26 19:09:42 tb Exp $ */
+/* $OpenBSD: bn_mont.c,v 1.56 2023/04/07 23:03:32 tb Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -166,9 +166,9 @@ BN_MONT_CTX_copy(BN_MONT_CTX *dst, BN_MONT_CTX *src)
 	if (dst == src)
 		return dst;
 
-	if (!BN_copy(&dst->RR, &src->RR))
+	if (!bn_copy(&dst->RR, &src->RR))
 		return NULL;
-	if (!BN_copy(&dst->N, &src->N))
+	if (!bn_copy(&dst->N, &src->N))
 		return NULL;
 
 	dst->ri = src->ri;
@@ -198,7 +198,7 @@ BN_MONT_CTX_set(BN_MONT_CTX *mont, const BIGNUM *mod, BN_CTX *ctx)
 	/* Save modulus and determine length of R. */
 	if (BN_is_zero(mod))
 		goto err;
-	if (!BN_copy(&mont->N, mod))
+	if (!bn_copy(&mont->N, mod))
 		 goto err;
 	mont->N.neg = 0;
 	mont->ri = ((BN_num_bits(mod) + BN_BITS2 - 1) / BN_BITS2) * BN_BITS2;
@@ -518,7 +518,7 @@ bn_montgomery_reduce(BIGNUM *r, BIGNUM *a, BN_MONT_CTX *mctx)
 	carry = 0;
 	n0 = mctx->n0[0];
 
-	/* Add multiples of the modulus, so that it becomes divisable by R. */
+	/* Add multiples of the modulus, so that it becomes divisible by R. */
 	for (i = 0; i < n_len; i++) {
 		v = bn_mul_add_words(&a->d[i], n->d, n_len, a->d[i] * n0);
 		bn_addw_addw(v, a->d[i + n_len], carry, &carry,
@@ -561,7 +561,7 @@ BN_from_montgomery(BIGNUM *r, const BIGNUM *a, BN_MONT_CTX *mctx, BN_CTX *ctx)
 
 	if ((tmp = BN_CTX_get(ctx)) == NULL)
 		goto err;
-	if (BN_copy(tmp, a) == NULL)
+	if (!bn_copy(tmp, a))
 		goto err;
 	if (!bn_montgomery_reduce(r, tmp, mctx))
 		goto err;

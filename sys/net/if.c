@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.685 2023/03/07 20:09:48 jan Exp $	*/
+/*	$OpenBSD: if.c,v 1.688 2023/04/08 13:49:38 mvs Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -753,6 +753,27 @@ if_enqueue_ifq(struct ifnet *ifp, struct mbuf *m)
 }
 
 void
+if_mqoutput(struct ifnet *ifp, struct mbuf_queue *mq, unsigned int *total,
+    struct sockaddr *dst, struct rtentry *rt)
+{
+	struct mbuf_list ml;
+	struct mbuf *m;
+	unsigned int len;
+
+	mq_delist(mq, &ml);
+	len = ml_len(&ml);
+	while ((m = ml_dequeue(&ml)) != NULL)
+		ifp->if_output(ifp, m, rt_key(rt), rt);
+
+	/* XXXSMP we also discard if other CPU enqueues */
+	if (mq_len(mq) > 0) {
+		/* mbuf is back in queue. Discard. */
+		atomic_sub_int(total, len + mq_purge(mq));
+	} else
+		atomic_sub_int(total, len);
+}
+
+void
 if_input(struct ifnet *ifp, struct mbuf_list *ml)
 {
 	ifiq_input(&ifp->if_rcv, ml);
@@ -906,11 +927,8 @@ if_netisr(void *unused)
 		atomic_clearbits_int(&netisr, n);
 
 #if NETHER > 0
-		if (n & (1 << NETISR_ARP)) {
-			KERNEL_LOCK();
+		if (n & (1 << NETISR_ARP))
 			arpintr();
-			KERNEL_UNLOCK();
-		}
 #endif
 		if (n & (1 << NETISR_IP))
 			ipintr();
@@ -1107,11 +1125,11 @@ if_detach(struct ifnet *ifp)
 #ifdef INET6
 	nd6_ifdetach(ifp);
 #endif
+	splx(s);
+	NET_UNLOCK();
 
 	/* Announce that the interface is gone. */
 	rtm_ifannounce(ifp, IFAN_DEPARTURE);
-	splx(s);
-	NET_UNLOCK();
 
 	if (ifp->if_counters != NULL)
 		if_counters_free(ifp);

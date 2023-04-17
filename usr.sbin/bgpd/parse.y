@@ -1,4 +1,4 @@
-/*	$OpenBSD: parse.y,v 1.442 2023/03/09 13:12:19 claudio Exp $ */
+/*	$OpenBSD: parse.y,v 1.446 2023/04/05 08:37:21 claudio Exp $ */
 
 /*
  * Copyright (c) 2002, 2003, 2004 Henning Brauer <henning@openbsd.org>
@@ -37,6 +37,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <limits.h>
+#include <netdb.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -88,24 +89,6 @@ struct sym {
 };
 int		 symset(const char *, const char *, int);
 char		*symget(const char *);
-
-static struct bgpd_config	*conf;
-static struct network_head	*netconf;
-static struct peer_head		*new_peers, *cur_peers;
-static struct rtr_config_head	*cur_rtrs;
-static struct peer		*curpeer;
-static struct peer		*curgroup;
-static struct rde_rib		*currib;
-static struct l3vpn		*curvpn;
-static struct prefixset		*curpset, *curoset;
-static struct roa_tree		*curroatree;
-static struct rtr_config	*currtr;
-static struct filter_head	*filter_l;
-static struct filter_head	*peerfilter_l;
-static struct filter_head	*groupfilter_l;
-static struct filter_rule	*curpeer_filter[2];
-static struct filter_rule	*curgroup_filter[2];
-static int			 noexpires;
 
 struct filter_rib_l {
 	struct filter_rib_l	*next;
@@ -179,6 +162,25 @@ static void	 add_roa_set(struct prefixset_item *, uint32_t, uint8_t,
 static struct rtr_config	*get_rtr(struct bgpd_addr *);
 static int	 insert_rtr(struct rtr_config *);
 static int	 merge_aspa_set(uint32_t, struct aspa_tas_l *, time_t);
+static int	 getservice(char *);
+
+static struct bgpd_config	*conf;
+static struct network_head	*netconf;
+static struct peer_head		*new_peers, *cur_peers;
+static struct rtr_config_head	*cur_rtrs;
+static struct peer		*curpeer;
+static struct peer		*curgroup;
+static struct rde_rib		*currib;
+static struct l3vpn		*curvpn;
+static struct prefixset		*curpset, *curoset;
+static struct roa_tree		*curroatree;
+static struct rtr_config	*currtr;
+static struct filter_head	*filter_l;
+static struct filter_head	*peerfilter_l;
+static struct filter_head	*groupfilter_l;
+static struct filter_rule	*curpeer_filter[2];
+static struct filter_rule	*curgroup_filter[2];
+static int			 noexpires;
 
 typedef struct {
 	union {
@@ -213,7 +215,7 @@ typedef struct {
 %}
 
 %token	AS ROUTERID HOLDTIME YMIN LISTEN ON FIBUPDATE FIBPRIORITY RTABLE
-%token	NONE UNICAST VPN RD EXPORT EXPORTTRGT IMPORTTRGT DEFAULTROUTE
+%token	NONE UNICAST VPN FLOWSPEC RD EXPORT EXPORTTRGT IMPORTTRGT DEFAULTROUTE
 %token	RDE RIB EVALUATE IGNORE COMPARE RTR PORT
 %token	GROUP NEIGHBOR NETWORK
 %token	EBGP IBGP
@@ -243,10 +245,11 @@ typedef struct {
 %token	<v.string>		STRING
 %token	<v.number>		NUMBER
 %type	<v.number>		asnumber as4number as4number_any optnumber
-%type	<v.number>		espah family safi restart origincode nettype
+%type	<v.number>		espah af safi restart origincode nettype
 %type	<v.number>		yesno inout restricted expires enforce
 %type	<v.number>		validity aspa_validity
 %type	<v.number>		addpathextra addpathmax
+%type	<v.number>		port
 %type	<v.string>		string
 %type	<v.addr>		address
 %type	<v.prefix>		prefix addrspec
@@ -278,6 +281,8 @@ grammar		: /* empty */
 		| grammar origin_set '\n'
 		| grammar rtr '\n'
 		| grammar rib '\n'
+		| grammar network '\n'
+		| grammar mrtdump '\n'
 		| grammar conf_main '\n'
 		| grammar l3vpn '\n'
 		| grammar neighbor '\n'
@@ -637,7 +642,7 @@ aspa_tas	: as4number_any {
 			$$->aid = AID_UNSPEC;
 			$$->num = 1;
 		}
-		| as4number_any family {
+		| as4number_any af {
 			if (($$ = calloc(1, sizeof(*$$))) == NULL)
 				fatal(NULL);
 			$$->as = $1;
@@ -690,12 +695,7 @@ rtropt		: DESCR STRING		{
 			}
 			currtr->local_addr = $2;
 		}
-		| PORT NUMBER {
-			if ($2 < 1 || $2 > USHRT_MAX) {
-				yyerror("port must be between %u and %u",
-				    1, USHRT_MAX);
-				YYERROR;
-			}
+		| PORT port {
 			currtr->remote_port = $2;
 		}
 		;
@@ -748,15 +748,9 @@ conf_main	: AS as4number		{
 			memcpy(&la->sa, sa, la->sa_len);
 			TAILQ_INSERT_TAIL(conf->listen_addrs, la, entry);
 		}
-		| LISTEN ON address PORT NUMBER	{
+		| LISTEN ON address PORT port	{
 			struct listen_addr	*la;
 			struct sockaddr		*sa;
-
-			if ($5 < 1 || $5 > USHRT_MAX) {
-				yyerror("port must be between %u and %u",
-				    1, USHRT_MAX);
-				YYERROR;
-			}
 
 			if ((la = calloc(1, sizeof(struct listen_addr))) ==
 			    NULL)
@@ -807,7 +801,6 @@ conf_main	: AS as4number		{
 			}
 			free($2);
 		}
-		| network
 		| DUMP STRING STRING optnumber		{
 			int action;
 
@@ -868,7 +861,6 @@ conf_main	: AS as4number		{
 			free($3);
 			free($5);
 		}
-		| mrtdump
 		| RDE STRING EVALUATE		{
 			if (!strcmp($2, "route-age"))
 				conf->flags |= BGPD_FLAG_DECISION_ROUTEAGE;
@@ -1085,14 +1077,14 @@ network		: NETWORK prefix filter_set	{
 			free($3);
 			free($4);
 		}
-		| NETWORK family RTLABEL STRING filter_set	{
+		| NETWORK af RTLABEL STRING filter_set	{
 			struct network	*n;
 
 			if ((n = calloc(1, sizeof(struct network))) == NULL)
 				fatal("new_network");
 			if (afi2aid($2, SAFI_UNICAST, &n->net.prefix.aid) ==
 			    -1) {
-				yyerror("unknown family");
+				yyerror("unknown address family");
 				filterset_free($5);
 				free($5);
 				YYERROR;
@@ -1104,7 +1096,7 @@ network		: NETWORK prefix filter_set	{
 
 			TAILQ_INSERT_TAIL(netconf, n, entry);
 		}
-		| NETWORK family PRIORITY NUMBER filter_set	{
+		| NETWORK af PRIORITY NUMBER filter_set	{
 			struct network	*n;
 			if (!kr_check_prio($4)) {
 				yyerror("priority %lld out of range", $4);
@@ -1115,7 +1107,7 @@ network		: NETWORK prefix filter_set	{
 				fatal("new_network");
 			if (afi2aid($2, SAFI_UNICAST, &n->net.prefix.aid) ==
 			    -1) {
-				yyerror("unknown family");
+				yyerror("unknown address family");
 				filterset_free($5);
 				free($5);
 				YYERROR;
@@ -1127,14 +1119,14 @@ network		: NETWORK prefix filter_set	{
 
 			TAILQ_INSERT_TAIL(netconf, n, entry);
 		}
-		| NETWORK family nettype filter_set	{
+		| NETWORK af nettype filter_set	{
 			struct network	*n;
 
 			if ((n = calloc(1, sizeof(struct network))) == NULL)
 				fatal("new_network");
 			if (afi2aid($2, SAFI_UNICAST, &n->net.prefix.aid) ==
 			    -1) {
-				yyerror("unknown family");
+				yyerror("unknown address family");
 				filterset_free($4);
 				free($4);
 				YYERROR;
@@ -1147,12 +1139,30 @@ network		: NETWORK prefix filter_set	{
 		}
 		;
 
+port		: NUMBER			{
+			if ($1 < 1 || $1 > USHRT_MAX) {
+				yyerror("port must be between %u and %u",
+				    1, USHRT_MAX);
+				YYERROR;
+			}
+			$$ = $1;
+		}
+		| STRING			{
+			if (($$ = getservice($1)) == -1) {
+				yyerror("unknown port '%s'", $1);
+				free($1);
+				YYERROR;
+			}
+			free($1);
+		}
+		;
+
 inout		: IN		{ $$ = 1; }
 		| OUT		{ $$ = 0; }
 		;
 
-restricted	: RESTRICTED	{ $$ = 1; }
-		| /* nothing */	{ $$ = 0; }
+restricted	: /* empty */	{ $$ = 0; }
+		| RESTRICTED	{ $$ = 1; }
 		;
 
 address		: STRING		{
@@ -1553,7 +1563,7 @@ peeropts	: REMOTEAS as4number	{
 			}
 			curpeer->conf.min_holdtime = $3;
 		}
-		| ANNOUNCE family safi {
+		| ANNOUNCE af safi {
 			uint8_t		aid, safi;
 			uint16_t	afi;
 
@@ -1954,12 +1964,7 @@ peeropts	: REMOTEAS as4number	{
 			else
 				curpeer->conf.flags &= ~PEERFLAG_NO_AS_SET;
 		}
-		| PORT NUMBER {
-			if ($2 < 1 || $2 > USHRT_MAX) {
-				yyerror("port must be between %u and %u",
-				    1, USHRT_MAX);
-				YYERROR;
-			}
+		| PORT port {
 			curpeer->conf.remote_port = $2;
 		}
 		| RDE EVALUATE STRING {
@@ -1988,13 +1993,14 @@ restart		: /* nada */		{ $$ = 0; }
 		}
 		;
 
-family		: IPV4	{ $$ = AFI_IPv4; }
+af		: IPV4	{ $$ = AFI_IPv4; }
 		| IPV6	{ $$ = AFI_IPv6; }
 		;
 
 safi		: NONE		{ $$ = SAFI_NONE; }
 		| UNICAST	{ $$ = SAFI_UNICAST; }
 		| VPN		{ $$ = SAFI_MPLSVPN; }
+		| FLOWSPEC	{ $$ = SAFI_FLOWSPEC; }
 		;
 
 nettype		: STATIC { $$ = 1; }
@@ -3200,6 +3206,7 @@ lookup(char *s)
 		{ "ext-community",	EXTCOMMUNITY},
 		{ "fib-priority",	FIBPRIORITY},
 		{ "fib-update",		FIBUPDATE},
+		{ "flowspec",		FLOWSPEC},
 		{ "from",		FROM},
 		{ "group",		GROUP},
 		{ "holdtime",		HOLDTIME},
@@ -5149,4 +5156,17 @@ merge_aspa_set(uint32_t as, struct aspa_tas_l *tas, time_t expires)
 		aspa->expires = expires;
 
 	return 0;
+}
+
+static int
+getservice(char *n)
+{
+	struct servent	*s;
+
+	s = getservbyname(n, "tcp");
+	if (s == NULL)
+		s = getservbyname(n, "udp");
+	if (s == NULL)
+		return -1;
+	return s->s_port;
 }

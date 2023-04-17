@@ -14,14 +14,12 @@
 /nsphyreg.h/1.4/Thu Jun 26 05:42:16 2008//
 /nsphyterreg.h/1.2/Thu Jun 26 05:42:16 2008//
 /qsphyreg.h/1.4/Thu Jun 26 05:42:16 2008//
-/rgephyreg.h/1.9/Tue Feb 27 19:47:10 2018//
 /sqphyreg.h/1.5/Sun Aug 31 09:54:32 2008//
 /tlphyvar.h/1.2/Thu Jun 26 05:42:16 2008//
 /tqphyreg.h/1.2/Sat May  4 11:30:06 2002//
 /ukphy_subr.c/1.10/Fri Oct 24 16:50:01 2008//
 /urlphyreg.h/1.2/Wed Sep 29 09:51:07 2004//
 /xmphyreg.h/1.6/Sun Jul 19 06:28:12 2015//
-/miivar.h/1.36/Sat May  1 08:41:51 2021//
 /bmtphyreg.h/1.4/Mon Jan 24 14:35:14 2022//
 /brgphyreg.h/1.19/Mon Jan 24 14:35:14 2022//
 /ciphyreg.h/1.4/Mon Jan 24 14:35:14 2022//
@@ -47,8 +45,6 @@
 /jmphy.c/1.7/Tue Jul 26 13:42:35 2022//
 /luphy.c/1.7/Tue Jul 26 13:42:35 2022//
 /lxtphy.c/1.23/Tue Jul 26 13:42:35 2022//
-/miidevs/1.131/Tue Jul 26 13:42:35 2022//
-/miidevs.h/1.134/Tue Jul 26 13:42:35 2022//
 /mlphy.c/1.6/Tue Jul 26 13:42:35 2022//
 /mtdphy.c/1.16/Tue Jul 26 13:42:35 2022//
 /nsgphy.c/1.26/Tue Jul 26 13:42:35 2022//
@@ -56,12 +52,10 @@
 /nsphyter.c/1.20/Tue Jul 26 13:42:35 2022//
 /qsphy.c/1.22/Tue Jul 26 13:42:35 2022//
 /rdcphy.c/1.5/Tue Jul 26 13:42:35 2022//
-/rgephy.c/1.41/Tue Jul 26 13:42:35 2022//
 /rlphy.c/1.34/Tue Jul 26 13:42:35 2022//
 /sqphy.c/1.22/Tue Jul 26 13:42:35 2022//
 /tlphy.c/1.22/Tue Jul 26 13:42:35 2022//
 /tqphy.c/1.19/Tue Jul 26 13:42:35 2022//
-/txphy.c/1.12/Tue Jul 26 13:42:35 2022//
 /ukphy.c/1.25/Tue Jul 26 13:42:35 2022//
 /urlphy.c/1.18/Tue Jul 26 13:42:35 2022//
 /xmphy.c/1.24/Tue Jul 26 13:42:35 2022//
@@ -69,4 +63,10 @@
 /devlist2h.awk/1.3/Mon Feb 27 09:09:55 2023//
 /files.mii/1.33/Tue Mar  7 18:59:12 2023//
 /ytphy.c/1.2/Sat Mar  4 22:40:37 2023//
+/miidevs/1.132/Mon Apr 17 19:48:51 2023//
+/miidevs.h/1.135/Mon Apr 17 19:48:51 2023//
+/miivar.h/1.37/Mon Apr 17 19:48:51 2023//
+/rgephy.c/1.43/Mon Apr 17 19:48:51 2023//
+/rgephyreg.h/1.10/Mon Apr 17 19:48:51 2023//
+/txphy.c/1.13/Mon Apr 17 19:48:51 2023//
 D

@@ -12,7 +12,6 @@
 /qereg.h/1.4/Thu Jun 26 05:42:18 2008//
 /sbusvar.h/1.14/Sun Sep  4 18:20:34 2016//
 /spifreg.h/1.5/Mon Jun  2 18:32:41 2003//
-/stp4020.c/1.22/Tue Feb 18 00:10:22 2020//
 /stp4020reg.h/1.7/Thu Jun 26 05:42:18 2008//
 /stp4020var.h/1.5/Fri Apr 10 20:54:59 2009//
 /uperf_sbusreg.h/1.3/Mon Jun  2 18:32:41 2003//
@@ -52,4 +51,5 @@
 /dma_sbus.c/1.19/Mon Feb 27 09:09:58 2023//
 /qe.c/1.43/Mon Feb 27 09:09:58 2023//
 /qec.c/1.17/Mon Feb 27 09:09:58 2023//
+/stp4020.c/1.23/Mon Apr 17 19:48:53 2023//
 D

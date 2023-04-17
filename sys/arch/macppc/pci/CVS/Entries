@@ -4,9 +4,9 @@
 /pci_machdep.c/1.7/Mon Jul  4 09:30:18 2016//
 /pciide_machdep.c/1.4/Mon Dec 12 18:25:47 2005//
 /ht.c/1.19/Tue Jul 26 13:42:34 2022//
-/kauaiata.c/1.11/Tue Jul 26 13:42:34 2022//
 /macobio.c/1.23/Tue Jul 26 13:42:34 2022//
 /mpcpcibus.c/1.49/Tue Jul 26 13:42:34 2022//
-/vgafb.c/1.64/Mon Feb 27 09:09:55 2023//
 /pchb.c/1.17/Mon Mar 27 08:58:34 2023//
+/kauaiata.c/1.12/Mon Apr 17 19:48:50 2023//
+/vgafb.c/1.65/Mon Apr 17 19:48:50 2023//
 D

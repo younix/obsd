@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmd.h,v 1.114 2023/01/28 14:40:53 dv Exp $	*/
+/*	$OpenBSD: vmd.h,v 1.116 2023/04/16 12:47:26 dv Exp $	*/
 
 /*
  * Copyright (c) 2015 Mike Larkin <mlarkin@openbsd.org>
@@ -286,7 +286,7 @@ struct vmd_vm {
 	int			 vm_cdrom;
 	int			 vm_disks[VM_MAX_DISKS_PER_VM][VM_MAX_BASE_PER_DISK];
 	struct vmd_if		 vm_ifs[VM_MAX_NICS_PER_VM];
-	char			*vm_ttyname;
+	char			 vm_ttyname[VM_TTYNAME_MAX];
 	int			 vm_tty;
 	uint32_t		 vm_peerid;
 	/* When set, VM was defined in a config file */
@@ -443,6 +443,7 @@ char	*get_string(uint8_t *, size_t);
 uint32_t prefixlen2mask(uint8_t);
 void	 prefixlen2mask6(u_int8_t, struct in6_addr *);
 void	 getmonotime(struct timeval *);
+int	 close_fd(int);
 
 /* priv.c */
 void	 priv(struct privsep *, struct privsep_proc *);
